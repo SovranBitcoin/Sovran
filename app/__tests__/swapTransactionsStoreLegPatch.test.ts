@@ -94,7 +94,7 @@ describe('swap leg patching', () => {
     expect(Object.keys(state.quoteIdToGroup)).toHaveLength(0);
   });
 
-  it('keeps an existing error message while failed and clears it on recovery', () => {
+  it('keeps an existing error message while failed and clears it when a new attempt starts', () => {
     const { groupId, legA } = freshGroup();
     const legOf = () =>
       useSwapTransactionsStore
@@ -110,9 +110,83 @@ describe('swap leg patching', () => {
     useSwapTransactionsStore.getState().setLegStatus(groupId, legA, { localStatus: 'failed' });
     expect(legOf().errorMessage).toBe('mint offline');
 
+    // A failed leg goes again through a new invoice, not straight to done.
     useSwapTransactionsStore.getState().setLegStatus(groupId, legA, { localStatus: 'done' });
+    expect(legOf()).toMatchObject({ localStatus: 'failed', errorMessage: 'mint offline' });
+
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legA, { localStatus: 'creatingInvoice' });
     expect(legOf().errorMessage).toBeUndefined();
-    expect(legOf().localStatus).toBe('done');
+    expect(legOf().localStatus).toBe('creatingInvoice');
+  });
+
+  it('follows a transfer through to done, and keeps a done leg done', () => {
+    const { groupId, legA } = freshGroup();
+    const path = [
+      'pending',
+      'creatingInvoice',
+      'invoiceReady',
+      'invoiceReady',
+      'melting',
+      'verifying',
+      'done',
+    ] as const;
+    for (const localStatus of path) {
+      useSwapTransactionsStore.getState().setLegStatus(groupId, legA, { localStatus });
+    }
+    expect(useSwapTransactionsStore.getState().getGroup(groupId)!.legs[0].localStatus).toBe('done');
+
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legA, { localStatus: 'failed', errorMessage: 'late' });
+    useSwapTransactionsStore.getState().setLegStatus(groupId, legA, { localStatus: 'settling' });
+
+    expect(
+      useSwapTransactionsStore
+        .getState()
+        .getGroup(groupId)!
+        .legs.find((l) => l.id === legA)
+    ).toMatchObject({ localStatus: 'done', errorMessage: undefined });
+  });
+
+  it('never moves a leg whose money has left back to before its melt', () => {
+    const { groupId, legA } = freshGroup();
+    const set = (localStatus: 'melting' | 'paymentPending' | 'pending' | 'creatingInvoice') =>
+      useSwapTransactionsStore.getState().setLegStatus(groupId, legA, { localStatus });
+    set('pending');
+    set('melting');
+    set('paymentPending');
+
+    set('pending');
+    set('creatingInvoice');
+
+    expect(useSwapTransactionsStore.getState().getGroup(groupId)!.legs[0].localStatus).toBe(
+      'paymentPending'
+    );
+  });
+
+  it('clips a new error message to 2048 characters, from a status or a new leg', () => {
+    const { groupId, legA, legB } = freshGroup();
+    const legOf = (legId: string) =>
+      useSwapTransactionsStore
+        .getState()
+        .getGroup(groupId)!
+        .legs.find((l) => l.id === legId)!;
+
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legA, { localStatus: 'failed', errorMessage: 'e'.repeat(2049) });
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legB, { localStatus: 'failed', errorMessage: 'f'.repeat(2048) });
+    const added = useSwapTransactionsStore
+      .getState()
+      .addLeg(groupId, { ...leg(7), localStatus: 'failed', errorMessage: 'g'.repeat(5000) });
+
+    expect(legOf(legA).errorMessage).toBe('e'.repeat(2048));
+    expect(legOf(legB).errorMessage).toBe('f'.repeat(2048));
+    expect(legOf(added).errorMessage).toBe('g'.repeat(2048));
   });
 
   it('leaves other groups untouched', () => {
@@ -125,5 +199,41 @@ describe('swap leg patching', () => {
 
     const untouched = useSwapTransactionsStore.getState().getGroup(second.groupId)!;
     expect(untouched.legs.every((l) => l.localStatus === undefined)).toBe(true);
+  });
+});
+
+describe('swap group moves', () => {
+  const stateOf = (groupId: string) => useSwapTransactionsStore.getState().getGroup(groupId)!.state;
+
+  it('ends a running group once: finished and cancelled never replace each other', () => {
+    const { groupId } = freshGroup();
+    const store = useSwapTransactionsStore.getState();
+
+    store.finalizeGroup(groupId, 'cancelled');
+    store.finalizeGroup(groupId, 'finished');
+
+    expect(stateOf(groupId)).toBe('cancelled');
+  });
+
+  it('reopens an ended group for a retry, which then ends it again', () => {
+    const { groupId } = freshGroup();
+    const store = useSwapTransactionsStore.getState();
+    store.finalizeGroup(groupId, 'cancelled');
+
+    store.reopenGroup(groupId);
+    expect(stateOf(groupId)).toBe('running');
+    store.finalizeGroup(groupId, 'finished');
+
+    expect(stateOf(groupId)).toBe('finished');
+  });
+
+  it('leaves a running group running when asked to reopen it, and ignores a missing group', () => {
+    const { groupId } = freshGroup();
+    const before = useSwapTransactionsStore.getState().groups;
+
+    useSwapTransactionsStore.getState().reopenGroup(groupId);
+    useSwapTransactionsStore.getState().finalizeGroup('missing-group', 'finished');
+
+    expect(useSwapTransactionsStore.getState().groups).toBe(before);
   });
 });

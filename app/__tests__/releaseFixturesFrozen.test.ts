@@ -8,12 +8,17 @@
  * migration; editing the stored data would make the failure go away and the
  * loss ship. This pins the stored data of every released fixture by hash.
  *
- * The newest fixture is the one this tree would ship as and is still being
- * written, so it is not pinned until a newer one is added.
+ * The newest fixture may evolve only while unreleased and uninstalled. Once a
+ * published observation or installable build names its version, it is pinned too.
  */
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { RELEASE_FIXTURES } from './releaseFixtures';
+import published from './releaseFixtures/published.json';
+import { catalogSchema, easBuilds } from '../scripts/persistence/releases';
+import { fixturesRequiringFreeze } from '../scripts/persistence/freeze';
 import { FROZEN_FIXTURE_DATA } from './releaseFixtures/frozen';
 import type { ReleaseFixture } from './releaseFixtures/format';
 
@@ -38,7 +43,12 @@ function storedDataHash(fixture: ReleaseFixture): string {
     .digest('hex');
 }
 
-const released = RELEASE_FIXTURES.slice(0, -1);
+const released = fixturesRequiringFreeze(RELEASE_FIXTURES, [
+  ...catalogSchema.parse(published).observations,
+  ...easBuilds(
+    readFileSync(join(__dirname, '../../docs/architecture/persistence/store-builds.tsv'), 'utf8')
+  ),
+]);
 
 it.each(released.map((fixture) => [fixture.epoch, fixture] as const))(
   '%s holds the data it was released with',

@@ -239,30 +239,12 @@ export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   vertexFresh: z.boolean().nullish(),
 });
 
-const FollowEdge = z.object({ out: z.boolean(), in: z.boolean() });
-
-export const NaggFollowStatusEnvelopeSchema = NaggEnvelopeSchema.extend({
-  // Keyed by pubkey and read one at a time, like the providers.
-  edges: z
-    .record(z.string(), z.unknown())
-    .nullish()
-    .transform((v): Record<string, { out: boolean; in: boolean }> => {
-      const out: Record<string, { out: boolean; in: boolean }> = {};
-      for (const [pubkey, raw] of Object.entries(v ?? {})) {
-        const parsed = FollowEdge.safeParse(raw);
-        if (parsed.success && NostrHexId.safeParse(pubkey).success) out[pubkey] = parsed.data;
-      }
-      return out;
-    }),
-});
-
 export type NaggAggregates = Record<string, Record<string, Record<string, number>>>;
 export type NaggEnvelope = z.infer<typeof NaggEnvelopeSchema>;
 export type NaggNotificationEntry = z.infer<typeof NaggNotificationEntrySchema>;
 export type NaggNotificationsEnvelope = z.infer<typeof NaggNotificationsEnvelopeSchema>;
 export type NaggIdentity = z.infer<typeof NaggIdentitySchema>;
 export type NaggProfilesEnvelope = z.infer<typeof NaggProfilesEnvelopeSchema>;
-export type NaggFollowStatusEnvelope = z.infer<typeof NaggFollowStatusEnvelopeSchema>;
 
 // ---------------------------------------------------------------------------
 // Aggregate rules — server rule names → the friendly fields the facade exposes
@@ -338,24 +320,6 @@ export function noteMetricsMapFromAggregates(
     if (!(id in out)) out[id] = noteMetricsFromAggregates(aggregates, id);
   }
   return out;
-}
-
-export type NaggProfileCounts = {
-  followers: number;
-  following: number;
-  postCount: number;
-};
-
-/** Friendly per-pubkey counts for the profile routes, zero-defaulted. */
-export function profileCountsFromAggregates(
-  aggregates: NaggAggregates,
-  pubkey: string,
-): NaggProfileCounts {
-  return {
-    followers: aggregateValue(aggregates, pubkey, 'followers') ?? 0,
-    following: aggregateValue(aggregates, pubkey, 'following') ?? 0,
-    postCount: aggregateValue(aggregates, pubkey, 'postCount') ?? 0,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -604,8 +568,7 @@ function feedItemContentEvents(items: readonly NaggFeedItem[]): NaggFeedEvent[] 
 
 /**
  * Rebuild the canonical `NaggFeedPage` (v1's feed shape, which the facade's
- * `bundleFromFeedPage` and the app's `mapNaggFeedPage` already consume) from a
- * v2 envelope. The ordering manifest carries the FULL server order — including
+ * `bundleFromFeedPage` consumes) from a v2 envelope. The ordering manifest carries the FULL server order — including
  * anchors whose events were not hydrated — so the facade can surface
  * `missingIds` for lazy backfill.
  */
@@ -852,11 +815,6 @@ export function notificationsPageFromEnvelope(
 // Simple per-route reconstructions
 // ---------------------------------------------------------------------------
 
-/** v1's `/nostr/notes/stats` map, now served by `POST /nostr/events/aggregates`. */
-export function noteStatsFromEnvelope(envelope: NaggEnvelope): Record<string, NaggNoteMetrics> {
-  return noteMetricsMapFromAggregates(envelope.aggregates);
-}
-
 /** v1's enrichment side maps (`/nostr/events` + `/nostr/profiles` consumers). */
 export type NaggEnrichment = {
   metrics: Record<string, NaggNoteMetrics>;
@@ -875,89 +833,4 @@ export function enrichmentFromEnvelope(envelope: NaggEnvelope): NaggEnrichment {
     profiles: profileInfoMapFromEnvelope(envelope),
     quoted,
   };
-}
-
-export type NaggFollowStatusEdgeRow = {
-  pubkey: string;
-  following: boolean;
-  followsYou: boolean;
-  mutual: boolean;
-  relationship: 'following' | 'follows_you' | 'mutual' | 'none';
-};
-
-/** Derive v1's follow-status rows from the v2 `edges` map (mutual = out && in). */
-export function followStatusRowsFromEnvelope(
-  envelope: NaggFollowStatusEnvelope,
-): NaggFollowStatusEdgeRow[] {
-  return Object.entries(envelope.edges).map(([pubkey, edge]) => {
-    const mutual = edge.out && edge.in;
-    return {
-      pubkey,
-      following: edge.out,
-      followsYou: edge.in,
-      mutual,
-      relationship: mutual
-        ? 'mutual'
-        : edge.out
-          ? 'following'
-          : edge.in
-            ? 'follows_you'
-            : 'none',
-    };
-  });
-}
-
-export type NaggOwnProfileRow = ProfileMetadata & {
-  pubkey: string;
-  followers: number;
-  follows: number;
-  createdAtSec?: number;
-};
-
-/** v1's own-profiles rows: kind-0 metadata + follower/following aggregates. */
-export function ownProfilesFromEnvelope(envelope: NaggProfilesEnvelope): NaggOwnProfileRow[] {
-  const kind0 = latestKind0ByPubkey(envelope);
-  const pubkeys = new Set<string>([
-    ...(envelope.pubkeys ?? []),
-    ...kind0.keys(),
-    ...Object.keys(envelope.aggregates),
-  ]);
-  const rows: NaggOwnProfileRow[] = [];
-  for (const pubkey of pubkeys) {
-    const event = kind0.get(pubkey);
-    const metadata = event ? parseProfileMetadata(event.content) : null;
-    const counts = profileCountsFromAggregates(envelope.aggregates, pubkey);
-    rows.push({
-      pubkey,
-      ...(metadata ?? {}),
-      followers: counts.followers,
-      follows: counts.following,
-      ...(event ? { createdAtSec: event.created_at } : {}),
-    });
-  }
-  return rows;
-}
-
-/**
- * Parse the `/nostr/notifications/seen` marker (a kind-30078 event whose
- * content carries the seen-until watermark). Accepts a bare number, a numeric
- * string, or `{ "seenUntil": <n> }`. Null when the envelope has no marker.
- */
-export function seenUntilFromEnvelope(envelope: NaggEnvelope): number | null {
-  const marker = envelope.events.find((e) => e.kind === 30_078) ?? envelope.events[0];
-  if (!marker) return null;
-  const content = marker.content.trim();
-  const direct = Number(content);
-  if (content.length > 0 && Number.isFinite(direct)) return direct;
-  try {
-    const json: unknown = JSON.parse(content);
-    if (typeof json === 'number' && Number.isFinite(json)) return json;
-    if (typeof json === 'object' && json !== null) {
-      const value = (json as Record<string, unknown>).seenUntil;
-      if (typeof value === 'number' && Number.isFinite(value)) return value;
-    }
-  } catch {
-    return null;
-  }
-  return null;
 }

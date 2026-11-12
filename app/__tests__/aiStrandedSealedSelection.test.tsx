@@ -63,6 +63,7 @@ jest.mock('@/shared/lib/apiClient', () => ({ getAiLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: {
     getState: () => ({ activeAccountIndex: 0, profiles: [{ accountIndex: 0 }] }),
+    subscribe: () => () => undefined,
   },
 }));
 jest.mock('@/shared/lib/routstr/api', () => ({

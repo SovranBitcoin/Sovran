@@ -36,7 +36,6 @@ function code(relativePath: string): string {
 const REACT_FILES = [
   "react/ColadaProvider.tsx",
   "react/useColadaTransactions.ts",
-  "react/usePaymentMachine.ts",
   "react/useScreenActions.ts",
 ];
 

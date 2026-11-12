@@ -7,10 +7,11 @@
  * scope; layout-owned `Stack.Screen` titles stay in the surrounding
  * `_layout.tsx` so we have one canonical declaration per screen name.
  *
- * Validates the JSON-encoded `sendHistoryEntry` deep-link param at the
- * route boundary per AUDIT.md dim-5 (audit 23#F-002, 18#F-002): the param
- * is `JSON.parse`d by the screen, so an attacker-crafted link could
- * otherwise crash the screen or render a spoofed history entry.
+ * Bounds the JSON-encoded `sendHistoryEntry` deep-link param at the route
+ * boundary: a non-empty string of at most 64,000 characters. The shell does
+ * not parse it or check what it holds. The string is passed through to
+ * `SendTokenScreen`, which decodes it via `useScreenActions`; a seed that
+ * does not decode comes back as the screen's error.
  * `mintWasOffline` is preserved across all three routes so reopening an
  * offline-created send from the transactions list keeps the warning
  * banner (audit 19#F-001).

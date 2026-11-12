@@ -6,15 +6,22 @@ import { resolveInboxRelays } from '../client/network';
 import { AsyncStorageKVBackend } from '../storage/asyncStorageBackend';
 import { WhitenoiseNamespace, whitenoisePrefix } from '../storage/namespaces';
 import { wnLog } from '@/shared/lib/logger';
+import { relays as appRelays } from '@/shared/ndk';
 
 type GiftWrapEvent = Parameters<InviteReader['ingestEvent']>[0];
 
 const GIFT_WRAP_KIND = 1059;
 const CURSOR_KEY = 'last-seen-at';
-// Seconds. NIP-01 `since` is inclusive of the boundary; one minute of
-// overlap absorbs relay clock skew without re-downloading more than a
-// negligible window.
-const CURSOR_SLACK_SECONDS = 60;
+/**
+ * How far before the newest gift wrap seen the inbox asks relays to start, in
+ * seconds: three days. A gift wrap's `created_at` is not when it was sent.
+ * The sender moves it back at random, by up to two days (NIP-59; Marmot moves
+ * a Welcome back by up to an hour), so an invitation sent after the newest
+ * wrap seen can carry an earlier date. Two days of backdating plus a day for
+ * relay clocks and a late delivery. Wraps fetched again are dropped by the
+ * invite reader's saved `seen` list before anything is decrypted.
+ */
+const INVITE_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 
 /**
  * Long-running subscription that watches for incoming gift-wrapped events
@@ -32,13 +39,14 @@ const CURSOR_SLACK_SECONDS = 60;
  * account scope.
  */
 export function useWhitenoiseInbox() {
-  const { client, inviteReader, relays, accountIndex } = useWhitenoise();
+  const { client, inviteReader, accountIndex } = useWhitenoise();
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey;
 
   // Persist the latest `created_at` we've ingested so subsequent cold
   // starts subscribe with `since:` and don't re-download every historical
-  // gift wrap. Per-account so profile switches don't share cursors.
+  // gift wrap, only the last three days before it. Per-account so profile
+  // switches don't share cursors.
   const cursorStore = useMemo(
     () =>
       new AsyncStorageKVBackend<number>(
@@ -56,21 +64,34 @@ export function useWhitenoiseInbox() {
     // ingest events can update the persisted cursor without racing each
     // other on the AsyncStorage write.
     let cursorHighSec = 0;
+    // Set when the saved cursor could not be read: it may be newer than
+    // anything the backfill delivers, so it is left alone this session.
+    let cursorUnknown = false;
 
-    void (async () => {
+    const start = async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
       // back to the default app relay set.
-      const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);
+      const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, appRelays);
       if (cancelled) return;
 
       // No cursor on first cold start: full backfill once so users with
       // pre-cursor history don't silently drop unread invites. Subsequent
       // starts bound the relay-to-device fetch to events we haven't seen.
-      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY);
+      // A cursor that cannot be read is treated as none: everything is fetched
+      // once and invites already seen are skipped, rather than no inbox at all.
+      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY).catch((err: unknown) => {
+        wnLog.warn('whitenoise.inbox.cursor_read_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        cursorUnknown = true;
+        return null;
+      });
       if (cancelled) return;
       cursorHighSec = persistedCursorSec ?? 0;
       const since =
-        persistedCursorSec !== null ? persistedCursorSec - CURSOR_SLACK_SECONDS : undefined;
+        persistedCursorSec !== null
+          ? Math.max(0, persistedCursorSec - INVITE_LOOKBACK_SECONDS)
+          : undefined;
 
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
@@ -102,7 +123,12 @@ export function useWhitenoiseInbox() {
       });
 
       unsubscribe = () => handle.unsubscribe();
-    })();
+    };
+    start().catch((err: unknown) => {
+      wnLog.warn('whitenoise.inbox.start_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     async function handleGiftWrap(ev: GiftWrapEvent): Promise<void> {
       if (!ev.id || ev.kind !== GIFT_WRAP_KIND) return;
@@ -119,7 +145,7 @@ export function useWhitenoiseInbox() {
       // Skipping the write on stale events bounds AsyncStorage churn to the
       // narrow tail of newer gift wraps once we've caught up.
       const createdAtSec = typeof ev.created_at === 'number' ? ev.created_at : 0;
-      if (createdAtSec > cursorHighSec) {
+      if (createdAtSec > cursorHighSec && !cursorUnknown) {
         cursorHighSec = createdAtSec;
         cursorStore.setItem(CURSOR_KEY, cursorHighSec).catch((err) => {
           wnLog.debug('whitenoise.inbox.cursor_persist_failed', {
@@ -154,5 +180,5 @@ export function useWhitenoiseInbox() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [client, inviteReader, selfPubkey, relays, cursorStore]);
+  }, [client, inviteReader, selfPubkey, cursorStore]);
 }

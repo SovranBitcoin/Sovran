@@ -225,13 +225,6 @@ export interface UpsertAppInput {
   grants?: Partial<Record<GrantKey, Nip46Grant>>;
 }
 
-interface UpdateMetadataInput {
-  name?: string;
-  url?: string;
-  image?: string;
-  relays?: string[];
-}
-
 export type UpsertAppError = 'invalid_pubkey' | 'invalid_relays' | 'app_limit_reached';
 type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
 type SetPeerDecryptGrantError =
@@ -296,14 +289,11 @@ interface Nip46ConnectionsActions {
     opts?: { denied?: boolean; grantKey?: GrantKey; peerGrantPubkey?: string }
   ) => void;
   blockApp: (clientPubkey: string) => void;
-  unblockApp: (clientPubkey: string) => void;
   /** Deletes the record entirely (Block keeps it with status 'blocked'). */
   disconnectApp: (clientPubkey: string) => void;
   /** Deletes EVERY record — the hub's Reset Remote Login. */
   clearAll: () => void;
   renameApp: (clientPubkey: string, name: string) => void;
-  /** Re-pair metadata refresh — only call after user approval (blocks rename-phishing). */
-  updateMetadataAfterApproval: (clientPubkey: string, meta: UpdateMetadataInput) => void;
 }
 
 type Nip46ConnectionsStore = Nip46ConnectionsState & Nip46ConnectionsActions;
@@ -339,8 +329,8 @@ function sanitizeUrl(value: string | undefined, max: number): string | undefined
  * emitted only when a usable value survived — a missing or over-long value
  * leaves whatever is already stored alone rather than erasing it.
  *
- * Every path that lets a client write its own metadata (pairing, adoption,
- * post-approval refresh) spreads this, so a field can't end up sanitized on one
+ * Every path that lets a client write its own metadata (pairing, adoption)
+ * spreads this, so a field can't end up sanitized on one
  * path and raw on another.
  */
 function sanitizedAppMetadata(meta: {
@@ -635,11 +625,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
           patchApp(clientPubkey, (app) => ({ ...app, status: 'blocked' }));
         },
 
-        unblockApp: (clientPubkey) => {
-          storeLog.info('store.nip46_connections.unblock');
-          patchApp(clientPubkey, (app) => ({ ...app, status: 'active' }));
-        },
-
         disconnectApp: (clientPubkey) => {
           storeLog.info('store.nip46_connections.disconnect');
           set((state) => {
@@ -663,17 +648,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
               return rest;
             }
             return { ...app, name: sanitized };
-          });
-        },
-
-        updateMetadataAfterApproval: (clientPubkey, meta) => {
-          patchApp(clientPubkey, (app) => {
-            const relays = meta.relays ? sanitizeRelays(meta.relays) : null;
-            return {
-              ...app,
-              ...sanitizedAppMetadata(meta),
-              ...(relays !== null && { relays }),
-            };
           });
         },
       };

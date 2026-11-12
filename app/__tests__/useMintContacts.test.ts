@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { Mint } from '@cashu/coco-core';
 import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
+import type { DmConversation } from '@/features/payments/hooks/useDmConversations';
 
 jest.mock('@/shared/lib/imageCache', () => ({ prefetchImages: jest.fn(async () => {}) }));
 jest.mock('@/shared/lib/nostr/client', () => ({
@@ -118,4 +119,66 @@ it('loads every mint again when the wallet hands over a new getMintInfo', async 
   rerender({ mints, getMintInfo: after });
   await waitFor(() => expect(result.current.displayMints[0].mintInfo.name).toBe('other wallet'));
   expect(after).toHaveBeenCalledTimes(2);
+});
+
+it('clears the contacts when the last mint is removed', async () => {
+  const getMintInfo = jest.fn(async (url: string) => infoFor(url));
+  const { result, rerender } = render({ mints: [mint('a')], getMintInfo });
+  await waitFor(() => expect(result.current.displayMints).toHaveLength(1));
+
+  rerender({ mints: [], getMintInfo });
+
+  await waitFor(() => expect(result.current.displayMints).toEqual([]));
+  expect(result.current.mintPubkeys).toEqual([]);
+  expect(result.current.mintInfoLoading).toBe(false);
+});
+
+it('stops loading when the last mint is removed while its info is still being read', async () => {
+  let release!: (info: GetInfoResponse) => void;
+  const getMintInfo = jest.fn(
+    () =>
+      new Promise<GetInfoResponse>((resolve) => {
+        release = resolve;
+      })
+  );
+  const { result, rerender } = render({ mints: [mint('a')], getMintInfo });
+  await waitFor(() => expect(result.current.mintInfoLoading).toBe(true));
+
+  rerender({ mints: [], getMintInfo });
+  await act(async () => release(infoFor('https://a.example')));
+
+  expect(result.current.mintInfoLoading).toBe(false);
+  expect(result.current.displayMints).toEqual([]);
+});
+
+it('uses the npub contact that admitted the mint, not the first nostr contact', async () => {
+  const mints = [mint('a')];
+  const fields: Partial<GetInfoResponse> = {
+    name: 'a',
+    contact: [
+      { method: 'nostr', info: 'https://a.example/nostr' },
+      { method: 'nostr', info: 'npub1valid' },
+    ],
+  };
+  const info = fields as GetInfoResponse;
+  const getMintInfo = async () => info;
+  const conversations: DmConversation[] = [
+    {
+      counterparty: 'hex:npub1valid',
+      lastMessagePreview: 'hello from the mint',
+      lastMessageIsOwn: false,
+      lastMessageAtSec: 1700000000,
+      protocol: 'nip17',
+      newestMessageId: 'event-1',
+    },
+  ];
+  const { result } = renderHook(() => useMintContacts(null, mints, getMintInfo, conversations));
+  await waitFor(() => expect(result.current.displayMints).toHaveLength(1));
+
+  expect(result.current.mintPubkeys).toEqual(['hex:npub1valid']);
+  expect(result.current.displayMints[0]).toMatchObject({
+    pubkey: 'hex:npub1valid',
+    dmEvent: { content: 'hello from the mint', isOwn: false },
+    timestamp: 1700000000,
+  });
 });

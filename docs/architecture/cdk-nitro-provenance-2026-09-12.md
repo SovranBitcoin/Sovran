@@ -1,7 +1,7 @@
 # CDK Nitro package and build provenance
 
 > Historical assessment of the September 12 snapshot. The current Cashu implementation
-> follows [ADR 22](../../app/docs/adr/0022-cashu-uses-javascript-cryptography.md).
+> follows [ADR 22](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0022-cashu-uses-javascript-cryptography.md).
 
 Verified on 2026-09-12 against Sovran commit `d9ad12c4bde03b609cd90a4487c466b88007a4cb` and its installed dependency. Application code, dependency declarations, and the existing entropy audit were not changed.
 

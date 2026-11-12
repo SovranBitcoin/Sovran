@@ -121,7 +121,7 @@ describe('profile store capacity', () => {
   });
 
   it('repairs an active index no profile stands behind', () => {
-    // `getActiveProfilePubkey()` returns undefined for it, and
+    // `activePubkey()` returns undefined for it, and
     // `createProfileScopedStorage` then falls back to the BARE key — every
     // profile-scoped store silently reading and writing unscoped state shared
     // across profiles. The schema permits the shape, so the repair is on

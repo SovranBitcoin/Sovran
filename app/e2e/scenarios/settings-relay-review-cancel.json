@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "settings.relay-review-cancel",
+  "name": "Review relay changes and cancel without publishing",
+  "description": "Read the latest list, restore defaults in a draft, review, cancel and leave. Needs isolated controlled relays; never taps Publish.",
+  "details": "A controlled relay environment is required so neither discovery nor editing uses a public identity. Publication races and saved proposals are covered by deterministic component tests.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install","relay.controlled"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-menu-settings"}},
+    {"action":"tap","selector":{"id":"drawer-menu-settings"}},
+    {"action":"waitFor","selector":{"id":"settings-network-row"}},
+    {"action":"tap","selector":{"id":"settings-network-row"}},
+    {"action":"waitFor","selector":{"id":"settings-network-relay-edit"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-network-relay-edit"}},
+    {"action":"waitFor","selector":{"id":"settings-network-restore-defaults"},"timeoutMs":90000},
+    {"action":"tap","selector":{"id":"settings-network-restore-defaults"}},
+    {"action":"tap","selector":{"id":"settings-network-relay-review"}},
+    {"action":"waitFor","selector":{"id":"settings-network-relay-comparison"}},
+    {"action":"screenshot","name":"settings-network"},
+    {"action":"tap","selector":{"id":"settings-network-relay-cancel"}},
+    {"action":"waitFor","selector":{"id":"settings-network-relay-edit"}},
+    {"action":"tap","selector":{"id":"flow-header-back"}},
+    {"action":"waitFor","selector":{"id":"settings-network-row"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

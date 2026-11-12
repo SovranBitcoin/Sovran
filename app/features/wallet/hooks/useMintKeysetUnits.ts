@@ -25,8 +25,13 @@ export function useMintKeysetUnits(): Record<string, string[] | undefined> {
   useEffect(() => {
     if (!manager) return;
     let cancelled = false;
+    // Reads can overlap (a coco refresh while the first read runs); only the
+    // newest one may publish, so a slow older read cannot roll its answer back.
+    let latestRead = 0;
 
     const load = async () => {
+      latestRead += 1;
+      const read = latestRead;
       const entries = await Promise.all(
         trustedMints.map(async (mint) => {
           try {
@@ -37,7 +42,7 @@ export function useMintKeysetUnits(): Record<string, string[] | undefined> {
           }
         })
       );
-      if (cancelled) return;
+      if (cancelled || read !== latestRead) return;
       const next = Object.fromEntries(entries);
       setUnitsByMint((prev) => {
         const prevKeys = Object.keys(prev);

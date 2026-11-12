@@ -18,12 +18,10 @@ import { feedEventsEqual, feedNotificationsEqual } from './feedNotificationEqual
 /** Map the app notifications request to the facade NotificationsRequest. */
 export function toFacadeNotificationsRequest(
   request: FeedNotificationsRequest
-): facade.NotificationsRequest | null {
-  // Only the server-shaped tabs route through the facade; APP (client-only) falls back.
-  if (request.tab && request.tab !== 'ALL' && request.tab !== 'MENTIONS') return null;
+): facade.NotificationsRequest {
   return {
     viewerPubkey: request.viewerPubkey,
-    tab: request.tab as 'ALL' | 'MENTIONS' | undefined,
+    tab: request.tab,
     policy: request.policy,
     replyScope: request.replyScope,
     grouped: request.grouped,

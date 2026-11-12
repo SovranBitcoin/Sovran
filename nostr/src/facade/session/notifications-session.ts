@@ -6,6 +6,7 @@ import { nostrLog } from '../../log';
 import type { NostrEntityCache } from '../cache/entity-cache';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrCursor } from '@sovranbitcoin/schemas';
+import type { FeedLaneState } from '../feed-pager';
 import type {
   NotificationItem,
   NotificationsBundle,
@@ -37,6 +38,82 @@ export type NotificationsSessionSource = {
   fetch: (request: NotificationsRequest) => Promise<TierOutcome<NotificationsBundle>>;
 };
 
+/**
+ * Where one source stands in paging. The pager's states (`FeedLaneState`)
+ * name the same things here, plus the two only a concurrent first page has.
+ */
+type SourceState =
+  /** Its first page has not answered yet. */
+  | { state: 'pending' }
+  /** Older pages are asked for from `cursor`. */
+  | { state: Extract<FeedLaneState, 'ready'>; cursor: NonNullable<NostrCursor> }
+  /** The last older page failed; the next loadMore asks again from `cursor`. */
+  | { state: Extract<FeedLaneState, 'backoff'>; cursor: NonNullable<NostrCursor> }
+  /** The end of its history: no cursor, or one that did not move older. */
+  | { state: Extract<FeedLaneState, 'exhausted'> }
+  /** It cannot serve notifications or older pages. */
+  | { state: Extract<FeedLaneState, 'unsupported'> }
+  /**
+   * Its first page failed. QUIRK (F221): read as no history and not asked
+   * again until a refresh; asking again would fetch its newest rows, which the
+   * next reveal sorts in above rows already on screen.
+   */
+  | { state: 'failed-first-page' };
+
+/** The state a source moves to when `outcome` answers the page it was asked for. */
+function afterPage(
+  current: SourceState,
+  outcome: TierOutcome<NotificationsBundle>,
+): SourceState {
+  switch (current.state) {
+    case 'pending':
+      if (outcome.kind === 'failed') return { state: 'failed-first-page' };
+      if (outcome.kind === 'unsupported') return { state: 'unsupported' };
+      return outcome.value.cursor
+        ? { state: 'ready', cursor: outcome.value.cursor }
+        : { state: 'exhausted' };
+    case 'ready':
+    case 'backoff': {
+      // A failed page (timeout, network, a 5xx) says nothing about the end of
+      // history: keep the cursor, as the feed pager does.
+      if (outcome.kind === 'failed') return { state: 'backoff', cursor: current.cursor };
+      if (outcome.kind === 'unsupported') return { state: 'unsupported' };
+      const next = outcome.value.cursor;
+      // Strict-advance guard: a cursor that does not move strictly older ends
+      // the source (kills the multi-cursor loop failure).
+      return next && next.createdAt < current.cursor.createdAt
+        ? { state: 'ready', cursor: next }
+        : { state: 'exhausted' };
+    }
+    case 'exhausted':
+    case 'unsupported':
+    case 'failed-first-page':
+      return current;
+    default: {
+      const unreachable: never = current;
+      return unreachable;
+    }
+  }
+}
+
+/** The cursor to ask for the next older page from, or null when the source is not asked. */
+function olderPageCursor(source: SourceState): NonNullable<NostrCursor> | null {
+  switch (source.state) {
+    case 'ready':
+    case 'backoff':
+      return source.cursor;
+    case 'pending':
+    case 'exhausted':
+    case 'unsupported':
+    case 'failed-first-page':
+      return null;
+    default: {
+      const unreachable: never = source;
+      return unreachable;
+    }
+  }
+}
+
 export type NotificationsSessionOptions = {
   request: NotificationsRequest;
   /** Log-only correlation id stamped on this session's `nostr.notifications.session.*` events. */
@@ -65,10 +142,10 @@ export type NotificationsSessionOptions = {
 export interface NotificationsSession {
   /** Fetch all sources concurrently; resolves at the paint gate with page 0. */
   firstPage(): Promise<ResolvedNotifications>;
-  /** Fan out to non-exhausted sources, then reveal fetched + pooled rows. */
+  /** Fan out to sources that are ready or in backoff, then reveal fetched + pooled rows. */
   loadMore(): Promise<ResolvedNotifications>;
   snapshot(): ResolvedNotifications;
-  /** Any source not exhausted, or pooled rows awaiting an artificial page. */
+  /** Any source ready or in backoff, or pooled rows awaiting an artificial page. */
   hasMore(): boolean;
   /** Pooled new rows not yet revealed. */
   pendingCount(): number;
@@ -108,7 +185,9 @@ export function createNotificationsSession(
   const controller = new AbortController();
   const signal = combineSignals(options.request.signal, controller.signal);
   const listeners = new Set<() => void>();
-  const per = new Map<NostrTier, { cursor: NostrCursor; exhausted: boolean }>();
+  const per = new Map<NostrTier, SourceState>(
+    options.sources.map((source) => [source.tier, { state: 'pending' }]),
+  );
   let painted = false;
   let closed = false;
   let bestRank: NostrTier | null = null;
@@ -222,7 +301,7 @@ export function createNotificationsSession(
 
   function hasMore(): boolean {
     if (merger.pooledCount() > 0) return true;
-    for (const state of per.values()) if (!state.exhausted) return true;
+    for (const state of per.values()) if (olderPageCursor(state)) return true;
     return false;
   }
 
@@ -233,22 +312,19 @@ export function createNotificationsSession(
     const attempts = options.sources.map(async (source) => {
       const outcome = await source.fetch(sourceRequest(options.request.cursor ?? null));
       if (closed) return;
+      const next = afterPage({ state: 'pending' }, outcome);
+      per.set(source.tier, next);
       if (outcome.kind === 'answered') {
         answeredCount += 1;
         answeredTiers.push(source.tier);
         trackBest(source.tier);
-        per.set(source.tier, {
-          cursor: outcome.value.cursor,
-          exhausted: outcome.value.cursor === null,
-        });
         absorb(source.tier, outcome.value);
-      } else {
-        per.set(source.tier, { cursor: null, exhausted: true });
       }
       nostrLog.debug('nostr.notifications.session.source', {
         readId,
         tier: source.tier,
         outcome: outcome.kind,
+        state: next.state,
         elapsedMs: Date.now() - startedAt,
       });
     });
@@ -270,7 +346,7 @@ export function createNotificationsSession(
           answered: [...answeredTiers],
           pending: options.sources
             .map((s) => s.tier)
-            .filter((tier) => !per.has(tier)),
+            .filter((tier) => per.get(tier)?.state === 'pending'),
           count: merger.revealedCount() + merger.pooledCount(),
           elapsedMs: Date.now() - startedAt,
         });
@@ -295,24 +371,22 @@ export function createNotificationsSession(
   }
 
   async function loadMore(): Promise<ResolvedNotifications> {
-    const live = options.sources.filter((s) => per.get(s.tier)?.exhausted === false);
     await Promise.allSettled(
-      live.map(async (source) => {
-        const state = per.get(source.tier)!;
-        const outcome = await source.fetch(sourceRequest(state.cursor));
+      options.sources.map(async (source) => {
+        const asked = per.get(source.tier);
+        const cursor = asked && olderPageCursor(asked);
+        if (!asked || !cursor) return;
+        const outcome = await source.fetch(sourceRequest(cursor));
         if (closed) return;
-        if (outcome.kind !== 'answered') {
-          state.exhausted = true;
-          return;
-        }
-        const next = outcome.value.cursor;
-        // Strict-advance guard: a cursor that doesn't move strictly older
-        // marks the source exhausted (kills the multi-cursor loop failure).
-        const advanced =
-          !!next && (!state.cursor || next.createdAt < state.cursor.createdAt);
-        if (advanced) state.cursor = next;
-        state.exhausted = !advanced;
-        absorb(source.tier, outcome.value);
+        // An overlapping loadMore may have moved the source on while this page
+        // was in flight. Then the answer only shows this request was stale: it
+        // says nothing about where the source's history ends, so its paging
+        // stays as it is (its rows are still taken in).
+        const now = per.get(source.tier) ?? asked;
+        const from = olderPageCursor(now);
+        if (from && from.createdAt === cursor.createdAt && from.id === cursor.id)
+          per.set(source.tier, afterPage(now, outcome));
+        if (outcome.kind === 'answered') absorb(source.tier, outcome.value);
       }),
     );
     merger.reveal(pageSize);

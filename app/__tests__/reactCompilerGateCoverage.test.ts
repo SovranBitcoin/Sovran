@@ -233,10 +233,9 @@ describe('React Compiler gate coverage — workspace packages', () => {
 
   it.each([
     // The payment context every screen in the app renders inside, and the
-    // three hooks that read coco through it. All four bailed unreported.
+    // two hooks that read coco through it. All three bailed unreported.
     'wallet/src/react/ColadaProvider.tsx',
     'wallet/src/react/useColadaTransactions.ts',
-    'wallet/src/react/usePaymentMachine.ts',
     'wallet/src/react/useScreenActions.ts',
   ])('sweeps the compiled package file %s', (relativePath) => {
     expect(statSync(path.join(REPO_DIR, relativePath)).isFile()).toBe(true);

@@ -3,8 +3,8 @@ import { createNaggFeedClient } from './naggFeedClient';
 import { createFacadeFeedClient } from './facadeFeedClient';
 
 export function getFeedClient(): FeedClient {
-  // The for-you / following-popular home feeds route through the tier-selecting
-  // facade (so the Settings → Network toggles take effect); everything else
-  // delegates to the existing nagg feed client.
+  // Feeds, threads and notifications route through the tier-selecting facade
+  // (so the Settings → Network toggles take effect); enrichment delegates to
+  // the nagg feed client.
   return createFacadeFeedClient(createNaggFeedClient());
 }

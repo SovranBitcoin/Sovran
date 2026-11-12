@@ -2,7 +2,6 @@ import {
   profileSwitchQuiescing,
   registerProfileSwitchService,
 } from '@/shared/lib/account/accountRegistry';
-import { clearForYouCache } from 'nostr';
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
@@ -128,11 +127,7 @@ export function NostrNDKProvider({
 
   // Non-blocking: starts after all blocking stages complete so it doesn't
   // compete for the JS thread during splash. App is already visible.
-  const stage = useInitializationStage('nostr-ndk', {
-    message: 'Initializing Nostr...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
+  const stage = useInitializationStage('nostr-ndk');
 
   // Hydrate the NIP-17 unwrap cache ahead of NDK init — the DM thread/contacts
   // decrypt path reads it synchronously, so a late hydration would race the
@@ -238,5 +233,3 @@ export function NostrNDKProvider({
 
   return <NostrNDKContext.Provider value={contextValue}>{children}</NostrNDKContext.Provider>;
 }
-
-registerAccountScoped('nostr.for-you-cache', clearForYouCache);

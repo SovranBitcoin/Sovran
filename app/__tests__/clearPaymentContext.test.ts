@@ -1,35 +1,28 @@
 /**
  * clearPaymentContext must reset the runtime stores that route an ecash Send, so
- * an abandoned Routstr top-up (or a leftover Nut-Drop session) can never hijack
- * the next flow. Regression guard for the "Top up → Send pays Routstr" bug.
+ * a leftover Nut Drop session or contact target can never hijack the next flow.
  */
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { peekPendingZap, registerPendingZap } from '@/shared/stores/runtime/pendingZapStore';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 
 describe('clearPaymentContext', () => {
-  it('clears Routstr top-up and Nut-Drop context', () => {
-    useRoutstrTopUpStore.getState().start('pending retry message');
+  it('clears Nut-Drop context', () => {
     useNearPaySessionStore.getState().start({
       peerID: 'peer-1',
       nickname: 'bob',
       hasDirectLink: true,
       lastSeen: 0,
       creq: 'creqA-confirmed',
-      delivery: { locked: true },
     });
 
-    expect(useRoutstrTopUpStore.getState().phase).toBe('active');
     expect(useNearPaySessionStore.getState().active).not.toBeNull();
 
     clearPaymentContext('test');
 
-    expect(useRoutstrTopUpStore.getState().phase).toBe('idle');
-    expect(useRoutstrTopUpStore.getState().pendingMessage).toBeNull();
     expect(useNearPaySessionStore.getState().active).toBeNull();
   });
 

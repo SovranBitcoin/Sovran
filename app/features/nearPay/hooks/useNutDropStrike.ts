@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { isMeshRedeemInPlay, meshRedeemPhase } from 'wallet/redeemEntry';
 
-import {
-  deriveStrikeMap,
-  type StrikeQueueEntry,
-  type StrikeState,
-} from '@/features/nearPay/lib/nutDropStrikeState';
+import { deriveStrikeMap, type StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { paymentLog } from '@/shared/lib/logger';
-
-const LIVE_STATUSES = new Set(['pending', 'redeeming']);
 
 /**
  * Maps the Nut Drop redeem queue to per-peer lightning-strike states for the
@@ -33,7 +28,7 @@ export function useNutDropStrike(): ReadonlyMap<string, StrikeState> {
     const terminal = new Set<string>();
     const live = new Set<string>();
     for (const [hash, entry] of Object.entries(byTokenHash)) {
-      if (LIVE_STATUSES.has(entry.status)) live.add(hash);
+      if (isMeshRedeemInPlay(meshRedeemPhase(entry))) live.add(hash);
       else terminal.add(hash);
     }
     baselineRef.current = { terminal, live };
@@ -45,7 +40,7 @@ export function useNutDropStrike(): ReadonlyMap<string, StrikeState> {
 
     const previousMap = prevRef.current;
     const { map: nextMap, nextDeadline } = deriveStrikeMap({
-      entries: byTokenHash as Record<string, StrikeQueueEntry>,
+      entries: byTokenHash,
       prev: previousMap,
       baselineTerminalHashes: baseline.terminal,
       baselineLiveHashes: baseline.live,

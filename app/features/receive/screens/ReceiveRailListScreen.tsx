@@ -50,7 +50,7 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { formatAmount } from '@/shared/lib/currency';
 import { formatRelative } from '@/shared/lib/date';
-import { copyPopup, paramPopup } from '@/shared/lib/popup';
+import { copyPopup, paramPopup, staticPopup } from '@/shared/lib/popup';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import { paymentLog } from '@/shared/lib/logger';
 import { Log } from '@/shared/lib/loggerUI';
@@ -279,9 +279,19 @@ export function ReceiveRailListScreen() {
   const handlePress = useCallback((item: ReceiveRailItem) => {
     if (isRailItemCopyable(item.status)) {
       void EnhancedHaptics.copyHaptic();
-      void setStringAsync(item.request);
-      copyPopup(item.copyTarget);
-      paymentLog.info('receive.rail_list.copied', { rail: item.rail, status: item.status });
+      setStringAsync(item.request).then(
+        () => {
+          copyPopup(item.copyTarget);
+          paymentLog.info('receive.rail_list.copied', { rail: item.rail, status: item.status });
+        },
+        (error: unknown) => {
+          paymentLog.warn('receive.rail_list.copy_failed', {
+            rail: item.rail,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          staticPopup('copy-failed');
+        }
+      );
       return;
     }
     if (item.linkEntry) {

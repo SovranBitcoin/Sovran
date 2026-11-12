@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  receiveFlow,
   startReceiveFlow,
   startReceiveLightningFlow,
   startReceiveQrFlow,
@@ -44,17 +43,5 @@ describe('receive flow', () => {
 
     expect(result.context.mintUrl).toBe('');
     expect(result.data.preselectedMintUrl).toBeUndefined();
-  });
-
-  it('declares actions and copy keys for receive states', () => {
-    expect(receiveFlow.actions({ type: 'receive-hub', unit: 'sat' })).toEqual(['showReceiveHub']);
-    expect(
-      receiveFlow.copyKeys({
-        type: 'enter-lightning-amount',
-        unit: 'sat',
-        mintUrl: MINT1,
-        method: 'bolt11',
-      }),
-    ).toEqual(['timeline.mint.unpaid.label', 'timeline.mint.unpaid.info']);
   });
 });

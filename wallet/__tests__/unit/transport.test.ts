@@ -7,8 +7,8 @@ import {
 import {
   classifyMeshRedeemError,
   createMeshRedeemOrchestrator,
-  type MeshRedeemEntry,
 } from "../../src/transport/redeemOrchestrator";
+import type { MeshRedeemEntry } from "../../src/transport/redeemEntry";
 
 const MY_PUBKEY = `02${"ab".repeat(32)}`;
 const OTHER_PUBKEY = `02${"cd".repeat(32)}`;
@@ -238,9 +238,14 @@ function createQueue(initial: Record<string, MeshRedeemEntry>) {
     port: {
       prune: () => {},
       entries: () => initial,
-      markStatus: (hash: string, status: string) =>
-        statuses.push([hash, status]),
-      scheduleRetry: (hash: string) => retries.push(hash),
+      markStatus: (hash: string, status: string): boolean => {
+        statuses.push([hash, status]);
+        return true;
+      },
+      scheduleRetry: (hash: string): "pending" | "failed" | null => {
+        retries.push(hash);
+        return "pending";
+      },
     },
     statuses,
     retries,
@@ -342,6 +347,193 @@ describe("createMeshRedeemOrchestrator", () => {
     expect(queue.statuses).toContainEqual(["spent", "spent"]);
     expect(queue.retries).toEqual(["net"]);
     expect(queue.statuses).toContainEqual(["fatal", "failed"]);
+  });
+
+  it("does not start a receive the queue refused to start", async () => {
+    const queue = createQueue({ h1: entry() });
+    queue.port.markStatus = (hash, status) => {
+      queue.statuses.push([hash, status]);
+      return status !== "redeeming";
+    };
+    const execute = vi.fn(async () => ({ historyEntryId: null }));
+    const onRedeeming = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: execute,
+      onRedeeming,
+    });
+    await orchestrator.drain();
+    expect(execute).not.toHaveBeenCalled();
+    expect(onRedeeming).not.toHaveBeenCalled();
+    expect(queue.statuses).toEqual([["h1", "redeeming"]]);
+  });
+
+  it("does not report a receive the queue refused to record", async () => {
+    const queue = createQueue({ h1: entry() });
+    queue.port.markStatus = (hash, status) => {
+      queue.statuses.push([hash, status]);
+      return status !== "redeemed";
+    };
+    const onRedeemed = vi.fn();
+    const onFailed = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async () => ({ historyEntryId: "hist1" }),
+      onRedeemed,
+      onFailed,
+    });
+    await orchestrator.drain();
+    expect(onRedeemed).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed attempt as the queue recorded it, and not when it refused", async () => {
+    const entries = {
+      spent: entry({ token: "spent" }),
+      fatal: entry({ token: "fatal" }),
+      net: entry({ token: "net" }),
+      exhausted: entry({ token: "exhausted", attempts: 4 }),
+      refused: entry({ token: "refused" }),
+    };
+    const queue = createQueue(entries);
+    queue.port.markStatus = (hash, status) =>
+      !(hash === "refused" && status !== "redeeming");
+    queue.port.scheduleRetry = (hash) =>
+      hash === "exhausted" ? "failed" : hash === "refused" ? null : "pending";
+    const errors: Record<string, Error> = {
+      spent: new Error("Token was already spent"),
+      fatal: new Error("proof verification failed"),
+      net: new Error("fetch failed: network down"),
+      exhausted: new Error("fetch failed: network down"),
+      refused: new Error("fetch failed: network down"),
+    };
+    const onFailed = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async ({ tokenString }) => {
+        throw errors[tokenString];
+      },
+      onFailed,
+    });
+    await orchestrator.drain();
+    expect(
+      onFailed.mock.calls.map(([hash, , recorded]) => [hash, recorded]),
+    ).toEqual([
+      ["spent", "spent"],
+      ["fatal", "failed"],
+      ["net", "retrying"],
+      ["exhausted", "failed"],
+    ]);
+  });
+
+  it("a drop queued while a drain runs is redeemed by one more run after it", async () => {
+    const entries: Record<string, MeshRedeemEntry> = {
+      a: entry({ token: "a" }),
+    };
+    const queue = createQueue(entries);
+    const prune = vi.fn();
+    queue.port.prune = prune;
+    let releaseA!: () => void;
+    const redeemed: string[] = [];
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async ({ tokenString: token }) => {
+        if (token === "a")
+          await new Promise<void>((resolve) => (releaseA = resolve));
+        redeemed.push(token);
+        // The fixture's queue does not move statuses; settle the entry so
+        // a later run does not pick it again.
+        entries[token] = entry({ token, status: "redeemed" });
+        return { historyEntryId: null };
+      },
+    });
+
+    const first = orchestrator.drain();
+    await vi.waitFor(() => expect(releaseA).toBeTypeOf("function"));
+    // B arrives (or a "try again" requeues it) while A is being redeemed;
+    // two triggers during the run still mean one more run.
+    entries.b = entry({ token: "b" });
+    const second = orchestrator.drain();
+    const third = orchestrator.drain();
+    releaseA();
+    await Promise.all([first, second, third]);
+
+    expect(redeemed).toEqual(["a", "b"]);
+    // Each run prunes once: A's run and exactly one more.
+    expect(prune).toHaveBeenCalledTimes(2);
+    expect(queue.statuses).toEqual([
+      ["a", "redeeming"],
+      ["a", "redeemed"],
+      ["b", "redeeming"],
+      ["b", "redeemed"],
+    ]);
+  });
+
+  it("receives waiting entries whose time has come and resumes interrupted ones, nothing else", async () => {
+    const entries: Record<string, MeshRedeemEntry> = {
+      due: entry({ token: "due" }),
+      retryDue: entry({ token: "retryDue", attempts: 2, nextAttemptAt: 1 }),
+      backingOff: entry({
+        token: "backingOff",
+        attempts: 1,
+        nextAttemptAt: Number.MAX_SAFE_INTEGER,
+      }),
+      interrupted: entry({ token: "interrupted", status: "redeeming" }),
+      interruptedRetryDue: entry({
+        token: "interruptedRetryDue",
+        status: "redeeming",
+        attempts: 1,
+        nextAttemptAt: 1,
+      }),
+      // An older build kept the retry time when it started the receive, and
+      // the clock has since moved back: it still waits for that time.
+      interruptedBackingOff: entry({
+        token: "interruptedBackingOff",
+        status: "redeeming",
+        attempts: 1,
+        nextAttemptAt: Number.MAX_SAFE_INTEGER,
+      }),
+      redeemed: entry({ token: "redeemed", status: "redeemed" }),
+      spent: entry({ token: "spent", status: "spent" }),
+      untrusted: entry({ token: "untrusted", status: "untrusted-mint" }),
+      refused: entry({ token: "refused", status: "failed", attempts: 2 }),
+      exhausted: entry({ token: "exhausted", status: "failed", attempts: 5 }),
+    };
+    const queue = createQueue(entries);
+    const received: string[] = [];
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      now: () => 1000,
+      executeAutoRedeem: async ({ tokenString }) => {
+        received.push(tokenString);
+        return { historyEntryId: null };
+      },
+    });
+    await orchestrator.drain();
+    expect(received).toEqual([
+      "due",
+      "retryDue",
+      "interrupted",
+      "interruptedRetryDue",
+    ]);
+  });
+
+  it("a drain with nothing arriving during it runs once", async () => {
+    const queue = createQueue({ h1: entry() });
+    const prune = vi.fn();
+    queue.port.prune = prune;
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async () => ({ historyEntryId: null }),
+    });
+    await orchestrator.drain();
+    expect(prune).toHaveBeenCalledTimes(1);
   });
 
   it("gates on manager availability, restore status, and backoff windows", async () => {

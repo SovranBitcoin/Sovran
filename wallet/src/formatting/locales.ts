@@ -29,6 +29,7 @@ type TranslationMap = Record<string, string>;
 const en: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: paymentCopyDefaults["nfc.unitSwitchFailed"],
   UNIT_NOT_FUNDED: paymentCopyDefaults["nfc.unitNotFunded"],
+  NFC_WRITE_OUTCOME_UNKNOWN: paymentCopyDefaults["nfc.writeOutcomeUnknown"],
   // Annotation reasons
   PAYABLE_ECASH: 'Payable with Cashu — no fees',
 
@@ -46,14 +47,6 @@ const en: TranslationMap = {
   AMOUNT_BELOW_MINT_MIN: 'Minimum {min} {unit}',
   AMOUNT_ABOVE_MINT_MAX: 'Maximum {max} {unit}',
 
-  // ExecutionState messages
-  OPTION_SELECTION_REQUIRED: 'Option selection is required to continue',
-  FALLBACK_OPTION_REQUIRED: 'Choose an alternative payment method',
-  NO_AMOUNT: 'Amount is required to continue',
-  MINT_SELECTION_REQUIRED: 'Mint selection is required to continue',
-  PROOF_SELECTION_REQUIRED: 'Proof selection is required to continue',
-  SEND_MEMO_REQUIRED: 'Memo input is required to continue',
-
   // Blocked / error messages
   NO_VALID_MINT: 'No valid mint available',
   ALL_OPTIONS_DISABLED: 'All payment options are disabled',
@@ -63,7 +56,6 @@ const en: TranslationMap = {
   MELT_FAILED: 'Lightning payment failed',
   PAYMENT_REQUEST_FAILED: 'Payment request failed',
   LOAD_MINTS_FAILED: 'Failed to load mints',
-  TRUST_MINT_FAILED: 'Failed to trust mint',
 
   // Mint selection errors
   NO_ALLOWED_MINT_TRUSTED: 'No allowed mint is trusted',
@@ -74,6 +66,7 @@ const en: TranslationMap = {
 const ar: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: 'تعذّر اختيار عملة المحطة. حاول مرة أخرى.',
   UNIT_NOT_FUNDED: 'تطلب هذه المحطة {unit}. ليس لديك نقد إلكتروني بعملة {unit} لدى جهة إصدار مقبولة.',
+  NFC_WRITE_OUTCOME_UNKNOWN: 'ربما وصلت الدفعة إلى المحطة. تحقّق من سجلّك قبل أن تدفع مرة أخرى.',
   PAYABLE_ECASH: 'يمكن الدفع بكاشو — بدون رسوم',
 
   INSUFFICIENT_BALANCE: 'رصيد غير كافٍ',
@@ -89,13 +82,6 @@ const ar: TranslationMap = {
   AMOUNT_BELOW_MINT_MIN: 'الحد الأدنى {min} {unit}',
   AMOUNT_ABOVE_MINT_MAX: 'الحد الأقصى {max} {unit}',
 
-  OPTION_SELECTION_REQUIRED: 'يجب اختيار خيار للمتابعة',
-  FALLBACK_OPTION_REQUIRED: 'اختر طريقة دفع بديلة',
-  NO_AMOUNT: 'يجب إدخال المبلغ للمتابعة',
-  MINT_SELECTION_REQUIRED: 'يجب اختيار المنت للمتابعة',
-  PROOF_SELECTION_REQUIRED: 'يجب اختيار الإثبات للمتابعة',
-  SEND_MEMO_REQUIRED: 'يجب إدخال المذكرة أو تخطيها للمتابعة',
-
   NO_VALID_MINT: 'لا يوجد منت صالح',
   ALL_OPTIONS_DISABLED: 'جميع خيارات الدفع معطلة',
   UNSUPPORTED_INPUT: 'إدخال غير مدعوم',
@@ -104,7 +90,6 @@ const ar: TranslationMap = {
   MELT_FAILED: 'فشل الدفع عبر البرق',
   PAYMENT_REQUEST_FAILED: 'فشل طلب الدفع',
   LOAD_MINTS_FAILED: 'فشل تحميل المنتات',
-  TRUST_MINT_FAILED: 'فشل الوثوق بالمنت',
 
   NO_ALLOWED_MINT_TRUSTED: 'لا يوجد منت مسموح به موثوق',
   INSUFFICIENT_BALANCE_ALLOWED: 'رصيد غير كافٍ في المنتات المسموحة',
@@ -114,6 +99,7 @@ const ar: TranslationMap = {
 const de: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: 'Die Währung des Terminals konnte nicht ausgewählt werden. Versuche es erneut.',
   UNIT_NOT_FUNDED: 'Dieses Terminal verlangt {unit}. Du hast kein {unit}-Ecash bei einer akzeptierten Mint.',
+  NFC_WRITE_OUTCOME_UNKNOWN: 'Die Zahlung hat das Terminal vielleicht erreicht. Prüfe deinen Verlauf, bevor du erneut zahlst.',
   PAYABLE_ECASH: 'Zahlbar mit Cashu — keine Gebühren',
 
   INSUFFICIENT_BALANCE: 'Unzureichendes Guthaben',
@@ -129,13 +115,6 @@ const de: TranslationMap = {
   AMOUNT_BELOW_MINT_MIN: 'Mindestens {min} {unit}',
   AMOUNT_ABOVE_MINT_MAX: 'Höchstens {max} {unit}',
 
-  OPTION_SELECTION_REQUIRED: 'Option muss ausgewählt werden',
-  FALLBACK_OPTION_REQUIRED: 'Wählen Sie eine alternative Zahlungsmethode',
-  NO_AMOUNT: 'Betrag muss eingegeben werden',
-  MINT_SELECTION_REQUIRED: 'Mint muss ausgewählt werden',
-  PROOF_SELECTION_REQUIRED: 'Proof muss ausgewählt werden',
-  SEND_MEMO_REQUIRED: 'Memo muss eingegeben oder übersprungen werden',
-
   NO_VALID_MINT: 'Kein gültiger Mint verfügbar',
   ALL_OPTIONS_DISABLED: 'Alle Zahlungsoptionen sind deaktiviert',
   UNSUPPORTED_INPUT: 'Nicht unterstützte Eingabe',
@@ -144,7 +123,6 @@ const de: TranslationMap = {
   MELT_FAILED: 'Lightning-Zahlung fehlgeschlagen',
   PAYMENT_REQUEST_FAILED: 'Zahlungsanfrage fehlgeschlagen',
   LOAD_MINTS_FAILED: 'Mints konnten nicht geladen werden',
-  TRUST_MINT_FAILED: 'Mint konnte nicht vertraut werden',
 
   NO_ALLOWED_MINT_TRUSTED: 'Kein erlaubter Mint ist vertraut',
   INSUFFICIENT_BALANCE_ALLOWED: 'Unzureichendes Guthaben bei erlaubten Mints',
@@ -156,28 +134,6 @@ const de: TranslationMap = {
 // ---------------------------------------------------------------------------
 
 const locales: Record<string, TranslationMap> = { en, ar, de };
-
-/**
- * Register additional locale translations at runtime.
- *
- * @example
- * registerLocale('fr', {
- *   INSUFFICIENT_BALANCE: 'Solde insuffisant',
- *   NO_BALANCE: 'Pas de solde',
- *   // ...
- * });
- */
-export function registerLocale(
-  lang: string,
-  translations: TranslationMap,
-): void {
-  logger.info('formatting.locale.register', {
-    lang,
-    translationCount: Object.keys(translations).length,
-    existingTranslationCount: Object.keys(locales[lang] ?? {}).length,
-  });
-  locales[lang] = { ...(locales[lang] ?? {}), ...translations };
-}
 
 // ---------------------------------------------------------------------------
 // Lookup

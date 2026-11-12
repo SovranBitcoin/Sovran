@@ -47,21 +47,17 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
 jest.mock('nostr-tools/kinds', () => ({ __esModule: true, EventDeletion: 5 }));
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class {},
-    NDKEvent: class {
-      kind = 0;
-      content = '';
-      created_at = 0;
-      tags: string[][] = [];
-    },
-    useNDK: () => ({ ndk: {} }),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class {},
+  NDKEvent: class {
+    kind = 0;
+    content = '';
+    created_at = 0;
+    tags: string[][] = [];
+  },
+  useNDK: () => ({ ndk: {} }),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   nostrLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
@@ -194,6 +190,16 @@ describe('executeDeletePost', () => {
     expect(markDeleteRequested).not.toHaveBeenCalled();
     expect(deleteStore.fail).toHaveBeenCalled();
     expect(deleteStore.complete).not.toHaveBeenCalled();
+  });
+
+  it('a publish that throws ends the toast as failed and does not reject', async () => {
+    publishEvent.mockRejectedValueOnce(new Error('signer went away'));
+    await expect(
+      executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() })
+    ).resolves.toBeUndefined();
+
+    expect(deleteStore.fail).toHaveBeenCalled();
+    expect(markDeleteRequested).not.toHaveBeenCalled();
   });
 
   it('drives per-relay legs from onRelayResult', async () => {

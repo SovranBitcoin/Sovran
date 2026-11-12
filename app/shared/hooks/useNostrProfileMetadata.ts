@@ -1,11 +1,12 @@
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockProfileMetadata } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { facade } from 'nostr';
 import {
   Kind0MetadataSchema,
+  NOSTR_METADATA_STALE_TTL_MS,
   cachedProfileToMetadata,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
@@ -45,7 +46,7 @@ async function fetchProfilesLogged(
     gen: 0,
   });
   try {
-    const profiles = await fetchProfilesViaFacade(pubkeys, { refresh: true, readId });
+    const profiles = await fetchProfilesViaFacade(pubkeys, { readId });
     const count = Object.keys(profiles).length;
     readEvents.done({
       readId,
@@ -74,8 +75,6 @@ async function fetchProfilesLogged(
   }
 }
 
-const STALE_TTL_MS = 24 * 60 * 60 * 1000;
-
 interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
   isLoading: boolean;
@@ -101,11 +100,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
   const cached = useCachedNostrProfile(pubkey ?? '');
   const baseMetadata = fixture ?? cached.metadata;
-  const isOwn = useProfileStore(
-    (s) =>
-      !!pubkey &&
-      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
-  );
+  const isOwn = useProfileStore((s) => !!pubkey && selectActivePubkey(s) === pubkey);
   const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
   const metadata = optimistic
     ? {
@@ -260,10 +255,10 @@ interface UseNostrProfileMetadataManyResult {
 }
 
 /**
- * SWR over many pubkeys at once. Backed by the same `nostrMetadataCache`
- * as the single-pubkey hook — populating one set of contacts warms the
- * cache for every other surface that consumes them (UserMessagesScreen,
- * UserProfileScreen, the picker, …). One batched kind-0 subscription
+ * SWR over many pubkeys at once. Reads the same entity cache as the
+ * single-pubkey hook — populating one set of contacts warms it for every
+ * other surface that consumes them (UserMessagesScreen, UserProfileScreen,
+ * the picker, …). One batched kind-0 subscription
  * per render with `authors: missingOrStale` so we don't repeatedly hit
  * relays for entries we already have.
  */
@@ -315,7 +310,7 @@ export function useNostrProfileMetadataMany(
       if (attemptedAt !== undefined && now - attemptedAt < RETRY_ATTEMPT_WINDOW_MS) continue;
       if (mockMode && getMockProfileMetadata(pk)) continue;
       const record = records.get(pk);
-      if (!record || now - (record.fetchedAt ?? 0) > STALE_TTL_MS) out.push(pk);
+      if (!record || now - (record.fetchedAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS) out.push(pk);
     }
     return out;
   }, [pubkeys, records, mockMode]);

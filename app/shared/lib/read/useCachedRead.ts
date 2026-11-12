@@ -77,12 +77,6 @@ interface UseCachedReadOptions<TData> {
    * the same surface; a tab is not). Default: never.
    */
   keepPreviousData?: (previousKey: string, nextKey: string) => boolean;
-  /**
-   * First access this session: `'paint-stale'` (default) shows
-   * a persisted entry immediately; `'skeleton'` hides it until the network
-   * answers (feeds that must not show yesterday's page).
-   */
-  coldStart?: 'paint-stale' | 'skeleton';
   /** Revalidate on refocus when the entry is stale (default true). A fresh entry is never refetched. */
   focusRevalidate?: boolean;
   /**
@@ -92,8 +86,6 @@ interface UseCachedReadOptions<TData> {
    */
   abortOnBlur?: boolean;
   enabled?: boolean;
-  /** How this read resolves, for the log only. Default `'http'`. */
-  strategy?: 'sequential' | 'aggregate' | 'session' | 'http';
 }
 
 interface UseCachedReadResult<TData> {
@@ -163,10 +155,10 @@ export function useCachedRead<TData>(
     viewerKey,
     enabled = true,
     focusRevalidate = true,
-    coldStart = 'paint-stale',
-    strategy = readStrategyFor(surface),
     abortOnBlur = false,
   } = options;
+  // How this read resolves, for the log only.
+  const strategy = readStrategyFor(surface);
   const keyHash = key ? readKeyHash(key) : 'k_none';
 
   // 1. The visible value IS the store entry. A viewer-key mismatch reads as
@@ -354,6 +346,9 @@ export function useCachedRead<TData>(
       return () => {
         abortRef.current?.abort();
         abortRef.current = null;
+        // The aborted run's `finally` skips clearing its flight, and a refocus
+        // on a still-fresh entry serves it without starting a new one.
+        setFlight(null);
       };
     }, [enabled, key, focusRevalidate, abortOnBlur, start])
   );
@@ -368,13 +363,10 @@ export function useCachedRead<TData>(
   const fetching = !!flight && flight.key === key && !landed;
   const failed = !!failure && failure.key === key;
   const stale = !!entry && !store.isFresh(entry);
-  const hideStaleOnCold =
-    coldStart === 'skeleton' && !!entry && !!key && store.isColdStart(key) && fetching;
-  const data: TData | undefined =
-    entry && !hideStaleOnCold ? entry.data : keep ? previousEntry!.data : seeded;
+  // A stored entry always paints, on a cold start too.
+  const data: TData | undefined = entry ? entry.data : keep ? previousEntry!.data : seeded;
   let source: ReadSource | undefined;
-  if (entry && !hideStaleOnCold)
-    source = flight?.partial && fetching ? 'partial' : fetching ? 'cache' : 'network';
+  if (entry) source = flight?.partial && fetching ? 'partial' : fetching ? 'cache' : 'network';
   else if (keep) source = 'cache';
   else if (seeded !== undefined) source = 'seed';
 

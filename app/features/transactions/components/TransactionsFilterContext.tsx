@@ -1,51 +1,114 @@
 /**
  * @fileoverview Transactions Filter Context
  *
- * Provides shared filter state between the transactions layout header
- * and the TransactionsScreen component.
+ * The transaction filters as one value: its fields, defaults and active count,
+ * and its two route encodings. Transactions opens the filter sheet with every
+ * filter under its own name (`currency`, `status`, ...); the sheet and the links
+ * into Transactions (and deep links) use `filter`-prefixed params
+ * (`filterCurrency`, ...). The provider shares the value between the
+ * transactions header and the list.
  */
 
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import type { ScanMethod, TransactionDirection, TransactionPaymentType } from 'wallet';
+import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { cashuLog } from '@/shared/lib/logger';
 
-type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
+/** Each filter's accepted values; the same limits in both route encodings. */
+const FILTER_FIELDS = {
+  currency: z.string().max(16),
+  paymentType: z.enum(['all', 'lightning', 'ecash', 'onchain']),
+  direction: z.enum(['all', 'incoming', 'outgoing']),
+  status: z.enum(['All', 'Confirmed', 'Pending', 'Expired']),
+  mintUrl: z.string().max(2048),
+  source: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']),
+  lock: z.enum(['all', 'locked', 'unlocked']),
+  counterparty: z.enum(['all', 'with']),
+  /** 'zaps' = melts carrying a zap annotation (paid for a nostr post). */
+  zap: z.enum(['all', 'zaps']),
+};
 
-/** Annotation-driven filters added on top of currency/type/direction/status/mint. */
-export type TransactionSourceFilter = 'all' | ScanMethod;
-export type TransactionLockFilter = 'all' | 'locked' | 'unlocked';
-export type TransactionCounterpartyFilter = 'all' | 'with';
-/** 'zaps' = melts carrying a zap annotation (paid for a nostr post). */
-export type TransactionZapFilter = 'all' | 'zaps';
+export type TransactionFilters = {
+  [K in keyof typeof FILTER_FIELDS]: z.infer<(typeof FILTER_FIELDS)[K]>;
+};
+type FilterKey = keyof TransactionFilters;
 
-interface TransactionsFilterState {
-  currency: string;
-  paymentType: TransactionPaymentType;
-  direction: TransactionDirection;
-  status: Status;
-  mintUrl: string;
-  source: TransactionSourceFilter;
-  lock: TransactionLockFilter;
-  counterparty: TransactionCounterpartyFilter;
-  zap: TransactionZapFilter;
-  selectedMonth: string | null;
+export const DEFAULT_TRANSACTION_FILTERS: TransactionFilters = {
+  currency: 'sat',
+  paymentType: 'all',
+  direction: 'all',
+  status: 'All',
+  mintUrl: 'all',
+  source: 'all',
+  lock: 'all',
+  counterparty: 'all',
+  zap: 'all',
+};
+
+const FILTER_KEYS = Object.keys(DEFAULT_TRANSACTION_FILTERS) as FilterKey[];
+
+/** How many filters differ from their default; any currency but sats counts. */
+export function countActiveFilters(filters: TransactionFilters): number {
+  return FILTER_KEYS.filter((key) =>
+    key === 'currency'
+      ? filters.currency.toLowerCase() !== 'sat'
+      : filters[key] !== DEFAULT_TRANSACTION_FILTERS[key]
+  ).length;
 }
 
-interface TransactionsFilterContextValue extends TransactionsFilterState {
-  setCurrency: (currency: string) => void;
-  setPaymentType: (type: TransactionPaymentType) => void;
-  setDirection: (dir: TransactionDirection) => void;
-  setStatus: (status: Status) => void;
-  setMintUrl: (mintUrl: string) => void;
-  setSource: (source: TransactionSourceFilter) => void;
-  setLock: (lock: TransactionLockFilter) => void;
-  setCounterparty: (counterparty: TransactionCounterpartyFilter) => void;
-  setZap: (zap: TransactionZapFilter) => void;
+/** The filter sheet's params: every filter under its own name. */
+export const FilterSheetParamsSchema = z.object(FILTER_FIELDS).partial();
+
+/** The sheet's starting draft: a missing or empty param is the default. */
+export function filtersFromSheetParams(
+  params: z.infer<typeof FilterSheetParamsSchema> | null
+): TransactionFilters {
+  const filters = { ...DEFAULT_TRANSACTION_FILTERS };
+  for (const key of FILTER_KEYS) if (params?.[key]) Object.assign(filters, { [key]: params[key] });
+  return filters;
+}
+
+const routeKey = <K extends FilterKey>(key: K) =>
+  `filter${key[0].toUpperCase()}${key.slice(1)}` as `filter${Capitalize<K>}`;
+
+type TransactionsRouteParams = {
+  [K in FilterKey as `filter${Capitalize<K>}`]?: TransactionFilters[K];
+};
+
+/** Transactions' params: `filter` and the filter's name, each optional. */
+export const TransactionsRouteParamsSchema = z.object(
+  Object.fromEntries(FILTER_KEYS.map((key) => [routeKey(key), FILTER_FIELDS[key].optional()]))
+) as unknown as z.ZodType<TransactionsRouteParams>;
+
+/** Params that open Transactions with these filters; filters left out stay as they are. */
+export function transactionsRouteParams(
+  filters: Partial<TransactionFilters>
+): TransactionsRouteParams {
+  return Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [routeKey(key as FilterKey), value])
+  );
+}
+
+/** The filters Transactions' params name; an empty param names none. */
+export function filtersFromTransactionsParams(
+  params: TransactionsRouteParams
+): Partial<TransactionFilters> {
+  const filters: Partial<TransactionFilters> = {};
+  for (const key of FILTER_KEYS) {
+    const value = params[routeKey(key)];
+    if (value) Object.assign(filters, { [key]: value });
+  }
+  return filters;
+}
+
+interface TransactionsFilterContextValue {
+  filters: TransactionFilters;
+  /** Changes the named filters and keeps the rest. */
+  updateFilters: (changes: Partial<TransactionFilters>) => void;
+  selectedMonth: string | null;
   setSelectedMonth: (month: string | null) => void;
   openFilterSheet: () => void;
-  hasActiveFilters: boolean;
   activeFilterCount: number;
 }
 
@@ -56,120 +119,39 @@ interface TransactionsFilterProviderProps {
 }
 
 export function TransactionsFilterProvider({ children }: TransactionsFilterProviderProps) {
-  const [currency, setCurrency] = useState('sat');
-  const [paymentType, setPaymentType] = useState<TransactionPaymentType>('all');
-  const [direction, setDirection] = useState<TransactionDirection>('all');
-  const [status, setStatus] = useState<Status>('All');
-  const [mintUrl, setMintUrl] = useState('all');
-  const [source, setSource] = useState<TransactionSourceFilter>('all');
-  const [lock, setLock] = useState<TransactionLockFilter>('all');
-  const [counterparty, setCounterparty] = useState<TransactionCounterpartyFilter>('all');
-  const [zap, setZap] = useState<TransactionZapFilter>('all');
+  const [filters, setFilters] = useState(DEFAULT_TRANSACTION_FILTERS);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const updateFilters = useCallback((changes: Partial<TransactionFilters>) => {
+    setFilters((current) =>
+      FILTER_KEYS.every((key) => changes[key] === undefined || changes[key] === current[key])
+        ? current
+        : { ...current, ...changes }
+    );
+  }, []);
 
   const openFilterSheet = useCallback(() => {
     cashuLog.info('transactions.filters.open', {
-      currency,
-      paymentType,
-      direction,
-      status,
-      hasMintFilter: mintUrl !== 'all',
+      currency: filters.currency,
+      paymentType: filters.paymentType,
+      direction: filters.direction,
+      status: filters.status,
+      hasMintFilter: filters.mintUrl !== 'all',
       hasSelectedMonth: !!selectedMonth,
     });
-    router.navigate({
-      pathname: '/filters',
-      params: {
-        currency,
-        paymentType,
-        direction,
-        status,
-        mintUrl,
-        source,
-        lock,
-        counterparty,
-        zap,
-      },
-    });
-  }, [
-    currency,
-    paymentType,
-    direction,
-    status,
-    mintUrl,
-    source,
-    lock,
-    counterparty,
-    zap,
-    selectedMonth,
-  ]);
-
-  const hasActiveFilters = useMemo(() => {
-    return (
-      paymentType !== 'all' ||
-      direction !== 'all' ||
-      status !== 'All' ||
-      mintUrl !== 'all' ||
-      source !== 'all' ||
-      lock !== 'all' ||
-      counterparty !== 'all' ||
-      zap !== 'all'
-    );
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (paymentType !== 'all') count++;
-    if (direction !== 'all') count++;
-    if (status !== 'All') count++;
-    if (mintUrl !== 'all') count++;
-    if (source !== 'all') count++;
-    if (lock !== 'all') count++;
-    if (counterparty !== 'all') count++;
-    if (zap !== 'all') count++;
-    return count;
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
+    router.navigate({ pathname: '/filters', params: filters });
+  }, [filters, selectedMonth]);
 
   const value = useMemo(
     () => ({
-      currency,
-      paymentType,
-      direction,
-      status,
-      mintUrl,
-      source,
-      lock,
-      counterparty,
-      zap,
+      filters,
+      updateFilters,
       selectedMonth,
-      setCurrency,
-      setPaymentType,
-      setDirection,
-      setStatus,
-      setMintUrl,
-      setSource,
-      setLock,
-      setCounterparty,
-      setZap,
       setSelectedMonth,
       openFilterSheet,
-      hasActiveFilters,
-      activeFilterCount,
+      activeFilterCount: countActiveFilters(filters),
     }),
-    [
-      currency,
-      paymentType,
-      direction,
-      status,
-      mintUrl,
-      source,
-      lock,
-      counterparty,
-      zap,
-      selectedMonth,
-      openFilterSheet,
-      hasActiveFilters,
-      activeFilterCount,
-    ]
+    [filters, updateFilters, selectedMonth, openFilterSheet]
   );
 
   return (

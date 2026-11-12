@@ -293,7 +293,9 @@ Rules:
   copied to `<store>:unreadable` (for a per-profile store, `<store>:unreadable:profile:<pubkey>`)
   before the store's next save, and the save is refused unless a copy exists or the new one reads
   back; data that could not be read at all is left alone until a read succeeds. Caches that can be
-  fetched again, and `routstr-store`, opt out.
+  fetched again, and `routstr-store`, opt out. Only `nut-drop-redeem-queue`, whose copy holds ecash,
+  reads its copy back: after a load that succeeded it merges the copy in by token hash, and removes
+  it only once the merged queue is saved and read back (`persistConfig.ts`, `recoverUnreadable`).
 - `routstr-store` moved its secrets into secure storage after v0.1.3. It still reads the key the
   old release wrote, copies the secrets across, verifies them, and only then strips the plaintext.
 - On Android, AsyncStorage is capped at 6 MB in total and a row over about 2 MB cannot be read

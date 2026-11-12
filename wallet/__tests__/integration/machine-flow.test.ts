@@ -4,7 +4,7 @@
  * If a test fails, fix the implementation, not the test.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * machine-flow.test.ts — createMachineFromInstance with real Manager
+ * machine-flow.test.ts — a payment machine on a createColada instance, real Manager
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Tests the full machine lifecycle: instance creation → machine wiring →
@@ -15,12 +15,25 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import type { Manager } from '@cashu/coco-core';
-import { createColada, createMachineFromInstance } from '../../src/core/createColada';
+import { createColada } from '../../src/core/createColada';
 import type { ColadaInstance } from '../../src/core/createColada';
-import type { NotificationHandlerMap } from '../../src/machine/types';
+import { createPaymentMachine } from '../../src/machine/createMachine';
+import type { MachineOperations, NotificationHandlerMap } from '../../src/machine/types';
 import { createTestManager, addTrustedMint, TEST_MINT } from './helpers/setup';
 
-describe('createMachineFromInstance — real Manager', () => {
+/** The machine the way the provider builds it: the instance's context and operations. */
+function machineOn(instance: ColadaInstance, notifications?: NotificationHandlerMap) {
+  return createPaymentMachine({
+    handlers: {},
+    getContext: instance.tracker.getContext,
+    getOffline: () => false,
+    getLocale: () => 'en',
+    operations: instance.operations as MachineOperations,
+    notifications,
+  });
+}
+
+describe('payment machine on a createColada instance — real Manager', () => {
   let manager: Manager;
   let instance: ColadaInstance;
 
@@ -37,51 +50,8 @@ describe('createMachineFromInstance — real Manager', () => {
     await manager.dispose();
   });
 
-  it('creates a working machine with real operations', () => {
-    const handlers = {};
-    const machine = createMachineFromInstance({
-      instance,
-      handlers,
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
-
-    expect(machine).toBeDefined();
-    expect(machine.getContext).toBeDefined();
-    expect(machine.subscribe).toBeDefined();
-    expect(machine.startSendEcash).toBeDefined();
-    expect(machine.startReceiveLightning).toBeDefined();
-    expect(machine.execute).toBeDefined();
-  });
-
-  it('machine context reflects real wallet state', () => {
-    const machine = createMachineFromInstance({
-      instance,
-      handlers: {},
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
-
-    const step = machine.getStep();
-    expect(step).toBe('idle');
-  });
-
-  it('wires notifications to the machine', () => {
-    const onPreferredMintChanged = vi.fn();
-    const notifications: NotificationHandlerMap = {
-      onPreferredMintChanged,
-    };
-
-    const machine = createMachineFromInstance({
-      instance,
-      handlers: {},
-      notifications,
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
-
-    expect(machine).toBeDefined();
-    // Notification wiring is verified — actual firing depends on machine transitions
+  it('starts idle', () => {
+    expect(machineOn(instance).getStep()).toBe('idle');
   });
 
   it('instance config is accessible', () => {
@@ -108,13 +78,7 @@ describe('createMachineFromInstance — real Manager', () => {
   it('onPreferredMintChanged fires on changeMint with persist', async () => {
     const onPreferredMintChanged = vi.fn();
 
-    const machine = createMachineFromInstance({
-      instance,
-      handlers: {},
-      notifications: { onPreferredMintChanged },
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
+    const machine = machineOn(instance, { onPreferredMintChanged });
 
     void machine.changeMint(TEST_MINT, { persist: true });
     await new Promise((resolve) => setTimeout(resolve, 50));

@@ -25,6 +25,7 @@ import { requireOfflineTokenDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { isPayableNearbyPeer } from './nearbyCapability';
 
 export const NEARBY_PAYMENT_PREFIX = 'sovran:payment:1:';
@@ -164,8 +165,7 @@ class NearbyPayments {
     await this.writes.catch(() => undefined);
     if (!this.isCurrent()) return;
     const journal = await this.read();
-    const restore = useWalletLifecycleStore.getState().restoreStatus;
-    if (restore === 'complete' || restore === 'not-needed') {
+    if (isSafeToMint(useWalletLifecycleStore.getState().restoreStatus)) {
       if (Object.keys(journal.inbound).length > 0 && Date.now() - this.lastRecoveryAt > 30_000) {
         this.lastRecoveryAt = Date.now();
         await this.manager.recoverPendingPaymentRequestReceiveAttempts();

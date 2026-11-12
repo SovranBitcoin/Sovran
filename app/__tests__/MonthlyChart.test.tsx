@@ -10,10 +10,9 @@ import { Text } from '@/shared/ui/primitives/Text';
 jest.mock('@/shared/stores/global/settingsStore', () => {
   const { create } = jest.requireActual('zustand');
   return {
-    useSettingsStore: create((_: unknown, get: () => { displayBtc: number }) => ({
+    useSettingsStore: create(() => ({
       mockMode: false,
       displayBtc: 2,
-      getDisplayBtc: () => get().displayBtc,
     })),
   };
 });

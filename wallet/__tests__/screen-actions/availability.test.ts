@@ -20,10 +20,8 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 // behaviour specified for the day it returns. `reclaim-gate.test.ts` covers
 // what ships.
 vi.mock("../../src/p2pk/reclaimGate", () => ({ P2PK_RECLAIM_ENABLED: true }));
-import {
-  getAvailableActions,
-  isPaymentRequestPreview,
-} from "../../src/screen-actions/availability";
+import { getAvailableActions } from "../../src/screen-actions/availability";
+import { decodePaymentRequestEntryPhase } from "../../src/screen-actions/paymentRequestPhase";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
 import { setLogger } from "../../src/logger";
 import { INPUTS, MINT1, MINT2 } from "../_harness/fixtures";
@@ -237,11 +235,106 @@ describe("paymentRequestAvailability — cancel", () => {
   });
 });
 
+// Every phase the confirm handler writes, and the values no writer produces,
+// with the Pay and Cancel each one leaves on screen.
+describe("paymentRequestAvailability — each phase the entry can carry", () => {
+  const base = {
+    id: "pr-preview-123",
+    type: "send",
+    mintUrl: "https://mint1.example.com",
+    amount: 100,
+  };
+
+  it("offers neither Pay nor Cancel once the ecash left and was not taken back", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "pending",
+      operationId: "op-9",
+      metadata: { operationId: "op-9", phase: "undelivered", tokenCreated: "true" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers Cancel but no Pay once the ecash was taken back", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "rolledBack",
+      operationId: "pr-preview-123",
+      metadata: {
+        operationId: "pr-preview-123",
+        phase: "rolledBack",
+        tokenCreated: "true",
+      },
+    });
+    expect(actions.confirm.available).toBe(false);
+    // Nothing went out: a rolled-back entry is not delivered.
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it("offers Pay and Cancel when the only operation id is the preview's own", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      operationId: "pr-preview-123",
+      metadata: { operationId: "pr-preview-123", phase: "preview" },
+    });
+    expect(actions.confirm.available).toBe(true);
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it("offers neither Pay nor Cancel for a delivered entry that kept the preview id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "pending",
+      operationId: "pr-preview-123",
+      metadata: {
+        operationId: "pr-preview-123",
+        phase: "delivered",
+        tokenCreated: "true",
+        nostrSent: "true",
+      },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers neither Pay nor Cancel when the phase says delivered without an operation id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      metadata: { phase: "delivered" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers Cancel but no Pay for a phase no writer produces", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      metadata: { phase: "sending" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it("offers neither Pay nor Cancel for an unknown phase with an operation id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      operationId: "op-1",
+      metadata: { phase: "sending" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
-// isPaymentRequestPreview
+// decodePaymentRequestEntryPhase — is the entry still a preview?
 // ---------------------------------------------------------------------------
 
-describe("isPaymentRequestPreview", () => {
+describe("decodePaymentRequestEntryPhase — preview", () => {
+  const isPaymentRequestPreview = (entry: Record<string, unknown>) =>
+    decodePaymentRequestEntryPhase(entry).kind === "preview";
+
   it('returns true for preview entry (phase "preview", no operationId)', () => {
     const entry = {
       id: "pr-preview-123",

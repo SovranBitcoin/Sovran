@@ -17,7 +17,7 @@
 // `TransactionAnnotation` shape and `encode`/`decode` bridge the two.
 
 /** Canonical flat keys. The persisted unit is `Record<flatKey, string>`. */
-export const ANNOTATION_KEYS = {
+const ANNOTATION_KEYS = {
   counterpartyPubkey: "counterpartyPubkey",
   counterpartyDisplayName: "counterpartyDisplayName",
   counterpartyAvatarUrl: "counterpartyAvatarUrl",

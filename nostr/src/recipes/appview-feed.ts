@@ -204,8 +204,8 @@ export function notificationsAppView(input: NotificationsAppViewInput): NaggAppV
  * `POST /nostr/notes/stats`: POST the id list to `/nostr/events/aggregates` and
  * the server returns an envelope whose `aggregates` map carries the rule values
  * (`order`/`events` stay empty). Reconstruct the friendly per-id stats map with
- * `noteStatsFromEnvelope` (zero values are omitted server-side and default to 0
- * there).
+ * `noteMetricsMapFromAggregates` (zero values are omitted server-side and
+ * default to 0 there).
  *
  * POST only — an `ids` CSV can exceed URL length limits.
  */

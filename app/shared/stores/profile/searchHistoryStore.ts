@@ -8,6 +8,13 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 /** Maximum number of recent searches to store */
 const MAX_RECENT_SEARCHES = 10;
 
+/**
+ * Longest query recorded. A longer one is not recorded at all: a clipped
+ * query is not what the person searched for. Held on write only; 0.1.3
+ * recorded without it, so the reader takes any length.
+ */
+const MAX_QUERY_LENGTH = 2048;
+
 /** A single search history entry */
 interface SearchHistoryEntry {
   /** The search query text */
@@ -37,7 +44,8 @@ interface SearchHistoryState {
 }
 
 const PersistedSearchEntry = z.looseObject({
-  query: z.string().max(2048),
+  // Any length, as 0.1.3 saved it; see `MAX_QUERY_LENGTH`.
+  query: z.string(),
   timestamp: z.number().int().nonnegative(),
   context: z.string().max(64).optional(),
 });
@@ -59,6 +67,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>({
       addSearch: (query: string, context: string = 'default') => {
         const trimmedQuery = query.trim();
         if (!trimmedQuery || trimmedQuery.length < 2) return;
+        if (trimmedQuery.length > MAX_QUERY_LENGTH) return;
         storeLog.debug('store.search_history.add', { context });
 
         set((state) => {

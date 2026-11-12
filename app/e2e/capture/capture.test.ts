@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import sharp from 'sharp';
 import { CANONICAL_PAGES } from '../schema/pages';
 import { createCapturePlan } from './plan';
-import { importCaptureRun, type CaptureAttestation } from './import';
+import { captureRecord, importCaptureRun, type CaptureAttestation } from './import';
 import { LIBRARY_CAPTURE_PROFILE } from '../drivers/capture-profile';
 
 const plan = createCapturePlan();
@@ -393,6 +393,26 @@ describe('verified capture import', () => {
       'Recipe changed'
     );
     expect(existsSync(e.libraryDir)).toBe(false);
+  });
+  it('preserves integrity-checked retired pages without approving them as new captures', async () => {
+    const e = await evidence();
+    await importCaptureRun(e.runDir, e.options);
+    const manifestPath = join(e.libraryDir, 'manifest.json');
+    const saved = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const archived = { ...saved.captures[0], page: 'retired-page', file: 'ios/retired-page.png' };
+    const bytes = readFileSync(join(e.libraryDir, saved.captures[0].file));
+    writeFileSync(join(e.libraryDir, archived.file), bytes);
+    saved.captures.push(archived);
+    writeFileSync(manifestPath, JSON.stringify(saved));
+    expect(captureRecord.safeParse(archived).success).toBe(false);
+    await importCaptureRun(e.runDir, e.options);
+    const updated = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    expect(
+      updated.captures.find((record: { file: string }) => record.file === archived.file)
+    ).toEqual(archived);
+    expect(readFileSync(join(e.libraryDir, archived.file))).toEqual(bytes);
+    writeFileSync(join(e.libraryDir, archived.file), 'tampered');
+    await expect(importCaptureRun(e.runDir, e.options)).rejects.toThrow('integrity');
   });
   it('preserves newer entries and rejects altered library bytes', async () => {
     const e = await evidence();

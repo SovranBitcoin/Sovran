@@ -35,7 +35,9 @@ export function WhitenoiseSetupScreen() {
           variant="primary"
           loading={isBootstrapping}
           disabled={isLoading || isBootstrapping}
-          onPress={bootstrap}
+          onPress={async () => {
+            await bootstrap();
+          }}
           testID="whitenoise-setup-start"
         />
       )}

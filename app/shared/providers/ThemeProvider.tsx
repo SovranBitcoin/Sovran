@@ -36,16 +36,17 @@ const ThemeContext = createContext<ThemeContextValue>({
 /**
  * Resolves the chrome theme for the whole app from the profile-scoped
  * `themeStore`: walks the resolver fallback chain and returns a theme name
- * that exists in THEMES. Gates first render on both the wallpaper store
- * (downloaded themes registered) and the theme store (profile overrides
- * loaded) — missing either would flash the built-in fallback.
+ * that exists in THEMES. Gates first render on the wallpaper store only
+ * (downloaded themes registered), so the built-in fallback never flashes; the
+ * theme store loads later, once AccountScopedProviders opens its gate, and
+ * the resolved theme follows it from then on.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useInitMount('ThemeProvider');
   // Only gate on wallpaperStore — it's a global store and always hydrates.
   // themeStore is profile-scoped and its hydration is gated on
   // `_migrationGate`, which signals AFTER AccountScopedProviders mounts
-  // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
+  // lower in the tree. Gating ThemeProvider on themeStore's load
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
   // The chrome theme follows the ACTIVE WALLET UNIT: switching the wallet to

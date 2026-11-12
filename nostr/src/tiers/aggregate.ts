@@ -83,14 +83,16 @@ export type AggregateOptions<T> = TierReadContext & {
 };
 
 const TIER_ORDER: readonly NostrTier[] = ['nagg', 'primal', 'relay', 'cache'];
-const rankOf = (tier: NostrTier): number => {
+/** A tier's rank: lower is better, and an unknown tier ranks last. */
+export function tierRank(tier: NostrTier): number {
   const index = TIER_ORDER.indexOf(tier);
   return index < 0 ? TIER_ORDER.length : index;
-};
+}
 
 const DEFAULT_MIN_ITEMS = 1;
 const DEFAULT_CAP_MS = 600;
-const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
+/** The default bookkeeping ceiling per source (`sourceTimeoutMs`). */
+export const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
 
 const defaultScheduleAfter = (ms: number, fire: () => void): (() => void) => {
   const timer = setTimeout(fire, ms);
@@ -184,7 +186,7 @@ export function resolveAllTiers<T>(
         acc = options.merge(acc, outcome.value, tier);
         items = options.count(acc);
         sources.push(tier);
-        if (best === null || rankOf(tier) < rankOf(best)) best = tier;
+        if (best === null || tierRank(tier) < tierRank(best)) best = tier;
         if (painted) {
           nostrLog.debug('nostr.tier.aggregate.merged', {
             ...ctx,

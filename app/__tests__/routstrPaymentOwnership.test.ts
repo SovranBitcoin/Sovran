@@ -18,8 +18,8 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: mockAccount,
       profiles: [
@@ -27,8 +27,14 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
         { accountIndex: 1, pubkey: 'b'.repeat(64) },
       ],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: (owner: string) => ({
     read: async () => null,
@@ -130,6 +136,25 @@ describe('Routstr payment ownership boundary', () => {
     expect(mockWrites).toEqual([
       { owner: 'a'.repeat(64), value: expect.stringContaining('cashuB-old-owner') },
     ]);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('mints no token when the request stops being owned while the journal flushes before minting', async () => {
+    // Owned at the first check before minting; lost while the journal flushes.
+    const canDispatch = jest.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    const bound = await getRoutstrClient('https://node.example', canDispatch);
+    await expect(
+      bound.client.routeRequest({
+        path: '/v1/chat/completions',
+        method: 'POST',
+        baseUrl: bound.baseUrl,
+        mintUrl: 'https://mint.example',
+        body: { model: 'm' },
+        modelId: 'm',
+      })
+    ).rejects.toThrow();
+    expect(canDispatch).toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 

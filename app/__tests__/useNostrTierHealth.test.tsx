@@ -295,6 +295,26 @@ describe('useNostrTierHealth', () => {
     unmount();
   });
 
+  it('does not restart the probes when a render rebuilds an unchanged host list', async () => {
+    // useNostrTierConfig builds a new `urls` array on every call.
+    mockedUseNostrTierConfig.mockImplementation(() => ({
+      ...ENABLED_CONFIG,
+      primal: { enabled: true, urls: [...ENABLED_CONFIG.primal.urls] },
+    }));
+    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(true)));
+    mockedProbePrimalHealth.mockReturnValue(probeResult(Promise.resolve(true)));
+
+    const { rerender, unmount } = renderHook(() => useNostrTierHealth({}));
+    await flushEffects();
+    rerender({});
+    await flushEffects();
+
+    expect(mockedProbeNaggHealth).toHaveBeenCalledTimes(1);
+    expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('marks every cache host disabled when the tier is off', async () => {
     mockedUseNostrTierConfig.mockReturnValue({
       ...ENABLED_CONFIG,

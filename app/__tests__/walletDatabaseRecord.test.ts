@@ -119,7 +119,10 @@ describe('a recorded account whose database comes up empty', () => {
   );
 
   it('leaves a failed restore showing its error', () => {
-    useWalletLifecycleStore.getState().setRestoreStatus('failed', 'mint unreachable');
+    useWalletLifecycleStore.setState({
+      restoreStatus: 'failed',
+      lastRestoreError: 'mint unreachable',
+    });
     askForRestoreIfWalletDatabaseLost(1, true);
     expect(status()).toBe('failed');
     expect(useWalletLifecycleStore.getState().lastRestoreError).toBe('mint unreachable');

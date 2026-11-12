@@ -12,7 +12,6 @@
 import { errField, logger } from './logger';
 import type {
   ExactOfflineAmountIndex,
-  FiatMinorUnitSatRange,
   CompositionResult,
   FiatCompositionResult,
 } from './types';
@@ -21,7 +20,6 @@ import type {
 // Constants
 // ---------------------------------------------------------------------------
 
-const SATS_PER_BTC = 100_000_000;
 const BITSET_LIMIT = 2_000_000;
 // Per-coin cap for bitset-DP. `bits << BigInt(coin)` creates a BigInt that's
 // `coin + 1` bits long; Hermes' BigInt representation tops out well before
@@ -31,7 +29,6 @@ const BITSET_LIMIT = 2_000_000;
 const BITSET_MAX_COIN = 1_000_000;
 const EXHAUSTIVE_LIMIT = 20;
 const MITM_LIMIT = 40;
-const RANGE_EPSILON = 1e-9;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -39,10 +36,6 @@ const RANGE_EPSILON = 1e-9;
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
-}
-
-function isFinitePositiveNumber(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function roundFiat(value: number): number {
@@ -650,89 +643,4 @@ export function buildExactOfflineAmountIndex(
     reachableSums,
     totalReadyBalance: total,
   };
-}
-
-/**
- * Convert a sat amount to the nearest displayed fiat minor unit
- * (e.g. cents). Returns null on invalid input.
- */
-export function getRoundedFiatMinorUnitForSats(
-  sats: number,
-  btcPrice: number,
-  minorUnitsPerUnit: number = 100,
-): number | null {
-  if (
-    !isPositiveInteger(sats) ||
-    !isFinitePositiveNumber(btcPrice) ||
-    !isPositiveInteger(minorUnitsPerUnit)
-  ) {
-    logger.debug('offline.fiatMinorUnitForSats.invalid', {
-      sats,
-      btcPrice,
-      minorUnitsPerUnit,
-    });
-    return null;
-  }
-  const result = Math.round(
-    (sats * btcPrice * minorUnitsPerUnit) / SATS_PER_BTC,
-  );
-  logger.debug('offline.fiatMinorUnitForSats.result', {
-    sats,
-    btcPrice,
-    minorUnitsPerUnit,
-    result,
-  });
-  return result;
-}
-
-/**
- * Derive the sat range that rounds to a given displayed fiat minor unit.
- * All sats in [minSat, maxSat] display as the same fiat amount.
- */
-export function getSatRangeForDisplayedFiatMinorUnit(
-  targetMinorUnit: number,
-  btcPrice: number,
-  minorUnitsPerUnit: number = 100,
-): FiatMinorUnitSatRange | null {
-  if (
-    !Number.isInteger(targetMinorUnit) ||
-    targetMinorUnit < 0 ||
-    !isFinitePositiveNumber(btcPrice) ||
-    !isPositiveInteger(minorUnitsPerUnit)
-  ) {
-    logger.debug('offline.satRangeForFiatMinorUnit.invalid', {
-      targetMinorUnit,
-      btcPrice,
-      minorUnitsPerUnit,
-    });
-    return null;
-  }
-
-  const minorUnitsPerBtc = btcPrice * minorUnitsPerUnit;
-  if (!isFinitePositiveNumber(minorUnitsPerBtc)) {
-    logger.debug('offline.satRangeForFiatMinorUnit.invalid', {
-      reason: 'minor-units-per-btc',
-      targetMinorUnit,
-      btcPrice,
-      minorUnitsPerUnit,
-    });
-    return null;
-  }
-
-  const rawMin = ((targetMinorUnit - 0.5) * SATS_PER_BTC) / minorUnitsPerBtc;
-  const rawMaxExcl =
-    ((targetMinorUnit + 0.5) * SATS_PER_BTC) / minorUnitsPerBtc;
-  const minSat = Math.max(1, Math.ceil(rawMin - RANGE_EPSILON));
-  const maxSat = Math.max(0, Math.floor(rawMaxExcl - RANGE_EPSILON));
-
-  const result = maxSat >= minSat ? { minSat, maxSat } : null;
-  logger.debug('offline.satRangeForFiatMinorUnit.result', {
-    targetMinorUnit,
-    btcPrice,
-    minorUnitsPerUnit,
-    hasRange: result != null,
-    minSat: result?.minSat ?? null,
-    maxSat: result?.maxSat ?? null,
-  });
-  return result;
 }

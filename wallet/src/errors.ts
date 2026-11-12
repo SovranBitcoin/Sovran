@@ -1,6 +1,7 @@
 import { NetworkError, HttpResponseError } from "@cashu/coco-core";
 
 import { logger } from "./logger";
+import { getPaymentCopy } from "./copy";
 
 function summarizeError(err: unknown): Record<string, unknown> {
   if (err instanceof HttpResponseError) {
@@ -92,6 +93,26 @@ export function failureText(cause: unknown, fallback: string): FailureText {
 }
 
 /**
+ * A payment request's ecash was created, its delivery failed, and taking it
+ * back failed too. The ecash may already be out, so the payment must not be
+ * offered again. Carries the delivery failure's message and authorship.
+ */
+export class PaymentRequestUndeliveredError extends Error {
+  readonly operationId: string;
+  readonly authored: boolean;
+  constructor(operationId: string, deliveryError: unknown) {
+    const { message, authored } = failureText(
+      deliveryError,
+      "Payment request failed",
+    );
+    super(message, { cause: deliveryError });
+    this.name = "PaymentRequestUndeliveredError";
+    this.operationId = operationId;
+    this.authored = authored;
+  }
+}
+
+/**
  * The user deliberately backed out of a melt mid-flow (e.g. dismissed the
  * onchain NUT-30 fee sheet before any proofs were reserved). Failure routing
  * treats this as a quiet cancel — no failure toast, no error step.
@@ -124,9 +145,12 @@ export class UnitRateUnavailableError extends Error {
   }
 }
 
-export function isUnitRateUnavailableError(err: unknown): boolean {
-  return (
-    err instanceof UnitRateUnavailableError ||
-    (err instanceof Error && err.name === "UnitRateUnavailableError")
-  );
+/** A melt may still pay; Coco recovery owns it until its outcome is known. */
+export class MeltOutcomeUnknownError extends AuthoredError {
+  readonly operationId: string;
+  constructor(operationId: string, cause: unknown) {
+    super(getPaymentCopy("melt.outcomeUnknown"), { cause });
+    this.name = "MeltOutcomeUnknownError";
+    this.operationId = operationId;
+  }
 }

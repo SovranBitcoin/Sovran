@@ -10,20 +10,17 @@ import {
 } from 'nostr';
 import { z } from 'zod';
 import { ResultAsync } from 'neverthrow';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { nostrLog } from '@/shared/lib/logger';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { signVertexRequest, vertexAutomationDisabled } from './signVertexRequest';
 
 const responseSchema = z.union([recipes.VertexFailureSchema, NaggProfilesEnvelopeSchema]);
 // In-memory only: never persist lookup targets or query text. Bound by the daily cap.
 const attempted = new Map<string, Set<string>>();
-const activePubkey = () => {
-  const state = useProfileStore.getState();
-  return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
-};
 const enabled = () =>
   useSettingsStore.getState().vertexCreditsEnabled &&
   getNostrTierConfig().nagg.enabled &&
@@ -50,17 +47,7 @@ export async function refreshVertex(
   if (!owner || !signer) return null;
   const budget = getVertexBudgetStore(owner);
   // Bound the wait if storage fails; spending fails closed until hydration succeeds.
-  if (!budget.persist.hasHydrated()) {
-    await new Promise<void>((resolve) => {
-      const finish = () => {
-        clearTimeout(timer);
-        unsubscribe();
-        resolve();
-      };
-      const unsubscribe = budget.persist.onFinishHydration(finish);
-      const timer = setTimeout(finish, 2_000);
-    });
-  }
+  await whenLoaded(budget, { timeoutMs: 2_000 });
   if (!budget.persist.hasHydrated()) return null;
   const identity = await ResultAsync.fromPromise(signer.user(), () => null);
   const stillCurrent = () =>

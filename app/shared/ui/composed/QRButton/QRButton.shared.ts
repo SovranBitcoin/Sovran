@@ -12,8 +12,6 @@ import { useQRButtonReveal } from './useQRButtonReveal';
 
 export interface QRButtonProps {
   onPress: () => void;
-  accentColor?: string;
-  color?: string;
   size?: number;
   /** e2e selector for the press surface. Defaults to `qr-scan-button`. */
   testID?: string;

@@ -4,8 +4,12 @@
  *
  * Touches ONLY signer-owned storage: the three nip46 stores, the pending
  * pairing intent, and the profile's bunker pairing secrets. Nothing else
- * (wallet, feed, theme, …) is read or written. The engine keeps running —
- * with the connections store empty every sender is a stranger again, and the
+ * (wallet, feed, theme, …) is read or written. The engine is not stopped
+ * here: with no connection left the signer service stops it, which also drops
+ * its pending-request contexts and awaited pairings, unless something else
+ * holds it hot (Share Remote Login open, a resumed pairing). While it is held
+ * hot it keeps running and keeps those two in-memory maps. Either way, with
+ * the connections store empty every sender is a stranger again, and the
  * requests-store wipe already dropped pending asks, session grants, and
  * throttle flags. In-memory rate-limiter windows are inert residue.
  */

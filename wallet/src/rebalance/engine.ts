@@ -18,6 +18,7 @@
 
 import { amountToNumber } from '../amount';
 import { logger as packageLogger, mintUrlFields, errField } from '../logger';
+import { meltDidNotPay, meltSettledUnpaid, outcomeOfFailedMeltExecute } from '../melt-outcome';
 import {
   computeInitialTransferAmount,
   feeHeadroomFor,
@@ -39,6 +40,7 @@ import type {
   RebalanceMintSnapshot,
   RebalancePreparedMelt,
   RebalanceRoute,
+  RebalanceRunActivity,
   RebalanceRunCallbacks,
   RebalanceRunResult,
   RebalanceTransfer,
@@ -62,9 +64,6 @@ const NEXT_TRANSFER_PAUSE_MS = 500;
 /** How long a settled melt's receipt is waited for before it is given up on. An invoice lives less. */
 const ARRIVING_MAX_MS = 60 * 60 * 1000;
 
-/** Melt states in which the payment may already have left the mint. */
-const MELT_IN_FLIGHT_STATES = new Set(['executing', 'pending', 'finalized']);
-
 type Settlement = 'finalized' | 'pending' | 'aborted';
 
 type ArrivingReceipt = { receipt: RebalanceMintReceipt; since: number };
@@ -79,9 +78,8 @@ function arrivingFor(lock: object): Map<string, ArrivingReceipt[]> {
   return arriving;
 }
 
-interface TransferRun {
+interface TransferRun extends RebalanceRunActivity {
   step: RebalanceTransfer;
-  isActive: () => boolean;
   sink: RebalanceEventSink;
   /** Mints holding a melt whose outcome is unknown; their proofs are never restored. */
   unsettledMints: Set<string>;
@@ -103,7 +101,7 @@ export interface RebalanceEngine {
   /** Run one transfer to a terminal outcome. Never throws for wallet failures. */
   executeTransfer(
     step: RebalanceTransfer,
-    options: { isActive: () => boolean; sink: RebalanceEventSink }
+    options: RebalanceRunActivity & { sink: RebalanceEventSink }
   ): Promise<RebalanceTransferOutcome>;
   /** Run transfers in order, skipping those already settled. */
   runTransfers(
@@ -149,6 +147,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   const log = config.logger ?? packageLogger;
   const debug = (entry: Record<string, unknown>) => log.debug('mint.rebalance.step', entry);
 
+  /** Whether a new leg may open: the caller is asked first, and may end the run. */
+  function mayOpenLeg(activity: RebalanceRunActivity): boolean {
+    activity.beforeLegOpens?.();
+    return activity.isActive();
+  }
+
   // ── Wallet reads with documented fallbacks ────────────────────────────
 
   async function readWorstCaseInputFee(mintUrl: string): Promise<number | null> {
@@ -184,21 +188,28 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   // ── Reconciliation ────────────────────────────────────────────────────
 
-  /** Poll a sent melt until coco reports it settled, it rolls back, or time runs out. */
+  /**
+   * Poll a sent melt until coco reports it settled, a state it reads proves
+   * it did not pay, or time runs out. A read that fails says nothing about
+   * the payment, and the next poll reads again.
+   */
   async function awaitMeltSettlement(
     operationId: string,
     maxWaitMs: number,
     isActive: () => boolean,
-    rolledBackMessage?: string
-  ): Promise<Settlement> {
+    provesNotPaid: (state: string) => boolean
+  ): Promise<Settlement | { notPaid: string }> {
     const start = clock.now();
     while (clock.now() - start < maxWaitMs) {
       if (!isActive()) return 'aborted';
-      const refreshed = await wallet.refreshMelt(operationId);
-      if (refreshed.state === 'finalized') return 'finalized';
-      if (refreshed.state === 'rolled_back') {
-        throw new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
+      let state: string | undefined;
+      try {
+        state = (await wallet.refreshMelt(operationId)).state;
+      } catch (error) {
+        log.warn('mint.rebalance.melt_refresh_failed', { operationId, error });
       }
+      if (state === 'finalized') return 'finalized';
+      if (state !== undefined && provesNotPaid(state)) return { notPaid: state };
       await clock.sleep(SETTLE_POLL_MS);
     }
     return 'pending';
@@ -209,7 +220,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       return (await wallet.getMeltOperation(operationId))?.state ?? null;
     } catch (error) {
-      // An unreadable state falls back to the error's own classification.
       log.warn('mint.rebalance.melt_state_read_failed', { operationId, error });
       return null;
     }
@@ -217,8 +227,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   /**
    * Execute a prepared melt once and report how it settled. When `execute`
-   * throws, the melt is reconciled against coco's state before the error is
-   * believed: a melt that is in flight is awaited, never repeated.
+   * throws, the error is believed (the melt failed, its proofs freed or
+   * another payment prepared) only once the melt is known not to have paid:
+   * its state says so or, when its state cannot be read, the mint refused it
+   * before paying. Any other melt is awaited as in flight, never repeated,
+   * and stays pending when it does not settle; a later read that proves it
+   * did not pay releases it then.
    */
   async function executeMeltOnce(
     run: TransferRun,
@@ -227,23 +241,27 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     settleWaitMs: number,
     rolledBackMessage?: string
   ): Promise<Settlement> {
-    const settle = async (operationId: string): Promise<Settlement> => {
+    const rolledBack = (operationId: string) =>
+      new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
+    /** Wait for the melt; once a read proves it did not pay, its mint holds nothing of it. */
+    const settle = async (
+      operationId: string,
+      provesNotPaid: (state: string) => boolean,
+      unpaid: (state: string) => unknown
+    ): Promise<Settlement> => {
       run.unsettledMints.add(mintUrl);
-      let settlement: Settlement;
-      try {
-        settlement = await awaitMeltSettlement(
-          operationId,
-          settleWaitMs,
-          run.isActive,
-          rolledBackMessage
-        );
-      } catch (error) {
-        // Rolled back: the mint released the inputs, so the mint is settled.
+      const settled = await awaitMeltSettlement(
+        operationId,
+        settleWaitMs,
+        run.isActive,
+        provesNotPaid
+      );
+      if (typeof settled === 'object') {
         run.unsettledMints.delete(mintUrl);
-        throw error;
+        throw unpaid(settled.notPaid);
       }
-      if (settlement === 'finalized') run.unsettledMints.delete(mintUrl);
-      return settlement;
+      if (settled === 'finalized') run.unsettledMints.delete(mintUrl);
+      return settled;
     };
 
     let result: Awaited<ReturnType<typeof wallet.executeMelt>>;
@@ -253,17 +271,23 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       if (!run.isActive()) return 'aborted';
       if (classifyRebalanceError(error) === 'operation_in_progress') {
         debug({ event: 'melt_in_progress_reconcile', stepId: run.step.id, operationId: melt.id });
-        return settle(melt.id);
+        // Another call holds the melt and may yet send it: only a settled
+        // state proves anything.
+        return settle(melt.id, meltSettledUnpaid, () => rolledBack(melt.id));
       }
       const state = await readMeltState(melt.id);
-      if (state !== null && MELT_IN_FLIGHT_STATES.has(state)) {
-        debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
-        return settle(melt.id);
-      }
-      throw error;
+      if (outcomeOfFailedMeltExecute(error, state) === 'notPaid') throw error;
+      debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
+      // This execute was the only call that could send it, and it has returned.
+      return settle(melt.id, meltDidNotPay, (unpaidState) =>
+        meltSettledUnpaid(unpaidState) ? rolledBack(melt.id) : error
+      );
     }
     if (!run.isActive()) return 'aborted';
-    if (result?.state === 'pending') return settle(result.id ?? melt.id);
+    if (result?.state === 'pending') {
+      const operationId = result.id ?? melt.id;
+      return settle(operationId, meltSettledUnpaid, () => rolledBack(operationId));
+    }
     return 'finalized';
   }
 
@@ -565,6 +589,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       }
     }
 
+    // Asked last, after the reads and the invoice above: an account switch
+    // during them must open nothing.
+    if (!mayOpenLeg(run)) return { status: 'aborted' };
     sink.legOpened(hop.legId, {
       fromMintUrl: hopFrom,
       toMintUrl: hopTo,
@@ -629,7 +656,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       let finalReceipt: RebalanceMintReceipt | null = null;
       for (let index = 0; index < hopCount; index++) {
-        if (!run.isActive()) return { status: 'incomplete', finalHopLegId, sentHops };
+        if (!mayOpenLeg(run)) return { status: 'incomplete', finalHopLegId, sentHops };
         const legId = hopLegIds[index];
         finalHopLegId = legId;
         startedHops = index + 1;
@@ -717,7 +744,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
     let lastError: unknown = noRouteError;
     for (let index = 0; index < routes.length; index++) {
-      if (!run.isActive()) return 'aborted';
+      if (!mayOpenLeg(run)) return 'aborted';
       const route = routes[index];
       debug({
         event: 'trying_candidate_route',
@@ -827,6 +854,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return { status: 'skipped' };
       }
 
+      // Asked last, after every read above: an account switch during them
+      // must open nothing.
+      if (!mayOpenLeg(run)) return { status: 'aborted' };
       sink.legOpened(id, {
         fromMintUrl,
         toMintUrl,
@@ -955,8 +985,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
             finalReceipt = receipt;
             break;
           } catch (error) {
-            // `executeMeltOnce` already confirmed the melt is not in flight,
-            // so the mint rejected its inputs before paying anything.
+            // `executeMeltOnce` already established the melt did not pay, so
+            // the mint rejected its inputs before paying anything.
             const shortfall = classifyRebalanceError(error) === 'input_shortfall';
             if (!shortfall || attempt >= MAX_EXECUTE_RETRIES) throw error;
             transferAmount -= RETRY_REDUCE_SATS;
@@ -1028,9 +1058,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   async function executeTransfer(
     step: RebalanceTransfer,
-    options: { isActive: () => boolean; sink: RebalanceEventSink }
+    options: RebalanceRunActivity & { sink: RebalanceEventSink }
   ): Promise<RebalanceTransferOutcome> {
-    if (!options.isActive()) return { status: 'aborted' };
+    if (!mayOpenLeg(options)) return { status: 'aborted' };
     // Coco operations are stateful (proof selection, inflight tracking);
     // transfers run one at a time.
     if (!(await lock.acquire())) {
@@ -1038,7 +1068,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       return { status: 'busy' };
     }
     try {
-      if (!options.isActive()) return { status: 'aborted' };
       return await transfer({ step, ...options, unsettledMints: new Set() });
     } finally {
       lock.release();
@@ -1058,7 +1087,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     let anyPending = false;
     try {
       for (const step of steps) {
-        if (!callbacks.isActive()) return { status: 'aborted' };
+        if (!mayOpenLeg(callbacks)) return { status: 'aborted' };
         // Legs settled by an earlier run (e.g. a retry of failed legs only).
         if (callbacks.isSettled(step.id)) continue;
         // A step that spends money still on its way to its source is left as
@@ -1073,6 +1102,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         const stepStart = clock.now();
         const outcome = await executeTransfer(step, {
           isActive: callbacks.isActive,
+          beforeLegOpens: callbacks.beforeLegOpens,
           sink: callbacks.sinkFor(step),
         });
         if (outcome.status === 'pending' || outcome.status === 'settling') anyPending = true;

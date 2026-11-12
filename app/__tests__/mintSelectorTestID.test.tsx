@@ -17,7 +17,6 @@ jest.mock('@/features/wallet/components/MintSelector/useMintSelector', () => ({
     isLoading: false,
     mintIconUrl: undefined,
     onRequestMintList: jest.fn(),
-    dimensions: { buttonWidth: 240 },
   })),
 }));
 jest.mock(

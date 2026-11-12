@@ -56,16 +56,6 @@ export function createInMemoryAnnotationStore(): AnnotationStoreAdapter {
   };
 }
 
-/** First non-undefined record from a candidate-key lookup. */
-export function firstAnnotationRecord(
-  records: ReadonlyArray<AnnotationRecord | undefined>,
-): AnnotationRecord | undefined {
-  for (const record of records) {
-    if (record && Object.keys(record).length > 0) return record;
-  }
-  return undefined;
-}
-
 /**
  * Merge every candidate-key record into one. An entry's annotations can be
  * split across keys — e.g. distribution written under `quote:` while a migrated

@@ -15,8 +15,8 @@ initLog('Module', 'InitializationProvider loaded');
 /**
  * Initialization stage system
  *
- * Each provider registers one or more stages via `useInitializationStage`.
- * Stages can declare dependencies (`dependsOn`) and whether they are
+ * Each provider registers its stage from `STAGES` via `useInitializationStage`.
+ * A stage declares its dependencies (`dependsOn`) and whether it is
  * **blocking** (default) or **non-blocking**.
  *
  *  - **Blocking** stages (`blocking: true`, the default) keep the splash
@@ -28,26 +28,14 @@ initLog('Module', 'InitializationProvider loaded');
  * the app. The native splash screen (`expo-splash-screen`) renders the
  * splash UI; consumers (see `app/_layout.tsx`) call `SplashScreen.hideAsync`
  * once `isInitializing` flips false and the root view has laid out.
- *
- * Current stage map:
- *
- *  | Stage ID               | Blocking | Depends On             | Provider              |
- *  |------------------------|----------|------------------------|-----------------------|
- *  | global-migrations      | yes      | —                      | GlobalMigrationGate   |
- *  | nostr                  | yes      | global-migrations      | NostrKeysProvider     |
- *  | coco                   | yes      | nostr                  | CocoProvider          |
- *  | nostr-ndk              | no       | coco                   | NostrNDKProvider      |
- *  | coco-background        | no       | coco                   | CocoProvider          |
  */
 
 type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
 
-/** Configuration passed when registering a new initialization stage. */
+/** How a stage sits in the startup graph. */
 interface StageConfig {
-  /** Human-readable message — captured into init logs only. */
-  message?: string;
   /** IDs of stages that must complete before this one can start. */
-  dependsOn?: string[];
+  dependsOn?: readonly string[];
   /**
    * When `true` (the default), the splash screen stays visible until this
    * stage completes. Set to `false` for work that can happen after the app
@@ -63,10 +51,26 @@ interface StageConfig {
   outlivesAccount?: boolean;
 }
 
+/** The startup stages, keyed by id, with the provider that registers each. */
+const STAGES = {
+  /** GlobalMigrationGate, mounted above the account providers. */
+  'global-migrations': { outlivesAccount: true },
+  /** NostrKeysProvider. */
+  nostr: { dependsOn: ['global-migrations'] },
+  /** CocoProvider: opening the wallet. */
+  coco: { dependsOn: ['nostr'] },
+  /** CocoProvider: background work once the wallet is open. */
+  'coco-background': { dependsOn: ['coco'], blocking: false },
+  /** NostrNDKProvider. */
+  'nostr-ndk': { dependsOn: ['coco'], blocking: false },
+} as const satisfies Record<string, StageConfig>;
+
+type StageId = keyof typeof STAGES;
+
 interface Stage {
   id: string;
   status: StageStatus;
-  dependsOn?: string[];
+  dependsOn?: readonly string[];
   /** When true (the default), this stage must complete before the app renders. */
   blocking: boolean;
   outlivesAccount: boolean;
@@ -84,7 +88,7 @@ interface InitializationContextValue {
   isInitializing: boolean;
   /** A blocking stage has failed; whatever it rendered in place of the app is on screen. */
   hasFailedStage: boolean;
-  registerStage: (id: string, config: StageConfig) => void;
+  registerStage: (id: StageId) => void;
   updateStage: (
     id: string,
     updates: { message?: string; status?: StageStatus; error?: string }
@@ -134,7 +138,8 @@ export function InitializationProvider({ children }: InitializationProviderProps
   // duration when it reaches 'complete'.
   const stageStartTimes = useRef<Map<string, number>>(new Map());
 
-  const registerStage = useCallback((id: string, config: StageConfig) => {
+  const registerStage = useCallback((id: StageId) => {
+    const config: StageConfig = STAGES[id];
     const isBlocking = config.blocking !== false;
 
     initLog(
@@ -322,31 +327,15 @@ export function useInitializationReset() {
   return { resetStages, cancelResetStages };
 }
 
-export function useInitializationStage(stageId: string, config: StageConfig = {}) {
+export function useInitializationStage(stageId: StageId) {
   const { registerStage, updateStage, canStageStart } = useInitializationContext();
   const hasRegistered = useRef(false);
-
-  // Registration is once-per-stage, but `config` is an object literal rebuilt
-  // on every render, so depending on it directly would be dishonest. Depend on
-  // its primitive contents instead: every call site passes literals, so these
-  // never change, and the `hasRegistered` guard covers the case where one does.
-  //
-  // The join/split round-trip is lossless because stage IDs are the closed,
-  // comma-free set in the table at the top of this file. A stage ID containing
-  // a comma would split into two phantom dependencies that never complete.
-  const { message, dependsOn, blocking, outlivesAccount } = config;
-  const dependsOnKey = dependsOn?.join(',') ?? '';
 
   useEffect(() => {
     if (hasRegistered.current) return;
     hasRegistered.current = true;
-    registerStage(stageId, {
-      message,
-      blocking,
-      outlivesAccount,
-      dependsOn: dependsOnKey ? dependsOnKey.split(',') : undefined,
-    });
-  }, [stageId, registerStage, message, blocking, outlivesAccount, dependsOnKey]);
+    registerStage(stageId);
+  }, [stageId, registerStage]);
 
   const log = useCallback(
     (message: string) => {

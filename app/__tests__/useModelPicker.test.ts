@@ -105,6 +105,25 @@ describe('useModelPicker', () => {
     expect(mockParamPopup).not.toHaveBeenCalled();
   });
 
+  it('takes a pick of a model that appeared after the sheet opened', async () => {
+    const { result, rerender } = renderHook(() => useModelPicker());
+    // Opened before the catalog landed: the sheet starts on the built-in list.
+    act(() => result.current());
+    const landed = {
+      'new-vendor': { auto: { modelId: 'new-vendor/model', name: 'New model' } },
+    };
+    mockRoutstr = { ...mockRoutstr, lineup: landed as never };
+    rerender({});
+
+    await act(async () => {
+      answer({ kind: 'option', id: 'new-vendor:auto' });
+      await flush();
+    });
+    mockRoutstr = { ...mockRoutstr, lineup: null };
+
+    expect(mockSetSelectedSlot).toHaveBeenCalledWith({ provider: 'new-vendor', tier: 'auto' });
+  });
+
   it('keeps the open sheet current as the balance changes', () => {
     const { result, rerender } = renderHook(() => useModelPicker());
     act(() => result.current());

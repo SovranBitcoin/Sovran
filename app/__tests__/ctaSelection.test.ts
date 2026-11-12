@@ -1,3 +1,5 @@
+import { Amount } from '@cashu/coco-core';
+import { holdsMoneyInAnyUnit } from '@/shared/lib/cta/useHoldsMoney';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
 import { CTA_DEFINITIONS, BACKUP_SNOOZE_MS, DAY_MS } from '@/shared/lib/cta/definitions';
 import { isNewerVersion } from '@/shared/lib/cta/version';
@@ -7,7 +9,7 @@ const ctx: CtaContext = {
   nativeVersion: '1.0.0',
   latest: { version: '2.0.0', fetchedAt: 10 * DAY_MS },
   lifecycle: { seedCreatedAt: 0, recoveryPhraseVerifiedAt: null, restoreStatus: 'complete' },
-  balanceTotalSat: 1,
+  holdsMoney: true,
   oldEcash: null,
   dismissed: {},
   mockMode: false,
@@ -91,7 +93,7 @@ it('suppresses auto-show under automation and backup under Mock Mode', () => {
 it('requires an unverified, eligible lifecycle and balance or a known seed older than seven days', () => {
   for (const lifecycle of [
     { ...ctx.lifecycle, recoveryPhraseVerifiedAt: 0, recoveryPhraseVerifiedRevision: 2 },
-    { ...ctx.lifecycle, restoreStatus: 'pending' },
+    { ...ctx.lifecycle, restoreStatus: 'pending' as const },
   ])
     expect(selectNextCta({ ...ctx, latest: null, lifecycle })).toBeNull();
   for (const seedCreatedAt of [null, ctx.nowMs - 7 * DAY_MS]) {
@@ -99,12 +101,12 @@ it('requires an unverified, eligible lifecycle and balance or a known seed older
       selectNextCta({
         ...ctx,
         latest: null,
-        balanceTotalSat: 0,
+        holdsMoney: false,
         lifecycle: { ...ctx.lifecycle, seedCreatedAt },
       })
     ).toBeNull();
   }
-  expect(selectNextCta({ ...ctx, latest: null, balanceTotalSat: 0 })?.id).toBe(
+  expect(selectNextCta({ ...ctx, latest: null, holdsMoney: false })?.id).toBe(
     'backup-recovery-phrase'
   );
 });
@@ -174,4 +176,44 @@ it('uses revision 1 for definitions without an explicit revision', () => {
       definitions
     )
   ).toBeNull();
+});
+
+describe('what each prompt makes of the saved restore status', () => {
+  // Pinned as it is: both prompts are held only while a restore is pending.
+  // `unknown`, `in-progress` and `failed` do not hold them here (the host
+  // holds the whole queue for `failed`; see ctaHost.test.tsx).
+  it.each([
+    ['unknown', true],
+    ['not-needed', true],
+    ['pending', false],
+    ['in-progress', true],
+    ['complete', true],
+    ['failed', true],
+  ] as const)('%s: shows %s', (restoreStatus, shows) => {
+    const lifecycle = { ...ctx.lifecycle, restoreStatus };
+    const backup = CTA_DEFINITIONS.find((cta) => cta.id === 'backup-recovery-phrase');
+    const claim = CTA_DEFINITIONS.find((cta) => cta.id === 'claim-old-ecash');
+    const oldEcash = { mintUrl: 'https://mint.example', amount: 21, unit: 'sat' };
+    expect(backup?.shouldShow({ ...ctx, lifecycle })).toBe(shows);
+    expect(claim?.shouldShow({ ...ctx, lifecycle, oldEcash })).toBe(shows);
+  });
+});
+it('counts a wallet as holding money when any one unit is above zero', () => {
+  const totals = (byUnit: Record<string, number>) =>
+    Object.fromEntries(
+      Object.entries(byUnit).map(([unit, total]) => [
+        unit,
+        {
+          unit,
+          spendable: Amount.from(total),
+          reserved: Amount.zero(),
+          total: Amount.from(total),
+        },
+      ])
+    );
+  expect(holdsMoneyInAnyUnit(totals({}))).toBe(false);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, usd: 0 }))).toBe(false);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 21 }))).toBe(true);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, usd: 500 }))).toBe(true);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, eur: 1 }))).toBe(true);
 });

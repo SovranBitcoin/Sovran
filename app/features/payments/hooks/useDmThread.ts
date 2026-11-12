@@ -6,10 +6,7 @@
  * counterparty after decryption, then deduped by id.
  */
 import { useCallback, useRef, useState } from 'react';
-import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -17,8 +14,6 @@ import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
 import { paymentLog } from '@/shared/lib/logger';
 import { dmThreadCache, dmThreadKey } from '../data/dmSnapshotCaches';
 import { useDmEnvelopePages, type DmPageMeta } from './useDmEnvelopePages';
-
-const PAGE_LIMIT = 50;
 
 export interface DmThreadMessage {
   id: string;
@@ -123,31 +118,18 @@ export function useDmThread({
     if (!useDmLastMessageStore.persist.hasHydrated()) {
       await useDmLastMessageStore.persist.rehydrate();
     }
-    await (protocol === 'nip04'
-      ? nip04Cache.hydrate(viewerPubkey)
-      : giftWrapCache.cache.hydrate(viewerPubkey));
+    await hydrateDmDecryptCaches(viewerPubkey, protocol);
   }, [protocol, viewerPubkey]);
-
-  const fetchPage = useCallback(
-    (args: { until?: number; refresh: boolean; signal?: AbortSignal }) =>
-      fetchDmEnvelopes({
-        viewer: viewerPubkey ?? '',
-        limit: PAGE_LIMIT,
-        ...args,
-      }),
-    [viewerPubkey]
-  );
 
   const pages = useDmEnvelopePages({
     surface: 'dmThread',
+    viewer: viewerPubkey,
     hasSnapshot: initial.key === cacheKey && initial.rows.length > 0,
     feedKey:
       viewerPubkey && viewerPrivateKey && counterparty
         ? `${viewerPubkey}:${protocol}:${counterparty}`
         : null,
-    pageLimit: PAGE_LIMIT,
     hydrate,
-    fetchPage,
     onPage,
     continueWhileEmpty: true,
     onReset,

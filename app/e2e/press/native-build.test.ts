@@ -5,6 +5,7 @@ import {
   nativeArtifactHash,
   selectBundledIosStoryApp,
   nativeBuildEnvironment,
+  parseNativeBuildArgs,
 } from './native-build';
 
 import { execFileSync } from 'node:child_process';
@@ -282,3 +283,39 @@ test.each(['dev', 'android', 'production', 'wrong path', 'missing hash', 'old so
     }
   }
 );
+
+test.each(['--status', '--force'] as const)(
+  'preserves %s regardless of bundled flag order',
+  (flag) => {
+    for (const flags of [[flag], [flag, '--bundled'], ['--bundled', flag]]) {
+      expect(parseNativeBuildArgs(['ios', ...flags])).toEqual({
+        platform: 'ios',
+        kind: flags.includes('--bundled') ? 'bundled' : 'dev',
+        edition: undefined,
+        flag,
+      });
+    }
+  }
+);
+test.each(
+  [
+    ['ios', '--edition'],
+    ['ios', '--typo'],
+    ['ios', '--status', '--force'],
+    ['ios', '--bundled', '--bundled'],
+    ['ios', '--edition', '--bundled'],
+    ['ios', '--bundled', '--edition', '../../other'],
+  ].map((args) => ({ args }))
+)('rejects malformed native arguments before any effect: %j', ({ args }) => {
+  expect(() => parseNativeBuildArgs(args)).toThrow();
+});
+
+test('keeps a valid bundled edition separate from mode flags', () => {
+  expect(parseNativeBuildArgs(['ios', '--bundled', '--edition', 'full'])).toEqual({
+    platform: 'ios',
+    kind: 'bundled',
+    edition: 'full',
+    flag: undefined,
+  });
+  expect(() => parseNativeBuildArgs(['android', '--bundled', '--edition', 'full'])).toThrow();
+});

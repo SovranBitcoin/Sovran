@@ -90,14 +90,14 @@ async function coldStart() {
     require('@/shared/lib/migrations/globalMigrations') as typeof import('@/shared/lib/migrations/globalMigrations');
   const { signalMigrationsComplete } =
     require('@/shared/lib/cashu/profileScopedStorage') as typeof import('@/shared/lib/cashu/profileScopedStorage');
-  const { hydrationSettled } =
+  const { whenLoaded } =
     require('@/shared/lib/persist/hydrationOutcome') as typeof import('@/shared/lib/persist/hydrationOutcome');
   const { useProfileStore } =
     require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
 
   await runGlobalMigrations();
   signalMigrationsComplete();
-  const loaded = await hydrationSettled(useRoutstrStore);
+  const loaded = await whenLoaded(useRoutstrStore, { orFailed: true });
   await settle();
   return {
     store: useRoutstrStore,
@@ -195,7 +195,7 @@ describe('an install from before accounts existed', () => {
     const { store, problems, addAccountZero } = await coldStart();
     await addAccountZero();
 
-    store.getState().setBalance(20_000);
+    store.setState({ balance: 20_000 });
     await settle();
 
     const plain = mockAsync.get(OWN_KEY)!;
@@ -209,7 +209,7 @@ describe('an install from before accounts existed', () => {
     const { store, problems } = await coldStart();
 
     // Any change made while there is still no account: a save of defaults.
-    store.getState().setBalance(0);
+    store.setState({ balance: 0 });
     await settle();
 
     expect(mockAsync.get(OWN_KEY)).toBe(PRE_ACCOUNT_BLOB);

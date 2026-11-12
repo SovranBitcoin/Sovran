@@ -1,11 +1,40 @@
-/** Shared opaque DM inbox for Contacts and conversation history. Decryption and peer filtering stay on-device. */
-import type { DmEnvelopePage } from './dmEnvelopeTypes';
+/**
+ * Shared opaque DM inbox for Contacts and conversation history. Decryption and
+ * peer filtering stay on-device.
+ *
+ * The facade is an INDEX only: it returns the opaque encrypted envelopes (kind
+ * 1059 gift wraps + kind 4 legacy) that reference the viewer. Decryption,
+ * sender identification, and bucketing stay client-side in `dmDecryptPipeline`.
+ */
+import type { facade } from 'nostr';
+
+import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
 import { paymentLog } from '@/shared/lib/logger';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
-import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeDmAdapter';
 
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
+
+/** Map a resolved tier answer to the app's `DmEnvelopePage`. The app
+ *  re-derives its `until` cursor from envelope `createdAt` (see `dmPagination`),
+ *  so `hasNextPage` is simply "this page had envelopes" — an empty answer (every
+ *  tier drained/disabled) stops `loadMore` rather than looping. */
+function toDmEnvelopePage(resolved: facade.ResolvedDmEnvelopes): DmEnvelopePage {
+  const envelopes: DmEnvelope[] = resolved.envelopes.map((e) => ({
+    id: e.id,
+    pubkey: e.pubkey,
+    kind: e.kind,
+    createdAt: e.createdAtSec,
+    content: e.content,
+    tags: e.tags,
+    ...(e.sig ? { sig: e.sig } : {}),
+  }));
+  return {
+    envelopes,
+    hasNextPage: envelopes.length > 0,
+    ...(resolved.received === undefined ? {} : { received: resolved.received }),
+  };
+}
 
 /**
  * All DM envelopes involving the viewer (for the conversation list).
@@ -18,7 +47,6 @@ const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
  */
 export async function fetchDmEnvelopes(args: {
   viewer: string;
-  kinds?: number[];
   until?: number;
   limit?: number;
   refresh?: boolean;
@@ -30,23 +58,23 @@ export async function fetchDmEnvelopes(args: {
     paymentLog.debug('payment.dm.envelopes.no_tiers');
     return EMPTY_PAGE;
   }
-  const result = await layer.getDmEnvelopes(
-    toFacadeDmEnvelopesRequest({
-      viewer: args.viewer,
-      until: args.until,
-      limit: args.limit,
-      refresh: args.refresh,
-      signal: args.signal,
-      readId: args.readId,
-    })
-  );
+  // The app's `until` (wrap arrival seconds) becomes the facade's cursor; only
+  // the nagg tier honours it, the relay floor fetches the whole inbox.
+  const result = await layer.getDmEnvelopes({
+    viewerPubkey: args.viewer,
+    ...(typeof args.until === 'number' ? { cursor: { createdAt: args.until, id: '' } } : {}),
+    ...(typeof args.limit === 'number' ? { limit: args.limit } : {}),
+    ...(args.refresh ? { refresh: true } : {}),
+    ...(args.signal ? { signal: args.signal } : {}),
+    ...(args.readId ? { readId: args.readId } : {}),
+  });
   return result.match(
     (resolved) => {
       paymentLog.debug('payment.dm.envelopes.resolved', {
         tier: resolved.tier,
         envelopes: resolved.envelopes.length,
       });
-      const page = resolvedDmEnvelopesToPage(resolved);
+      const page = toDmEnvelopePage(resolved);
       // Dev-only: stamp each envelope with its serving tier so the contacts
       // list can badge each conversation's source (n/c/r) — the decrypted
       // message keeps the wrap's event id, which is the badge key.
@@ -80,7 +108,7 @@ export function subscribeDmEnvelopesLive(
   const layer = buildNostrDataLayer();
   if (!layer || !viewer) return () => {};
   return layer.subscribeDmEnvelopes({ viewerPubkey: viewer }, (envelope) => {
-    const page = resolvedDmEnvelopesToPage({ tier: 'relay', envelopes: [envelope], cursor: null });
+    const page = toDmEnvelopePage({ tier: 'relay', envelopes: [envelope], cursor: null });
     paymentLog.debug('payment.dm.envelopes.live', { envelopes: page.envelopes.length });
     onPage(page);
   });

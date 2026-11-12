@@ -17,20 +17,6 @@ function mintUrlSetFingerprint(urls: readonly string[]): string | null {
   );
 }
 
-/** True when the machine selector was built from a different trusted-mint set. */
-export function mintSelectorCandidateSetIsStale(
-  trustedMintUrls: readonly string[],
-  candidateMintUrls: readonly string[]
-): boolean {
-  const trustedResult = normalizeMintUrlSet(trustedMintUrls);
-  const candidateResult = normalizeMintUrlSet(candidateMintUrls);
-  if (trustedResult.isErr() || candidateResult.isErr()) return true;
-  const trusted = trustedResult.value;
-  const candidates = candidateResult.value;
-  if (trusted.size !== candidates.size) return true;
-  return [...trusted].some((url) => !candidates.has(url));
-}
-
 /**
  * Rebuild a management selector from the machine's current WalletContext after
  * returning from Add Mint. This keeps machine-derived units, capabilities,

@@ -64,7 +64,7 @@ describe('capture page native selectors', () => {
     const setup = source('features/whitenoise/screens/WhitenoiseSetupScreen.tsx');
     expect(setup).toContain('!isLoading && !isBootstrapping && !error && keyPackageCount === 0');
     expect(setup).toContain('testID="whitenoise-setup-uninitialized"');
-    expect(setup).toContain('onPress={bootstrap}');
+    expect(setup).toContain('await bootstrap();');
     expect(source('features/settings/screens/SettingsStorageScreen.tsx')).toContain(
       '__DEV__ && !isLoading && !isRefreshing && !error'
     );

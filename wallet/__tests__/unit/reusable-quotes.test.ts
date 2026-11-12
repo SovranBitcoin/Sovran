@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Manager } from "@cashu/coco-core";
 
 import {
+  disposeReusableQuoteFlights,
   ensureReusableMintQuote,
   rotateReusableMintQuote,
   reusableQuoteKey,
@@ -160,6 +161,67 @@ describe("ensureReusableMintQuote (identity-store singleton)", () => {
     const resolved = await ensureReusableMintQuote(manager, bolt12Input, store);
     expect(create).not.toHaveBeenCalled();
     expect(resolved.quoteId).toBe("offer-1");
+  });
+});
+
+describe("ensureReusableMintQuote across wallets", () => {
+  const input = { mintUrl: MINT, method: "onchain" as const, unit: "sat" };
+  const key = reusableQuoteKey(input);
+
+  it("gives each wallet its own quote when both ask at the same moment", async () => {
+    let finishA: (value: unknown) => void = () => {};
+    const createA = vi.fn().mockReturnValue(new Promise((resolve) => (finishA = resolve)));
+    const createB = vi.fn().mockResolvedValue(quote({ quoteId: "B", request: "bc1qaddressb" }));
+    const storeA = memoryStore();
+    const storeB = memoryStore();
+
+    const a = ensureReusableMintQuote(mockManager({ create: createA }), input, storeA);
+    const b = ensureReusableMintQuote(mockManager({ create: createB }), input, storeB);
+    finishA(quote({ quoteId: "A", request: "bc1qaddressa" }));
+
+    expect(await a).toMatchObject({ quoteId: "A", request: "bc1qaddressa" });
+    expect(await b).toMatchObject({ quoteId: "B", request: "bc1qaddressb" });
+    expect(storeA.map[key]).toBe("A");
+    expect(storeB.map[key]).toBe("B");
+  });
+
+  it("still shares one create between two callers of the same wallet", async () => {
+    const create = vi.fn().mockResolvedValue(quote());
+    const manager = mockManager({ create });
+    const store = memoryStore();
+
+    const [first, second] = await Promise.all([
+      ensureReusableMintQuote(manager, input, store),
+      ensureReusableMintQuote(manager, input, store),
+    ]);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+  });
+});
+
+describe("reusable quote flights after a dispose", () => {
+  const input = { mintUrl: MINT, method: "onchain" as const, unit: "sat" };
+
+  it("lets an ensure join a rotation that resumed after the flights were disposed", async () => {
+    const finish: ((value: unknown) => void)[] = [];
+    const create = vi.fn().mockImplementation(() => new Promise((resolve) => finish.push(resolve)));
+    const manager = mockManager({ create });
+    const store = memoryStore();
+
+    const first = ensureReusableMintQuote(manager, input, store);
+    const rotation = rotateReusableMintQuote(manager, input, store, "manual");
+    disposeReusableQuoteFlights();
+    finish[0](quote({ quoteId: "first" }));
+    await first;
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+
+    const joined = ensureReusableMintQuote(manager, input, store);
+    finish[1](quote({ quoteId: "rotated" }));
+
+    expect(await rotation).toMatchObject({ quoteId: "rotated" });
+    expect(await joined).toMatchObject({ quoteId: "rotated" });
+    expect(create).toHaveBeenCalledTimes(2);
   });
 });
 

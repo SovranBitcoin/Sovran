@@ -41,7 +41,6 @@ const BackendEnv = z.object({
   EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NAGG_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
-  EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
   // Primal public cache server (tier 2). Defaults to wss://cache2.primal.net/v1.
   EXPO_PUBLIC_PRIMAL_CACHE_URL: OptionalUrl,
 });
@@ -51,14 +50,6 @@ type BackendEnvInput = Partial<Record<keyof z.input<typeof BackendEnv>, string |
 type BackendConfig = {
   nostrAppViewBaseUrl: string;
   scoreApiBaseUrl: string;
-  /**
-   * nagg's GraphQL endpoint. The feed/thread/notifications/DM data layer is
-   * app-view-only (no client GraphQL); this remains ONLY for integrations that
-   * embed nagg's GraphQL via coco-core (mint enrichment, mint-operator Nostr
-   * profiles) plus the recent-people-profiles lookup — none of which route
-   * through nagg-ts. Pending their own migration to REST.
-   */
-  nostrGraphqlEndpoint: string;
   /** Primal public cache server URLs, tried in order (tier 2 of the data layer). */
   primalCacheUrls: readonly string[];
 };
@@ -68,7 +59,6 @@ function readBackendEnv(): BackendEnvInput {
     EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL,
     EXPO_PUBLIC_NAGG_BASE_URL: process.env.EXPO_PUBLIC_NAGG_BASE_URL,
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
-    EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
     EXPO_PUBLIC_PRIMAL_CACHE_URL: process.env.EXPO_PUBLIC_PRIMAL_CACHE_URL,
   };
 }
@@ -92,8 +82,6 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
   return {
     nostrAppViewBaseUrl,
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
-    nostrGraphqlEndpoint:
-      parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
     primalCacheUrls:
       splitUrls(parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL) ?? DEFAULT_PRIMAL_CACHE_URLS,
   };

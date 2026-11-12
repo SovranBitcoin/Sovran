@@ -7,11 +7,7 @@
 //
 // Usage:
 //   const { entry, error, actions, source } = useScreenActions('sendToken', entryParam);
-//   const { entry, error, actions, source } = useScreenActions(
-//     'amountEntry',
-//     entrySeed,
-//     { amountConfig }
-//   );
+//   const { entry, actions, suggestions } = useScreenActions('amountEntry', entrySeed);
 // ---------------------------------------------------------------------------
 
 import {
@@ -62,31 +58,6 @@ import { useColadaContext } from './ColadaProvider';
 export type BoundAction = ActionState & {
   execute: (params?: Record<string, unknown>) => Promise<void>;
 };
-
-/**
- * Advanced: full config when not using provider-driven handlers.
- * Prefer `useScreenActions(screenType, entryParam)` at the call site.
- */
-export interface UseScreenActionsConfig<S extends ScreenType> {
-  screenType: S;
-  handlers: ScreenActionHandlerMap[S];
-  /** Default handlers used as fallback when no wallet handler is registered. */
-  defaultHandlers?: ScreenActionHandlerMap[S];
-  entryParam: Record<string, unknown> | string | undefined;
-  getExtraContext?: () => Record<string, unknown>;
-  onEntryUpdate?: (
-    callback: (entry: Record<string, unknown>) => void,
-  ) => () => void;
-  shouldApplyEntryUpdate?: (
-    currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>,
-  ) => boolean;
-  mergeEntryUpdate?: (
-    currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>,
-  ) => Record<string, unknown>;
-  amountConfig?: CreateAmountActionManagerConfig;
-}
 
 export type UseScreenActionsResult<
   S extends ScreenType,
@@ -157,204 +128,6 @@ function summarizeActionStates(
     loadingCount,
     variantCount,
     actionNames: entries.map(([name]) => name).sort(),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Internal: config-based manager (tests / advanced callers)
-// ---------------------------------------------------------------------------
-
-/**
- * Builds the session for `useScreenActionsWithConfig`, in module scope.
- *
- * Every getter below reads `someRef.current` — correct, and exactly what the
- * session needs so it always sees the caller's latest callbacks. But a closure
- * CREATED during render that reads a ref is what the React Compiler rejects
- * ("Passing a ref to a function may read its value during render"), and one
- * rejection switches the compiler off for the whole hook. Outside the
- * component the reads are unchanged and the analysis no longer applies.
- */
-function buildConfigSession<S extends ScreenType>(
-  config: UseScreenActionsConfig<S>,
-  refs: {
-    getExtraContextRef: MutableRefObject<
-      UseScreenActionsConfig<S>['getExtraContext']
-    >;
-    onEntryUpdateRef: MutableRefObject<
-      UseScreenActionsConfig<S>['onEntryUpdate']
-    >;
-    shouldApplyEntryUpdateRef: MutableRefObject<
-      UseScreenActionsConfig<S>['shouldApplyEntryUpdate']
-    >;
-    mergeEntryUpdateRef: MutableRefObject<
-      UseScreenActionsConfig<S>['mergeEntryUpdate']
-    >;
-    amountConfigRef: MutableRefObject<
-      UseScreenActionsConfig<S>['amountConfig']
-    >;
-  },
-): ScreenActionSession<S> {
-  const {
-    screenType,
-    handlers,
-    defaultHandlers,
-    entryParam,
-    getExtraContext,
-    onEntryUpdate,
-    shouldApplyEntryUpdate,
-    mergeEntryUpdate,
-    amountConfig,
-  } = config;
-
-  logger.info('react.useScreenActionsWithConfig.session.create', {
-    screenType,
-    ...summarizeEntryParam(entryParam),
-    ...summarizeHandlerMap(handlers as Record<string, unknown> | undefined),
-    defaultHandlerCount: Object.keys(defaultHandlers ?? {}).length,
-    hasGetExtraContext: !!getExtraContext,
-    hasEntryUpdates: !!onEntryUpdate,
-    hasShouldApplyEntryUpdate: !!shouldApplyEntryUpdate,
-    hasMergeEntryUpdate: !!mergeEntryUpdate,
-    hasAmountConfig: !!amountConfig,
-  });
-
-  return createScreenActionSession<S>({
-    screenType,
-    handlers,
-    defaultHandlers,
-    entrySeed: entryParam,
-    getExtraContext: () => refs.getExtraContextRef.current?.() ?? {},
-    subscribeEntryUpdates: onEntryUpdate
-      ? (callback) => refs.onEntryUpdateRef.current?.(callback) ?? (() => {})
-      : undefined,
-    shouldApplyEntryUpdate: shouldApplyEntryUpdate
-      ? (current, updated) =>
-          refs.shouldApplyEntryUpdateRef.current!(current, updated)
-      : undefined,
-    mergeEntryUpdate: mergeEntryUpdate
-      ? (current, updated) =>
-          refs.mergeEntryUpdateRef.current!(current, updated)
-      : undefined,
-    amountConfig:
-      screenType === 'amountEntry'
-        ? (refs.amountConfigRef.current ?? undefined)
-        : undefined,
-    decorateEntry: (entry) => entry,
-  });
-}
-
-export function useScreenActionsWithConfig<S extends ScreenType>(
-  config: UseScreenActionsConfig<S>,
-): Omit<UseScreenActionsResult<S>, 'source'> {
-  const {
-    screenType,
-    entryParam,
-    getExtraContext,
-    onEntryUpdate,
-    shouldApplyEntryUpdate,
-    mergeEntryUpdate,
-    amountConfig,
-  } = config;
-
-  const getExtraContextRef = useLatestRef(getExtraContext);
-  const shouldApplyEntryUpdateRef = useLatestRef(shouldApplyEntryUpdate);
-  const mergeEntryUpdateRef = useLatestRef(mergeEntryUpdate);
-  const amountConfigRef = useLatestRef(amountConfig);
-  const onEntryUpdateRef = useLatestRef(onEntryUpdate);
-
-  // Created exactly once, through a `useState` initializer rather than the
-  // `if (!ref.current)` lazy-init idiom this used to use. Reading a ref back
-  // out in the render body — `const session = sessionRef.current` — is a ref
-  // access during render, which is both a Rules-of-React violation and what
-  // stopped the React Compiler from compiling this hook at all.
-  //
-  // ⚠️ `createScreenActionSession` subscribes at construction, and a `useState`
-  // initializer is double-invoked under React StrictMode — which would leak
-  // the discarded session's subscriptions. StrictMode is off in the app that
-  // consumes this (`index.js` hands straight to Expo Router), and the same
-  // caveat already stands on the lazy initializer in
-  // `NotificationFollowersScreen`. Turning StrictMode on means giving the
-  // session an idempotent construction, not reverting this: the ref idiom it
-  // replaced is a ref read in render, which the compiler refuses outright.
-  const [session] = useState(() =>
-    buildConfigSession<S>(config, {
-      getExtraContextRef,
-      onEntryUpdateRef,
-      shouldApplyEntryUpdateRef,
-      mergeEntryUpdateRef,
-      amountConfigRef,
-    }),
-  );
-  const snapshotKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    logger.debug('react.useScreenActionsWithConfig.entrySeed', {
-      screenType,
-      ...summarizeEntryParam(entryParam),
-    });
-    session.setEntrySeed(entryParam);
-  }, [entryParam, screenType, session]);
-
-  useEffect(() => {
-    return () => {
-      logger.info('react.useScreenActionsWithConfig.session.dispose', {
-        screenType,
-      });
-      session.dispose();
-    };
-  }, [screenType, session]);
-
-  const snapshot = useSyncExternalStore(
-    session.subscribe,
-    session.inspect,
-    session.inspect,
-  );
-
-  useEffect(() => {
-    const actionSummary = summarizeActionStates(snapshot.actions);
-    const key = JSON.stringify({
-      screenType,
-      error: snapshot.error,
-      mintUrlLength: snapshot.mintUrl?.length ?? 0,
-      suggestionCount: snapshot.suggestions.length,
-      ...actionSummary,
-      ...summarizeEntryParam(snapshot.entry),
-    });
-    if (snapshotKeyRef.current === key) return;
-    snapshotKeyRef.current = key;
-    logger.debug('react.useScreenActionsWithConfig.snapshot', {
-      screenType,
-      hasError: !!snapshot.error,
-      errorLength: snapshot.error?.length ?? 0,
-      hasMintUrl: !!snapshot.mintUrl,
-      mintUrlLength: snapshot.mintUrl?.length ?? 0,
-      suggestionCount: snapshot.suggestions.length,
-      ...summarizeEntryParam(snapshot.entry),
-      ...actionSummary,
-    });
-  }, [screenType, snapshot]);
-
-  const actions = useMemo(() => {
-    const bound = {} as Record<ScreenActionName[S], BoundAction>;
-    for (const [name, state] of Object.entries(snapshot.actions) as [
-      ScreenActionName[S],
-      ActionState,
-    ][]) {
-      bound[name] = {
-        ...state,
-        execute: (params?: Record<string, unknown>) =>
-          session.execute(name, params),
-      };
-    }
-    return bound;
-  }, [snapshot.actions, session]);
-
-  return {
-    entry: snapshot.entry,
-    error: snapshot.error,
-    actions,
-    mintUrl: snapshot.mintUrl,
-    suggestions: snapshot.suggestions,
   };
 }
 
@@ -573,8 +346,6 @@ function buildScreenSession(
     entryParam: Record<string, unknown> | string | undefined;
     screenActionsBridge: ScreenActionsBridge | undefined;
     amountConfig: CreateAmountActionManagerConfig | undefined;
-    providedAmountConfig: CreateAmountActionManagerConfig | undefined;
-    derivedAmountConfig: CreateAmountActionManagerConfig | undefined;
     getExtraContext: () => Record<string, unknown>;
     sessionBridge: ScreenActionsBridge;
   },
@@ -591,9 +362,7 @@ function buildScreenSession(
     defaultHandlerCount: Object.keys(args.defaultHandlers ?? {}).length,
     hasBridge: !!args.screenActionsBridge,
     hasSubscriptionBus: !!subscriptionBus,
-    hasEffectiveAmountConfig: !!args.amountConfig,
-    hasProvidedAmountConfig: !!args.providedAmountConfig,
-    hasDerivedAmountConfig: !!args.derivedAmountConfig,
+    hasAmountConfig: !!args.amountConfig,
   });
   return createScreenActionSession({
     screenType: args.screenType,
@@ -612,7 +381,6 @@ export function useScreenActions<
 >(
   screenType: 'amountEntry',
   entryParam?: E | string | undefined,
-  options?: { amountConfig?: CreateAmountActionManagerConfig },
 ): UseScreenActionsResult<'amountEntry', E>;
 
 export function useScreenActions<
@@ -626,7 +394,6 @@ export function useScreenActions<
 export function useScreenActions(
   screenType: ScreenType,
   entryParam: Record<string, unknown> | string | undefined,
-  options?: { amountConfig?: CreateAmountActionManagerConfig },
 ): UseScreenActionsResult<ScreenType, any> {
   const {
     machine,
@@ -694,15 +461,15 @@ export function useScreenActions(
       : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
   ) as ScreenActionHandlerMap[typeof screenType];
 
-  // Auto-derive amountConfig from provider context when not explicitly
-  // provided. Every reactive field is a getter so the manager — created once
-  // and held for the screen's lifetime — re-reads destination, unit, and
-  // display currency on every inspect(). Without this, opening amountEntry a
-  // second time from a different destination (sendEcash → meltQuote) or after
-  // a settings currency change keeps the first-render snapshot.
-  const derivedAmountConfig = useMemo(
+  // The amount screen's config, derived from provider context. Every reactive
+  // field is a getter so the manager — created once and held for the screen's
+  // lifetime — re-reads destination, unit, and display currency on every
+  // inspect(). Without this, opening amountEntry a second time from a
+  // different destination (sendEcash → meltQuote) or after a settings
+  // currency change keeps the first-render snapshot.
+  const amountConfig = useMemo(
     () =>
-      !isAmountEntry || options?.amountConfig
+      !isAmountEntry
         ? undefined
         : buildDerivedAmountConfig({
             machineRef,
@@ -714,7 +481,6 @@ export function useScreenActions(
           }),
     [
       isAmountEntry,
-      options?.amountConfig,
       machineRef,
       walletContextSource,
       walletContextRef,
@@ -723,10 +489,6 @@ export function useScreenActions(
       getOfflineRef,
     ],
   );
-
-  const effectiveAmountConfig = isAmountEntry
-    ? (options?.amountConfig ?? derivedAmountConfig)
-    : undefined;
 
   // Created exactly once, through a `useState` initializer rather than the
   // `if (!ref.current)` lazy-init idiom. Reading the session back out of a ref
@@ -750,9 +512,7 @@ export function useScreenActions(
         defaultHandlers: defaultHandlersForScreen,
         entryParam,
         screenActionsBridge,
-        amountConfig: effectiveAmountConfig,
-        providedAmountConfig: options?.amountConfig,
-        derivedAmountConfig,
+        amountConfig,
         getExtraContext,
         sessionBridge,
       },

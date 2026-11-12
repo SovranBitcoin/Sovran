@@ -4,7 +4,6 @@ import {
   createPaymentCopyGroups,
   createPaymentCopyResolver,
   getPaymentCopy,
-  registerPaymentCopyLocale,
   resolvePaymentCopy,
 } from '../../src/copy';
 
@@ -57,13 +56,4 @@ describe('payment copy', () => {
     expect(createPaymentCopyGroups(copy).MINT_COPY.UNPAID.label).toBe('Awaiting funds');
   });
 
-  it('registers locale-specific overrides for known copy keys only', () => {
-    registerPaymentCopyLocale('test', {
-      'toast.send.confirmed': 'Sent test',
-      unrelated: 'ignored',
-    });
-
-    expect(getPaymentCopy('toast.send.confirmed', {}, { locale: 'test' })).toBe('Sent test');
-    expect(getPaymentCopy('toast.send.failed', {}, { locale: 'test' })).toBe('Payment failed');
-  });
 });

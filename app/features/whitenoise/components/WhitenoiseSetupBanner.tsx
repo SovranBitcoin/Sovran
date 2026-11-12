@@ -21,12 +21,14 @@ import Icon from 'assets/icons';
  * left icon + title/description, a separator, and a primary action
  * across the bottom.
  *
- * The action runs in-place — no nav. Three phases:
+ * The action runs in-place — no nav. Phases:
  *   1. `idle`     → "Set up" label
  *   2. `running`  → spinner replaces label while bootstrap publishes
  *                   key packages
  *   3. `success`  → green check scales in with overshoot, hold ~900ms,
  *                   then the whole card fades out and unmounts
+ *   4. `failed`   → the bootstrap's error under the description, and
+ *                   "Set up" again to retry
  *
  * Mounted inside ContactsScreen so it shares the page viewport and inset
  * with `position: absolute`, anchored above the native tab bar via the
@@ -41,7 +43,7 @@ const FLOAT_GAP = 12;
 // continuous beat instead of two pauses.
 const SUCCESS_HOLD_MS = 1400;
 
-type Phase = 'idle' | 'running' | 'success' | 'gone';
+type Phase = 'idle' | 'running' | 'success' | 'failed' | 'gone';
 
 // The card fades in on mount and fades out on dismiss — no slide. A plain
 // opacity cross-fade reads calmer than the previous slide-down and matches
@@ -58,7 +60,7 @@ export function WhitenoiseSetupBanner({
 }) {
   const pathname = usePathname();
   const insets = useScreenInsets();
-  const { isReady, isLoading, isBootstrapping, bootstrap } = useWhitenoiseSetup();
+  const { isReady, isLoading, isBootstrapping, error, bootstrap } = useWhitenoiseSetup();
   const { client } = useWhitenoise();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
 
@@ -81,10 +83,10 @@ export function WhitenoiseSetupBanner({
   }, [phase]);
 
   const onPress = useCallback(async () => {
-    if (phase !== 'idle') return;
+    if (phase !== 'idle' && phase !== 'failed') return;
     setPhase('running');
-    await bootstrap();
-    setPhase('success');
+    const done = await bootstrap();
+    setPhase(done ? 'success' : 'failed');
   }, [phase, bootstrap]);
 
   // Render gates — idle state hides when there's nothing to set up.
@@ -96,7 +98,13 @@ export function WhitenoiseSetupBanner({
     hasFeature('directMessages') &&
     whitenoiseEnabled &&
     phase !== 'gone' &&
-    (phase !== 'idle' || (pathname.includes('/contacts') && !!client && !isLoading && !isReady));
+    (phase === 'running' ||
+      phase === 'success' ||
+      // A failure stays up whatever the count says: a key package is counted
+      // once stored, before the relays have accepted it.
+      (pathname.includes('/contacts') &&
+        !!client &&
+        (phase === 'failed' || (!isLoading && !isReady))));
 
   useEffect(() => {
     onClearanceChange?.(shouldRenderCard ? cardHeight + FLOAT_GAP + 16 : 0);
@@ -116,6 +124,7 @@ export function WhitenoiseSetupBanner({
             phase={phase}
             onPress={onPress}
             isBootstrapping={isBootstrapping}
+            error={phase === 'failed' ? error : null}
             testID={testID}
           />
         </Animated.View>
@@ -128,11 +137,13 @@ function BannerCard({
   phase,
   onPress,
   isBootstrapping,
+  error,
   testID,
 }: {
   phase: Phase;
   onPress: () => void;
   isBootstrapping: boolean;
+  error: string | null;
   testID?: string;
 }) {
   const [surface, foreground, foregroundSecondary, accent, iconBg, separator] = useThemeColor([
@@ -148,7 +159,7 @@ function BannerCard({
     'separator-secondary',
   ] as const);
 
-  const isInteractive = phase === 'idle';
+  const isInteractive = phase === 'idle' || phase === 'failed';
   // Same LoadingIndicator the restore screen and the payment toast use,
   // so the affordance reads identically across the app.
   const indicatorPhase: 'loading' | 'done' | null =
@@ -181,6 +192,15 @@ function BannerCard({
             Publish your encryption keys so contacts can start MLS-encrypted DMs and group chats
             with you.
           </Text>
+          {error ? (
+            <Text
+              size={13}
+              className="text-danger mt-1"
+              accessibilityRole="alert"
+              numberOfLines={3}>
+              {error}
+            </Text>
+          ) : null}
         </View>
       </View>
       <View style={[styles.divider, { backgroundColor: separator }]} />

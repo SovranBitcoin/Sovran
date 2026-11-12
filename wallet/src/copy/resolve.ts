@@ -45,10 +45,6 @@ function resolveLocaleCatalog(
   return paymentCopyDefaults;
 }
 
-function isPaymentCopyKey(key: string): key is PaymentCopyKey {
-  return Object.prototype.hasOwnProperty.call(paymentCopyDefaults, key);
-}
-
 function templateForKey(
   key: PaymentCopyKey,
   options: PaymentCopyOptions,
@@ -81,28 +77,6 @@ function interpolatePaymentCopy(
     },
   );
   return missingVariable ? err(missingVariable) : ok(text);
-}
-
-export function registerPaymentCopyLocale(
-  locale: string,
-  translations: Record<string, string>,
-): void {
-  const knownTranslations: Partial<PaymentCopyCatalog> = {};
-  let ignoredCount = 0;
-  for (const [key, value] of Object.entries(translations)) {
-    if (isPaymentCopyKey(key)) {
-      knownTranslations[key] = value;
-    } else {
-      ignoredCount += 1;
-    }
-  }
-  catalogs[locale] = { ...(catalogs[locale] ?? {}), ...knownTranslations };
-  logger.info("copy.locale.register", {
-    locale: normalizeLocale(locale),
-    acceptedCount: Object.keys(knownTranslations).length,
-    ignoredCount,
-    totalCount: Object.keys(translations).length,
-  });
 }
 
 export function resolvePaymentCopy(

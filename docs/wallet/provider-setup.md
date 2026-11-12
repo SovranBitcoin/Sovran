@@ -24,7 +24,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   return (
     <ColadaProvider
       instance={instance}
-      getManager={() => manager}
       handlers={handlers}
       operations={operationsOverride}
       clipboardAdapter={clipboardAdapter}

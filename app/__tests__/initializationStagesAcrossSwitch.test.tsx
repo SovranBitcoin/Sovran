@@ -31,7 +31,7 @@ beforeEach(() => {
 
 /** Mounted above the account providers: never unmounts, never registers twice. */
 function Above({ children }: { children: React.ReactNode }) {
-  const migrations = useInitializationStage('global-migrations', { outlivesAccount: true });
+  const migrations = useInitializationStage('global-migrations');
   const reset = useInitializationReset();
   const { isInitializing } = useInitializationState();
   probe = { ...probe, migrations, reset, isInitializing };
@@ -40,7 +40,7 @@ function Above({ children }: { children: React.ReactNode }) {
 
 /** An account provider: remounts on a switch and registers again. */
 function Account() {
-  const keys = useInitializationStage('nostr', { dependsOn: ['global-migrations'] });
+  const keys = useInitializationStage('nostr');
   probe = { ...probe, keys };
   return null;
 }

@@ -90,15 +90,6 @@ describe('Operations — real Manager', () => {
     expect(info.unit).toBe('sat');
   });
 
-  it('executeMintQuote creates a quote with bolt11 invoice', async () => {
-    const result = await instance.operations.executeMintQuote!({ mintUrl: TEST_MINT, amount: 64, unit: 'sat' });
-
-    expect(result.historyEntry).toBeDefined();
-    const entry = JSON.parse(result.historyEntry);
-    expect(entry.type).toBe('mint');
-    expect(entry.mintUrl).toBe(TEST_MINT);
-  });
-
   it('catalog data is applied to mint list items', async () => {
     const enrichedInstance = createColada({
       manager,
@@ -190,18 +181,6 @@ describe('Operations — real Manager', () => {
       await instance.tracker.refresh();
       const ctx = instance.getWalletContext();
       expect(ctx.mintBalances[TEST_MINT]).toBeLessThan(500);
-    });
-
-    it('executeReceive accepts a token and creates history', async () => {
-      const sendResult = await instance.operations.executeSend!({ mintUrl: TEST_MINT, amount: 5 });
-      const sendEntry = JSON.parse(sendResult.historyEntry);
-      const token = sendEntry.token || sendEntry.metadata?.token;
-      expect(token).toBeTruthy();
-
-      const result = await instance.operations.executeReceive!({ tokenString: token, mintUrl: TEST_MINT, amount: 5 });
-      expect(result.historyEntry).toBeDefined();
-      const entry = JSON.parse(result.historyEntry);
-      expect(entry.type).toBe('receive');
     });
   });
 });

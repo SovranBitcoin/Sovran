@@ -557,3 +557,63 @@ describe('lightning melt — confirmMelt notification sequence', () => {
     expect(keys).toEqual(['onPaymentProcessing', 'onPaymentFailed']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A Pay tap after the melt has settled
+// ---------------------------------------------------------------------------
+
+/**
+ * A successful melt keeps the step on navigateToMeltPreview with the
+ * historyEntry attached. A second Pay there must not run executeMelt again:
+ * for a Lightning address that fetches a fresh invoice and pays it twice.
+ * A Pay after a failed attempt is a retry and must still run.
+ */
+describe('lightning melt — Pay after the melt settled', () => {
+  it('does not pay again when Pay is tapped after a successful melt', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+
+    await tm.machine.confirmMelt();
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executeMelt')).toHaveLength(1);
+    tm.assertStep('navigateToMeltPreview');
+  });
+
+  it('does not pay again when the mint list is opened and closed after a successful melt', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.confirmMelt();
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executeMelt')).toHaveLength(1);
+    tm.assertStep('navigateToMeltPreview');
+  });
+
+  it('pays again when Pay is tapped after a failed attempt', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executeMelt: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('Route not found');
+          return { historyEntry: JSON.stringify({ id: 'melt-1', type: 'melt', state: 'PAID' }) };
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+    tm.assertStep('navigateToMeltPreview');
+
+    await tm.machine.confirmMelt();
+
+    expect(attempts).toBe(2);
+    const confirmed = tm.notificationCalls.filter((c) => c.key === 'onPaymentConfirmed');
+    expect(confirmed).toHaveLength(1);
+  });
+});

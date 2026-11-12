@@ -12,22 +12,18 @@
 
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class MockNDK {},
-    NDKPrivateKeySigner: class MockPrivateKeySigner {},
-    NDKUser: class MockUser {
-      pubkey: string;
-      constructor(params: { pubkey: string }) {
-        this.pubkey = params.pubkey;
-      }
-    },
-    // virtual: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class MockNDK {},
+  NDKPrivateKeySigner: class MockPrivateKeySigner {},
+  NDKUser: class MockUser {
+    pubkey: string;
+    constructor(params: { pubkey: string }) {
+      this.pubkey = params.pubkey;
+    }
+  },
+  // Mocked: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
+}));
 
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],
@@ -845,6 +841,30 @@ describe('nostrconnect pairing', () => {
       expect(activityEntries()[0]).toMatchObject({ clientPubkey: APP_B, method: 'connect' });
     });
 
+    it('active match: the replaced client keeps no session allow, so its key must ask again', async () => {
+      seedPreviousPrimal();
+      // "Allow for this session" on a wallet sign kind, given to the old key.
+      expect(
+        useNip46RequestsStore.getState().grantSessionAllow(OLD_CLIENT, 'sign_event:17375').isOk()
+      ).toBe(true);
+      const { engine } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        presentedGrantKeys: [],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(useNip46RequestsStore.getState().hasSessionAllow(OLD_CLIENT, 'sign_event:17375')).toBe(
+        false
+      );
+      expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
+    });
+
     it('forged replacesClientPubkey (matcher disagrees) fails the pairing, nothing written', async () => {
       // The previous record claims a DIFFERENT hostname — the matcher would
       // never pick it, so inheritance must be refused outright.
@@ -974,18 +994,14 @@ async function makeAsk(
 }
 
 describe('ask path', () => {
-  it('enqueues an ungrated request with a safe preview and notifies the UI callback', async () => {
+  it('enqueues an ungrated request with a safe preview', async () => {
     pairApp();
     const harness = makeEngine();
-    const seen: string[] = [];
-    const unsubscribe = harness.engine.onUserVerdictNeeded((request) => {
-      seen.push(request.id);
-    });
 
     const { requestId, sent } = await makeAsk('sign_event', signEventParams(), harness);
 
     expect(sent).toHaveLength(0); // deferred — no response until a verdict
-    expect(seen).toEqual([requestId]);
+    expect(useNip46RequestsStore.getState().pending.map((p) => p.id)).toEqual([requestId]);
     const pending = useNip46RequestsStore.getState().pending[0]!;
     expect(pending).toMatchObject({
       clientPubkey: APP,
@@ -994,7 +1010,6 @@ describe('ask path', () => {
       expiresAt: now + REQUEST_TTL_MS,
     });
     expect(pending.paramsPreview).toMatchObject({ type: 'sign_event' });
-    unsubscribe();
   });
 
   it('keeps ciphertext out of decrypt previews', async () => {

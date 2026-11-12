@@ -124,7 +124,7 @@ describe('routstr store upgrade past the ceilings', () => {
     expect(store.getState().sessions.some((s) => s.id === sessions[1024].id)).toBe(false);
 
     // One ordinary save after the load.
-    store.getState().setBalance(20_000);
+    store.setState({ balance: 20_000 });
     await saved();
 
     const stored = await storedState();
@@ -176,7 +176,7 @@ describe('routstr store upgrade past the ceilings', () => {
     expect(store.getState().apiKey).toBeNull();
     expect(store.getState().sessions).toEqual([]);
 
-    store.getState().setBalance(1);
+    store.setState({ balance: 1 });
     store.getState().createSession();
     await saved();
 
@@ -196,7 +196,7 @@ describe('routstr store upgrade past the ceilings', () => {
     await saved();
     expect(store.getState().apiKey).toBe(FUNDED_KEY);
 
-    store.getState().setBalance(5);
+    store.setState({ balance: 5 });
     await saved();
     expect((await storedState()).balance).toBe(5);
   });

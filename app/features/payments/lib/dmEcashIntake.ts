@@ -12,8 +12,9 @@
  */
 
 import { classifyMeshToken, isValidEcashToken, meshTokenDedupeKey } from 'wallet';
+import type { MeshRedeemArrival } from 'wallet/redeemEntry';
 
-import { NUT_DROP_QUEUE_LIMITS } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { fitsNutDropQueue } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 /** The fields of a decrypted DM this module reads. */
 interface IncomingDm {
@@ -25,6 +26,11 @@ interface IncomingDm {
 export interface DmEcashQueuePort {
   /** True when the token hash is already known (queued, redeemed or spent). */
   has(tokenHash: string): boolean;
+  /**
+   * Queue a new entry as `status`: in line, held for review (its mint is not
+   * trusted), or spent (so it is never probed or shown again). False, with
+   * nothing changed, when the token is already queued.
+   */
   enqueue(
     tokenHash: string,
     entry: {
@@ -34,12 +40,9 @@ export interface DmEcashQueuePort {
       unit: string;
       source: 'nostr';
       senderPubkey: string;
-    }
+    },
+    status: MeshRedeemArrival
   ): boolean;
-  /** Record a token as already spent, so it is never probed or shown again. */
-  markSpent(tokenHash: string): void;
-  /** Hold the entry for review: its mint is not trusted. */
-  park(tokenHash: string): void;
 }
 
 type DmEcashOutcome =
@@ -104,20 +107,9 @@ export async function intakeDmEcash(
   if (deps.queue.has(tokenHash)) return 'already-known';
 
   const unit = classified.unit ?? 'sat';
-  // What the queue stores has limits, and one entry past them fails the whole
-  // stored queue on the next launch. Such a token is left for the person to
+  // What the queue stores has limits, and an older release's reader fails its
+  // whole queue on one entry past them. Such a token is left for the person to
   // paste by hand; it never enters the queue.
-  if (
-    token.length > NUT_DROP_QUEUE_LIMITS.token ||
-    classified.mintUrl.length > NUT_DROP_QUEUE_LIMITS.mintUrl ||
-    unit.length > NUT_DROP_QUEUE_LIMITS.unit ||
-    tokenHash.length > NUT_DROP_QUEUE_LIMITS.tokenHash ||
-    !Number.isSafeInteger(classified.amount) ||
-    classified.amount < 0
-  ) {
-    return 'unsupported';
-  }
-
   const entry = {
     token,
     mintUrl: classified.mintUrl,
@@ -126,31 +118,25 @@ export async function intakeDmEcash(
     source: 'nostr' as const,
     senderPubkey: dm.senderPubkey,
   };
+  if (!fitsNutDropQueue(tokenHash, entry)) return 'unsupported';
+  // The same token can arrive another way (over Bluetooth, or in a second
+  // message) while this one awaits, and be queued and redeeming by the time
+  // it writes. That entry is not this intake's: it only ever creates one.
+  const queueAs = (status: MeshRedeemArrival, outcome: DmEcashOutcome): DmEcashOutcome =>
+    deps.queue.enqueue(tokenHash, entry, status) ? outcome : 'already-known';
   const trusted = await deps.isTrustedMint(entry.mintUrl);
   if (!deps.stillCurrent()) return 'abandoned';
-  if (trusted === false) {
-    // Parked without a single request to the mint: probing it would tell a
-    // server the sender picked where this wallet is, and store its keysets.
-    deps.queue.enqueue(tokenHash, entry);
-    deps.queue.park(tokenHash);
-    return 'needs-review';
-  }
-  if (trusted === null) {
-    // The wallet is not up. Queue unprobed; the orchestrator applies the
-    // trust gate when it runs.
-    deps.queue.enqueue(tokenHash, entry);
-    return 'queued';
-  }
+  // Held without a single request to the mint: probing it would tell a
+  // server the sender picked where this wallet is, and store its keysets.
+  if (trusted === false) return queueAs('untrusted-mint', 'needs-review');
+  // The wallet is not up. Queue unprobed; the orchestrator applies the
+  // trust gate when it runs.
+  if (trusted === null) return queueAs('pending', 'queued');
   const spent = await deps.isSpent(token);
   // The last await is behind us: check, then write, with nothing in between.
   if (!deps.stillCurrent()) return 'abandoned';
-  if (spent === true) {
-    // Enqueue-then-mark keeps the hash as a dedupe record without it ever
-    // being a candidate for redemption.
-    deps.queue.enqueue(tokenHash, entry);
-    deps.queue.markSpent(tokenHash);
-    return 'already-spent';
-  }
-  deps.queue.enqueue(tokenHash, entry);
-  return 'queued';
+  // Queued as spent keeps the hash as a dedupe record without it ever being a
+  // candidate for redemption.
+  if (spent === true) return queueAs('spent', 'already-spent');
+  return queueAs('pending', 'queued');
 }

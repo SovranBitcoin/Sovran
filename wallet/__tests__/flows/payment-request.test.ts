@@ -32,6 +32,7 @@ import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
+import { PaymentRequestUndeliveredError } from '../../src/errors';
 
 // ---------------------------------------------------------------------------
 // Payment request — happy path (matching mint + sufficient balance)
@@ -287,5 +288,110 @@ describe('payment request — confirmPaymentRequest notification sequence', () =
       'onPaymentProcessing',
       'onPaymentFailed',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A confirm tap after the payment request was delivered
+// ---------------------------------------------------------------------------
+
+/**
+ * A delivered payment request keeps the step on navigateToPaymentRequest with
+ * the historyEntry attached. A second confirm must not send again; a confirm
+ * after a failed attempt is a retry and must still run.
+ */
+describe('payment request — confirm after delivery', () => {
+  it('does not send again when confirm is tapped after a delivered send', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('sends when the mint list is opened and closed before the first confirm', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    await tm.machine.requestMintSelector();
+    tm.assertStep('selectMint');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+  });
+
+  it('does not send again when the mint list is opened and closed after a delivered send', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    await tm.machine.requestMintSelector();
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('offers no other way to pay when the ecash left and could not be taken back', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          throw new PaymentRequestUndeliveredError('op-9', new Error('relay down'));
+        },
+      },
+    });
+    await tm.machine.execute(`bitcoin:?lightning=${INPUTS.bolt11WithAmount}&creq=${INPUTS.paymentRequestBasic}`, { reset: true });
+    tm.assertStep('chooseOption');
+    const request = tm.machine.getContext().parsed!.options.find((o) => o.kind === 'paymentRequest')!;
+    await tm.machine.chooseOption(request);
+    tm.assertStep('navigateToPaymentRequest');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('undelivered');
+
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('does not send again, from the same mint or another, once ecash left and could not be taken back', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          attempts += 1;
+          throw new PaymentRequestUndeliveredError('op-9', new Error('relay down'));
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('undelivered');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+    await tm.machine.requestMintSelector();
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(attempts).toBe(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('sends again when confirm is tapped after a failed attempt', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('Transport down');
+          return { historyEntry: JSON.stringify({ id: 'pr-1', type: 'send', state: 'pending' }) };
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('failed');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+    expect(attempts).toBe(2);
   });
 });

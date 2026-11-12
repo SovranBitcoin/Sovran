@@ -36,7 +36,7 @@ import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46Conne
 import type { ActivityVerdict, Nip46Method } from '@/features/nostrSigner/lib/nip46Types';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatDate, formatRelative } from '@/shared/lib/date';
-import { popup } from '@/shared/lib/popup';
+import { popup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -82,8 +82,10 @@ function CopyableEventId({ eventId }: { eventId: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
   const copy = useCallback(() => {
-    void Clipboard.setStringAsync(eventId);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
+    Clipboard.setStringAsync(eventId).then(
+      () => popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 }),
+      () => staticPopup('copy-failed')
+    );
   }, [eventId]);
 
   return (

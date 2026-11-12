@@ -102,12 +102,17 @@ describe('routstrStore persist resilience', () => {
   it('retains every unsettled payment instead of evicting the oldest recovery token', async () => {
     const store = await loadStore();
     for (let index = 0; index < 33; index++) {
-      store.getState().beginPayment(`payment-${index}`, {
-        encoded: `cashuB-fixture-${index}`,
-        nodeBaseUrl: 'https://node.example',
-        operationId: `operation-${index}`,
-        startedAt: index,
-      });
+      store.setState((state) => ({
+        pendingPayments: {
+          ...state.pendingPayments,
+          [`payment-${index}`]: {
+            encoded: `cashuB-fixture-${index}`,
+            nodeBaseUrl: 'https://node.example',
+            operationId: `operation-${index}`,
+            startedAt: index,
+          },
+        },
+      }));
     }
     const saved = JSON.parse(mockMemory[STORAGE_KEY]);
     expect(Object.keys(saved.state.pendingPayments)).toHaveLength(33);

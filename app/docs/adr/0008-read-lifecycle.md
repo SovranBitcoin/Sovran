@@ -70,7 +70,8 @@ The aggregate engine opens every candidate tier at once, resolves at `minItems`
 or `capMs` — never while nothing has answered — and delivers later merges
 through `onUpdate` or the entity cache. Merges are idempotent, append-only and
 rank-aware: a better tier's fields replace a worse tier's in place; a worse tier
-can only add. The gate table is `app/shared/lib/read/readPolicy.ts`.
+can only add. Which engine each surface uses is `app/shared/lib/read/readPolicy.ts`;
+the caps belong to the nostr package.
 
 ### Correlation and measurement
 

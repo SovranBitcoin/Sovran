@@ -7,6 +7,10 @@ import {
 } from '../shared/lib/nostr/moderation';
 import { useFeedIgnoreStore } from '../features/feed/stores/ignoreStore';
 import { asNostrPubkeyHex } from '../shared/lib/protocolIds';
+import {
+  SILENT_READS_BEFORE_LEFT_OUT,
+  forgetSilentRelays,
+} from '../shared/lib/nostr/ownReplaceableEvent';
 
 const own = 'a'.repeat(64);
 const target = asNostrPubkeyHex('b'.repeat(64));
@@ -20,52 +24,57 @@ const mockProfile = {
   ],
 };
 const mockListeners = new Set<(state: typeof mockProfile) => void>();
+/** Whether this session's relay-list sync has found the account's relays. */
+let mockDiscovered = true;
 const mockPublish = jest.fn(async (..._args: unknown[]) => ({ isErr: () => false }));
 let mockEventId = 100;
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class {},
-    NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
-    NDKRelaySet: {
-      fromRelayUrls: (urls: string[]) => ({
-        relays: new Set(mockRelays.filter((relay) => urls.includes(relay.url))),
-      }),
-    },
-    NDKEvent: class {
-      kind = 10000;
-      pubkey = 'a'.repeat(64);
-      created_at = 10;
-      tags: string[][] = [];
-      content = '';
-      id = 'c'.repeat(64);
-      getEventHash() {
-        return this.id;
-      }
-      verifySignature() {
-        return true;
-      }
-      async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
-        this.pubkey = (await signer.user()).pubkey;
-        this.id = (++mockEventId).toString(16).padStart(64, '0');
-      }
-    },
-  }),
-  { virtual: true }
-);
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class {},
+  NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
+  NDKRelaySet: {
+    fromRelayUrls: (urls: string[]) => ({
+      relays: new Set(mockRelays.filter((relay) => urls.includes(relay.url))),
+    }),
+  },
+  NDKEvent: class {
+    kind = 10000;
+    pubkey = 'a'.repeat(64);
+    created_at = 10;
+    tags: string[][] = [];
+    content = '';
+    id = 'c'.repeat(64);
+    getEventHash() {
+      return this.id;
+    }
+    verifySignature() {
+      return true;
+    }
+    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
+      this.pubkey = (await signer.user()).pubkey;
+      this.id = (++mockEventId).toString(16).padStart(64, '0');
+    }
+  },
+}));
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => mockProfile,
     subscribe: (listener: (state: typeof mockProfile) => void) => {
       mockListeners.add(listener);
       return () => mockListeners.delete(listener);
     },
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState(), useProfileStore.subscribe),
+  };
+});
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
   getOwnWriteRelays: () => mockRelays.map((relay) => relay.url),
+  getKnownOwnWriteRelays: () => (mockDiscovered ? mockRelays.map((relay) => relay.url) : null),
 }));
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
@@ -73,6 +82,7 @@ jest.mock('@/shared/lib/nostr/publish', () => ({
 jest.mock('@sovranbitcoin/schemas', () => ({ loggableIssues: () => [] }), { virtual: true });
 jest.mock('@/shared/lib/logger', () => ({
   storeLog: { info: jest.fn() },
+  nostrLog: { info: jest.fn(), warn: jest.fn() },
   log: { warn: jest.fn() },
   redactError: () => '',
 }));
@@ -115,7 +125,14 @@ function event(overrides: Record<string, unknown> = {}) {
   return Object.assign(new NDKEvent(), overrides);
 }
 
+/** Let `reads` reads end, each by a relay's silence (12 s). */
+async function readsTimeOut(reads: number) {
+  for (let read = 0; read < reads; read++) await jest.advanceTimersByTimeAsync(12_001);
+}
+
 beforeEach(() => {
+  forgetSilentRelays();
+  mockDiscovered = true;
   mockRelays.splice(0, mockRelays.length, mockRelay);
   mockProfile.activeAccountIndex = 0;
   mockPublish.mockClear();
@@ -147,8 +164,11 @@ it('times out and stops subscriptions; an empty timed-out read cannot create a l
   jest.useFakeTimers();
   const { ndk, subscription } = setup([], false);
   const result = expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('timed out');
-  await jest.advanceTimersByTimeAsync(12_001);
+  // The only relay is read again until it counts as silent, and once more:
+  // with no other relay there is nothing to read without it.
+  await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
   await result;
+  expect(subscription.start).toHaveBeenCalledTimes(SILENT_READS_BEFORE_LEFT_OUT + 1);
   expect(subscription.stop).toHaveBeenCalled();
   expect(mockPublish).not.toHaveBeenCalled();
 });
@@ -166,7 +186,7 @@ it('keeps a first block local when configured relays have not confirmed an empty
   subscription.eosesSeen.clear();
   subscription.eosesSeen.add({ url: 'wss://some-other-relay.example' });
   const result = expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow();
-  await jest.advanceTimersByTimeAsync(12_001);
+  await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
   await result;
   expect(mockPublish).not.toHaveBeenCalled();
   expect(useFeedIgnoreStore.getState().ignoredPubkeys).toEqual([target]);
@@ -224,17 +244,31 @@ it('waits for the slower relay and preserves its newer private blocks and unfami
   expect(slow.subscription.stop).toHaveBeenCalled();
 });
 
-it('keeps a block pending and publishes nothing if a relay stalls after another returns an old list', async () => {
+it('keeps a block pending while a relay stalls after another returns an old list, then publishes without it', async () => {
   jest.useFakeTimers();
-  const { ndk, fast, slow } = setupDelayedRelay();
-  const result = expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('timed out');
-  await jest.advanceTimersByTimeAsync(12_001);
-  await result;
+  const { ndk, fast, slow, slowRelay } = setupDelayedRelay();
+  const result = setPersonBlocked(ndk, own, target, true);
+  await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
   expect(mockPublish).not.toHaveBeenCalled();
   expect(useFeedIgnoreStore.getState().ignoredPubkeys).toEqual([target]);
   expect(useFeedIgnoreStore.getState().blockOverrides).toEqual({ [target]: true });
   expect(fast.subscription.stop).toHaveBeenCalled();
   expect(slow.subscription.stop).toHaveBeenCalled();
+
+  // Silent three reads in a row: the next read goes without it, and the list
+  // is sent only to the relay read. A newer list only the slow relay holds is
+  // overruled, the risk the owner accepted (F227).
+  await readsTimeOut(1);
+  await result;
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+  const published = mockPublish.mock.calls[0][0] as {
+    relays: string[];
+    event: { tags: string[][] };
+  };
+  expect(published.relays).toEqual([mockRelay.url]);
+  expect(published.relays).not.toContain(slowRelay.url);
+  expect(published.event.tags).toEqual([['t', 'old']]);
+  expect(useFeedIgnoreStore.getState().blockOverrides).toEqual({});
 });
 
 it('rejects stale-account signers without publishing under the wrong identity', async () => {
@@ -280,6 +314,56 @@ it('does not overwrite a newer list learned while the signer was open', async ()
   expect(useFeedIgnoreStore.getState().blockOverrides[target]).toBe(true);
 });
 
+it('dates a replacement mute list now, or one second past a base dated ahead of this clock', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const older = setup([event({ created_at: 10 })]);
+  await setPersonBlocked(older.ndk, own, target, true);
+  const first = (mockPublish.mock.calls[0][0] as { event: Record<string, unknown> }).event;
+  expect(first).toMatchObject({ kind: 10000, pubkey: own });
+  expect(first.created_at).toBeGreaterThanOrEqual(now);
+  expect(first.created_at).toBeLessThan(now + 5);
+
+  useFeedIgnoreStore.setState(useFeedIgnoreStore.getInitialState(), true);
+  const ahead = setup([event({ created_at: now + 30 })]);
+  await setPersonBlocked(ahead.ndk, own, target, true);
+  const second = (mockPublish.mock.calls[1][0] as { event: Record<string, unknown> }).event;
+  expect(second.created_at).toBe(now + 31);
+});
+
+it('refuses a mute list whose signer was replaced before signing, after asking the old signer', async () => {
+  const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
+  const sign = jest.spyOn(NDKEvent.prototype, 'sign');
+  const { ndk, signer } = setup();
+  signer.encrypt.mockImplementationOnce(async (_user, content) => {
+    (ndk as unknown as { signer: unknown }).signer = { ...signer };
+    return content;
+  });
+  await expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('Account signer changed');
+  // Checked before signing, as for the follow list: the replaced signer is never asked.
+  expect(sign).not.toHaveBeenCalled();
+  expect(mockPublish).not.toHaveBeenCalled();
+  sign.mockRestore();
+});
+
+it('publishes a report as a kind 1984 with empty content, and refuses one whose signer changed while signing', async () => {
+  const ok = setup();
+  await publishReport(ok.ndk, own, target, 'spam');
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+  const published = (mockPublish.mock.calls[0][0] as { event: Record<string, unknown> }).event;
+  expect(published).toMatchObject({ kind: 1984, pubkey: own, content: '' });
+  expect(published.tags).toEqual([['p', target, 'spam']]);
+
+  const { ndk, signer } = setup();
+  signer.user
+    .mockImplementationOnce(async () => ({ pubkey: own }))
+    .mockImplementationOnce(async () => {
+      (ndk as unknown as { signer: unknown }).signer = { ...signer };
+      return { pubkey: own };
+    });
+  await expect(publishReport(ndk, own, target, 'spam')).rejects.toThrow('Account signer changed');
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+});
+
 it('rejects invalid IDs, timestamps and signatures before parsing a list', async () => {
   const { ndk } = setup();
   for (const bad of [
@@ -301,4 +385,29 @@ it('never falls back to an older list when the newest authenticated list is unsu
     await expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('Unsupported mute list');
     expect(mockPublish).not.toHaveBeenCalled();
   }
+});
+
+describe('where a block is sent', () => {
+  it('sends it only to the relays the read asked, never one added after it', async () => {
+    const { ndk, signer } = setup();
+    const added = { url: 'wss://added.example' };
+    signer.encrypt.mockImplementationOnce(async (_user, content) => {
+      mockRelays.push(added);
+      return content;
+    });
+    await setPersonBlocked(ndk, own, target, true);
+    expect((mockPublish.mock.calls[0][0] as { relays: string[] }).relays).toEqual([mockRelay.url]);
+  });
+
+  it("waits, blocked on this device, until this session has found the account's relays", async () => {
+    mockDiscovered = false;
+    const { ndk, subscription } = setup();
+    await expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow(
+      'Mute-list relays not known yet'
+    );
+    expect(subscription.start).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(useFeedIgnoreStore.getState().ignoredPubkeys).toEqual([target]);
+    expect(useFeedIgnoreStore.getState().blockOverrides).toEqual({ [target]: true });
+  });
 });

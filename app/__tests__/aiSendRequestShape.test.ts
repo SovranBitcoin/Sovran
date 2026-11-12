@@ -33,7 +33,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type AiLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
+import { sendMessage, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import {
   AFFORD_BUFFER,
   maxSpendSats,
@@ -47,11 +47,13 @@ jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }))
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
   sendMessage: jest.fn(),
-  checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: {
+    getState: () => ({ activeAccountIndex: 0 }),
+    subscribe: () => () => undefined,
+  },
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
@@ -63,9 +65,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     setItem: async () => {},
     removeItem: async () => {},
   }),
-}));
-jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn() },
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => {
   const useMintStore = Object.assign(
@@ -165,7 +164,6 @@ async function sendWith(
 beforeEach(async () => {
   jest.clearAllMocks();
   await useRoutstrStore.persist.rehydrate();
-  jest.mocked(checkBalance).mockResolvedValue({ balance: 99_000 });
   sendMock.mockResolvedValue(success());
 });
 
@@ -377,5 +375,85 @@ describe('what the spend sheet is told', () => {
     // And the transcript is untouched — a declined send leaves no orphan
     // question with no answer under it.
     expect(useRoutstrStore.getState().conversationHistory).toHaveLength(0);
+  });
+});
+
+/**
+ * Which model a send goes to, and which one the spend sheet names. Both read
+ * this session's lineup, else the saved one, and the wallet's spendable sats.
+ */
+describe('which model a send goes to', () => {
+  /** Reserve far above the 100 000 sats the wallet holds. */
+  const dear = (modelId: string): LineupEntry => ({
+    ...entry(modelId, null),
+    displayName: `${modelId} name`,
+    satsPricing: { prompt: 100, completion: 100, request: 0, image: 0, max_cost: 9_000_000 },
+  });
+  const cheap = (modelId: string): LineupEntry => ({
+    ...entry(modelId, null),
+    displayName: `${modelId} name`,
+  });
+  const saved = (lineup: AiLineup) => ({
+    lastKnownLineup: { derivedAt: 1, nodeBaseUrl: 'https://node.example', lineup },
+  });
+
+  it('goes to the saved lineup while this session has none', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.auto = cheap('saved-model');
+    await sendWith(null as unknown as AiLineup, 'openai', saved(lineup));
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][1].model).toBe('saved-model');
+  });
+
+  it('sends nothing when this session derived an empty lineup, even with a saved one', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.auto = cheap('saved-model');
+    await sendWith(emptyLineup(), 'openai', saved(lineup));
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('goes to the first model the wallet can afford, and the sheet names that one', async () => {
+    const { confirmSpend } = jest.requireMock('@/features/ai/lib/spendConfirm') as {
+      confirmSpend: jest.Mock;
+    };
+    confirmSpend.mockResolvedValue(true);
+    const lineup = emptyLineup();
+    lineup.openai.auto = dear('dear-model');
+    lineup.claude.auto = cheap('cheap-model');
+    await sendWith(lineup, 'openai', { confirmSpend: true });
+    expect(confirmSpend).toHaveBeenCalledWith(
+      expect.objectContaining({ modelName: 'cheap-model name' })
+    );
+    expect(sendMock.mock.calls[0][1].model).toBe('cheap-model');
+  });
+
+  it('goes to the first model at any cost when the wallet can afford none', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.auto = dear('dear-first');
+    lineup.claude.auto = dear('dear-second');
+    await sendWith(lineup);
+    const { aiLog } = jest.requireMock('@/shared/lib/logger') as { aiLog: { info: jest.Mock } };
+    expect(aiLog.info).toHaveBeenCalledWith(
+      'ai.send.gate',
+      expect.objectContaining({ model: 'dear-first', state: 'insufficient-funds' })
+    );
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('moves the selection to a fallback the node accepted, found in the saved lineup', async () => {
+    sendMock.mockRejectedValueOnce({ status: 404, error: { type: 'upstream_error' } });
+    const lineup = emptyLineup();
+    lineup.openai.auto = cheap('refused-model');
+    lineup.claude.auto = cheap('accepted-model');
+    await sendWith(null as unknown as AiLineup, 'openai', {
+      ...saved(lineup),
+      nodeBaseUrl: 'https://fallback-node.example',
+      userNodeBaseUrl: 'https://fallback-node.example',
+    });
+    expect(sendMock.mock.calls.map((call) => call[1].model)).toEqual([
+      'refused-model',
+      'accepted-model',
+    ]);
+    expect(useRoutstrStore.getState().selectedProvider).toBe('claude');
   });
 });

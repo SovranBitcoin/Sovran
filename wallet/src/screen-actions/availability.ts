@@ -14,6 +14,7 @@ import { describeSendLock } from "../annotations";
 import { logger } from "../logger";
 import { LOCK_CLOCK_SKEW_MS } from "../p2pk";
 import { meltMethodForTarget } from "../melt-target";
+import { decodePaymentRequestEntryPhase } from "./paymentRequestPhase";
 import type {
   AmountEntryMethodContext,
   MintMethodCapabilityMap,
@@ -402,24 +403,29 @@ function meltQuoteAvailability(
 function paymentRequestAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"paymentRequest"> {
-  const metadata = isRecord(entry.metadata) ? entry.metadata : undefined;
-  const phase =
-    typeof metadata?.phase === "string" ? metadata.phase : undefined;
-  const hasOperationId = !!(entry.operationId || metadata?.operationId);
-  const isPreview = (phase === "preview" || !phase) && !hasOperationId;
-  const isDelivered = phase === "delivered" || hasOperationId;
+  const phase = decodePaymentRequestEntryPhase(entry);
   logger.debug("screenActions.availability.paymentRequest.context", {
-    phase: phase ?? null,
-    hasOperationId,
-    isPreview,
-    isDelivered,
+    phase: phase.kind,
   });
-
-  return {
-    confirm: { available: isPreview },
-    cancel: { available: !isDelivered },
+  const actions = (confirm: boolean, cancel: boolean) => ({
+    confirm: { available: confirm },
+    cancel: { available: cancel },
     back: { available: true },
-  };
+  });
+  switch (phase.kind) {
+    case "preview":
+      return actions(true, true);
+    case "delivered":
+    case "undelivered":
+      return actions(false, false);
+    case "rolledBack":
+    case "unrecognised":
+      return actions(false, true);
+    default: {
+      const unreachable: never = phase;
+      return unreachable;
+    }
+  }
 }
 
 function amountEntryAvailability(
@@ -1169,25 +1175,6 @@ const AVAILABILITY_FNS: {
   amountEntry: amountEntryAvailability,
   mintSelector: mintSelectorAvailability,
 };
-
-/**
- * Pure check — is the payment request entry still in preview state?
- * Returns false once an operationId is present (i.e. the operation executed).
- */
-export function isPaymentRequestPreview(
-  entry: Record<string, unknown>,
-): boolean {
-  const metadata = entry.metadata as Record<string, unknown> | undefined;
-  const phase = metadata?.phase as string | undefined;
-  const hasOperationId = !!(entry.operationId || metadata?.operationId);
-  const result = (phase === "preview" || !phase) && !hasOperationId;
-  logger.debug("screenActions.availability.paymentRequestPreview", {
-    phase: phase ?? null,
-    hasOperationId,
-    result,
-  });
-  return result;
-}
 
 /**
  * Pure function — derives which actions are available from the history entry.

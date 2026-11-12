@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, afterEach } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNostrDataLayer, noteStatsFromRelayEvents, noteStatsBatches } from '../src/facade';
+import { createNostrDataLayer, mergeNoteStatsByRank, noteStatsFromRelayEvents, noteStatsBatches } from '../src/facade';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import { createNaggTier } from '../src/facade/nagg-tier';
 import { createNaggClient } from '../src/transport';
@@ -39,6 +39,32 @@ describe('noteStatsFromRelayEvents', () => {
     const ids = Array.from({ length: 120 }, (_, i) => `id${i}`);
     const batches = noteStatsBatches([...ids, 'id0'], 50);
     expect(batches.map((b) => b.length)).toEqual([50, 50, 20]);
+  });
+});
+
+describe('mergeNoteStatsByRank', () => {
+  test('the first tier to answer keeps its rank: a worse-ranked later answer only adds ids', () => {
+    const likes = (count: number) =>
+      noteStatsFromRelayEvents(
+        [N1],
+        Array.from({ length: count }, (_, i) => ({ id: `like${i}`, pubkey: A, kind: 7, content: '+', tags: [['e', N1]], created_at: 1 })),
+      );
+    const fromNagg = mergeNoteStatsByRank(undefined, likes(3), 'nagg');
+    const merged = mergeNoteStatsByRank(fromNagg, { ...likes(1), ...noteStatsFromRelayEvents([N2], []) }, 'primal');
+    expect(merged[N1]?.likes).toBe(3);
+    expect(merged[N2]?.likes).toBe(0);
+  });
+
+  test('each note is ranked by the tier that supplied it, not by the first tier to answer', () => {
+    const likes = (count: number) =>
+      noteStatsFromRelayEvents(
+        [N1],
+        Array.from({ length: count }, (_, i) => ({ id: `like${i}`, pubkey: A, kind: 7, content: '+', tags: [['e', N1]], created_at: 1 })),
+      );
+    const empty = mergeNoteStatsByRank(undefined, {}, 'nagg');
+    const fromRelay = mergeNoteStatsByRank(empty, likes(1), 'relay');
+    const merged = mergeNoteStatsByRank(fromRelay, likes(9), 'primal');
+    expect(merged[N1]?.likes).toBe(9);
   });
 });
 

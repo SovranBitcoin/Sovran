@@ -77,11 +77,6 @@
       "count": 1
     }
   },
-  "features/settings/screens/SettingsRecoveryScreen.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
   "features/theme/components/UnitPreviewCard.tsx": {
     "no-restricted-syntax": {
       "count": 6
@@ -201,7 +196,7 @@
       "count": 1
     },
     "no-restricted-globals": {
-      "count": 3
+      "count": 1
     }
   },
   "shared/lib/utils.tsx": {

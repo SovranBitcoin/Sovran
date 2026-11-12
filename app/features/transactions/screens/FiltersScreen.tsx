@@ -3,12 +3,11 @@
  * mint, and the annotation-driven filters (source, P2PK lock, counterparty).
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useMints } from '@cashu/coco-react';
-import { z } from 'zod';
 
 import { PillTabs } from '@/shared/ui/composed/PillTabs';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
@@ -30,20 +29,21 @@ import {
   isP2PKLocked,
   isPendingTransaction,
   matchesTransactionFilters,
-  type ScanMethod,
-  type TransactionDirection,
-  type TransactionPaymentType,
   accountUnitLabel,
   isTestnutUnit,
   SWITCHABLE_UNITS,
 } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
-
-type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
-type SourceFilter = 'all' | ScanMethod;
-type LockFilter = 'all' | 'locked' | 'unlocked';
-type CounterpartyFilter = 'all' | 'with';
-type ZapFilter = 'all' | 'zaps';
+import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import {
+  countActiveFilters,
+  DEFAULT_TRANSACTION_FILTERS,
+  FilterSheetParamsSchema,
+  filtersFromSheetParams,
+  transactionsRouteParams,
+  type TransactionFilters,
+} from '../components/TransactionsFilterContext';
 
 const PAYMENT_TYPE_OPTIONS = {
   all: { label: 'All', icon: 'fluent:apps-16-filled' },
@@ -90,22 +90,11 @@ const ZAP_OPTIONS = {
   zaps: { label: 'Zapped posts', icon: 'mingcute:lightning-fill' },
 } as const;
 
-const ParamsSchema = z.object({
-  currency: z.string().max(16).optional(),
-  paymentType: z.enum(['all', 'lightning', 'ecash', 'onchain']).optional(),
-  direction: z.enum(['all', 'incoming', 'outgoing']).optional(),
-  status: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
-  mintUrl: z.string().max(2048).optional(),
-  source: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
-  lock: z.enum(['all', 'locked', 'unlocked']).optional(),
-  counterparty: z.enum(['all', 'with']).optional(),
-  zap: z.enum(['all', 'zaps']).optional(),
-});
-
 export function FiltersScreen() {
   useLifecycleLogger('FiltersScreen');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
+  const isTestnutMint = useIsTestnutMint();
   // Every real account, plus the testnut accounts this wallet actually has.
   const { availableUnits } = useActiveUnit();
   const currencyTabs = [
@@ -115,21 +104,13 @@ export function FiltersScreen() {
     ),
   ];
 
-  const params = useRouteParams(ParamsSchema, { where: 'filter-flow.filters' });
+  const params = useRouteParams(FilterSheetParamsSchema, { where: 'filter-flow.filters' });
 
-  const [currency, setCurrency] = useState<string>(params?.currency || 'sat');
-  const [paymentType, setPaymentType] = useState<TransactionPaymentType>(
-    params?.paymentType || 'all'
-  );
-  const [direction, setDirection] = useState<TransactionDirection>(params?.direction || 'all');
-  const [status, setStatus] = useState<Status>(params?.status || 'All');
-  const [mintUrl, setMintUrl] = useState<string>(params?.mintUrl || 'all');
-  const [source, setSource] = useState<SourceFilter>(params?.source || 'all');
-  const [lock, setLock] = useState<LockFilter>(params?.lock || 'all');
-  const [counterparty, setCounterparty] = useState<CounterpartyFilter>(
-    params?.counterparty || 'all'
-  );
-  const [zap, setZap] = useState<ZapFilter>(params?.zap || 'all');
+  const [draft, setDraft] = useState(() => filtersFromSheetParams(params));
+  const change = (changes: Partial<TransactionFilters>) =>
+    setDraft((current) => ({ ...current, ...changes }));
+  const { currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap } =
+    draft;
 
   const mintOptions = useMemo(
     () => [
@@ -143,7 +124,7 @@ export function FiltersScreen() {
     [trustedMints]
   );
 
-  const handleApply = useCallback(() => {
+  const handleApply = () => {
     log.info('tx.filters.apply', {
       currency,
       paymentType,
@@ -157,52 +138,23 @@ export function FiltersScreen() {
     });
     router.dismissTo({
       pathname: '/transactions',
-      params: {
-        filterCurrency: currency.toLowerCase(),
-        filterPaymentType: paymentType,
-        filterDirection: direction,
-        filterStatus: status,
-        filterMintUrl: mintUrl,
-        filterSource: source,
-        filterLock: lock,
-        filterCounterparty: counterparty,
-        filterZap: zap,
-      },
+      params: transactionsRouteParams({ ...draft, currency: currency.toLowerCase() }),
     });
-  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
+  };
 
-  const handleReset = useCallback(() => {
+  const handleReset = () => {
     log.info('tx.filters.reset');
-    setCurrency('sat');
-    setPaymentType('all');
-    setDirection('all');
-    setStatus('All');
-    setMintUrl('all');
-    setSource('all');
-    setLock('all');
-    setCounterparty('all');
-    setZap('all');
-  }, []);
+    setDraft(DEFAULT_TRANSACTION_FILTERS);
+  };
 
-  const hasActiveFilters = useMemo(
-    () =>
-      currency.toLowerCase() !== 'sat' ||
-      paymentType !== 'all' ||
-      direction !== 'all' ||
-      status !== 'All' ||
-      mintUrl !== 'all' ||
-      source !== 'all' ||
-      lock !== 'all' ||
-      counterparty !== 'all' ||
-      zap !== 'all',
-    [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]
-  );
+  const hasActiveFilters = countActiveFilters(draft) > 0;
 
   const resultCount = useMemo(() => {
     const normalizedCurrency = currency.toLowerCase();
 
     const filteredTransactions = history.filter((historyEntry: HistoryEntry) => {
-      if (normalizedCurrency !== 'all' && historyEntry.unit !== normalizedCurrency) return false;
+      // The list's account scope, so a test account counts what it then shows.
+      if (!belongsToAccount(normalizedCurrency, historyEntry, isTestnutMint)) return false;
       if (mintUrl !== 'all' && historyEntry.mintUrl !== mintUrl) return false;
 
       // Swap legs are surfaced as a single grouped row (annotation-driven).
@@ -230,7 +182,19 @@ export function FiltersScreen() {
     });
 
     return filteredTransactions.length;
-  }, [currency, direction, history, mintUrl, paymentType, source, lock, counterparty, zap, status]);
+  }, [
+    currency,
+    direction,
+    history,
+    isTestnutMint,
+    mintUrl,
+    paymentType,
+    source,
+    lock,
+    counterparty,
+    zap,
+    status,
+  ]);
 
   return (
     <ScreenWrapper
@@ -282,7 +246,7 @@ export function FiltersScreen() {
                   selectedVariant="contrast"
                   fitContent
                   accessibilityRole="radio"
-                  onPress={() => setMintUrl(mint.mintUrl)}
+                  onPress={() => change({ mintUrl: mint.mintUrl })}
                   testID={`filter-mint-${mint.mintUrl}`}
                 />
               ))}
@@ -296,7 +260,7 @@ export function FiltersScreen() {
             tabs={currencyTabs}
             labelFor={(value) => (isTestnutUnit(value) ? accountUnitLabel(value) : value)}
             activeTab={currency.toUpperCase()}
-            onTabChange={(value) => setCurrency(value.toLowerCase())}
+            onTabChange={(value) => change({ currency: value.toLowerCase() })}
             accessibilityRole="radio"
             testIDFor={(value) => `filter-currency-${value.toLowerCase()}`}
           />
@@ -307,7 +271,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'lightning', 'ecash', 'onchain'] as const}
             activeTab={paymentType}
-            onTabChange={setPaymentType}
+            onTabChange={(value) => change({ paymentType: value })}
             labelFor={(value) => PAYMENT_TYPE_OPTIONS[value].label}
             iconFor={(value) => PAYMENT_TYPE_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -320,7 +284,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'incoming', 'outgoing'] as const}
             activeTab={direction}
-            onTabChange={setDirection}
+            onTabChange={(value) => change({ direction: value })}
             labelFor={(value) => DIRECTION_OPTIONS[value].label}
             iconFor={(value) => DIRECTION_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -333,7 +297,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['All', 'Confirmed', 'Pending', 'Expired'] as const}
             activeTab={status}
-            onTabChange={setStatus}
+            onTabChange={(value) => change({ status: value })}
             labelFor={(value) => STATUS_OPTIONS[value].label}
             iconFor={(value) => STATUS_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -346,7 +310,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink'] as const}
             activeTab={source}
-            onTabChange={setSource}
+            onTabChange={(value) => change({ source: value })}
             labelFor={(value) => SOURCE_OPTIONS[value].label}
             iconFor={(value) => SOURCE_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -359,7 +323,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'locked', 'unlocked'] as const}
             activeTab={lock}
-            onTabChange={setLock}
+            onTabChange={(value) => change({ lock: value })}
             labelFor={(value) => LOCK_OPTIONS[value].label}
             iconFor={(value) => LOCK_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -372,7 +336,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'with'] as const}
             activeTab={counterparty}
-            onTabChange={setCounterparty}
+            onTabChange={(value) => change({ counterparty: value })}
             labelFor={(value) => COUNTERPARTY_OPTIONS[value].label}
             iconFor={(value) => COUNTERPARTY_OPTIONS[value].icon}
             accessibilityRole="radio"
@@ -385,7 +349,7 @@ export function FiltersScreen() {
             selectedVariant="contrast"
             tabs={['all', 'zaps'] as const}
             activeTab={zap}
-            onTabChange={setZap}
+            onTabChange={(value) => change({ zap: value })}
             labelFor={(value) => ZAP_OPTIONS[value].label}
             iconFor={(value) => ZAP_OPTIONS[value].icon}
             accessibilityRole="radio"

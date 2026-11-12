@@ -257,8 +257,8 @@ export interface RoutstrMessage {
   /** Reasoning/thinking text from the model (e.g. DeepSeek R1, o-series). */
   reasoningContent?: string;
   /**
-   * Whole sats this assistant message cost the user, derived from a
-   * pre/post `checkBalance` diff in `useAiSend`. Set after stream completion
+   * Whole sats this assistant message cost the user: the spent-minus-change
+   * figure the send returns to `useAiSend`. Set after stream completion
    * so it can land on a subsequent persisted write; rendered next to the
    * "Thought for…" header. Absent on user messages and on assistant
    * messages from before the cost-tracking change shipped.
@@ -561,31 +561,30 @@ interface RoutstrActions {
    *  catalog in hand, so a list that arrives after the catalog still shapes
    *  the menu this session. */
   setCuratedModels: (curated: CuratedModelsState) => void;
-  setApiKey: (apiKey: string) => void;
-  clearApiKey: () => void;
   /** Move a credential into `legacyAccounts` so its balance stays reachable.
    *  Idempotent, and never overwrites a richer record with a poorer one. */
   archiveAccount: (nodeBaseUrl: string | null, apiKey: string, balanceMsats: number | null) => void;
   /** Mark an archived credential as swept. Keeps the row (the node may still
    *  hold dust, and a refund is idempotent) but stops it being retried. */
   markAccountReclaimed: (nodeBaseUrl: string) => void;
-  applyChangeToken: (token: string) => void;
   invalidateServerLineup: () => void;
 
-  setBalance: (balance: number) => void;
-  clearBalance: () => void;
-
-  addMessage: (message: RoutstrMessage) => void;
-  updateMessage: (id: string, content: string) => void;
-  /** Toggle a message's transient `pending` flag. Used by `useAiSend` to
-   *  flip the user-bubble spinner → check once the streaming round-trip
-   *  resolves. Transient — never persisted as `true` (see `afterHydrate`). */
-  setMessagePending: (id: string, pending: boolean) => void;
+  /** Add messages to a conversation (`selectConversationId` when they were
+   *  asked) in one write, so a question and its answer's placeholder are
+   *  saved together or not at all, whichever conversation is open now. */
+  addMessages: (conversationId: string | null, messages: RoutstrMessage[]) => void;
+  /** Toggle a message's transient `pending` flag in the conversation it was
+   *  sent in (`selectConversationId` when it was sent), whichever one is open
+   *  now. Used by `useAiSend` to flip the user-bubble spinner → check once
+   *  the streaming round-trip resolves. Cleared on load (see `afterHydrate`). */
+  setMessagePending: (conversationId: string | null, id: string, pending: boolean) => void;
   /** Persist the final assistant payload (content + reasoning + thinking
    *  duration + cost) in one atomic write, replacing the placeholder body
-   *  added at stream open. Preserves `id`, `parentId`, `role`, and
-   *  `timestamp` so message identity / branch links don't shift. */
+   *  added at stream open, in the conversation it was asked in. Preserves
+   *  `id`, `parentId`, `role`, and `timestamp` so message identity / branch
+   *  links don't shift. */
   finalizeAssistantMessage: (
+    conversationId: string | null,
     id: string,
     fields: {
       content: string;
@@ -595,7 +594,6 @@ interface RoutstrActions {
       modelSwitch?: RoutstrMessage['modelSwitch'];
     }
   ) => void;
-  removeMessages: (ids: Set<string>) => void;
   /** Pick which sibling is shown at a branch point. Writes through to
    *  the current session's `activeChildren` so the choice survives across
    *  app restarts. */
@@ -628,15 +626,14 @@ interface RoutstrActions {
    */
   observeProviders: (source: ProviderSource, providers: Record<string, ProviderClaim>) => void;
   setUserNode: (nodeBaseUrl: string | null) => void;
-  /** Record a payment before it leaves, so its change stays recoverable. */
-  beginPayment: (id: string, payment: PendingPayment) => void;
   /** Forget a payment whose change is home, or which was never taken. */
   settlePayment: (id: string) => void;
   isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
   switchSession: (sessionId: string) => void;
-  updateCurrentSessionTitle: () => void;
+  /** Title a saved conversation after its first question. */
+  updateSessionTitle: (sessionId: string) => void;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
@@ -647,43 +644,36 @@ type SessionMirrorState = Pick<
 >;
 
 /**
- * Set `conversationHistory` to `messages` and mirror the same list into the
- * current session, unless anonymous mode is on (sessions stay untouched).
+ * The conversation on screen: the saved session's id, or `null` for one that
+ * is not saved (anonymous mode). A message written now belongs to it.
  */
-function withSessionMirror(
-  state: SessionMirrorState,
-  messages: RoutstrMessage[]
-): Partial<SessionMirrorState> {
-  if (state.isAnonymousMode || !state.currentSessionId) {
-    return { conversationHistory: messages };
-  }
-  return {
-    conversationHistory: messages,
-    sessions: state.sessions.map((session) =>
-      session.id === state.currentSessionId ? { ...session, messages } : session
-    ),
-  };
+export function selectConversationId(
+  state: Pick<RoutstrState, 'isAnonymousMode' | 'currentSessionId'>
+): string | null {
+  return state.isAnonymousMode ? null : state.currentSessionId;
 }
 
+/** The lineup a model is chosen from: this session's, else the saved one (an empty one stands). */
+export const selectLineup = (state: Pick<RoutstrState, 'lineup' | 'lastKnownLineup'>) =>
+  state.lineup ?? state.lastKnownLineup?.lineup ?? null;
+
 /**
- * Apply a per-message transform to the conversation AND to the current
- * session's own message list (mapped independently, not replaced wholesale),
- * unless anonymous mode is on.
+ * Apply a per-message transform in one conversation (`selectConversationId`
+ * when its messages were written): its saved session's message list, and the
+ * list on screen only while that conversation is the one shown.
  */
-function mapSessionMessages(
+function mapConversationMessages(
   state: SessionMirrorState,
-  apply: (msg: RoutstrMessage) => RoutstrMessage
+  conversationId: string | null,
+  apply: (messages: RoutstrMessage[]) => RoutstrMessage[]
 ): Partial<SessionMirrorState> {
-  const conversationHistory = state.conversationHistory.map(apply);
-  if (state.isAnonymousMode || !state.currentSessionId) {
-    return { conversationHistory };
-  }
+  const shown = selectConversationId(state) === conversationId;
+  const conversationHistory = shown ? apply(state.conversationHistory) : state.conversationHistory;
+  if (conversationId === null) return { conversationHistory };
   return {
     conversationHistory,
     sessions: state.sessions.map((session) =>
-      session.id === state.currentSessionId
-        ? { ...session, messages: session.messages.map(apply) }
-        : session
+      session.id === conversationId ? { ...session, messages: apply(session.messages) } : session
     ),
   };
 }
@@ -1192,11 +1182,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         if (!same && cached) get().setCachedModels(cached.data);
       },
 
-      setApiKey: (apiKey: string) => {
-        storeLog.info('store.routstr.set_api_key');
-        set({ apiKey });
-      },
-
       archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
         if (!apiKey) return;
         set((state) => ({
@@ -1223,63 +1208,26 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         });
       },
 
-      applyChangeToken: (token) => {
-        if (!get().apiKey?.startsWith('cashu') || !token.startsWith('cashu')) return;
-        set({ apiKey: token });
-        aiLog.info('routstr.change_token.applied');
-      },
-
       invalidateServerLineup: () => {
         set({ serverLineupAt: null, lineup: null });
       },
 
-      clearApiKey: () => {
-        storeLog.info('store.routstr.clear_api_key');
-        set({ apiKey: null });
-      },
-
-      setBalance: (balance: number) => {
-        storeLog.debug('store.routstr.set_balance', { balance });
-        set({ balance });
-      },
-
-      clearBalance: () => {
-        storeLog.info('store.routstr.clear_balance');
-        set({ balance: null });
-      },
-
-      addMessage: (message: RoutstrMessage) => {
-        storeLog.debug('store.routstr.add_message', { role: message.role });
-        set((state) => withSessionMirror(state, [...state.conversationHistory, message]));
-      },
-
-      removeMessages: (ids: Set<string>) => {
-        storeLog.debug('store.routstr.remove_messages', { count: ids.size });
+      addMessages: (conversationId, messages) => {
+        storeLog.debug('store.routstr.add_message', { roles: messages.map((m) => m.role) });
         set((state) =>
-          withSessionMirror(
-            state,
-            state.conversationHistory.filter((msg) => !ids.has(msg.id))
+          mapConversationMessages(state, conversationId, (list) => [...list, ...messages])
+        );
+      },
+
+      setMessagePending: (conversationId, id, pending) => {
+        set((state) =>
+          mapConversationMessages(state, conversationId, (messages) =>
+            messages.map((msg) => (msg.id === id ? { ...msg, pending } : msg))
           )
         );
       },
 
-      setMessagePending: (id: string, pending: boolean) => {
-        set((state) =>
-          mapSessionMessages(state, (msg) => (msg.id === id ? { ...msg, pending } : msg))
-        );
-      },
-
-      updateMessage: (id: string, content: string) => {
-        storeLog.debug('store.routstr.update_message', { id, contentLength: content.length });
-        set((state) =>
-          withSessionMirror(
-            state,
-            state.conversationHistory.map((msg) => (msg.id === id ? { ...msg, content } : msg))
-          )
-        );
-      },
-
-      finalizeAssistantMessage: (id, fields) => {
+      finalizeAssistantMessage: (conversationId, id, fields) => {
         storeLog.debug('store.routstr.finalize_assistant', {
           id,
           contentLength: fields.content.length,
@@ -1287,17 +1235,19 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
           costSats: fields.costSats,
         });
         set((state) =>
-          mapSessionMessages(state, (msg) =>
-            msg.id === id
-              ? {
-                  ...msg,
-                  content: fields.content,
-                  thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
-                  reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
-                  costSats: fields.costSats ?? msg.costSats,
-                  modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
-                }
-              : msg
+          mapConversationMessages(state, conversationId, (messages) =>
+            messages.map((msg) =>
+              msg.id === id
+                ? {
+                    ...msg,
+                    content: fields.content,
+                    thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
+                    reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
+                    costSats: fields.costSats ?? msg.costSats,
+                    modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
+                  }
+                : msg
+            )
           )
         );
       },
@@ -1322,7 +1272,7 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         // of four names compiled into the app: the menu now comes from the
         // catalog, so its ids do too. The known-four remain acceptable so a
         // selection survives a lineup that has not landed yet.
-        const lineup = get().lineup ?? get().lastKnownLineup?.lineup ?? null;
+        const lineup = selectLineup(get());
         const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
         const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
         // `TIER_IDS` is the global list of tier NAMES, so it can only say that
@@ -1486,10 +1436,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         return true;
       },
 
-      beginPayment: (id, payment) => {
-        set((state) => ({ pendingPayments: { ...state.pendingPayments, [id]: payment } }));
-      },
-
       settlePayment: (id) => {
         set((state) => {
           if (!Object.hasOwn(state.pendingPayments, id)) return state;
@@ -1630,24 +1576,22 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         }
       },
 
-      updateCurrentSessionTitle: () => {
+      updateSessionTitle: (sessionId) => {
         const state = get();
-        if (!state.currentSessionId) return;
+        const session = state.sessions.find((s) => s.id === sessionId);
+        if (!session) return;
 
         // Find first user message to use as title
-        const firstUserMessage = state.conversationHistory.find((msg) => msg.role === 'user');
+        const firstUserMessage = session.messages.find((msg) => msg.role === 'user');
         if (firstUserMessage) {
           const title =
             firstUserMessage.content.length > 50
               ? firstUserMessage.content.substring(0, 50) + '...'
               : firstUserMessage.content;
 
-          storeLog.debug('store.routstr.update_session_title', {
-            sessionId: state.currentSessionId,
-            title,
-          });
-          const updatedSessions = state.sessions.map((session) =>
-            session.id === state.currentSessionId ? { ...session, title } : session
+          storeLog.debug('store.routstr.update_session_title', { sessionId, title });
+          const updatedSessions = state.sessions.map((s) =>
+            s.id === sessionId ? { ...s, title } : s
           );
           set({ sessions: updatedSessions });
         }

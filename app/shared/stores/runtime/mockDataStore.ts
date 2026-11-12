@@ -10,6 +10,7 @@ import { isLegacyMockProfile } from './legacyMockProfiles';
 
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { storeLog } from '@/shared/lib/logger';
+import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useSwapTransactionsStore,
@@ -450,23 +451,9 @@ export const MOCK_SWAP_GROUPS: Record<string, SwapGroup> = Object.fromEntries(
   MOCK.swapGroups.map((group) => [group.id, group])
 );
 
-function afterHydrationOnce(
-  store: { persist: { hasHydrated(): boolean; onFinishHydration(fn: () => void): () => void } },
-  cleanup: () => void
-) {
-  if (store.persist.hasHydrated()) {
-    cleanup();
-    return;
-  }
-  const unsubscribe = store.persist.onFinishHydration(() => {
-    unsubscribe();
-    cleanup();
-  });
-}
-
 /** Upgrade cleanup is independent of Mock Mode. No listeners ever re-inject data. */
 export function purgeLegacyMockData() {
-  afterHydrationOnce(useNostrMetadataCache, () => {
+  onceLoaded(useNostrMetadataCache, () => {
     useNostrMetadataCache.setState((state) => {
       const byPubkey = Object.fromEntries(
         Object.entries(state.byPubkey).filter(
@@ -480,23 +467,15 @@ export function purgeLegacyMockData() {
       return { byPubkey };
     });
   });
-  afterHydrationOnce(useScanHistoryStore, () => {
+  onceLoaded(useScanHistoryStore, () => {
     useScanHistoryStore.setState((state) => {
       const entries = state.entries.filter(
         (entry) => !MOCK.scanEntries.some((fixture) => fixture.id === entry.id)
       );
-      if (entries.length === state.entries.length) return state;
-      return {
-        entries,
-        entriesByTransactionId: Object.fromEntries(
-          entries
-            .filter((entry) => entry.transactionId)
-            .map((entry) => [entry.transactionId!, entry])
-        ),
-      };
+      return entries.length === state.entries.length ? state : { entries };
     });
   });
-  afterHydrationOnce(useSwapTransactionsStore, () => {
+  onceLoaded(useSwapTransactionsStore, () => {
     useSwapTransactionsStore.setState((state) => {
       const groups = Object.fromEntries(
         Object.entries(state.groups).filter(([id]) => !MOCK_SWAP_GROUPS[id])
@@ -504,7 +483,7 @@ export function purgeLegacyMockData() {
       return Object.keys(groups).length === Object.keys(state.groups).length ? state : { groups };
     });
   });
-  afterHydrationOnce(useTransactionLocationStore, () => {
+  onceLoaded(useTransactionLocationStore, () => {
     useTransactionLocationStore.setState((state) => {
       const locations = Object.fromEntries(
         Object.entries(state.locations).filter(([id]) => !MOCK.locations[id])

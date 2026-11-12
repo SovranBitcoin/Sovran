@@ -5,8 +5,8 @@
  * Entry, copy, and mint-change actions come from `useScreenActions('receive')`
  * with the payment machine from ColadaProvider. Paste / Fixed Amount / Scan QR
  * live on the receive hub (ReceiveHubScreen); the footer here is a single
- * Copy of whatever payload the visible tab's QR is showing (each rail
- * reports its value via `onQrPayload`).
+ * Copy of whatever payload the visible tab's QR is showing (the quote rails
+ * report theirs via `onQrPayload`; the address and the request are read here).
  */
 
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -227,7 +227,11 @@ interface ReceiveScreenProps {
 }
 
 export function ReceiveScreen(props: ReceiveScreenProps) {
-  const [selectedTab, setSelectedTab] = useState<string>('Unified');
+  // Opens on the first tab the build ships: Unified when it composes several
+  // rails, otherwise the one rail there is (its tab strip is hidden).
+  const [selectedTab, setSelectedTab] = useState<string>(
+    () => computeReceiveTabs()[0] ?? 'Unified'
+  );
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
   // `props.unit` is the mint's REAL unit; the account adds the active side of
   // the testnut split, so `usd` → `tusd` (same unit, different mints) is a
@@ -279,8 +283,8 @@ function ReceiveScreenForUnit({
   const receiveEntryData = useMemo(() => (entry ? readReceiveHubEntry(entry) : null), [entry]);
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
-  // Each rail reports its copyable payload as it resolves; the footer Copy
-  // copies whichever rail the visible tab is showing.
+  // The quote rails report their copyable payload as it resolves; the footer
+  // Copy copies whichever rail the visible tab is showing.
   const [qrPayloads, setQrPayloads] = useState<Record<string, ReceiveQrPayload | null>>({});
   const setQrPayload = useCallback((key: string, payload: ReceiveQrPayload | null) => {
     setQrPayloads((prev) => {
@@ -309,39 +313,6 @@ function ReceiveScreenForUnit({
     (p: ReceiveQrPayload | null) => setQrPayload('onchain', p),
     [setQrPayload]
   );
-  const onCashuPayload = useCallback(
-    (p: ReceiveQrPayload | null) => setQrPayload('cashu', p),
-    [setQrPayload]
-  );
-
-  const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
-  const activePayload: ReceiveQrPayload | null = useMemo(
-    () =>
-      selectedTab === 'Lightning'
-        ? lightningMode === 'address'
-          ? npcAddress
-            ? { value: npcAddress, copyTarget: 'address' }
-            : null
-          : (qrPayloads['lightning-offer'] ?? null)
-        : selectedTab === 'Unified'
-          ? (qrPayloads['unified'] ?? null)
-          : selectedTab === 'Onchain'
-            ? (qrPayloads['onchain'] ?? null)
-            : (qrPayloads['cashu'] ?? null),
-    [selectedTab, lightningMode, npcAddress, qrPayloads]
-  );
-
-  const handleFooterCopy = useCallback(async () => {
-    if (!activePayload) return;
-    await EnhancedHaptics.copyHaptic();
-    await setStringAsync(activePayload.value);
-    copyPopup(activePayload.copyTarget);
-    paymentLog.info('receive.qr.footer_copied', {
-      tab: selectedTab,
-      copyTarget: activePayload.copyTarget,
-      valueLength: activePayload.value.length,
-    });
-  }, [activePayload, selectedTab]);
 
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
@@ -419,7 +390,7 @@ function ReceiveScreenForUnit({
   const creqLockPubkey = creqMintSelection.p2pkLockEffective
     ? receiveEntryData?.p2pkKey
     : undefined;
-  const bip321 = useBip321RailSelection(unit, walletContext);
+  const bip321 = useBip321RailSelection(unit);
   const creqEnabled =
     selectedTab === 'Cashu' ||
     bip321.selection.rails.some((rail) => rail.id === 'creq' && rail.state === 'included');
@@ -436,6 +407,38 @@ function ReceiveScreenForUnit({
     { freshOnMount: true }
   );
 
+  const creqCopyValue = creq.request?.encodedRequest;
+  const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
+  const activePayload: ReceiveQrPayload | null = useMemo(
+    () =>
+      selectedTab === 'Lightning'
+        ? lightningMode === 'address'
+          ? npcAddress
+            ? { value: npcAddress, copyTarget: 'address' }
+            : null
+          : (qrPayloads['lightning-offer'] ?? null)
+        : selectedTab === 'Unified'
+          ? (qrPayloads['unified'] ?? null)
+          : selectedTab === 'Onchain'
+            ? (qrPayloads['onchain'] ?? null)
+            : creqCopyValue
+              ? { value: creqCopyValue, copyTarget: 'paymentRequest' }
+              : null,
+    [selectedTab, lightningMode, npcAddress, qrPayloads, creqCopyValue]
+  );
+
+  const handleFooterCopy = useCallback(async () => {
+    if (!activePayload) return;
+    await EnhancedHaptics.copyHaptic();
+    await setStringAsync(activePayload.value);
+    copyPopup(activePayload.copyTarget);
+    paymentLog.info('receive.qr.footer_copied', {
+      tab: selectedTab,
+      copyTarget: activePayload.copyTarget,
+      valueLength: activePayload.value.length,
+    });
+  }, [activePayload, selectedTab]);
+
   const tabs = useMemo(() => computeReceiveTabs(), []);
 
   useEffect(() => {
@@ -443,9 +446,11 @@ function ReceiveScreenForUnit({
   }, [tabs, unit]);
 
   // If the open tab disappears (setting toggled off / capability change),
-  // snap back to Lightning so hidden content stops rendering.
+  // snap back to the first tab there is so hidden content stops rendering.
   useEffect(() => {
-    if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Unified');
+    if (!(tabs as readonly string[]).includes(selectedTab)) {
+      setSelectedTab(tabs[0] ?? 'Unified');
+    }
   }, [tabs, selectedTab, setSelectedTab]);
 
   useEffect(() => {
@@ -575,7 +580,6 @@ function ReceiveScreenForUnit({
                         )
                       }
                       unit={unit}
-                      walletContext={walletContext}
                       actions={actions}
                       muted={muted}
                       onQrPayload={onOfferPayload}
@@ -603,7 +607,6 @@ function ReceiveScreenForUnit({
                       )
                     }
                     unit={unit}
-                    walletContext={walletContext}
                     actions={actions}
                     muted={muted}
                     onQrPayload={onOnchainPayload}
@@ -618,7 +621,6 @@ function ReceiveScreenForUnit({
                     muted={muted}
                     creq={creq}
                     mintSelection={creqMintSelection}
-                    onQrPayload={onCashuPayload}
                   />
                 </TabPane>
               </>

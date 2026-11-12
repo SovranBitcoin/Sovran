@@ -6,8 +6,9 @@
  * to get the "stop paging" rule wrong, which is the rule that keeps a spinner
  * from looping forever.
  *
- * Callers supply what differs (which endpoint, which caches, what to do with a
- * page) and are freed from what doesn't. Callbacks are mirrored into refs and
+ * Callers supply what differs (which viewer, which caches, what to do with a
+ * page) and are freed from what doesn't, including the inbox request and its
+ * page size. Callbacks are mirrored into refs and
  * the reload is keyed off `feedKey`, so a caller cannot cause a refetch loop by
  * passing an unmemoized closure — the identity of the feed is stated, not
  * inferred from dependency arrays.
@@ -22,6 +23,7 @@ import {
   readKeyHash,
   type ReadSurface,
 } from '@/shared/lib/read/readLog';
+import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { createDmEnvelopeCursor } from '../data/dmPagination';
 
@@ -33,10 +35,28 @@ export type DmPageMeta = {
 };
 
 type DmPagesStatus = 'idle' | 'loading' | 'revalidating' | 'ready' | 'error';
+type DmFeedSurface = Extract<ReadSurface, 'dmConversations' | 'dmThread'>;
+
+/** Envelopes asked for per page; a page this full means the inbox may hold more. */
+const PAGE_LIMIT: Record<DmFeedSurface, number> = { dmConversations: 100, dmThread: 50 };
+
+type FetchPage = (args: {
+  until?: number;
+  refresh: boolean;
+  signal?: AbortSignal;
+}) => Promise<DmEnvelopePage>;
+
+/** One page of the viewer's shared inbox; `until` is undefined for the first page. */
+const inboxPage =
+  (viewer: string, limit: number): FetchPage =>
+  (args) =>
+    fetchDmEnvelopes({ viewer, limit, ...args });
 
 interface DmEnvelopePagesOptions {
-  /** Read-lifecycle surface for the `read.<surface>.*` events. */
-  surface: ReadSurface;
+  /** Read-lifecycle surface for the `read.<surface>.*` events; also sets the page size. */
+  surface: DmFeedSurface;
+  /** Whose inbox is paged. */
+  viewer: string | undefined;
   /** True when the caller already shows a snapshot/seed for this feed (status revalidating, not loading). */
   hasSnapshot?: boolean;
   /**
@@ -45,15 +65,8 @@ interface DmEnvelopePagesOptions {
    * `null` while the feed can't be loaded at all — results are cleared.
    */
   feedKey: string | null;
-  pageLimit: number;
   /** Warm the decryption caches this feed reads, before the first fetch. */
   hydrate: () => Promise<void>;
-  /** Fetch one page. `until` is undefined for the first page. */
-  fetchPage: (args: {
-    until?: number;
-    refresh: boolean;
-    signal?: AbortSignal;
-  }) => Promise<DmEnvelopePage>;
   /** Consume a page, after the cursor has tracked it. */
   onPage: (page: DmEnvelopePage, meta: DmPageMeta) => number | void;
   /** Threads skip unrelated inbox pages without requiring a scrollable message. */
@@ -74,7 +87,7 @@ async function readDmPages(ctx: {
   refresh: boolean;
   pageLimit: number;
   cursor: ReturnType<typeof createDmEnvelopeCursor>;
-  fetchPage: DmEnvelopePagesOptions['fetchPage'];
+  fetchPage: FetchPage;
   onPage: DmEnvelopePagesOptions['onPage'];
   signal: AbortSignal;
   continueWhileEmpty: boolean;
@@ -98,11 +111,10 @@ async function readDmPages(ctx: {
 
 export function useDmEnvelopePages({
   surface,
+  viewer,
   hasSnapshot = false,
   feedKey,
-  pageLimit,
   hydrate,
-  fetchPage,
   onPage,
   onReset,
   continueWhileEmpty = false,
@@ -122,13 +134,14 @@ export function useDmEnvelopePages({
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const pageLimit = PAGE_LIMIT[surface];
 
   const cursorRef = useRef(createDmEnvelopeCursor());
   const loadingMoreRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   const hydrateRef = useLatestRef(hydrate);
-  const fetchPageRef = useLatestRef(fetchPage);
+  const viewerRef = useLatestRef(viewer);
   const onPageRef = useLatestRef(onPage);
   const onResetRef = useLatestRef(onReset);
   const failureEventRef = useLatestRef(failureEvent);
@@ -145,6 +158,7 @@ export function useDmEnvelopePages({
       setRefreshing(false);
       setHasLoadedOnce(false);
       setPainted(false);
+      setError(null);
       return;
     }
     const mode: DmPageMeta['mode'] = lastKeyRef.current === feedKey ? 'refresh' : 'initial';
@@ -154,7 +168,7 @@ export function useDmEnvelopePages({
     const cursor = createDmEnvelopeCursor();
     cursorRef.current = cursor;
     loadingMoreRef.current = false;
-    const fetchPage = fetchPageRef.current;
+    const fetchPage = inboxPage(viewerRef.current ?? '', pageLimit);
     const onPage = onPageRef.current;
     const readId = newReadId(surface);
     const keyHash = readKeyHash(feedKey);
@@ -254,7 +268,7 @@ export function useDmEnvelopePages({
     continueWhileEmpty,
     refreshKey,
     failureEventRef,
-    fetchPageRef,
+    viewerRef,
     hydrateRef,
     onPageRef,
     onResetRef,
@@ -280,7 +294,7 @@ export function useDmEnvelopePages({
       refresh: false,
       pageLimit,
       cursor: cursorRef.current,
-      fetchPage: fetchPageRef.current,
+      fetchPage: inboxPage(viewerRef.current ?? '', pageLimit),
       onPage: onPageRef.current,
       signal: controller.signal,
       continueWhileEmpty,
@@ -298,7 +312,7 @@ export function useDmEnvelopePages({
       .finally(() => {
         if (controllerRef.current === controller) loadingMoreRef.current = false;
       });
-  }, [loading, hasMore, feedKey, pageLimit, continueWhileEmpty, fetchPageRef, onPageRef]);
+  }, [loading, hasMore, feedKey, pageLimit, continueWhileEmpty, viewerRef, onPageRef]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 

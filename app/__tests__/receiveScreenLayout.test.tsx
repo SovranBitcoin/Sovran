@@ -10,13 +10,27 @@ import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
 import { createPaymentMachine, FormattedString, type PaymentMachine } from 'wallet';
 import { ReceiveScreen } from '@/features/receive/screens/ReceiveScreen';
+import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
+import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
+import { setStringAsync } from 'expo-clipboard';
+import { copyPopup } from '@/shared/lib/popup';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUseScreenActions = jest.fn();
 const mockStandingRequest = jest.fn();
+let mockStandingRequestResult: { encodedRequest: string; encodedRequestB: string } | null = null;
+let mockRealCashuTab = false;
 let mockCreqExcluded = false;
 let mockTrustedMintUrls: string[] = [];
+// The tabs an edition ships; null is this build's own.
+let mockReceiveTabs: string[] | null = null;
+jest.mock('@/features/receive/lib/receiveTabs', () => {
+  const actual = jest.requireActual<typeof import('@/features/receive/lib/receiveTabs')>(
+    '@/features/receive/lib/receiveTabs'
+  );
+  return { computeReceiveTabs: () => mockReceiveTabs ?? actual.computeReceiveTabs() };
+});
 jest.mock('@/shared/lib/version', () => ({ supportsLiquidGlass: () => true }));
 
 // The QR placeholder and the copy row's scramble readout run on Reanimated
@@ -94,8 +108,8 @@ jest.mock('wallet/react', () => ({
   useStandingPaymentRequest: (...args: unknown[]) => {
     mockStandingRequest(...args);
     return {
-      request: null,
-      isLoading: true,
+      request: mockStandingRequestResult,
+      isLoading: !mockStandingRequestResult,
       error: null,
       rotate: jest.fn(),
     };
@@ -148,8 +162,24 @@ jest.mock('expo-clipboard', () => ({
 jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
   ReceiveReusableQuoteTab: () => null,
 }));
-jest.mock('@/features/receive/components/ReceivePaymentRequestTab', () => ({
-  ReceivePaymentRequestTab: () => null,
+jest.mock('@/features/receive/components/ReceivePaymentRequestTab', () => {
+  const actual = jest.requireActual<
+    typeof import('@/features/receive/components/ReceivePaymentRequestTab')
+  >('@/features/receive/components/ReceivePaymentRequestTab');
+  return {
+    ReceivePaymentRequestTab: (props: Record<string, unknown>) =>
+      mockRealCashuTab
+        ? jest
+            .requireActual<typeof import('react')>('react')
+            .createElement(actual.ReceivePaymentRequestTab, props as never)
+        : null,
+  };
+});
+jest.mock('@/features/receive/components/CreqCustomizationCard', () => ({
+  CreqCustomizationCard: () => null,
+}));
+jest.mock('@/shared/ui/composed/ActionSegmentsCard', () => ({
+  ActionSegmentsCard: () => null,
 }));
 jest.mock('@/features/receive/hooks/useBip321RailSelection', () => ({
   useBip321RailSelection: () => ({
@@ -396,7 +426,10 @@ describe('ReceiveScreen layout stability', () => {
     mockUseScreenActions.mockReset();
     mockStandingRequest.mockClear();
     mockCreqExcluded = false;
+    mockStandingRequestResult = null;
+    mockRealCashuTab = false;
     mockTrustedMintUrls = [];
+    mockReceiveTabs = null;
     mockMachine.inspect.mockReturnValue({ isExecuting: false });
     mockMachine.reset.mockClear();
     mockSelectUnit.mockReset();
@@ -461,6 +494,39 @@ describe('ReceiveScreen layout stability', () => {
     });
   });
 
+  it('opens on the only rail an edition ships and copies its payload', async () => {
+    mockReceiveTabs = ['Onchain'];
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive', id: 'receive-hub' },
+      error: null,
+      actions: receiveActions(),
+      mintUrl: 'https://mint.example',
+    });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry={JSON.stringify({ type: 'receive' })} unit="sat" />
+      );
+    });
+
+    // One tab: no strip to choose from, so the screen must already be on it.
+    expect(findAllByType(renderer, 'UnderlineTabs')).toHaveLength(0);
+    const onchain = renderer.root
+      .findAllByType(ReceiveReusableQuoteTab)
+      .find((node) => node.props.method === 'onchain')!;
+    expect(onchain.props.active).toBe(true);
+    expect(renderer.root.findByType(ReceiveUnifiedTab).props.active).toBe(false);
+
+    act(() => {
+      onchain.props.onQrPayload({ value: 'bc1qfixture', copyTarget: 'address' });
+    });
+    const copyButton = findByTestID(renderer, 'receive-copy');
+    expect(copyButton.props.disabled).toBe(false);
+    await act(async () => copyButton.props.onPress());
+    expect(jest.mocked(setStringAsync)).toHaveBeenLastCalledWith('bc1qfixture');
+    act(() => renderer.unmount());
+  });
+
   it('does not create an excluded Cashu request until the Cashu tab is selected', () => {
     mockCreqExcluded = true;
     mockTrustedMintUrls = ['https://mint.example'];
@@ -492,6 +558,33 @@ describe('ReceiveScreen layout stability', () => {
       findAllByType(renderer, 'UnderlineTabs')[0].props.handleTabPress('Unified');
     });
     expect(mockStandingRequest.mock.calls.at(-1)?.[0]).toBeNull();
+    act(() => renderer.unmount());
+  });
+
+  it('footer Copy on the Cashu tab copies the standing request in its A encoding', async () => {
+    mockRealCashuTab = true;
+    mockTrustedMintUrls = ['https://mint.example'];
+    mockStandingRequestResult = { encodedRequest: 'creqAfixture', encodedRequestB: 'creqBfixture' };
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive', id: 'receive-hub' },
+      error: null,
+      actions: receiveActions(),
+      mintUrl: 'https://mint.example',
+    });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry={JSON.stringify({ type: 'receive' })} unit="sat" />
+      );
+    });
+    act(() => {
+      findAllByType(renderer, 'UnderlineTabs')[0].props.handleTabPress('Cashu');
+    });
+    const copyButton = findByTestID(renderer, 'receive-copy');
+    expect(copyButton.props.disabled).toBe(false);
+    await act(async () => copyButton.props.onPress());
+    expect(jest.mocked(setStringAsync)).toHaveBeenLastCalledWith('creqAfixture');
+    expect(jest.mocked(copyPopup)).toHaveBeenLastCalledWith('paymentRequest');
     act(() => renderer.unmount());
   });
 

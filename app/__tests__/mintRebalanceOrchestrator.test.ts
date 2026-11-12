@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { Amount } from '@cashu/coco-core';
+import { Amount, MintOperationError } from '@cashu/coco-core';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { cashuLog } from '@/shared/lib/logger';
@@ -27,6 +27,9 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/lib/popup', () => ({ swapStatusPopup: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
+}));
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'account-a',
 }));
 jest.mock('@/shared/stores/profile/swapTransactionsStore', () => ({
   useSwapTransactionsStore: { getState: () => mockTransactions },
@@ -59,11 +62,12 @@ const mockTransactions = {
   tagMintQuote: jest.fn(),
   tagMelt: jest.fn(),
   finalizeGroup: jest.fn(),
+  reopenGroup: jest.fn(),
 };
 const mockStatus = {
-  active: null as { state: string } | null,
-  start: jest.fn(() => {
-    mockStatus.active = { state: 'running' };
+  active: null as { state: string; meta: { groupId?: string } } | null,
+  start: jest.fn((params: { meta: { groupId?: string } }) => {
+    mockStatus.active = { state: 'running', meta: params.meta };
   }),
   setActiveLeg: jest.fn(),
   setLegDone: jest.fn(),
@@ -73,6 +77,7 @@ const mockStatus = {
   settleUnknown: jest.fn(),
   fail: jest.fn(),
   cancel: jest.fn(),
+  resume: jest.fn(),
 };
 let destinationBalance = 0;
 let mintState = 'pending';
@@ -145,8 +150,9 @@ const plan: RebalancePlan = {
   currentBalances: { [SOURCE]: 1000, [DESTINATION]: 0 },
   targetBalances: { [SOURCE]: 900, [DESTINATION]: 100 },
 };
+let mounted: { current: ReturnType<typeof useMintRebalanceOrchestrator> }[] = [];
 function mount(unit = 'sat') {
-  return renderHook(() =>
+  const hook = renderHook(() =>
     useMintRebalanceOrchestrator({
       unit,
       computedPlan: plan,
@@ -162,6 +168,8 @@ function mount(unit = 'sat') {
       minTransferThreshold: 5,
     })
   );
+  mounted.push(hook.result);
+  return hook;
 }
 beforeEach(() => {
   jest.useFakeTimers();
@@ -173,6 +181,9 @@ beforeEach(() => {
   mockManager = createManager();
 });
 afterEach(() => {
+  // A run still going holds its group for the process; end it with the test.
+  for (const result of mounted) act(() => result.current.handleCancelRun());
+  mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
 });
@@ -475,7 +486,8 @@ function configureMiddleman() {
     [via]: { total: Amount.from(100) },
   }));
   mockManager.ops.melt.execute
-    .mockRejectedValueOnce(new Error('no_route'))
+    // The mint answers that Lightning found no route.
+    .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
     .mockImplementation(async () => {
       const latest = receipts.get(`quote-${nextQuote}`)!;
       latest.state = 'finalized';

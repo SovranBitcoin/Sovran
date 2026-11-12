@@ -42,7 +42,6 @@ import {
   demuxRelayOwnHistory,
   relayNotificationItem,
 } from './demux';
-import { buildRelayForYouFeed } from './for-you/build';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 import { noteStatsFromRelayEvents, type NoteStatsRequest } from '../note-stats';
 import type { NoteStatsMap } from '@sovranbitcoin/schemas';
@@ -68,19 +67,6 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   return {
     tier: 'relay',
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
-      // For-You is normally OUT OF REACH on the floor, but the viewer's own likes
-      // are a relay-native ranking signal: build a personalized feed from the
-      // accounts they like (one hop / curated cold-start when likes are thin).
-      // Null = no usable signal → fall through to the honest recency degrade below.
-      if (request.spec.kind === 'for-you' && request.spec.viewerPubkey) {
-        const forYou = await buildRelayForYouFeed({
-          viewerPubkey: request.spec.viewerPubkey,
-          connection: config.connection,
-          request,
-        });
-        if (forYou) return answered(forYou);
-      }
-
       let spec = request.spec;
       if (spec.kind === 'following-recent' && !spec.authors && spec.viewerPubkey) {
         const follows = await config.connection.request(
@@ -481,12 +467,12 @@ export function filtersForSpec(
       // For-You can't be ranked on the floor — degrade to recent global notes.
       return [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
     case 'following-popular':
-      // Needs the viewer's follow list (kind 3) resolved first — handled once the
-      // social-graph surface lands; until then, fall through.
+      // The floor cannot rank a follow feed: the pager asks this lane for
+      // `following-recent` instead, so this spec is not served here.
       return null;
     case 'following-recent':
-      // The floor can serve an explicit author list; a viewer anchor needs the
-      // viewer's kind-3 resolved first (same gap as following-popular).
+      // The floor can serve an explicit author list; `feedPage` resolves a
+      // viewer anchor to its kind-3 authors before it gets here.
       if (!spec.authors) return spec.viewerPubkey ? null : [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
       if (spec.authors.length === 0) return null;
       return [{ kinds: [1], authors: spec.authors, limit: paging.limit ?? 30, ...bounds }];

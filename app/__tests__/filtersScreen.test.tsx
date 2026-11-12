@@ -8,10 +8,13 @@ import { CapsuleButtonBlur } from '@/shared/ui/composed/CapsuleButton/CapsuleBut
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockDismissTo = jest.fn();
 let mockParams: Record<string, string> = {};
+let mockAvailableUnits = ['sat', 'usd'];
+let mockHistory: unknown[] = [];
+const TESTNUT = 'https://testnut.example';
 
 // Expo's node preset rewrites FlatList to this web host. Layout is outside this test.
 jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
-  useActiveUnit: () => ({ availableUnits: ['sat', 'usd'] }),
+  useActiveUnit: () => ({ availableUnits: mockAvailableUnits }),
 }));
 jest.mock('react-native-web/dist/exports/FlatList', () => {
   const React = jest.requireActual('react');
@@ -46,7 +49,10 @@ jest.mock('@cashu/coco-react', () => ({
   }),
 }));
 jest.mock('@/features/transactions/hooks/useHistoryWithMelts', () => ({
-  useHistoryWithMelts: () => ({ history: [] }),
+  useHistoryWithMelts: () => ({ history: mockHistory }),
+}));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  useIsTestnutMint: () => (mintUrl: string) => mintUrl === 'https://testnut.example',
 }));
 jest.mock('@/shared/lib/utils', () => ({ mintHistoryEntryExpired: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
@@ -147,6 +153,8 @@ async function press(testID: string) {
 }
 beforeEach(() => {
   mockParams = {};
+  mockAvailableUnits = ['sat', 'usd'];
+  mockHistory = [];
   mockDismissTo.mockClear();
 });
 afterEach(() => {
@@ -242,6 +250,57 @@ it('restores route selections and resets every draft before applying defaults', 
       filterMintUrl: 'all',
     },
   });
+});
+
+it('opens on the defaults for empty route values, and sends the currency in lower case', async () => {
+  mockParams = { currency: 'USD', paymentType: '', status: '', mintUrl: '' };
+  act(() => {
+    renderer = TestRenderer.create(<FiltersScreen />);
+  });
+  expect(control('filter-currency-usd').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-type-all').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-status-all').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-mint-all').props.accessibilityState.checked).toBe(true);
+  await press('filters-apply');
+  expect(mockDismissTo).toHaveBeenCalledWith({
+    pathname: '/transactions',
+    params: {
+      filterCurrency: 'usd',
+      filterPaymentType: 'all',
+      filterDirection: 'all',
+      filterStatus: 'All',
+      filterSource: 'all',
+      filterLock: 'all',
+      filterCounterparty: 'all',
+      filterZap: 'all',
+      filterMintUrl: 'all',
+    },
+  });
+});
+
+it('counts a test account the way the transaction list scopes it', async () => {
+  // A testnut mint keeps its proofs in unit `sat`; the TSAT account is that mint's side
+  // of the split, as the list's `belongsToAccount` scope decides.
+  mockAvailableUnits = ['sat', 'tsat'];
+  mockHistory = [
+    { id: 'test', type: 'receive', unit: 'sat', mintUrl: TESTNUT, amount: 21, createdAt: 1 },
+    {
+      id: 'real',
+      type: 'receive',
+      unit: 'sat',
+      mintUrl: 'https://mint.example',
+      amount: 5,
+      createdAt: 2,
+    },
+  ];
+  act(() => {
+    renderer = TestRenderer.create(<FiltersScreen />);
+  });
+  expect(control('filters-apply').props.accessibilityLabel).toBe('Apply filters, 1 results');
+  await press('filter-currency-tsat');
+  expect(control('filters-apply').props.accessibilityLabel).toBe('Apply filters, 1 results');
+  await press('filter-currency-all');
+  expect(control('filters-apply').props.accessibilityLabel).toBe('Apply filters, 2 results');
 });
 
 it('keeps plain PillTabs labels and values compatible with existing callers', async () => {

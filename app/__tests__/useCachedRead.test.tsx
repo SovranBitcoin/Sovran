@@ -25,11 +25,27 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-// Focus effects run as plain effects in tests (same seam mintChangesLoading uses).
-jest.mock('expo-router', () => ({
-  useFocusEffect: (effect: () => void | (() => void)) =>
-    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]),
-}));
+// Focus effects run as plain effects in tests (same seam mintChangesLoading uses),
+// re-run when a test blurs or refocuses the screen through `__setFocused`.
+jest.mock('expo-router', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const listeners = new Set<React.Dispatch<React.SetStateAction<boolean>>>();
+  return {
+    useFocusEffect: (effect: () => void | (() => void)) => {
+      const [focused, setFocused] = React.useState(true);
+      React.useEffect(() => {
+        listeners.add(setFocused);
+        return () => {
+          listeners.delete(setFocused);
+        };
+      }, []);
+      React.useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+    },
+    __setFocused: (next: boolean) => listeners.forEach((listener) => listener(next)),
+  };
+});
+const setFocused = (jest.requireMock('expo-router') as { __setFocused: (focused: boolean) => void })
+  .__setFocused;
 
 type Page = { items: string[]; read?: { status: 'ok' | 'unavailable' } };
 
@@ -65,6 +81,50 @@ beforeEach(() => {
 });
 
 describe('useCachedRead', () => {
+  it.each([
+    ['notifications', 'session'],
+    ['searchProfiles', 'aggregate'],
+    ['profiles', 'aggregate'],
+    ['feed', 'sequential'],
+    ['mintChanges', 'sequential'],
+    ['noteStats', 'http'],
+  ] as const)('logs a %s read with the %s strategy', async (surface, strategy) => {
+    const store = makeStore();
+    renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface,
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: () => new Promise(() => {}),
+      })
+    );
+    await flush();
+    const request = events('info').find((e) => e.event === `read.${surface}.request`);
+    expect(request?.params).toMatchObject({ strategy });
+  });
+
+  it('on a cold start paints the stored entry while it revalidates', async () => {
+    const store = makeStore(0);
+    store.setEntry('k', { items: ['yesterday'] }, { viewerKey: 'v' });
+    expect(store.isColdStart('k')).toBe(true);
+    const { result } = renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface: 'feed',
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: () => new Promise(() => {}),
+      })
+    );
+    await flush();
+    expect(result.current).toMatchObject({
+      status: 'revalidating',
+      source: 'cache',
+      data: { items: ['yesterday'] },
+    });
+  });
+
   it('a fresh entry serves with zero round-trips and logs serve-fresh', async () => {
     const store = makeStore();
     store.setEntry('k', { items: ['a'] }, { viewerKey: 'v' });
@@ -378,6 +438,39 @@ describe('useCachedRead', () => {
       result.current.refresh();
     });
     expect(modes).toEqual(['initial', 'refresh']);
+  });
+
+  it('a refresh aborted by blur stops reading as fetching once the fresh entry is refocused', async () => {
+    const store = makeStore();
+    store.setEntry('k', { items: ['a'] }, { viewerKey: 'v' });
+    let signal: AbortSignal | undefined;
+    const { result } = renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface: 'notifications',
+        key: 'k',
+        viewerKey: 'v',
+        abortOnBlur: true,
+        fetcher: (ctx) => {
+          signal = ctx.signal;
+          return new Promise(() => {});
+        },
+      })
+    );
+    await flush();
+    act(() => result.current.refresh());
+    await flush();
+    expect(result.current.isFetching).toBe(true);
+
+    act(() => setFocused(false));
+    await flush();
+    expect(signal?.aborted).toBe(true);
+    act(() => setFocused(true));
+    await flush();
+
+    expect(result.current.isFetching).toBe(false);
+    expect(result.current.mode).toBeNull();
+    expect(result.current.status).toBe('ready');
   });
 
   it('unmount aborts the in-flight run so nothing sets state afterwards', async () => {

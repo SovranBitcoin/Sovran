@@ -65,9 +65,20 @@ function isUnexpired(expiry: number | null, nowSeconds: number): boolean {
  * recording one only when none is recorded or the recorded one expired.
  * Never rotates a live standing quote.
  */
-// One in-flight ensure per key: a double-mounted tab (React StrictMode,
-// rapid re-open) must never race two creates for the same standing quote.
-const inFlight = new Map<string, Promise<ReusableMintQuote>>();
+// One in-flight ensure per key, PER MANAGER: a double-mounted tab (React
+// StrictMode, rapid re-open) must never race two creates for the same
+// standing quote, and one wallet must never be handed another's.
+type Flights = Map<string, Promise<ReusableMintQuote>>;
+let inFlight = new WeakMap<Manager, Flights>();
+
+function flightsFor(manager: Manager): Flights {
+  let flights = inFlight.get(manager);
+  if (!flights) {
+    flights = new Map();
+    inFlight.set(manager, flights);
+  }
+  return flights;
+}
 
 // Last resolved standing quote per key, PER MANAGER (WeakMap keyed by the
 // manager instance so one profile's addresses can never leak into another's
@@ -99,7 +110,8 @@ export async function ensureReusableMintQuote(
   identityStore: ReusableQuoteIdentityStore,
 ): Promise<ReusableMintQuote> {
   const key = reusableQuoteKey(input);
-  const pending = inFlight.get(key);
+  const flights = flightsFor(manager);
+  const pending = flights.get(key);
   if (pending) return pending;
 
   const startedAt = Date.now();
@@ -116,11 +128,11 @@ export async function ensureReusableMintQuote(
     });
     return resolved;
   });
-  inFlight.set(key, task);
+  flights.set(key, task);
   try {
     return await task;
   } finally {
-    inFlight.delete(key);
+    if (flights.get(key) === task) flights.delete(key);
   }
 }
 
@@ -142,8 +154,10 @@ export async function rotateReusableMintQuote(
   const key = reusableQuoteKey(input);
   // Let any in-flight ensure settle first so its callers keep a consistent
   // quote, then rotate — the rotation task owns the slot afterwards.
-  const pending = inFlight.get(key);
+  const pending = flightsFor(manager).get(key);
   if (pending) await pending.catch(() => undefined);
+  // Looked up after the wait: a dispose in between replaces the map.
+  const flights = flightsFor(manager);
 
   const unit = input.unit.trim().toLowerCase();
   const task = (async () => {
@@ -163,11 +177,11 @@ export async function rotateReusableMintQuote(
     });
     return created;
   })();
-  inFlight.set(key, task);
+  flights.set(key, task);
   try {
     return await task;
   } finally {
-    inFlight.delete(key);
+    if (flights.get(key) === task) flights.delete(key);
   }
 }
 
@@ -266,5 +280,5 @@ async function resolveReusableMintQuote(
 }
 
 export function disposeReusableQuoteFlights(): void {
-  inFlight.clear();
+  inFlight = new WeakMap();
 }

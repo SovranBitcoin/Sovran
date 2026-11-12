@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  selectConversationId,
+  selectLineup,
+  useRoutstrStore,
+  type ChatAttachment,
+} from '@/shared/stores/profile/routstrStore';
 import { useRoutstrFunds } from './useRoutstrFunds';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
@@ -41,24 +46,12 @@ import {
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
 import { reservedSatsForSend } from '../lib/reserve';
-import { clearTurnTruncation, recordTurnTruncation } from '../lib/turnTruncation';
 import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
 import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
-import { clearTurnError, recordTurnError } from '../lib/turnErrors';
-import {
-  clearStreaming,
-  setStreamingReasoning,
-  setStreamingText,
-  startStreaming,
-} from '../lib/streamingBuffer';
-
-interface SendStatus {
-  isSending: boolean;
-  streamingMessageId: string | null;
-}
+import { dispatchTurn, useAnyTurnLive } from '../lib/turns';
 
 /** Minimum interval between streaming-token haptics. Streamers can fire >50
  * tokens/sec; without throttling the device feels like a buzzing wall. 80ms
@@ -86,6 +79,11 @@ const STREAM_STALL_THRESHOLD_MS = 500;
  * upstream is down would otherwise fan out across all twelve lineup cells.
  */
 const MAX_DECLINED_ATTEMPTS = 3;
+/**
+ * What the send gate is given as the typed text for a regenerate. Nothing is
+ * typed for one; the gate only asks whether there is something to send.
+ */
+const REASKED_QUESTION = 'regenerate';
 
 /**
  * The candidate chain for a selection, with models this node refused recently
@@ -119,7 +117,82 @@ function availableChain(
   return ordered;
 }
 
+/** The selected (provider, tier), the lineup it resolves against and the chain a send walks. */
+function selectedChain(state: ReturnType<typeof useRoutstrStore.getState>) {
+  const provider = getProviderById(state.selectedProvider);
+  const tier = getTierById(state.selectedTier);
+  const lineup = selectLineup(state);
+  const chain = availableChain(provider.id, tier.id, lineup, state.nodeBaseUrl);
+  return { provider, tier, lineup, chain };
+}
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Run a send or regenerate with its request's controller, held in `preparing`
+ * (what closing the screen aborts) until the stream takes it or the run ends,
+ * and with a watch on the account and conversation it was started in.
+ */
+async function withRequestController(
+  preparing: Set<AbortController>,
+  run: (controller: AbortController, watch: OwnerWatch) => Promise<void>
+): Promise<void> {
+  const controller = new AbortController();
+  preparing.add(controller);
+  const watch = watchOwner(currentOwner());
+  try {
+    await run(controller, watch);
+  } finally {
+    watch.stop();
+    preparing.delete(controller);
+  }
+}
+
+/** The account and conversation a send or regenerate belongs to, taken before its first wait. */
+type Owner = { account: number; anonymous: boolean; conversationId: string | null };
+
+function currentOwner(): Owner {
+  const state = useRoutstrStore.getState();
+  return {
+    account: useProfileStore.getState().activeAccountIndex,
+    anonymous: state.isAnonymousMode,
+    conversationId: selectConversationId(state),
+  };
+}
+
+type OwnerChange = 'none' | 'account' | 'conversation';
+
+/** What moved since `owner` was taken: a request then would be sent for the wrong one. */
+function ownerChange(owner: Owner): OwnerChange {
+  const now = currentOwner();
+  if (now.account !== owner.account) return 'account';
+  if (now.anonymous !== owner.anonymous || now.conversationId !== owner.conversationId)
+    return 'conversation';
+  return 'none';
+}
+
+/** An owner watched from when it was taken until `stop`. */
+type OwnerWatch = { owner: Owner; change: () => OwnerChange; stop: () => void };
+
+/**
+ * Watch `owner` for every change to the account or conversation, not only at
+ * the moments it is asked. A move is kept once seen, even when it is undone:
+ * a request whose conversation was left and opened again, or whose account was
+ * switched and back, is over for good. `change` says `account` while another
+ * account is active (its store holds that account's conversations), and
+ * `conversation` for any other move seen since `owner` was taken.
+ */
+function watchOwner(owner: Owner): OwnerWatch {
+  let moved = false;
+  const change = (): OwnerChange => {
+    const now = ownerChange(owner);
+    if (now !== 'none') moved = true;
+    if (now === 'account') return 'account';
+    return moved ? 'conversation' : 'none';
+  };
+  const offs = [useRoutstrStore.subscribe(change), useProfileStore.subscribe(change)];
+  return { owner, change, stop: () => offs.forEach((off) => off()) };
+}
 
 /**
  * Encapsulates the routstr send + stream + balance-refresh flow for the AI
@@ -134,9 +207,11 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     new branch immediately.
  *
  * Both flows:
- *   - Stream tokens through the module-level `streamingBuffer` instead of
- *     `routstrStore.updateMessage`, so per-token AsyncStorage writes are
- *     avoided (those caused the "sudden reveal" lag).
+ *   - Move the answer's turn (`turns`) through asking, streaming and how it
+ *     settled, by its message id, so a stream only ever touches its own
+ *     answer. Tokens stream there instead of into `routstrStore`, so
+ *     per-token AsyncStorage writes are avoided (those caused the "sudden
+ *     reveal" lag).
  *   - Persist the final assistant payload (content + reasoning + thinking
  *     duration + cost) in ONE atomic write via `finalizeAssistantMessage`,
  *     preserving the placeholder's id / parentId / role / timestamp.
@@ -149,25 +224,24 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     `UserMessagesScreen`).
  */
 export function useAiSend() {
-  const [status, setStatus] = useState<SendStatus>({
-    isSending: false,
-    streamingMessageId: null,
-  });
+  const isSending = useAnyTurnLive();
 
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
-  const addMessage = useRoutstrStore((s) => s.addMessage);
+  const addMessages = useRoutstrStore((s) => s.addMessages);
   const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
-  const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
+  const updateSessionTitle = useRoutstrStore((s) => s.updateSessionTitle);
 
   // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
   // mid-stream stops billing. There is no longer a balance promise to wait on:
   // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
+  // Each send or regenerate still getting ready (encoding images, the spend
+  // sheet): its request's controller, so closing the screen stops it too.
+  const preparingRef = useRef(new Set<AbortController>());
 
   const navigateToAddFunds = useNavigateToAddFunds();
   const funds = useRoutstrFunds();
@@ -175,21 +249,27 @@ export function useAiSend() {
   const walletSats = funds?.balanceSats ?? 0;
   const heldMints = useHeldMints();
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const preparing = preparingRef.current;
+    return () => {
       streamControllerRef.current?.abort();
-    },
-    []
-  );
+      for (const controller of preparing) controller.abort();
+    };
+  }, []);
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
-   * candidate chain, streams tokens into `streamingBuffer`, finalises the
+   * candidate chain, streams tokens into its turn, finalises the
    * persisted message, and stamps cost asynchronously off the post-stream
    * balance diff. Both `send` and `retry` funnel through here.
    */
   const streamIntoPlaceholder = useCallback(
     async (params: {
+      /** The conversation the answer was asked in (`selectConversationId`
+       *  then): every write about it goes there, whichever is open now. */
+      conversationId: string | null;
+      /** The request's controller, made when the send or regenerate started. */
+      controller: AbortController;
       assistantMessageId: string;
       apiMessages: RoutstrChatMessage[];
       /** `image_url` parts included in `apiMessages` (drives the
@@ -202,38 +282,27 @@ export function useAiSend() {
        *  ran (a retry) or the model could not be priced. */
       shownSats?: number | null;
     }) => {
-      const { assistantMessageId, flowId } = params;
+      const { conversationId, assistantMessageId, flowId, controller } = params;
       const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
 
       const profile = useProfileStore.getState().activeAccountIndex;
       const storeState = useRoutstrStore.getState();
       const balanceSats = walletSats;
-      const tier = getTierById(storeState.selectedTier);
-      const provider = getProviderById(storeState.selectedProvider);
       const cachedModels = storeState.modelsCache?.data ?? [];
-      // Resolve the (provider, tier) pair against the dynamic lineup —
-      // live-derived when a catalog fetch has landed this session, else
-      // the persisted last-known snapshot. `null` only on a true
+      // Resolved against `selectLineup`, which is `null` only on a true
       // first-run-offline (no catalog AND no snapshot): there is
       // deliberately no hardcoded id to guess at anymore, so surface it
       // instead of burning a round-trip on a dead model.
-      const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
-      const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       // ONE chain, built once and never widened. Its `sealed` tag carries the
       // user's encryption choice through every later narrowing below — the
       // vision filter and the post-repoint recovery both derive from it, and
       // neither can reach a vendor the chain did not already contain.
-      const chain = availableChain(provider.id, tier.id, lineup, storeState.nodeBaseUrl);
+      const { provider, tier, lineup, chain } = selectedChain(storeState);
+      const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
-        // Two different absences wearing one shape. An empty plaintext chain
-        // means the catalogue never landed. An empty SEALED chain means it
-        // did, and this node serves nothing encrypted — the models we could
-        // reach are all plaintext, and the user asked for the opposite. Saying
-        // "the model list has not loaded" there would send them to retry a
-        // connection that is fine.
-        // Three absences wearing one shape, not two. A sealed chain that is
+        // Three absences wearing one shape. A sealed chain that is
         // empty against a real lineup means the node serves nothing encrypted.
         // A PLAINTEXT chain empty against a real lineup means the catalogue
         // landed and nothing in it is usable here — "the model list has not
@@ -265,13 +334,13 @@ export function useAiSend() {
         });
         // Same contract as a failed request: the turn stays in the
         // conversation and says, in place, why it could not run.
-        recordTurnError(assistantMessageId, { id, text: ERROR_COPY[id] });
+        dispatchTurn(assistantMessageId, { type: 'failed', error: { id, text: ERROR_COPY[id] } });
         return;
       }
 
       streamControllerRef.current?.abort();
-      const controller = new AbortController();
       streamControllerRef.current = controller;
+      preparingRef.current.delete(controller);
 
       // Same-tier chain across the other providers as runtime fallback for
       // connect-time failures — or, on a sealed selection, the encrypted
@@ -298,6 +367,11 @@ export function useAiSend() {
           imageCount = 0;
         }
       }
+      const owner: Owner = {
+        account: profile,
+        anonymous: storeState.isAnonymousMode,
+        conversationId,
+      };
       const primaryModel = primaryEntry.modelId;
       // What the user approved, or — on a retry, which shows no sheet — what
       // the model they picked would have reserved. No candidate may reserve
@@ -315,15 +389,9 @@ export function useAiSend() {
         });
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
-      setStatus({ isSending: true, streamingMessageId: assistantMessageId });
-      // Captures `Date.now()` for the live "Thinking for X seconds"
-      // counter rendered by the bubble. Resets text + reasoning channels
-      // so a previous stream's tail can't leak into this one.
-      startStreaming(assistantMessageId);
-      // A placeholder that is streaming is not a failed one. Ids are fresh per
-      // send and per retry, so this only ever matters if one is re-driven.
-      clearTurnError(assistantMessageId);
-      clearTurnTruncation(assistantMessageId);
+      // Captures `Date.now()` for the live "Thinking for X seconds" counter
+      // rendered by the bubble.
+      dispatchTurn(assistantMessageId, { type: 'asked', startedAtMs: Date.now() });
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -346,6 +414,21 @@ export function useAiSend() {
         { warnAtMs: 15_000, errorAtMs: 60_000 }
       );
 
+      // Set once the answer settles. Its turn may then be gone (a finished
+      // answer reads from its saved message), so a failure after that, in the
+      // title or the cost log, must not give it a new, failed one.
+      let settled = false;
+      // Whether the answer still belongs to the account and conversation it
+      // was asked in, on a screen still open, and has all along. Asked before
+      // each request is paid for, up to the moment its token is handed over,
+      // but not once it is: a switch then leaves the answer streaming into its
+      // own conversation. Losing it aborts the request, so the abort paths
+      // stop it, and the abort is what keeps it lost.
+      const ownerWatch = watchOwner(owner);
+      const stillOwned = () => {
+        if (ownerWatch.change() !== 'none') controller.abort();
+        return !controller.signal.aborted;
+      };
       try {
         // Text chars + image-part count — never serialises base64 payloads
         // into a log line.
@@ -407,7 +490,7 @@ export function useAiSend() {
         let declinedAttempts = 0;
         for (let i = 0; i < candidateChain.length; i++) {
           if (useProfileStore.getState().activeAccountIndex !== profile) return;
-          if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
+          if (!stillOwned()) throw { status: 0, error: { type: 'aborted' } };
           const candidate = candidateChain[i];
           const candidateReserve = reservedSatsForSend({
             entry: candidateEntries[i] ?? null,
@@ -468,7 +551,7 @@ export function useAiSend() {
               // attempt to the same exchange.
               payment: {
                 groupId: i === 0 ? flowId : `${flowId}#${i + 1}`,
-                sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
+                sessionId: conversationId ?? undefined,
                 messageId: assistantMessageId,
                 model: candidate,
               },
@@ -482,6 +565,7 @@ export function useAiSend() {
               // blanket 0.7 is a guess that can only lose.
               max_tokens: maxTokens,
               signal: controller.signal,
+              canDispatch: stillOwned,
             });
             stream = result.stream;
             costPromise = result.cost;
@@ -498,11 +582,7 @@ export function useAiSend() {
               current.selectedProvider === provider.id &&
               current.selectedTier === tier.id
             ) {
-              const slot = slotForModel(
-                current.lineup ?? current.lastKnownLineup?.lineup ?? null,
-                candidate,
-                tier.id
-              );
+              const slot = slotForModel(selectLineup(current), candidate, tier.id);
               if (slot) current.setSelectedSlot(slot);
             }
             if (i > 0) {
@@ -710,10 +790,6 @@ export function useAiSend() {
             }
             chunksWithReasoning++;
             fullReasoning += reasoning;
-            // Push the live reasoning to the streaming buffer so the bubble
-            // can render the model's thought process as it arrives, instead
-            // of waiting for stream completion to surface it.
-            setStreamingReasoning(assistantMessageId, fullReasoning);
           }
 
           if (content) {
@@ -728,13 +804,21 @@ export function useAiSend() {
             }
             chunksWithContent++;
             fullContent += content;
-            setStreamingText(assistantMessageId, fullContent);
 
             if (now - lastHapticAt >= HAPTIC_THROTTLE_MS) {
               lastHapticAt = now;
               void EnhancedHaptics.navigateHaptic();
             }
           }
+
+          // The bubble renders the reasoning and the text as they arrive,
+          // instead of waiting for the stream to end.
+          if (reasoning || content)
+            dispatchTurn(assistantMessageId, {
+              type: 'streamed',
+              text: fullContent,
+              reasoning: fullReasoning,
+            });
 
           if (now - lastProgressAt >= STREAM_PROGRESS_INTERVAL_MS) {
             const windowMs = now - lastProgressAt;
@@ -761,7 +845,6 @@ export function useAiSend() {
         // content rather than as a failure — the content is real — and the
         // bubble offers to carry on from there.
         const truncated = isBudgetTruncation(finishReason);
-        if (truncated) recordTurnTruncation(assistantMessageId, { budgetTokens: sentMaxTokens });
         const totalMs = streamEnd - sendStart;
         const streamMs = firstChunkAt > 0 ? streamEnd - firstChunkAt : 0;
         aiLog.info('ai.stream.complete', {
@@ -812,7 +895,7 @@ export function useAiSend() {
           // arrives before the first chunk — so there is nothing to stamp on
           // afterwards. That second write was only ever needed because the old
           // figure came from a balance re-read that had to wait for the stream.
-          finalizeAssistantMessage(assistantMessageId, {
+          finalizeAssistantMessage(conversationId, assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
             ...(displayedModel && displayedModel.modelId !== modelToUse
@@ -828,13 +911,23 @@ export function useAiSend() {
             ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
+        settled = true;
+        dispatchTurn(
+          assistantMessageId,
+          finalizePayload
+            ? {
+                type: 'answered',
+                truncation: truncated ? { budgetTokens: sentMaxTokens } : null,
+              }
+            : { type: 'interrupted' }
+        );
         aiLog.info('ai.send.assistant_finalized', {
           flowId,
           messageId: assistantMessageId,
           chars: fullContent.length,
         });
 
-        if (!isAnonymous) updateCurrentSessionTitle();
+        if (conversationId !== null) updateSessionTitle(conversationId);
 
         // Snapshot what the affordability gate predicted for the model we
         // actually used, so this log can quote both numbers.
@@ -869,9 +962,16 @@ export function useAiSend() {
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
         if (useProfileStore.getState().activeAccountIndex !== profile) return;
+        if (settled) {
+          aiLog.warn('ai.send.failed_after_answer', { flowId });
+          span.end({ outcome: 'ok' });
+          return;
+        }
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
-          removeMessages(new Set([assistantMessageId]));
+          // The answer stays, with what had arrived, and can be asked again:
+          // a question must never be left with no answer and nothing to press.
+          dispatchTurn(assistantMessageId, { type: 'interrupted' });
           span.end({ outcome: 'aborted' });
           return;
         }
@@ -918,10 +1018,13 @@ export function useAiSend() {
               ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
               : `${friendlyName} reserves more per request than your wallet holds.`;
         }
-        recordTurnError(assistantMessageId, {
-          id: presentation.id,
-          text: presentation.text,
-          ...(detail != null ? { detail } : {}),
+        dispatchTurn(assistantMessageId, {
+          type: 'failed',
+          error: {
+            id: presentation.id,
+            text: presentation.text,
+            ...(detail != null ? { detail } : {}),
+          },
         });
         aiLog.info('ai.turn_error.shown', {
           flowId,
@@ -929,15 +1032,162 @@ export function useAiSend() {
           errorId: presentation.id,
         });
       } finally {
-        clearStreaming();
-        setStatus({ isSending: false, streamingMessageId: null });
+        ownerWatch.stop();
+        // Left without settling (the account changed under it): it ended
+        // without an answer. Only this turn: a newer stream owns its own.
+        dispatchTurn(assistantMessageId, { type: 'interrupted' });
       }
     },
-    [isAnonymous, removeMessages, finalizeAssistantMessage, updateCurrentSessionTitle, walletSats]
+    [finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
-  const sendInner = useCallback(
-    async (userMessage: string, attachments?: ChatAttachment[]) => {
+  /**
+   * Everything that is checked, and asked, before a request may spend: a
+   * provider is chosen, it takes a mint the wallet holds, the wallet covers
+   * what the model will hold, and the person agreed on the spend sheet to the
+   * figure for this exact request. A send, a regenerate and the error pill's
+   * Retry all pass through here, so none of them is a way to spend without
+   * being asked.
+   *
+   * Resolves to the figure that was shown when the request may go ahead, and
+   * to `null` when it may not; whatever there is to say has been said by then.
+   */
+  const passSendGate = useCallback(
+    async (request: {
+      flowId: string;
+      watch: OwnerWatch;
+      controller: AbortController;
+      /** What was typed, trimmed; `null` for a regenerate, which types nothing. */
+      typed: string | null;
+      /** The request body the node will price, already assembled. */
+      apiMessages: Awaited<ReturnType<typeof assembleApiMessages>>['messages'];
+      imageParts: number;
+      /** Images counted by the typical-case estimate when the model has no price. */
+      attachedImages: number;
+      /** What the quote is made from, read before anything was awaited. */
+      quoted: {
+        store: ReturnType<typeof useRoutstrStore.getState>;
+        funds: typeof latestFunds.current;
+        entry: LineupEntry | null;
+      };
+      /** The conversation moved or the screen closed while the sheet was open. */
+      onLeft: (reason: 'conversation' | 'closed') => void;
+    }): Promise<{ shownSats: number | null } | null> => {
+      const { flowId, watch, controller, typed, apiMessages, quoted } = request;
+      const { owner } = watch;
+      const storeNow = quoted.store;
+      const activeProvider = storeNow.userNodeBaseUrl;
+      const plannedEntry = quoted.entry;
+      // The gate's first question is whether anything was typed. A regenerate
+      // re-asks a saved question that is already known not to be empty.
+      const text = typed ?? REASKED_QUESTION;
+
+      // The node's admission gate for this body, computed the way the node
+      // computes it. `null` when the model carries no usable pricing, which
+      // the gate turns back into the typical-case estimate and the sheet
+      // labels as one.
+      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
+      const reservedSats = text
+        ? reservedSatsForSend({
+            entry: plannedEntry,
+            models: storeNow.modelsCache?.data ?? [],
+            messages: apiMessages,
+            maxTokens: plannedMaxTokens,
+          })
+        : null;
+
+      const gate = evaluateSendGate({
+        text,
+        providerBaseUrl: activeProvider,
+        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
+        heldMints,
+        walletSats,
+        entry: plannedEntry,
+        imageCount: request.attachedImages,
+        confirmSpend: storeNow.confirmSpend,
+        reservedSats,
+      });
+
+      // The figure the user is about to be shown, recorded under the same
+      // flowId as the money that follows it. It used to live only on screen,
+      // which is why a 30x overstatement could only be found by someone
+      // watching their own balance.
+      const shownSats =
+        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
+      aiLog.info('ai.send.gate', {
+        flowId,
+        state: gate.state,
+        shownSats,
+        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
+        model: plannedEntry?.modelId ?? null,
+        maxTokens: plannedMaxTokens,
+        promptMessages: apiMessages.length,
+        imageParts: request.imageParts,
+        walletSats,
+      });
+      switch (gate.state) {
+        case 'empty':
+          return null;
+        case 'no-provider':
+          // The one refusal with somewhere to go: the list is the answer.
+          staticPopup('ai-no-provider');
+          router.navigate('/(ai-flow)/providers');
+          return null;
+        case 'mint-not-accepted':
+          staticPopup('ai-mint-not-accepted');
+          return null;
+        case 'insufficient-funds':
+          navigateToAddFunds();
+          return null;
+        case 'confirm': {
+          const allowed = await confirmSpend({
+            modelName: gate.modelName,
+            reserveSats: gate.reserveSats,
+            reserveKnown: gate.reserveKnown,
+          });
+          if (!allowed) return null;
+          const change = watch.change();
+          const afterSheet = change === 'none' && controller.signal.aborted ? 'closed' : change;
+          if (afterSheet === 'conversation' || afterSheet === 'closed') {
+            request.onLeft(afterSheet);
+            return null;
+          }
+          const current = useRoutstrStore.getState();
+          const currentFunds = latestFunds.current;
+          if (
+            useProfileStore.getState().activeAccountIndex !== owner.account ||
+            current.userNodeBaseUrl !== activeProvider ||
+            current.selectedProvider !== storeNow.selectedProvider ||
+            current.selectedTier !== storeNow.selectedTier ||
+            current.lineup !== storeNow.lineup ||
+            // The conversation itself is now part of the quote: the sheet
+            // priced this tree, so a tree that moved while it was open is a
+            // different request at a different price.
+            current.conversationHistory !== storeNow.conversationHistory ||
+            current.activeChildren !== storeNow.activeChildren ||
+            currentFunds?.mintUrl !== quoted.funds?.mintUrl ||
+            currentFunds?.balanceSats !== quoted.funds?.balanceSats
+          ) {
+            staticPopup('ai-payment-options-changed');
+            return null;
+          }
+          break;
+        }
+        case 'ready':
+          break;
+      }
+      return { shownSats };
+    },
+    [walletSats, heldMints, latestFunds, navigateToAddFunds]
+  );
+
+  const prepareSend = useCallback(
+    async (
+      controller: AbortController,
+      watch: OwnerWatch,
+      userMessage: string,
+      attachments?: ChatAttachment[]
+    ) => {
       // Every precondition in one place, decided before the optimistic bubbles
       // go in: declining after them would leave a user message with no answer
       // and nothing to retry. The gate is pure and exhaustive, so each way a
@@ -945,21 +1195,12 @@ export function useAiSend() {
       // provider, a mint the provider refuses and a declined confirmation used
       // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
+      const { owner } = watch;
       const storeNow = useRoutstrStore.getState();
-      const owner = useProfileStore.getState().activeAccountIndex;
       const quotedFunds = latestFunds.current;
-      const activeProvider = storeNow.userNodeBaseUrl;
       // Quoted from the same chain the send will walk, refused models last, so
       // the sheet names the model — and the figure — that actually goes first.
-      const plannedEntry = selectFromChain(
-        availableChain(
-          getProviderById(storeNow.selectedProvider).id,
-          getTierById(storeNow.selectedTier).id,
-          storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null,
-          storeNow.nodeBaseUrl
-        ),
-        walletSats
-      );
+      const plannedEntry = selectFromChain(selectedChain(storeNow).chain, walletSats);
       const timestamp = Date.now();
       const userMessageId = `msg-${timestamp}-u`;
       const assistantMessageId = `msg-${timestamp + 1}-a`;
@@ -989,6 +1230,27 @@ export function useAiSend() {
         timestamp,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
+      const answerPlaceholder = {
+        id: assistantMessageId,
+        parentId: userMessageId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: timestamp + 1,
+      };
+      // Checked after every wait before the request. An account or
+      // conversation that moved meanwhile would get the answer, and the bill,
+      // for a question asked elsewhere; a screen that closed has no one to
+      // show it to. Nothing is sent; a question asked in a saved conversation
+      // is left there, unanswered, to be asked again.
+      const whyNotSend = () => {
+        const change = watch.change();
+        return change === 'none' && controller.signal.aborted ? 'closed' : change;
+      };
+      const leaveQuestion = (reason: 'conversation' | 'closed') => {
+        aiLog.info('ai.send.not_sent', { flowId, reason });
+        if (owner.conversationId !== null)
+          addMessages(owner.conversationId, [pendingUserMessage, answerPlaceholder]);
+      };
       // Assembly (incl. the inline-image window and per-attachment encoding)
       // is shared with retry via `assembleApiMessages` so the two flows can't
       // diverge — and now also shared with the quote, so the priced request
@@ -1000,111 +1262,43 @@ export function useAiSend() {
       const { messages: apiMessages, imageCount } = trimmed
         ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
         : { messages: [], imageCount: 0 };
-
-      // The node's admission gate for this body, computed the way the node
-      // computes it. `null` when the model carries no usable pricing, which
-      // the gate turns back into the typical-case estimate and the sheet
-      // labels as one.
-      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
-      const reservedSats = trimmed
-        ? reservedSatsForSend({
-            entry: plannedEntry,
-            models: storeNow.modelsCache?.data ?? [],
-            messages: apiMessages,
-            maxTokens: plannedMaxTokens,
-          })
-        : null;
-
-      const gate = evaluateSendGate({
-        text: trimmed,
-        providerBaseUrl: activeProvider,
-        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
-        heldMints,
-        walletSats,
-        entry: plannedEntry,
-        imageCount: attachments?.length ?? 0,
-        confirmSpend: storeNow.confirmSpend,
-        reservedSats,
-      });
-
-      // The figure the user is about to be shown, recorded under the same
-      // flowId as the money that follows it. It used to live only on screen,
-      // which is why a 30x overstatement could only be found by someone
-      // watching their own balance.
-      const shownSats =
-        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
-      aiLog.info('ai.send.gate', {
-        flowId,
-        state: gate.state,
-        shownSats,
-        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
-        model: plannedEntry?.modelId ?? null,
-        maxTokens: plannedMaxTokens,
-        promptMessages: apiMessages.length,
-        imageParts: imageCount,
-        walletSats,
-      });
-      switch (gate.state) {
-        case 'empty':
-          return;
-        case 'no-provider':
-          // The one refusal with somewhere to go: the list is the answer.
-          staticPopup('ai-no-provider');
-          router.navigate('/(ai-flow)/providers');
-          return;
-        case 'mint-not-accepted':
-          staticPopup('ai-mint-not-accepted');
-          return;
-        case 'insufficient-funds':
-          navigateToAddFunds();
-          return;
-        case 'confirm': {
-          const allowed = await confirmSpend({
-            modelName: gate.modelName,
-            reserveSats: gate.reserveSats,
-            reserveKnown: gate.reserveKnown,
-          });
-          if (!allowed) return;
-          const current = useRoutstrStore.getState();
-          const currentFunds = latestFunds.current;
-          if (
-            useProfileStore.getState().activeAccountIndex !== owner ||
-            current.userNodeBaseUrl !== activeProvider ||
-            current.selectedProvider !== storeNow.selectedProvider ||
-            current.selectedTier !== storeNow.selectedTier ||
-            current.lineup !== storeNow.lineup ||
-            // The conversation itself is now part of the quote: the sheet
-            // priced this tree, so a tree that moved while it was open is a
-            // different request at a different price.
-            current.conversationHistory !== storeNow.conversationHistory ||
-            current.activeChildren !== storeNow.activeChildren ||
-            currentFunds?.mintUrl !== quotedFunds?.mintUrl ||
-            currentFunds?.balanceSats !== quotedFunds?.balanceSats
-          ) {
-            staticPopup('ai-payment-options-changed');
-            return;
-          }
-          break;
-        }
-        case 'ready':
-          break;
+      const afterAssembly = whyNotSend();
+      if (afterAssembly === 'account') {
+        aiLog.info('ai.send.not_sent', { flowId, reason: afterAssembly });
+        return;
       }
+      if (afterAssembly !== 'none') {
+        leaveQuestion(afterAssembly);
+        return;
+      }
+
+      const passed = await passSendGate({
+        flowId,
+        watch,
+        controller,
+        typed: trimmed,
+        apiMessages,
+        imageParts: imageCount,
+        attachedImages: attachments?.length ?? 0,
+        quoted: { store: storeNow, funds: quotedFunds, entry: plannedEntry },
+        onLeft: leaveQuestion,
+      });
+      if (!passed) return;
+      const { shownSats } = passed;
 
       if (willStartNewSession) {
         createSession();
       }
+      const conversationId = selectConversationId(useRoutstrStore.getState());
 
-      addMessage({ ...pendingUserMessage, pending: true });
-      addMessage({
-        id: assistantMessageId,
-        parentId: userMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: timestamp + 1,
-      });
+      // One write: a question is never saved without its answer, so one left
+      // by a kill reads as an answer to ask again.
+      addMessages(conversationId, [{ ...pendingUserMessage, pending: true }, answerPlaceholder]);
 
       try {
         await streamIntoPlaceholder({
+          conversationId,
+          controller,
           assistantMessageId,
           apiMessages,
           imageCount,
@@ -1116,20 +1310,19 @@ export function useAiSend() {
         // streaming round-trip resolves — success or error, the request
         // left our hands. Errors surface as a pill on the assistant
         // placeholder, not on the user bubble's check.
-        setMessagePending(userMessageId, false);
+        setMessagePending(conversationId, userMessageId, false);
       }
     },
     [
       isAnonymous,
       currentSessionId,
       createSession,
-      addMessage,
+      addMessages,
       setMessagePending,
       streamIntoPlaceholder,
       walletSats,
-      heldMints,
       latestFunds,
-      navigateToAddFunds,
+      passSendGate,
     ]
   );
 
@@ -1138,6 +1331,13 @@ export function useAiSend() {
   // `streamIntoPlaceholder` before the disabled flag commits, billing the
   // user twice and corrupting the active branch tree. `useSingleFlight`
   // drops the duplicate at the ref level.
+  const sendInner = useCallback(
+    (userMessage: string, attachments?: ChatAttachment[]) =>
+      withRequestController(preparingRef.current, (controller, watch) =>
+        prepareSend(controller, watch, userMessage, attachments)
+      ),
+    [prepareSend]
+  );
   const send = useSingleFlight(sendInner);
 
   /**
@@ -1147,9 +1347,13 @@ export function useAiSend() {
    * sibling (follow-up exchanges) drop out of view immediately and can be
    * brought back via the bubble's chevron nav.
    */
-  const retryInner = useCallback(
-    async (messageId: string) => {
+  const prepareRetry = useCallback(
+    async (controller: AbortController, watch: OwnerWatch, messageId: string) => {
+      const { owner } = watch;
       const stateNow = useRoutstrStore.getState();
+      const quotedFunds = latestFunds.current;
+      // Quoted from the chain the request will walk, as a send's is.
+      const plannedEntry = selectFromChain(selectedChain(stateNow).chain, walletSats);
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
         aiLog.warn('ai.retry.invalid_target', { messageId, role: original?.role });
@@ -1169,19 +1373,48 @@ export function useAiSend() {
         aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
+      // The answer stays in its own conversation, to be asked again from
+      // there, when the account or conversation moved or the screen closed.
+      const change = watch.change();
+      if (change !== 'none' || controller.signal.aborted) {
+        aiLog.info('ai.retry.not_sent', {
+          messageId,
+          reason: change === 'none' ? 'closed' : change,
+        });
+        return;
+      }
 
+      const { conversationId } = owner;
       const timestamp = Date.now();
       const newAssistantId = `msg-${timestamp}-r`;
       const flowId = `ai-retry-${timestamp}`;
       const parentId = original.parentId ?? null;
 
-      addMessage({
-        id: newAssistantId,
-        parentId,
-        role: 'assistant',
-        content: '',
-        timestamp,
+      // Asking again costs what asking did, so it is checked and asked the
+      // way a send is, before the new answer's bubble goes in. Declined or
+      // refused, the answer that was there stays as it was.
+      const passed = await passSendGate({
+        flowId,
+        watch,
+        controller,
+        typed: null,
+        apiMessages,
+        imageParts: imageCount,
+        attachedImages: imageCount,
+        quoted: { store: stateNow, funds: quotedFunds, entry: plannedEntry },
+        onLeft: (reason) => aiLog.info('ai.retry.not_sent', { messageId, reason }),
       });
+      if (!passed) return;
+
+      addMessages(conversationId, [
+        {
+          id: newAssistantId,
+          parentId,
+          role: 'assistant',
+          content: '',
+          timestamp,
+        },
+      ]);
       // Flip immediately so the chat list shows the streaming sibling as
       // the active branch. The user can navigate back to the original via
       // the bubble's chevron nav.
@@ -1190,20 +1423,29 @@ export function useAiSend() {
       }
 
       await streamIntoPlaceholder({
+        conversationId,
+        controller,
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,
         flowId,
+        shownSats: passed.shownSats,
         retriedFromMessageId: messageId,
       });
     },
-    [addMessage, setActiveBranch, streamIntoPlaceholder]
+    [addMessages, setActiveBranch, streamIntoPlaceholder, passSendGate, latestFunds, walletSats]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the
   // regenerate chevron would spawn two sibling assistants and bill twice.
+  const retryInner = useCallback(
+    (messageId: string) =>
+      withRequestController(preparingRef.current, (controller, watch) =>
+        prepareRetry(controller, watch, messageId)
+      ),
+    [prepareRetry]
+  );
   const retry = useSingleFlight(retryInner);
 
-  const balance = useRoutstrStore((s) => s.balance);
-  return { send, retry, ...status, balance };
+  return { send, retry, isSending };
 }

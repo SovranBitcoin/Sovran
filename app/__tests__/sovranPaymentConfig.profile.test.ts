@@ -119,13 +119,6 @@ jest.mock('@/features/send/lib/sendFallbackPicker', () => ({ chooseSendFallback:
 jest.mock('@/shared/hooks/useTransactionLocation', () => ({
   captureAndStoreLocation: jest.fn(),
 }));
-jest.mock('@/shared/lib/routstr/topUp', () => ({
-  executeRoutstrTopUp: jest.fn(),
-  formatRoutstrBalance: jest.fn(),
-}));
-jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn(() => ({ phase: 'idle', complete: jest.fn() })) },
-}));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: {
     getState: jest.fn(() => ({
@@ -735,6 +728,52 @@ describe('createSovranHandlers profile routing', () => {
       }),
     });
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
+  });
+
+  // The amount screen shows a nearby recipient over a contact, and the send
+  // ends the same way: on the hand-off screen, with no message to the contact.
+  it('ends a nearby send on the hand-off screen even with a contact target set', async () => {
+    mockNearPayActive = {
+      id: 'peer-1-1',
+      recipient: {
+        peerID: 'peer-1',
+        nickname: 'Bob',
+        hasDirectLink: true,
+        lastSeen: 0,
+      },
+      presentation: 'radar',
+      mintPickerOpen: false,
+    };
+    useContactSendStore
+      .getState()
+      .start({ pubkey: 'ef'.repeat(32), displayName: 'Erin', delivery: 'nip17' });
+    const deliverContactEcashDm = jest.fn(async () => {});
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-nearby',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: 'cashuA-nearby-token',
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    expect(deliverContactEcashDm).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(send-flow)/sendToken',
+      params: expect.objectContaining({
+        sendHistoryEntry: expect.stringContaining('send-nearby'),
+      }),
+    });
   });
 
   it('opens the ecash memo sheet without submitting the memo on display', () => {

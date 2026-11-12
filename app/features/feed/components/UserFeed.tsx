@@ -507,15 +507,11 @@ export function UserFeed({
   const paginationCursorRef =
     useRef<import('../data/feedClient').FeedParseResult['paginationCursor']>(null);
   const paginationUntilRef = useRef(0);
-  const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
   // Tracks the prefix of the most recent loadMoreItems request so enrichment
   // cannot write into a feed reset by a later author switch.
   const activeLoadMoreIdRef = useRef<string | null>(null);
-
-  // Track whether initial load has completed — skip fade-in for items after first render
-  const isFirstRender = useRef(true);
 
   // Snapshot of deleted-repost IDs taken at first feed load. Using a snapshot
   // rather than live state means unreposting while viewing won't yank items away
@@ -560,11 +556,9 @@ export function UserFeed({
     const page = read.data;
     if (!page || appliedPageRef.current === page) return;
     appliedPageRef.current = page;
-    isFirstRender.current = true;
     hasMoreRef.current = page.paginationUntil > 0 && page.orderedFeedItems.length > 0;
     paginationCursorRef.current = page.paginationCursor;
     paginationUntilRef.current = page.paginationUntil;
-    paginationOffsetRef.current = page.paginationOffset;
     feedItemIdsRef.current = new Set(
       page.orderedFeedItems.map((item) =>
         item.type === 'note' ? item.event.id : item.repostEvent.id
@@ -583,10 +577,6 @@ export function UserFeed({
           })
         : page.orderedFeedItems;
     applyPage(page, displayItems);
-    // After initial render, mark first render done so subsequent items skip animation
-    requestAnimationFrame(() => {
-      isFirstRender.current = false;
-    });
     // A hand-over seed is a partial page: the network page that supersedes it
     // brings its own enrichment; enriching the seed would be wasted work.
     if (read.source === 'seed') return;
@@ -609,31 +599,25 @@ export function UserFeed({
         hasMoreRef,
         paginationUntilRef,
         paginationCursorRef,
-        paginationOffsetRef,
         loadingMoreRef,
         feedItemIdsRef,
         activeLoadMoreIdRef,
-        isFirstRender,
         deletedRepostIdsRef,
         quotedRef,
         profilesRef,
-        applyPage,
         appendPage,
         applyEnrichment,
-        resetContent,
         setIsLoadingMore,
       }),
     [
       appendPage,
       applyEnrichment,
-      applyPage,
       authorName,
       authorPicture,
       isOwnProfile,
       profilesRef,
       pubkey,
       quotedRef,
-      resetContent,
     ]
   );
 
@@ -902,7 +886,6 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
     hasMoreRef,
     paginationUntilRef,
     paginationCursorRef,
-    paginationOffsetRef,
     loadingMoreRef,
     feedItemIdsRef,
     activeLoadMoreIdRef,
@@ -929,8 +912,6 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
       authorPicture,
       limit: 30,
       cursor: paginationCursorRef.current,
-      until: paginationUntilRef.current,
-      offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
     });
 
     paginationCursorRef.current = page.paginationCursor;
@@ -941,12 +922,8 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
 
     if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
       paginationUntilRef.current = page.paginationUntil;
-      paginationOffsetRef.current = page.paginationOffset;
-    } else if (page.paginationUntil === paginationUntilRef.current) {
-      // Same cursor (score-based feeds) — accumulate offset
-      paginationOffsetRef.current += page.paginationOffset;
-    } else {
-      // No valid cursor from FeedRange — fallback to oldest item timestamp
+    } else if (page.paginationUntil !== paginationUntilRef.current) {
+      // The page's cursor did not move older: fall back to its oldest item
       let oldest = paginationUntilRef.current;
       for (const item of page.orderedFeedItems) {
         if (item.timestamp < oldest) oldest = item.timestamp;
@@ -956,7 +933,6 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
         return [];
       }
       paginationUntilRef.current = oldest;
-      paginationOffsetRef.current = page.paginationOffset;
     }
 
     const dedupedItems = page.orderedFeedItems.filter((item) => {

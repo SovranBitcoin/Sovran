@@ -6,13 +6,13 @@ import {
 import { logger } from "../logger";
 import { isSendTokenCancelled, isSendTokenComplete } from "./filters";
 
-export type SendTokenReachabilityStatus =
+type SendTokenReachabilityStatus =
   | "checking"
   | "device-offline"
   | "mint-unreachable"
   | "mint-reachable";
 
-export interface SendTokenWarningCopy {
+interface SendTokenWarningCopy {
   title: string;
   description: string;
 }
@@ -26,7 +26,7 @@ interface SendTokenWarningCopyKeys {
   description: PaymentCopyKey;
 }
 
-export interface SendTokenReachabilityWarningOptions {
+interface SendTokenReachabilityWarningOptions {
   mintWasOffline?: boolean;
   reachabilityStatus?: SendTokenReachabilityStatus;
   paymentCopy?: PaymentCopyResolver;

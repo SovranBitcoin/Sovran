@@ -5,22 +5,13 @@
  * nagg orders/filters by the wrap timestamp. Overlap only its last second
  * (the server uses an exclusive bound), deduplicating by envelope ID.
  */
-import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
-
-/** Normalize an envelope `createdAt` (ISO string | unix seconds | ms | Date) to unix seconds. */
-function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
-  if (typeof createdAt === 'number') {
-    return createdAt > 1e12 ? Math.floor(createdAt / 1000) : Math.floor(createdAt);
-  }
-  const ms = createdAt instanceof Date ? createdAt.getTime() : Date.parse(createdAt);
-  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
-}
+import { envelopeUnixSeconds, type DmEnvelopePage } from './dmEnvelopeTypes';
 
 /** Oldest envelope (wrap) timestamp in a page — the correct `until` cursor. */
 function pageOldestWrapSec(page: DmEnvelopePage): number | undefined {
   let oldestSec: number | undefined;
   for (const envelope of page.envelopes) {
-    const wrapSec = envelopeUnixSeconds(envelope.createdAt);
+    const wrapSec = Math.floor(envelopeUnixSeconds(envelope.createdAt));
     if (wrapSec > 0 && (oldestSec === undefined || wrapSec < oldestSec)) oldestSec = wrapSec;
   }
   return oldestSec;
@@ -36,8 +27,6 @@ function pageOldestWrapSec(page: DmEnvelopePage): number | undefined {
  * slack to a per-page minimum by mistake.
  */
 export interface DmEnvelopeCursor {
-  /** Forget every tracked envelope — for a fresh first page. */
-  reset(): void;
   /** Record a page; returns how many of its envelopes were previously unseen. */
   track(page: DmEnvelopePage): number;
   /** `until` for the next (older) page, or undefined while nothing is tracked. */
@@ -45,14 +34,10 @@ export interface DmEnvelopeCursor {
 }
 
 export function createDmEnvelopeCursor(): DmEnvelopeCursor {
-  let seenWrapIds = new Set<string>();
+  const seenWrapIds = new Set<string>();
   let oldestWrapSec: number | undefined;
 
   return {
-    reset() {
-      seenWrapIds = new Set();
-      oldestWrapSec = undefined;
-    },
     track(page) {
       let fresh = 0;
       for (const envelope of page.envelopes) {

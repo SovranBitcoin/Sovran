@@ -82,7 +82,7 @@ describe('settingsStore persist resilience', () => {
     );
     const store = await loadStore();
     expect(store.getState().lastKnownAppVersion).toBeNull();
-    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     expect(store.getState().hasSeenOnboarding).toBe(true);
     expect(store.getState().displayCurrency).toBe('eur');
   });
@@ -107,7 +107,7 @@ describe('settingsStore persist resilience', () => {
       // The denylist degrades to empty, i.e. every host stays ON. An allowlist
       // would have degraded to "no hosts", silently killing the tier.
       expect(store.getState().primalHostsDisabled).toEqual([]);
-      expect(store.getState().isTermsAccepted()).toBe(true);
+      expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     }
   );
 
@@ -162,7 +162,7 @@ describe('settingsStore persist resilience', () => {
 
     const store = await loadStore();
 
-    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     expect(store.getState().hasSeenOnboarding).toBe(true);
     expect(store.getState().displayCurrency).toBe('eur');
   });
@@ -183,7 +183,7 @@ describe('settingsStore persist resilience', () => {
 
     const store = await loadStore();
 
-    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     expect(store.getState().hasSeenOnboarding).toBe(true);
     expect(store.getState().displayCurrency).toBe('eur');
     expect('avatarFallbackVariant' in store.getState()).toBe(false);
@@ -200,7 +200,7 @@ describe('settingsStore persist resilience', () => {
 
     const store = await loadStore();
 
-    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     expect('avatarFallbackVariant' in store.getState()).toBe(false);
   });
 
@@ -244,7 +244,7 @@ describe('settingsStore persist resilience', () => {
     expect(state.relayTierEnabled).toBe(true);
 
     // User settings survive.
-    expect(state.isTermsAccepted()).toBe(true);
+    expect(state.termsAccepted?.termsAccepted).toBe(true);
     expect(state.hasSeenOnboarding).toBe(true);
     expect(state.displayCurrency).toBe('eur');
   });
@@ -308,12 +308,12 @@ test('failed settings hydration preserves the unreadable blob and exposes retrya
   jest.resetModules();
   mockMemory[STORAGE_KEY] = '{broken json';
   const store = await loadStore();
-  const { useSettingsHydration } = require('@/shared/stores/global/settingsStore');
-  expect(useSettingsHydration.getState().status).toBe('error');
+  const { whenLoaded } = require('@/shared/lib/persist/hydrationOutcome');
+  await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(false);
   expect(mockMemory[STORAGE_KEY]).toBe('{broken json');
   preload({ displayCurrency: 'eur', hasSeenOnboarding: true });
   await store.persist.rehydrate();
-  expect(useSettingsHydration.getState().status).toBe('ready');
+  await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(true);
   expect(store.getState().displayCurrency).toBe('eur');
 });
 
@@ -326,7 +326,7 @@ it.each([undefined, false, true, 'invalid'])(
       vertexCreditsEnabled: value,
     });
     const store = await loadStore();
-    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
     expect(store.getState().vertexCreditsEnabled).toBe(typeof value === 'boolean' ? value : true);
   }
 );

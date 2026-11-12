@@ -11,7 +11,7 @@ import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { decryptNip04 } from '@/shared/lib/nostr/nip04';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import type { DmEnvelope, DmProtocol } from './dmEnvelopeTypes';
+import { envelopeUnixSeconds, type DmEnvelope, type DmProtocol } from './dmEnvelopeTypes';
 
 interface DecryptedDm {
   /** Source event id (gift-wrap id for NIP-17, kind-4 event id for NIP-04). */
@@ -26,26 +26,16 @@ interface DecryptedDm {
   protocol: DmProtocol;
 }
 
-function pTagValue(tags: string[][]): string | undefined {
-  return tags.find((t) => t[0] === 'p')?.[1];
+/** Load the caches `decryptDmEnvelopes` reads for a viewer: one protocol's, or both. */
+export async function hydrateDmDecryptCaches(viewerPubkey: string, only?: DmProtocol) {
+  await Promise.all([
+    only !== 'nip04' && giftWrapCache.cache.hydrate(viewerPubkey),
+    only !== 'nip17' && nip04Cache.hydrate(viewerPubkey),
+  ]);
 }
 
-function envelopeCreatedAtSec(envelope: DmEnvelope): number {
-  const raw = envelope.createdAt;
-  if (raw instanceof Date) return Math.floor(raw.getTime() / 1000);
-  // nagg returns `createdAt` as a number OR a string (numeric or ISO-8601);
-  // normalize all of them to unix seconds. A numeric value above the
-  // milliseconds threshold is downscaled. The previous `Number(raw)` path
-  // produced NaN -> 0 (epoch / 1970) for ISO-string timestamps, which is why
-  // NIP-04 message dates rendered as 1970 (NIP-17 is unaffected — it uses the
-  // decrypted inner rumor's numeric `created_at`).
-  if (typeof raw === 'number') {
-    return raw > 1_000_000_000_000 ? Math.floor(raw / 1000) : raw;
-  }
-  const n = Number(raw);
-  if (Number.isFinite(n)) return n > 1_000_000_000_000 ? Math.floor(n / 1000) : n;
-  const parsed = Date.parse(raw);
-  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
+function pTagValue(tags: string[][]): string | undefined {
+  return tags.find((t) => t[0] === 'p')?.[1];
 }
 
 /**
@@ -116,7 +106,7 @@ export function decryptDmEnvelopes(
         counterparty,
         senderPubkey: envelope.pubkey,
         content,
-        createdAtSec: envelopeCreatedAtSec(envelope),
+        createdAtSec: envelopeUnixSeconds(envelope.createdAt),
         isOwn,
         protocol: 'nip04',
       });

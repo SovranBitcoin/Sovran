@@ -40,6 +40,7 @@ export type ChatBubbleMessage = {
    *    dimmed to 60%).
    *  - `'sent'` — transport ack received (single-check glyph).
    *  - `'delivered'` — counterparty acked decryption (double-check glyph).
+   *  - `'read'` — counterparty read it; BitChat BLE DMs only, shown as sent.
    *  - `'failed'` — transport rejected the message (warning glyph). For
    *    BitChat DMs this typically means a handshake never completed.
    * Non-own messages leave this field unset. Nostr-based DMs (NIP-04,
@@ -47,7 +48,7 @@ export type ChatBubbleMessage = {
    * 'sending' or 'sent'. BitChat BLE DMs flow through the full set via
    * the native delivery-status event.
    */
-  deliveryStatus?: 'sending' | 'sent' | 'delivered' | 'failed';
+  deliveryStatus?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   /**
    * Pre-extracted cashu token (cashuA…/cashuB…) found inside `content`. When
    * present, the bubble strips it from the rendered text and shows a

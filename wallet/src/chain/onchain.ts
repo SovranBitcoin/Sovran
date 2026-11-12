@@ -165,38 +165,3 @@ export function shouldStopTxConfirmationPolling(
       : DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS;
   return status.confirmations >= normalizedRequired;
 }
-
-export function getOnchainConfirmationInfo(
-  progress: OnchainConfirmationProgress,
-): string {
-  if (progress.hasUnconfirmedPayment && progress.currentConfirmations == null) {
-    logger.debug("chain.onchain.confirmationInfo.result", {
-      reason: "waiting-first-confirmation",
-      hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
-      currentConfirmations: progress.currentConfirmations,
-      requiredConfirmations: progress.requiredConfirmations,
-      isSatisfied: progress.isSatisfied,
-    });
-    return "Waiting for first confirmation";
-  }
-
-  if (progress.currentConfirmations == null) {
-    logger.debug("chain.onchain.confirmationInfo.result", {
-      reason: "confirmed-no-count",
-      hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
-      currentConfirmations: progress.currentConfirmations,
-      requiredConfirmations: progress.requiredConfirmations,
-      isSatisfied: progress.isSatisfied,
-    });
-    return "Payment confirmed onchain";
-  }
-
-  logger.debug("chain.onchain.confirmationInfo.result", {
-    reason: "counted-confirmations",
-    hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
-    currentConfirmations: progress.currentConfirmations,
-    requiredConfirmations: progress.requiredConfirmations,
-    isSatisfied: progress.isSatisfied,
-  });
-  return `${progress.currentConfirmations}/${progress.requiredConfirmations} confirmations`;
-}

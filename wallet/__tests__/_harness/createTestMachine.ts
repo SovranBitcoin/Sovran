@@ -45,6 +45,7 @@ import type {
   FlowStep,
   ExecutionState,
   PaymentMachine,
+  StepDataMap,
   StepHandlerMap,
   NotificationHandlerMap,
 } from '../../src/machine/types';
@@ -240,6 +241,15 @@ export function createTestMachine(config?: TestMachineConfig): TestMachine {
     },
 
     /**
+     * Assert the machine is at `error` and its step data (code, message,
+     * data) matches the expected fields.
+     */
+    assertError(matcher: Partial<StepDataMap['error']>) {
+      expect(machine.getStep()).toBe('error');
+      expect(machine.inspect().details).toMatchObject(matcher);
+    },
+
+    /**
      * Capture the full machine state for snapshot comparisons.
      */
     snapshot(): TestMachineSnapshot {
@@ -333,9 +343,6 @@ async function executeAction(machine: PaymentMachine, action: FlowAction): Promi
       break;
     case 'reviewMint':
       await machine.reviewMint(action.mintUrl, action.token);
-      break;
-    case 'mintTrusted':
-      await machine.mintTrusted();
       break;
     case 'reset':
       machine.reset();

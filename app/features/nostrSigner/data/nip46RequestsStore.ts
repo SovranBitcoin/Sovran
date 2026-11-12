@@ -150,14 +150,10 @@ interface Nip46RequestsActions {
   }) => Result<void, SessionGrantError>;
   hasSessionGrant: (clientPubkey: string, grantKey: GrantKey, peerPubkey: string) => boolean;
   /**
-   * Revoke session grants for an app — all of them, one method's, or (via
-   * `peerPubkey`) one conversation partner's across both methods.
+   * Revoke session grants for an app — all of them, or (via `peerPubkey`) one
+   * conversation partner's across both methods.
    */
-  revokeSessionGrant: (
-    clientPubkey: string,
-    grantKey?: SessionGrantKey,
-    peerPubkey?: string
-  ) => void;
+  revokeSessionGrant: (clientPubkey: string, peerPubkey?: string) => void;
   /**
    * Session-scoped allow for a non-decrypt grant key (wallet sign kinds
    * included — runtime-only by design). Idempotent: consolidated approval
@@ -165,7 +161,13 @@ interface Nip46RequestsActions {
    */
   grantSessionAllow: (clientPubkey: string, grantKey: GrantKey) => Result<void, SessionAllowError>;
   hasSessionAllow: (clientPubkey: string, grantKey: GrantKey) => boolean;
-  revokeSessionAllows: (clientPubkey: string) => void;
+  /**
+   * End one app's session: every session grant (all methods, all peers) and
+   * every session allow it holds. Disconnect, block and a re-pair that
+   * replaces the client all call this, so a key that pairs again in the same
+   * engine session is asked again rather than inheriting what it was allowed.
+   */
+  endClientSession: (clientPubkey: string) => void;
   /** Record an app's cooldown end (epoch ms), or clear the flag with `null`. */
   setAppThrottled: (clientPubkey: string, cooldownUntil: number | null) => void;
   setServiceHotRequested: (hot: boolean) => void;
@@ -265,14 +267,11 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>({
     );
   },
 
-  revokeSessionGrant: (clientPubkey, grantKey, peerPubkey) => {
+  revokeSessionGrant: (clientPubkey, peerPubkey) => {
     const peer = peerPubkey?.toLowerCase();
     set((state) => ({
       sessionGrants: state.sessionGrants.filter(
-        (g) =>
-          g.clientPubkey !== clientPubkey ||
-          (grantKey !== undefined && g.grantKey !== grantKey) ||
-          (peer !== undefined && g.peerPubkey !== peer)
+        (g) => g.clientPubkey !== clientPubkey || (peer !== undefined && g.peerPubkey !== peer)
       ),
     }));
   },
@@ -294,10 +293,14 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>({
   hasSessionAllow: (clientPubkey, grantKey) =>
     get().sessionAllows.some((a) => a.clientPubkey === clientPubkey && a.grantKey === grantKey),
 
-  revokeSessionAllows: (clientPubkey) => {
+  endClientSession: (clientPubkey) => {
     set((state) => {
+      const sessionGrants = state.sessionGrants.filter((g) => g.clientPubkey !== clientPubkey);
       const sessionAllows = state.sessionAllows.filter((a) => a.clientPubkey !== clientPubkey);
-      return sessionAllows.length === state.sessionAllows.length ? state : { sessionAllows };
+      return sessionGrants.length === state.sessionGrants.length &&
+        sessionAllows.length === state.sessionAllows.length
+        ? state
+        : { sessionGrants, sessionAllows };
     });
   },
 

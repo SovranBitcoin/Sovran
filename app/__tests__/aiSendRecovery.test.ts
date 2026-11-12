@@ -1,3 +1,9 @@
+/** The failure recorded on an answer's turn, if it failed. */
+function getTurnError(messageId: string) {
+  const turn = getTurn(messageId);
+  return turn?.phase === 'failed' ? turn.error : null;
+}
+
 jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
   useNavigateToAddFunds: () => jest.fn(),
 }));
@@ -5,11 +11,11 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
+import { sendMessage, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
-import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { getTurn, resetTurns } from '@/features/ai/lib/turns';
 import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
@@ -19,11 +25,13 @@ jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }))
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
   sendMessage: jest.fn(),
-  checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: {
+    getState: () => ({ activeAccountIndex: 0 }),
+    subscribe: () => () => undefined,
+  },
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
@@ -35,9 +43,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     setItem: async () => {},
     removeItem: async () => {},
   }),
-}));
-jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn() },
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => {
   const useMintStore = Object.assign(
@@ -142,7 +147,7 @@ describe('AI send lineup recovery', () => {
   });
   beforeEach(async () => {
     jest.clearAllMocks();
-    resetTurnErrors();
+    resetTurns();
     resetModelAvailability();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();
@@ -169,7 +174,6 @@ describe('AI send lineup recovery', () => {
       currentSessionId: null,
       isAnonymousMode: true,
     });
-    jest.mocked(checkBalance).mockResolvedValue({ balance: 90000 });
     refreshMock.mockResolvedValue(false);
   });
 
@@ -518,13 +522,16 @@ describe('AI send lineup recovery', () => {
     expect(chatErrorActions('routstr.not_found')).toContain('retry');
   });
 
-  it('keeps an aborted turn out of the conversation — it did not fail', async () => {
+  it('keeps an aborted turn as one to ask again — it did not fail', async () => {
     const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
     sendMock.mockRejectedValueOnce(abort);
     await send();
-    expect(useRoutstrStore.getState().conversationHistory).toEqual([
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(history).toEqual([
       expect.objectContaining({ role: 'user', pending: false }),
+      expect.objectContaining({ role: 'assistant', content: '' }),
     ]);
+    expect(getTurn(history[1].id)).toEqual({ phase: 'interrupted', text: '' });
   });
 
   it('carries the exact shortfall on a wallet 402 rather than a bare top-up prompt', async () => {

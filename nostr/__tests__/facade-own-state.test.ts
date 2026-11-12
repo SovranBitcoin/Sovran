@@ -59,6 +59,8 @@ describe('getOwnHistory — relay floor', () => {
 
     const asAuthored = await tier.ownHistory!({ actionType: 'authored', viewerPubkey: ME });
     const asReplies = await tier.ownHistory!({ actionType: 'replies', viewerPubkey: ME });
+    expect(asAuthored.kind).toBe('answered');
+    expect(asReplies.kind).toBe('answered');
     if (asAuthored.kind === 'answered') {
       expect([...asAuthored.value.itemsById.keys()]).toEqual(['1'.repeat(64)]);
     }

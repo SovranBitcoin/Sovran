@@ -1,4 +1,3 @@
-import { useColadaBalance } from 'wallet/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { useNavigation } from 'expo-router';
@@ -15,6 +14,7 @@ import { ControlField, Label } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
+import { useHoldsMoney } from '@/shared/lib/cta/useHoldsMoney';
 import type { CtaBodyView, CtaDefinition, CtaId } from '@/shared/lib/cta/types';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
@@ -29,7 +29,7 @@ import { DOWNLOAD_URL } from '@/shared/config/download';
 
 export function CtaScreen({ id }: { id: CtaId }) {
   const cta = CTA_DEFINITIONS.find((definition) => definition.id === id)!;
-  const balance = useColadaBalance('sat');
+  const holdsMoney = useHoldsMoney();
   const navigation = useNavigation();
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const preview = previewOverride === id;
@@ -130,7 +130,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
       cta={cta}
       blocking={blocking}
       body={{
-        balanceTotalSat: balance.total,
+        holdsMoney,
         oldEcash: claim && describeLegacyClaim(claim, claimMintName),
       }}
       updateError={updateError}

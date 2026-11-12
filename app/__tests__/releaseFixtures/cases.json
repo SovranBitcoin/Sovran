@@ -1,0 +1,53 @@
+[
+  {
+    "id": "restore-pending",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "app/shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "storageKey": "wallet-lifecycle",
+    "preserve": {
+      "restoreStatus": "pending",
+      "seedCreatedAt": null,
+      "lastRestoreAt": null,
+      "lastRestoreError": null
+    }
+  },
+  {
+    "id": "restore-in-progress",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "app/shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "storageKey": "wallet-lifecycle",
+    "preserve": {
+      "restoreStatus": "in-progress",
+      "seedCreatedAt": null,
+      "lastRestoreAt": 1788000000000,
+      "lastRestoreError": null
+    }
+  },
+  {
+    "id": "restore-failed",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "app/shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "storageKey": "wallet-lifecycle",
+    "preserve": {
+      "restoreStatus": "failed",
+      "seedCreatedAt": null,
+      "lastRestoreAt": null,
+      "lastRestoreError": "Could not reach https://mint.example/Bitcoin"
+    }
+  }
+]

@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
 
-import { hasMintSupportingMethod, resolveReceiveMethodMint } from 'wallet';
+import {
+  getMintMethodCapability,
+  hasMintSupportingMethod,
+  resolveReceiveMethodMint,
+  type MintMethodUnitCapability,
+} from 'wallet';
 
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -13,6 +18,10 @@ interface ReceiveMethodMintState {
   mintUrl: string | undefined;
   /** How the mint was chosen — colada's resolveReceiveMethodMint policy. */
   source: 'explicit' | 'auto' | 'none';
+  /** What that mint advertises for this rail; null without a mint. */
+  capability: MintMethodUnitCapability | null;
+  /** That mint can serve the rail now (supported and not disabled). */
+  supported: boolean;
   /** Whether ANY trusted mint could serve this rail (drives the empty state). */
   anyMintSupports: boolean;
 }
@@ -44,6 +53,9 @@ export function useReceiveMethodMint(
     const requirement = { operation: 'mint' as const, method, unit };
     const resolution = resolveReceiveMethodMint(walletContext, explicit, requirement);
     const anyMintSupports = hasMintSupportingMethod(walletContext, requirement);
+    const capability = resolution.mintUrl
+      ? getMintMethodCapability(walletContext, resolution.mintUrl, requirement)
+      : null;
     paymentLog.debug(`receive.${method}.mint_resolved`, {
       source: resolution.source,
       anyMintSupports,
@@ -52,6 +64,8 @@ export function useReceiveMethodMint(
     return {
       mintUrl: resolution.mintUrl ?? undefined,
       source: resolution.source,
+      capability,
+      supported: !!capability?.supported && !capability.disabled,
       anyMintSupports,
     };
   }, [walletContext, explicit, method, unit]);

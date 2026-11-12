@@ -52,11 +52,16 @@ describe('DM envelope cursor', () => {
     expect(cursor.nextUntil()).toBe(700 + 1);
   });
 
-  it('forgets everything on reset', () => {
-    const cursor = createDmEnvelopeCursor();
-    cursor.track(page({ id: 'a', createdAt: 700 }));
-    cursor.reset();
-    expect(cursor.nextUntil()).toBeUndefined();
-    expect(cursor.track(page({ id: 'a', createdAt: 700 }))).toBe(1);
+  it('reads a wrap time sent as a numeric string the same as the number', () => {
+    const at = (createdAt: DmEnvelope['createdAt']) => {
+      const cursor = createDmEnvelopeCursor();
+      cursor.track(page({ id: 'a', createdAt }));
+      return cursor.nextUntil();
+    };
+    expect(at('1700000000')).toBe(at(1_700_000_000));
+    expect(at('1700000000000')).toBe(at(1_700_000_000_000));
+    expect(at('1700000000')).toBe(1_700_000_000 + 1);
+    // ISO strings still read as before.
+    expect(at('2023-11-14T22:13:20.000Z')).toBe(1_700_000_000 + 1);
   });
 });

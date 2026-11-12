@@ -32,7 +32,7 @@ type NfcWriteFailedNotificationData = Parameters<
   NonNullable<NotificationHandlerMap['onNfcWriteFailed']>
 >[0];
 
-type MachineEffectNotification =
+export type MachineEffectNotification =
   | {
       type: 'onPaymentConfirmed';
       data: PaymentConfirmedNotificationData;
@@ -50,7 +50,7 @@ type MachineEffectNotification =
       data: NfcWriteFailedNotificationData;
     };
 
-type MachineEffectLink = {
+export type MachineEffectLink = {
   type: 'linkTransaction';
   input: string;
   transactionId: string;
@@ -118,10 +118,7 @@ type ConfirmSendEffectSuccess =
       data: StepDataMap['chooseProofs'];
       context?: ConfirmSendContextPatch;
     }
-  | {
-      kind: 'stale';
-      context?: ConfirmSendContextPatch;
-    };
+  | { kind: 'stale' };
 
 type ConfirmSendEffectError = {
   kind: 'failed';
@@ -205,20 +202,6 @@ type MintReviewInfoEffectError = {
   data: StepDataMap['error'];
 };
 
-type TrustMintEffectSuccess =
-  | {
-      kind: 'completed';
-    }
-  | {
-      kind: 'stale';
-    };
-
-type TrustMintEffectError = {
-  kind: 'failed';
-  cause: unknown;
-  data: StepDataMap['error'];
-};
-
 type MintListEnrichmentEffectSuccess =
   | {
       kind: 'completed';
@@ -243,6 +226,12 @@ type NfcWriteBackEffectSuccess =
     }
   | {
       kind: 'stale';
+      /**
+       * Whether the write succeeded before the turn went stale. A write that
+       * began and failed is not delivered here, but its token is not taken
+       * back either: the terminal may hold it.
+       */
+      delivered: boolean;
     };
 
 type NfcWriteBackEffectError = {
@@ -250,6 +239,11 @@ type NfcWriteBackEffectError = {
   cause: unknown;
   data: StepDataMap['error'];
   rolledBack: boolean;
+  /**
+   * A token was made and could not be taken back: it may have reached the
+   * terminal, so the payment must not be offered again.
+   */
+  tokenOutstanding: boolean;
   notifications: MachineEffectNotification[];
 };
 
@@ -348,13 +342,6 @@ interface RunMintReviewInfoEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-interface RunTrustMintEffectConfig {
-  data: StepDataMap['reviewMint'];
-  operation: NonNullable<MachineOperations['trustMint']>;
-  getLocale: () => string;
-  isStale: (op: string) => boolean;
-}
-
 interface RunMintListEnrichmentEffectConfig {
   data: StepDataMap['selectMint'];
   operation: MachineOperations['buildMintListItems'];
@@ -369,6 +356,7 @@ interface RunNfcWriteBackEffectConfig {
   context: FlowContext;
   onProgress?: (data: NfcPaymentProgressNotificationData) => void;
   isStale: (op: string) => boolean;
+  locale?: string;
 }
 
 interface RunRecipientPubkeyEffectConfig {
@@ -490,34 +478,14 @@ function toMintReviewInfoEffectError(
   };
 }
 
-function toTrustMintEffectError(
-  cause: unknown,
+/** The error a mint out of reach throws, made here for work known to be offline. */
+function createOfflineError(
   locale: string,
-): TrustMintEffectError {
-  logger.warn('effects.trustMint.error', {
-    error: errField(cause),
-  });
-  return {
-    kind: 'failed',
-    cause,
-    data: {
-      code: 'UNSUPPORTED_INPUT',
-      message: t('TRUST_MINT_FAILED', locale),
-    },
-  };
-}
-
-function createOfflineMintQuoteError(locale: string): Error {
+  logEvent: 'effects.mintQuote.offlineBlocked' | 'effects.send.offlineErrorCreated',
+): Error {
   const error = new Error(t('MINT_UNREACHABLE', locale));
   error.name = 'MintFetchError';
-  logger.info('effects.mintQuote.offlineBlocked');
-  return error;
-}
-
-function createOfflineSendError(locale: string): Error {
-  const error = new Error(t('MINT_UNREACHABLE', locale));
-  error.name = 'MintFetchError';
-  logger.info('effects.send.offlineErrorCreated');
+  logger.info(logEvent);
   return error;
 }
 
@@ -655,7 +623,10 @@ function buildConfirmMeltResult(
   return {
     kind: 'completed',
     step: 'navigateToMeltPreview',
-    data: { ...data, historyEntry: result.historyEntry },
+    data: {
+      ...data,
+      phase: { kind: 'settled', historyEntry: result.historyEntry },
+    },
     links,
     notifications,
   };
@@ -718,7 +689,10 @@ function buildConfirmPaymentRequestResult(
   return {
     kind: 'completed',
     step: 'navigateToPaymentRequest',
-    data: { ...data, historyEntry: result.historyEntry },
+    data: {
+      ...data,
+      phase: { kind: 'settled', historyEntry: result.historyEntry },
+    },
     links,
     notifications,
   };
@@ -796,12 +770,19 @@ function buildNfcWriteBackError(args: {
   cause: unknown;
   rolledBack: boolean;
   stage: 'prepare' | 'write';
+  locale: string;
 }): NfcWriteBackEffectError {
-  const { message, authored } = failureText(args.cause, 'NFC write failed');
+  const tokenOutstanding = args.stage === 'write' && !args.rolledBack;
+  // The cause is logged below; what the person needs is that the payment
+  // may have gone out.
+  const { message, authored } = tokenOutstanding
+    ? { message: t('NFC_WRITE_OUTCOME_UNKNOWN', args.locale), authored: true }
+    : failureText(args.cause, 'NFC write failed');
 
   logger.warn('effects.nfcWriteBack.error', {
     rolledBack: args.rolledBack,
     stage: args.stage,
+    tokenOutstanding,
     error: errField(args.cause),
   });
 
@@ -809,6 +790,7 @@ function buildNfcWriteBackError(args: {
     kind: 'failed',
     cause: args.cause,
     rolledBack: args.rolledBack,
+    tokenOutstanding,
     data: {
       code: 'NFC_WRITE_FAILED',
       message,
@@ -889,7 +871,7 @@ function executeSendOperation(
   operation: SendOperation,
   data: StepDataMap['confirmSend'],
   options?: { p2pkLockPubkey?: string; p2pkLock?: P2pkLockSpec },
-  path: ConfirmSendEffectPath | 'forcedLocalProbe' = 'online',
+  path: ConfirmSendEffectPath = 'online',
 ): ResultAsync<SendOperationResult, unknown> {
   logger.info('effects.sendOperation.start', {
     path,
@@ -1071,10 +1053,7 @@ function handleConfirmSendFailure(args: {
               op: 'executeOfflineSend',
               path: 'offlineFallback',
             });
-            return okAsync({
-              kind: 'stale',
-              ...(contextPatch ? { context: contextPatch } : {}),
-            } as const);
+            return okAsync({ kind: 'stale' } as const);
           }
 
           return okAsync(
@@ -1086,7 +1065,6 @@ function handleConfirmSendFailure(args: {
               contextPatch,
               createdOffline: true,
               mintWasOffline:
-                contextPatch?.mintUnreachableConfirmed === true ||
                 effectiveContext.mintUnreachableConfirmed === true,
             }),
           );
@@ -1097,10 +1075,7 @@ function handleConfirmSendFailure(args: {
               op: 'executeOfflineSend.catch',
               path: 'offlineFallback',
             });
-            return okAsync({
-              kind: 'stale',
-              ...(contextPatch ? { context: contextPatch } : {}),
-            } as const);
+            return okAsync({ kind: 'stale' } as const);
           }
 
           return errAsync(
@@ -1183,7 +1158,11 @@ export function runMintQuoteEffect({
       unit: data.unit,
     });
     return errAsync(
-      toMintQuoteEffectError(createOfflineMintQuoteError(locale), data, locale),
+      toMintQuoteEffectError(
+        createOfflineError(locale, 'effects.mintQuote.offlineBlocked'),
+        data,
+        locale,
+      ),
     );
   }
 
@@ -1384,7 +1363,7 @@ export function runConfirmMeltEffect({
  * quote's `fee_reserve` and mint-quoted amount are what the confirm screen
  * displays; `confirmMelt` later executes against the same quote. Best-effort
  * by contract of the caller: a failure must NOT block navigation — the
- * preview degrades to today's pay-then-quote shape instead.
+ * preview opens without a quote and Pay creates one as it executes.
  */
 export function runMeltQuotePreviewEffect({
   data,
@@ -1607,46 +1586,6 @@ export function runMintReviewInfoEffect({
     });
 }
 
-export function runTrustMintEffect({
-  data,
-  operation,
-  getLocale,
-  isStale,
-}: RunTrustMintEffectConfig): ResultAsync<
-  TrustMintEffectSuccess,
-  TrustMintEffectError
-> {
-  const locale = getLocale();
-
-  logger.info('effects.trustMint.start', {
-    ...mintUrlFields(data.mintUrl),
-  });
-
-  return ResultAsync.fromThrowable(
-    () => operation(data.mintUrl),
-    (cause) => toTrustMintEffectError(cause, locale),
-  )()
-    .andThen(() => {
-      if (isStale('trustMint')) {
-        logger.info('effects.trustMint.stale', { op: 'trustMint' });
-        return okAsync({ kind: 'stale' } as const);
-      }
-      logger.info('effects.trustMint.completed', { ...mintUrlFields(data.mintUrl) });
-      return okAsync({ kind: 'completed' } as const);
-    })
-    .orElse((failure) => {
-      if (isStale('trustMint.catch')) {
-        logger.info('effects.trustMint.stale', { op: 'trustMint.catch' });
-        return okAsync({ kind: 'stale' } as const);
-      }
-      logger.warn('effects.trustMint.failed', {
-        ...mintUrlFields(data.mintUrl),
-        error: errField(failure.cause),
-      });
-      return errAsync(failure);
-    });
-}
-
 export function runMintListEnrichmentEffect({
   data,
   operation,
@@ -1714,6 +1653,7 @@ export function runNfcWriteBackEffect({
   context,
   onProgress,
   isStale,
+  locale = 'en',
 }: RunNfcWriteBackEffectConfig): ResultAsync<
   NfcWriteBackEffectSuccess,
   NfcWriteBackEffectError
@@ -1727,9 +1667,53 @@ export function runNfcWriteBackEffect({
     context: summarizeContext(context),
   });
 
+  // The write-back holds the tag session from here and lets it go on every
+  // way out, a stale one included: no one else releases it. A release that
+  // fails is logged; the session is gone either way.
+  const releaseSession = async (failurePath: boolean): Promise<void> => {
+    try {
+      await nfcAdapter.releaseSession();
+      logger.info('effects.nfcWriteBack.release.completed', { failurePath });
+    } catch (releaseErr) {
+      logger.warn('effects.nfcWriteBack.release.failed', {
+        failurePath,
+        error: errField(releaseErr),
+      });
+    }
+  };
+
+  // Takes back a token that never reached the tag. Best-effort: a failure is
+  // logged, and whether it worked is what the caller can report. A take-back
+  // that could not tell what happened leaves the token outstanding.
+  const rollBack = async (
+    operationId: string,
+    stale: boolean,
+  ): Promise<boolean> => {
+    if (!rollbackSend) return false;
+    try {
+      const result = await rollbackSend(operationId);
+      logger.info('effects.nfcWriteBack.rollback.completed', {
+        stale,
+        operationIdPresent: operationId.length > 0,
+        result: result.kind,
+        ...(result.kind === 'unknown' ? { reason: result.reason } : {}),
+      });
+      return result.kind !== 'unknown';
+    } catch (rollbackErr) {
+      logger.warn('effects.nfcWriteBack.rollback.failed', {
+        stale,
+        operationIdPresent: operationId.length > 0,
+        error: errField(rollbackErr),
+      });
+      return false;
+    }
+  };
+
   return ResultAsync.fromPromise(
     (async () => {
       let nfcSendResult: NfcSendOperationResult | null = null;
+      // From here the terminal may hold the token, whatever the write reports.
+      let writeStarted = false;
 
       try {
         logger.info('effects.nfcWriteBack.progress', { phase: 'creating' });
@@ -1743,34 +1727,37 @@ export function runNfcWriteBackEffect({
           operationIdPresent: nfcSendResult.operationId.length > 0,
           ...summarizeHistoryEntry(nfcSendResult.historyEntry),
         });
+        // Overtaken with a token that is not on the tag: take it back, as a
+        // failed write does, and leave the machine to whoever overtook it.
         if (isStale('executeNfcSend')) {
           logger.info('effects.nfcWriteBack.stale', { op: 'executeNfcSend' });
-          return { kind: 'stale' } as const;
+          await rollBack(nfcSendResult.operationId, true);
+          await releaseSession(false);
+          return { kind: 'stale', delivered: false } as const;
         }
 
         logger.info('effects.nfcWriteBack.progress', { phase: 'writing' });
         onProgress?.({ phase: 'writing' });
+        writeStarted = true;
         await nfcAdapter.writeToken(nfcSendResult.token);
-        if (isStale('nfc.writeToken')) {
-          logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
-          return { kind: 'stale' } as const;
-        }
-
-        await nfcAdapter.releaseSession();
-        if (isStale('nfc.releaseSession')) {
-          logger.info('effects.nfcWriteBack.stale', {
-            op: 'nfc.releaseSession',
-          });
-          return { kind: 'stale' } as const;
-        }
-
-        return buildNfcWriteBackResult(nfcSendResult, data, context);
       } catch (cause) {
         if (isStale('executeNfcSend.catch')) {
           logger.info('effects.nfcWriteBack.stale', {
             op: 'executeNfcSend.catch',
+            writeStarted,
           });
-          return { kind: 'stale' } as const;
+          // A write that began and then failed may still have reached the
+          // terminal (its last acknowledgement can be lost): the outcome is
+          // unknown, and taking the token back could undo a payment made.
+          // The reset that overtook the tap already left nothing that could
+          // rebuild it.
+          if (nfcSendResult && !writeStarted) {
+            await rollBack(nfcSendResult.operationId, true);
+          } else if (writeStarted) {
+            logger.warn('effects.nfcWriteBack.outcomeUnknown', { stale: true });
+          }
+          await releaseSession(true);
+          return { kind: 'stale', delivered: false } as const;
         }
 
         logger.warn('effects.nfcWriteBack.failed', {
@@ -1779,41 +1766,32 @@ export function runNfcWriteBackEffect({
           error: errField(cause),
         });
 
-        let rolledBack = false;
-        if (nfcSendResult && rollbackSend) {
-          try {
-            await rollbackSend(nfcSendResult.operationId);
-            rolledBack = true;
-            logger.info('effects.nfcWriteBack.rollback.completed', {
-              operationIdPresent: nfcSendResult.operationId.length > 0,
-            });
-          } catch (rollbackErr) {
-            logger.warn('effects.nfcWriteBack.rollback.failed', {
-              operationIdPresent: nfcSendResult.operationId.length > 0,
-              error: errField(rollbackErr),
-            });
-            // Rollback is best-effort; the caller still needs the write failure.
-          }
-        }
+        // Rollback is best-effort; the caller still needs the write failure.
+        const rolledBack = nfcSendResult
+          ? await rollBack(nfcSendResult.operationId, false)
+          : false;
 
-        try {
-          await nfcAdapter.releaseSession();
-          logger.info('effects.nfcWriteBack.release.completed', {
-            failurePath: true,
-          });
-        } catch (releaseErr) {
-          logger.warn('effects.nfcWriteBack.release.failed', {
-            error: errField(releaseErr),
-          });
-          // Release is idempotent and best-effort on the failure path.
-        }
+        await releaseSession(true);
 
         throw buildNfcWriteBackError({
           cause,
           rolledBack,
           stage: nfcSendResult ? 'write' : 'prepare',
+          locale,
         });
       }
+
+      // The tag holds the token and the receiver may already have redeemed
+      // it: the payment is delivered, also when a reset overtook the write. A
+      // session that will not close undoes nothing; taking the ecash back now
+      // could fail and leave the payment unrecorded, for Pay to send again.
+      await releaseSession(false);
+      if (isStale('nfc.writeToken')) {
+        logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
+        return { kind: 'stale', delivered: true } as const;
+      }
+
+      return buildNfcWriteBackResult(nfcSendResult, data, context);
     })(),
     (cause) => cause as NfcWriteBackEffectError,
   );
@@ -2007,7 +1985,7 @@ export function runConfirmSendEffect({
     });
     return errAsync({
       kind: 'failed',
-      cause: createOfflineSendError(locale),
+      cause: createOfflineError(locale, 'effects.send.offlineErrorCreated'),
       data: {
         code: 'SEND_FAILED',
         message: t('MINT_UNREACHABLE', locale),
@@ -2063,7 +2041,7 @@ export function runConfirmSendEffect({
       localProofSend: context.localProofSend === true,
     });
     return handleConfirmSendFailure({
-      cause: createOfflineSendError(locale),
+      cause: createOfflineError(locale, 'effects.send.offlineErrorCreated'),
       config,
       locale,
       forceLocalSend,

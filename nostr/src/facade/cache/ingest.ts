@@ -136,7 +136,8 @@ export function ingestSearchHits(
       stats.followingCount === undefined &&
       stats.score === undefined &&
       stats.rank === undefined &&
-      stats.operatesMints === undefined
+      stats.operatesMints === undefined &&
+      stats.operatesAiProviders === undefined
     ) {
       continue;
     }

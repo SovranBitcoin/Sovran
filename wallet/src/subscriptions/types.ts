@@ -13,9 +13,10 @@ export type SubscriptionEventType =
   | 'mintSelector.itemAdded'
   | 'screenActions.changed';
 
-export type ScreenActionsChangedReason =
+type ScreenActionsChangedReason =
   | 'scanHistory'
   | 'transactionDistribution'
+  | 'transactionAnnotation'
   | 'settings'
   | 'offline'
   | 'unknown';
@@ -104,7 +105,7 @@ export type SubscriptionListener<E extends ColadaSubscriptionEvent = ColadaSubsc
   event: E,
 ) => void;
 
-export type SubscriptionEventForType<T extends SubscriptionEventType> = Extract<
+type SubscriptionEventForType<T extends SubscriptionEventType> = Extract<
   ColadaSubscriptionEvent,
   { type: T }
 >;

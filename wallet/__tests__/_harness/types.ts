@@ -22,6 +22,7 @@ import type {
   PaymentMachine,
   MachineOperations,
   NfcIOAdapter,
+  StepDataMap,
 } from '../../src/machine/types';
 import type { Detectors, PaymentOptionKind, WalletContext } from '../../src/types';
 
@@ -121,6 +122,8 @@ export interface TestMachine {
   assertContext(matcher: Partial<FlowContext>): void;
   /** Assert execution state matches expected fields. */
   assertExecution(matcher: Partial<ExecutionState>): void;
+  /** Assert the machine is at `error` with step data matching these fields. */
+  assertError(matcher: Partial<StepDataMap['error']>): void;
 
   /** All step handler calls, in order. */
   handlerCalls: HandlerCall[];
@@ -174,8 +177,6 @@ export type FlowAction =
   | { type: 'confirmPaymentRequest' }
   /** App initiates mint trust review (untrusted mint detected). */
   | { type: 'reviewMint'; mintUrl: string; token: string }
-  /** User trusts the mint after reviewing. */
-  | { type: 'mintTrusted' }
   /** User taps Cancel / Back — reset to idle. */
   | { type: 'reset' };
 

@@ -86,11 +86,12 @@ export function WalletScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
-  // While a multi-leg swap is running, every payment-initiating button on
-  // this screen is gated. Coco's mint/melt services serialize through a
-  // per-instance lock, and the user kicking off a Send/Receive/Swap/Split
-  // Bill in parallel can stall the swap or surface "operation already in
-  // progress" errors. Greying out is the cheapest user-visible indicator.
+  // While a multi-leg swap is running, Receive, Send, Scan and Split on this
+  // screen are gated (the ambient NFC listener is not). Coco's mint/melt
+  // services serialize through a per-instance lock, and the user kicking off a
+  // Send/Receive/Swap/Split Bill in parallel can stall the swap or surface
+  // "operation already in progress" errors. Greying out is the cheapest
+  // user-visible indicator.
   const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
   const handleReceive = () => {
@@ -224,12 +225,6 @@ export function WalletScreen() {
     },
   };
 
-  const renderBalance = (floorScale: number) => (
-    <LayoutShiftProbe tag="account-carousel">
-      <Account minHeight={minBalanceHeight * floorScale} />
-    </LayoutShiftProbe>
-  );
-
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.
   return (
@@ -248,7 +243,15 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <HomeTop actions={actions} renderBalance={renderBalance} paymentsLocked={isSwapping} />
+            <HomeTop
+              actions={actions}
+              balance={
+                <LayoutShiftProbe tag="account-carousel">
+                  <Account minHeight={minBalanceHeight} />
+                </LayoutShiftProbe>
+              }
+              paymentsLocked={isSwapping}
+            />
           </View>
 
           <View

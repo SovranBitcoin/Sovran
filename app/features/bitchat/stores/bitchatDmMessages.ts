@@ -4,22 +4,142 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { bitchatLog } from '@/shared/lib/logger';
-import type {
-  BLEDeliveryStatus,
-  BLEDeliveryStatusEvent,
-  BLEPrivateMessageEvent,
-  ChatMessage,
-} from 'bitchat-module';
+import type { BLEDeliveryStatusEvent, BLEPrivateMessageEvent, ChatMessage } from 'bitchat-module';
 
 const MESSAGE_BUFFER_CAP = 500;
 
 type BleDmDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface BleDmMessage extends ChatMessage {
-  /** Status only set on own (outbound) messages. */
+  /** Status only set on own (outbound) messages. Read through `decodeDelivery`. */
   deliveryStatus?: BleDmDeliveryStatus;
-  /** When `deliveryStatus === 'failed'`, the reason string the native side sent. */
+  /** When `deliveryStatus === 'failed'`, the reason: the native side's, or `timeout` / `app_restart`. */
   failureReason?: string;
+}
+
+/** Why no report settled a message: the 15 s watchdog fired, or the app restarted first. */
+type UnconfirmedWhy = 'timeout' | 'app_restart';
+
+/**
+ * Where an own message's delivery stands. Saved as `deliveryStatus`,
+ * `failureReason` and `isPending` exactly as before (`encodeDelivery`), so an
+ * older release reads every message a newer one saves.
+ */
+type BleDmDelivery =
+  | { state: 'sending' }
+  | { state: 'sent' }
+  | { state: 'delivered' }
+  | { state: 'read' }
+  /** No report came in time. Saved as `failed` with `why` as the reason. */
+  | { state: 'unconfirmed'; why: UnconfirmedWhy }
+  /** The native side reported a failure or refused the send. */
+  | { state: 'failed'; reason: string | undefined };
+
+type DeliveryEvent =
+  | { type: 'sending' | 'sent' | 'delivered' | 'read' }
+  | { type: 'failed'; reason: string | undefined }
+  /** The 15 s watchdog fired. */
+  | { type: 'timed-out' }
+  /** The app started again with the message saved. */
+  | { type: 'relaunched' };
+
+/**
+ * Which events move each state; any other is refused. Reports only move
+ * forward (sending → sent → delivered → read), and a delivered or read report
+ * wins over every failure.
+ */
+const MOVES: Record<BleDmDelivery['state'], readonly DeliveryEvent['type'][]> = {
+  sending: ['sent', 'delivered', 'read', 'failed', 'timed-out', 'relaunched'],
+  sent: ['delivered', 'read', 'failed', 'relaunched'],
+  // The peer acknowledged it: final, a late failure included (owner's ruling, 2026-11-11).
+  delivered: ['read'],
+  read: [],
+  // The 15 s mark and a restart mean "not confirmed yet": a later report
+  // wins (owner's ruling, 2026-11-11). Until one comes it offers a retry.
+  unconfirmed: ['sent', 'delivered', 'read', 'failed'],
+  // A new reason replaces the old one. A delivered or read report is proof
+  // the peer has it, so it wins over a failure, whichever came first (owner's ruling).
+  failed: ['failed', 'delivered', 'read'],
+};
+
+function stateAfter(event: DeliveryEvent): BleDmDelivery {
+  switch (event.type) {
+    case 'sending':
+    case 'sent':
+    case 'delivered':
+    case 'read':
+      return { state: event.type };
+    case 'failed':
+      return { state: 'failed', reason: event.reason };
+    case 'timed-out':
+      return { state: 'unconfirmed', why: 'timeout' };
+    case 'relaunched':
+      return { state: 'unconfirmed', why: 'app_restart' };
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+}
+
+/**
+ * The state `event` moves `current` to, or null when the table refuses it. A
+ * message saved with no status counts as sending for a native report, as every
+ * own message starts; the watchdog and a relaunch leave it alone.
+ */
+function nextDelivery(current: BleDmDelivery | null, event: DeliveryEvent): BleDmDelivery | null {
+  const from =
+    current ?? (event.type === 'timed-out' || event.type === 'relaunched' ? null : SENDING);
+  return from && MOVES[from.state].includes(event.type) ? stateAfter(event) : null;
+}
+
+const SENDING: BleDmDelivery = { state: 'sending' };
+
+/** A saved message's delivery, or null when it carries no status (inbound messages). */
+function decodeDelivery(
+  message: Pick<BleDmMessage, 'deliveryStatus' | 'failureReason'>
+): BleDmDelivery | null {
+  const { deliveryStatus, failureReason } = message;
+  switch (deliveryStatus) {
+    case undefined:
+      return null;
+    case 'sending':
+    case 'sent':
+    case 'delivered':
+    case 'read':
+      return { state: deliveryStatus };
+    case 'failed':
+      return failureReason === 'timeout' || failureReason === 'app_restart'
+        ? { state: 'unconfirmed', why: failureReason }
+        : { state: 'failed', reason: failureReason };
+    default: {
+      const unreachable: never = deliveryStatus;
+      return unreachable;
+    }
+  }
+}
+
+/** The saved fields for `delivery`, as every release has written them. */
+function encodeDelivery(
+  delivery: BleDmDelivery
+): Required<Pick<BleDmMessage, 'deliveryStatus' | 'isPending'>> &
+  Pick<BleDmMessage, 'failureReason'> {
+  switch (delivery.state) {
+    case 'sending':
+      return { deliveryStatus: 'sending', isPending: true, failureReason: undefined };
+    case 'sent':
+    case 'delivered':
+    case 'read':
+      return { deliveryStatus: delivery.state, isPending: false, failureReason: undefined };
+    case 'unconfirmed':
+      return { deliveryStatus: 'failed', isPending: false, failureReason: delivery.why };
+    case 'failed':
+      return { deliveryStatus: 'failed', isPending: false, failureReason: delivery.reason };
+    default: {
+      const unreachable: never = delivery;
+      return unreachable;
+    }
+  }
 }
 
 interface BitchatDmMessagesStore {
@@ -29,45 +149,72 @@ interface BitchatDmMessagesStore {
   appendIncoming(event: BLEPrivateMessageEvent): void;
   /** Add an optimistic outbound DM (status `'sending'`) before native dispatch. */
   appendOutgoing(message: BleDmMessage, peerID: string): void;
-  /** Update an outbound message's delivery status when the native event fires. */
+  /** Move an outbound message on a native delivery status, as the table allows. */
   applyDeliveryStatus(event: BLEDeliveryStatusEvent): void;
-  /** Get the current thread for a peer (stable reference until next change). */
-  getForPeer(peerID: string): BleDmMessage[];
-  /** Reset a thread (e.g. when the user clears the conversation). */
-  clearForPeer(peerID: string): void;
+  /** The 15 s watchdog fired for `messageID`; true when that moved the message. */
+  markTimedOut(messageID: string): boolean;
 }
 
-function mapStatus(status: BLEDeliveryStatus): BleDmDeliveryStatus {
-  bitchatLog.debug('bitchat.dm.status.map', { nativeStatus: status });
-  switch (status) {
+function reportedEvent(event: BLEDeliveryStatusEvent): DeliveryEvent {
+  bitchatLog.debug('bitchat.dm.status.map', { nativeStatus: event.status });
+  switch (event.status) {
     case 'sending':
-      return 'sending';
     case 'sent':
-      return 'sent';
     case 'delivered':
-      return 'delivered';
     case 'read':
-      return 'read';
+      return { type: event.status };
     case 'failed':
-      return 'failed';
+      return { type: 'failed', reason: event.reason };
     case 'partiallyDelivered':
       // 1:1 DM should never see partial — treat as sent.
-      return 'sent';
+      return { type: 'sent' };
   }
 }
 
 /**
- * Status progression: sending → sent → delivered → read. Never downgrade
- * (a late 'sent' arriving after we've already seen 'delivered' would otherwise
- * undo the better signal). `failed` always wins so users see transport errors.
+ * `byPeer` with the message `messageID` moved by `event`, or null when no
+ * thread holds it or the table refuses the move. Outbound messages are keyed
+ * by counterparty, but a delivery status carries only the message id, so
+ * every thread is searched.
  */
-const STATUS_RANK: Record<BleDmDeliveryStatus, number> = {
-  sending: 0,
-  sent: 1,
-  delivered: 2,
-  read: 3,
-  failed: 4,
-};
+function moveDelivery(
+  byPeer: Record<string, BleDmMessage[]>,
+  messageID: string,
+  event: DeliveryEvent
+): Record<string, BleDmMessage[]> | null {
+  for (const [peer, thread] of Object.entries(byPeer)) {
+    const idx = thread.findIndex((m) => m.id === messageID);
+    if (idx < 0) continue;
+    const message = thread[idx]!;
+    const current = decodeDelivery(message);
+    const next = nextDelivery(current, event);
+    if (!next) {
+      bitchatLog.debug('bitchat.dm.delivery_status.skipped_downgrade', {
+        peerID: peer,
+        messageId: messageID,
+        previousStatus: current?.state ?? 'sending',
+        incoming: event.type,
+      });
+      return null;
+    }
+    const updated = thread.slice();
+    updated[idx] = { ...message, ...encodeDelivery(next) };
+    bitchatLog.info('bitchat.dm.delivery_status.updated', {
+      peerID: peer,
+      messageId: messageID,
+      previousStatus: current?.state ?? 'sending',
+      nextStatus: next.state,
+      hasFailureReason: next.state === 'failed' && !!next.reason,
+    });
+    return { ...byPeer, [peer]: updated };
+  }
+  bitchatLog.debug('bitchat.dm.delivery_status.no_match_or_noop', {
+    messageId: messageID,
+    incoming: event.type,
+    peerCount: Object.keys(byPeer).length,
+  });
+  return null;
+}
 
 function appendCapped(prev: BleDmMessage[], msg: BleDmMessage): BleDmMessage[] {
   if (prev.some((m) => m.id === msg.id)) {
@@ -137,11 +284,12 @@ type PersistedSlice = Pick<BitchatDmMessagesStore, 'byPeer'>;
  *
  * Persisted to AsyncStorage so chat history survives app kill. On rehydrate,
  * any outbound message still in `sending` / `sent` (without a `delivered`
- * ack) is downgraded to `failed` with reason `'app_restart'` — we can't
- * know whether it actually reached the peer between the last write and the
- * relaunch, so we surface the ambiguity rather than show a misleading
- * "in flight" forever. The user can tap the failed bubble to retry, which
- * starts a fresh handshake and sends with a new messageID.
+ * ack) becomes unconfirmed, saved as `failed` with reason `'app_restart'` —
+ * we can't know whether it actually reached the peer between the last write
+ * and the relaunch, so we surface the ambiguity rather than show a misleading
+ * "in flight" forever. A delivery report that still arrives wins. The user can
+ * tap the failed bubble to retry, which starts a fresh handshake and sends
+ * with a new messageID.
  *
  * Native-side `DmPeerSummary` (UserDefaults-backed in `BitChatBLEBridge.swift`)
  * remains the source of truth for the Contacts-tab Recent/All entries — this
@@ -193,78 +341,21 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
         }));
       },
       applyDeliveryStatus: (event) => {
-        const incoming = mapStatus(event.status);
         bitchatLog.info('bitchat.dm.delivery_status.apply', {
           messageId: event.messageID,
-          incoming,
           nativeStatus: event.status,
           hasReason: !!event.reason,
         });
         set((state) => {
-          // Outbound messages are keyed by `peerID === counterparty`, but the
-          // delivery status event carries only `messageID`. Find which peer's
-          // thread holds the matching id.
-          const next: Record<string, BleDmMessage[]> = {};
-          let mutated = false;
-          for (const [peer, thread] of Object.entries(state.byPeer)) {
-            let updated = thread;
-            const idx = thread.findIndex((m) => m.id === event.messageID);
-            if (idx >= 0) {
-              const current = thread[idx]!;
-              const currentRank = STATUS_RANK[current.deliveryStatus ?? 'sending'];
-              // Never downgrade (e.g. a late `sent` after we already saw
-              // `delivered`); always accept `failed` so the user can see it.
-              if (incoming === 'failed' || STATUS_RANK[incoming] > currentRank) {
-                updated = thread.slice();
-                updated[idx] = {
-                  ...current,
-                  deliveryStatus: incoming,
-                  isPending: incoming === 'sending',
-                  failureReason: incoming === 'failed' ? event.reason : undefined,
-                };
-                mutated = true;
-                bitchatLog.info('bitchat.dm.delivery_status.updated', {
-                  peerID: peer,
-                  messageId: event.messageID,
-                  previousStatus: current.deliveryStatus ?? 'sending',
-                  nextStatus: incoming,
-                  hasFailureReason: incoming === 'failed' && !!event.reason,
-                });
-              } else {
-                bitchatLog.debug('bitchat.dm.delivery_status.skipped_downgrade', {
-                  peerID: peer,
-                  messageId: event.messageID,
-                  previousStatus: current.deliveryStatus ?? 'sending',
-                  incoming,
-                });
-              }
-            }
-            next[peer] = updated;
-          }
-          if (!mutated) {
-            bitchatLog.debug('bitchat.dm.delivery_status.no_match_or_noop', {
-              messageId: event.messageID,
-              incoming,
-              peerCount: Object.keys(state.byPeer).length,
-            });
-          }
-          return mutated ? { byPeer: next } : state;
+          const byPeer = moveDelivery(state.byPeer, event.messageID, reportedEvent(event));
+          return byPeer ? { byPeer } : state;
         });
       },
-      getForPeer: (peerID) => get().byPeer[peerID] ?? [],
-      clearForPeer: (peerID) =>
-        set((state) => {
-          if (!state.byPeer[peerID]) {
-            bitchatLog.debug('bitchat.dm.thread.clear.skipped_missing', { peerID });
-            return state;
-          }
-          const { [peerID]: _removed, ...rest } = state.byPeer;
-          bitchatLog.info('bitchat.dm.thread.clear', {
-            peerID,
-            removedCount: state.byPeer[peerID]?.length ?? 0,
-          });
-          return { byPeer: rest };
-        }),
+      markTimedOut: (messageID) => {
+        const byPeer = moveDelivery(get().byPeer, messageID, { type: 'timed-out' });
+        if (byPeer) set({ byPeer });
+        return !!byPeer;
+      },
     }),
     persistConfig<BitchatDmMessagesStore, PersistedSlice>({
       name: 'bitchat-dm-messages-store',
@@ -272,7 +363,7 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
       schema: PersistedBitchatDmStore,
       partialize: (state) => ({ byPeer: state.byPeer }),
       afterHydrate: (state) => {
-        // Demote any in-flight outbound messages to `failed`. We don't know
+        // Mark any in-flight outbound messages unconfirmed. We don't know
         // whether they actually made it to the peer between the last write
         // and the relaunch — better to flag the ambiguity than show a
         // permanent spinner. Inbound messages and already-delivered/read
@@ -287,17 +378,11 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
         for (const [peer, thread] of Object.entries(state.byPeer)) {
           let changed = false;
           const updated = thread.map((m) => {
-            if (m.isOwn && (m.deliveryStatus === 'sending' || m.deliveryStatus === 'sent')) {
-              changed = true;
-              demotedCount += 1;
-              return {
-                ...m,
-                deliveryStatus: 'failed' as const,
-                isPending: false,
-                failureReason: 'app_restart',
-              };
-            }
-            return m;
+            const next = m.isOwn ? nextDelivery(decodeDelivery(m), { type: 'relaunched' }) : null;
+            if (!next) return m;
+            changed = true;
+            demotedCount += 1;
+            return { ...m, ...encodeDelivery(next) };
           });
           if (changed) {
             mutated = true;

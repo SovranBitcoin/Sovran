@@ -77,7 +77,8 @@ Source paths are relative to the Colada package root.
 | Platform adapters (clipboard, share, NFC, scan sources) | the app owns | `src/adapters/types.ts` |
 | Secret storage, seed derivation, P2PK key rotation policy | the app owns | reacts to `onP2PKReceiveCompleted` |
 | `linkTransaction`, `sendNostrDM`, `resolveRecipientProfile` | the app owns | not implemented in `defaultOperations.ts:10-11` |
-| Offline detection source (`getOffline`) | the app owns the value; Colada owns the routing | `src/core/createColada.ts`, `effects.ts:1181` |
+| `executeReceive`, `executeMintQuote` | the app wires them | built by `createExecuteReceive` / `createExecuteMintQuote` in `src/operations/receiveOperations.ts`; `defaultOperations.ts` has neither |
+| Offline detection source (`getOffline`) | the app owns the value; Colada owns the routing | `src/core/createColada.ts`, `runConfirmSendEffect` in `effects.ts` |
 
 Colada is agnostic of `@cashu/coco-core`: `ScreenActionContext.manager` is typed
 `unknown` and the wallet casts it (`src/screen-actions/types.ts`). Colada must
@@ -94,37 +95,38 @@ fall back to an unlocked token. Lightning/onchain choices discard an editable
 ecash lock. Protocol-seeded locks remain authoritative when the amount screen
 does not own the choice.
 
-`FlowStep` (`src/machine/types.ts:19-38`). Terminal here means
-`deriveExecutionState` settles it to `ready`/`READY` or `blocked` and no further
-machine transition is expected from the step itself.
+`FlowStep` (`src/machine/types.ts:19-38`). Terminal here means no further
+machine transition is expected from the step itself. `inspect()` reports the
+step, `isExecuting`, and the step's data as `details` on an input step and on
+`error`.
 
 | Step | Purpose | Input step | Terminal |
 | --- | --- | --- | --- |
-| `idle` | Reset resting state; `ready`/`READY`, `isExecutable:true`. No handler. | no | no |
-| `chooseOption` | BIP321 multi-option selection. `needsInput`/`OPTION_SELECTION_REQUIRED`. | yes | no |
-| `chooseFallbackOption` | BIP321 fallback after an option failed. `FALLBACK_OPTION_REQUIRED`. | yes | no |
-| `enterAmount` | Amount entry. `needsInput`/`NO_AMOUNT`. | yes | no |
-| `selectMint` | Mint selection. `MINT_SELECTION_REQUIRED`. Seeds fallback rows, runs `operations.buildMintListItems`. | yes | no |
-| `chooseProofs` | Offline proof round-up/round-down. `PROOF_SELECTION_REQUIRED`. | yes | no |
-| `enterSendMemo` | Optional ecash token memo (only when `enableEcashSendMemo`). `SEND_MEMO_REQUIRED`. | yes | no |
+| `idle` | Reset resting state. No handler. | no | no |
+| `chooseOption` | BIP321 multi-option selection. | yes | no |
+| `chooseFallbackOption` | BIP321 fallback after an option failed. | yes | no |
+| `enterAmount` | Amount entry. | yes | no |
+| `selectMint` | Mint selection. Seeds fallback rows, runs `operations.buildMintListItems`. | yes | no |
+| `chooseProofs` | Offline proof round-up/round-down. | yes | no |
+| `enterSendMemo` | Optional ecash token memo (only when `enableEcashSendMemo`). | yes | no |
 | `confirmSend` | Action step for ecash send. Intercepted -> `runConfirmSendEffect`. | no | no (internal) |
 | `sendComplete` | Terminal success of ecash send. Carries `historyEntry`, `createdOffline?`, `mintWasOffline?`. | no | yes |
 | `createMintQuote` | Action step for Lightning receive. Intercepted -> `runMintQuoteEffect`. | no | no (internal) |
 | `mintQuoteCreated` | Terminal success of mint-quote creation. | no | yes |
-| `navigateToMeltPreview` | Lightning melt preview/confirm; `CONFIRM_MELT` executes in place. | no | yes |
-| `navigateToPaymentRequest` | Payment-request preview/confirm; `CONFIRM_PAYMENT_REQUEST` executes in place. NFC auto-execute target. | no | yes |
-| `receiveToken` | Token redeem step. Reached from intent and from `MINT_TRUSTED`. | no | yes |
+| `navigateToMeltPreview` | Lightning melt preview/confirm; `CONFIRM_MELT` executes in place. Carries `phase`: `preview` or `settled {historyEntry}`. | no | yes |
+| `navigateToPaymentRequest` | Payment-request preview/confirm; `CONFIRM_PAYMENT_REQUEST` executes in place. Carries `phase`: `preview`, `settled {historyEntry}` or `undelivered {operationId}`. NFC auto-execute target. | no | yes |
+| `receiveToken` | Token redeem step. Reached from intent. | no | yes |
 | `reviewMint` | Mint trust-review before redeeming from an untrusted mint. | no | yes |
 | `openMint` | Open a mint info screen (non-trust-review). | no | yes |
 | `openProfile` | Open a Nostr profile screen. | no | yes |
 | `navigateToReceive` | Open the receive hub (`START_RECEIVE`). | no | yes |
 | `dismiss` | Persist-only / dismiss terminal (`MINT_SELECTED` with no destination). | no | yes |
-| `error` | Error terminal. `deriveExecutionState` -> `blocked`. Dispatches `notifications[code]`. | no | yes |
+| `error` | Error terminal; its data (`code`, `message`, `data`) is `inspect().details`. Dispatches `notifications[code]`. | no | yes |
 
-`confirmSend` and `createMintQuote` have no `deriveExecutionState` case; when
-`operations` are present the machine intercepts and re-targets them to a result
-or error step before settling, so they read as `ready`/`READY` only transiently.
-Without `operations`, the step is dispatched to the app step handler instead.
+`confirmSend` and `createMintQuote` are action steps: when `operations` are
+present the machine intercepts and re-targets them to a result or error step
+before settling, so `inspect()` reports them only transiently. Without
+`operations`, the step is dispatched to the app step handler instead.
 
 ### 3.2 Destinations
 
@@ -151,11 +153,11 @@ Other carriers:
 ### 3.3 Machine methods
 
 `PaymentMachine` (`src/machine/types.ts`). All dispatch through `send(event)`,
-guarded by `sendLocked`.
+one turn at a time (see "How a turn flows").
 
 | Method | Wraps | Notes |
 | --- | --- | --- |
-| `send(event)` | core dispatcher | `createMachine.ts:547-1219` |
+| `send(event)` | core dispatcher | `send` -> `runTurn` in `createMachine.ts` |
 | `execute(input, {reset?})` | `EXECUTE` | `{reset}` calls `resetInternal` first |
 | `scan(data?, opts?)` | `processScanData` -> `execute` | OPTIONAL; present only with `createURDecoder`/`scanSources` |
 | `enterAmount(amount, mintUrl, opts?)` | `AMOUNT_ENTERED` | carries destination, methods, offline, meltTarget, recipients, display |
@@ -168,18 +170,16 @@ guarded by `sendLocked`.
 | `startReceiveLightning({reset?})` | `START_RECEIVE_LIGHTNING` | |
 | `startReceive({reset?})` | `START_RECEIVE` | |
 | `reviewMint(mintUrl, token)` | `REVIEW_MINT` | |
-| `mintTrusted()` | `MINT_TRUSTED` | then runs `operations.trustMint` |
 | `confirmMelt()` | `CONFIRM_MELT` | runs `operations.executeMelt` in place |
-| `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `{rolledBack}` |
+| `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `PaymentRequestConfirmOutcome`: `delivered`, `rolledBack`, `failed`, `undelivered {operationId}` or `ignored` |
 | `reset()` | `resetInternal` + notify | |
-| `inspect()` | cached `ExecutionState` | the snapshot accessor is `inspect`, not `getSnapshot` |
+| `inspect()` | cached `ExecutionState` (`step`, `isExecuting`, `details`) | the snapshot accessor is `inspect`, not `getSnapshot` |
 | `getContext()` | current `FlowContext` | |
 | `getStep()` | current `FlowStep` | |
 | `subscribe(listener)` | state-change bus | returns unsubscribe |
 
-React hooks: `usePaymentMachine` (low-level) and `usePaymentFlowMachine`
-(provider-bound, re-exported from `react/index.ts`); both return
-`PaymentMachine`. `useScreenActions` returns
+React hook: `usePaymentFlowMachine` (provider-bound, re-exported from
+`react/index.ts`) returns the provider's `PaymentMachine`. `useScreenActions` returns
 `{entry, error, actions, mintUrl, source, suggestions}` where `actions[name]` is
 a `BoundAction` with `.execute(params?)`.
 
@@ -200,7 +200,7 @@ is not implemented in `defaultOperations.ts`.
 | `executePaymentRequest` | Create token + deliver over Nostr/HTTP; rollback on delivery failure. Optional. | always | Colada default |
 | `linkTransaction` | Link scanned input to a transaction id. Optional. | never (local) | app |
 | `executeNfcSend` | NFC POS token creation. Optional. | always | Colada default |
-| `rollbackSend` | Roll back a pending send. Optional. | conditional | Colada default |
+| `rollbackSend` | Take back a send; reports `reclaimed`, `neverExecuted` or `unknown` (could not tell, so the token may be out). Optional. | conditional | Colada default |
 | `checkSendStatus` | Poll a pending send. Optional. | conditional | Colada default |
 | `executeReceive` | Redeem an ecash token (`wallet.receive`). Optional. | always | Colada default |
 | `rollbackMelt` | Cancel a melt operation. Optional. | conditional | Colada default |
@@ -235,13 +235,14 @@ All 15 `FlowEvent` types are dispatched via `send()`
 (`src/machine/types.ts:355-412`):
 
 `EXECUTE`, `OPTION_CHOSEN`, `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`,
-`SEND_MEMO_SUBMITTED`, `REQUEST_MINT_SELECTOR`, `START_SEND_ECASH`,
-`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`, `MINT_TRUSTED`,
-`CONFIRM_MELT`, `CONFIRM_PAYMENT_REQUEST`, `RESET`.
+`SEND_MEMO_SUBMITTED`, `REQUEST_MINT_SELECTOR`, `START_SEND`, `START_SEND_ECASH`,
+`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`,
+`CONFIRM_MELT`, `CONFIRM_PAYMENT_REQUEST`. There is no reset event:
+`machine.reset()` calls `resetInternal`.
 
 Global events (handled from any state, `transitions.ts:390-441`): `EXECUTE`,
-`RESET`, `REQUEST_MINT_SELECTOR`, `SEND_MEMO_SUBMITTED`, `START_SEND_ECASH`,
-`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`, `MINT_TRUSTED`.
+`REQUEST_MINT_SELECTOR`, `SEND_MEMO_SUBMITTED`, `START_SEND_ECASH`,
+`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`.
 State-specific events (`transitions.ts:444-453`): `OPTION_CHOSEN`,
 `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`. These four are not actually
 state-gated inside `transition()`; the second switch only lists events not
@@ -254,9 +255,8 @@ caught by the first. `CONFIRM_MELT` and `CONFIRM_PAYMENT_REQUEST` bypass
 `INSUFFICIENT_BALANCE`, `NO_BALANCE`, `UNSUPPORTED_INPUT`,
 `UNSUPPORTED_PAYMENT_METHOD`, `ALL_OPTIONS_DISABLED`, `MISSING_MELT_TARGET`,
 `SEND_FAILED`, `MINT_QUOTE_FAILED`, `MELT_FAILED`, `PAYMENT_REQUEST_FAILED`,
-`NFC_WRITE_FAILED`, `NFC_SESSION_LOST`, `NFC_READ_FAILED`. `deriveExecutionState`
-maps the `error` step to `status:'blocked'`; codes outside the allowlist fall
-back to `UNSUPPORTED_INPUT` (`createMachine.ts:119-134`).
+`NFC_WRITE_FAILED`, `NFC_SESSION_LOST`, `NFC_READ_FAILED`. The `error` step's
+data carries the code as set; `inspect().details` reports it unchanged.
 
 ## 4. Machine lifecycle
 
@@ -264,46 +264,89 @@ back to `UNSUPPORTED_INPUT` (`createMachine.ts:119-134`).
 
 ```
 send(event)
-  -> sendLocked acquired; sendGeneration = flowGeneration (snapshot)
-  -> resolve offline once: offline = getOffline?.() ?? false   (createMachine.ts:777)
+  -> beginTurn: dropped while money moves or, without fresh intent, while
+     another turn runs; otherwise takes the lock -> sendGeneration
+  -> resolve offline once: offline = currentOffline()   (getOffline, else false)
   -> CONFIRM_MELT / CONFIRM_PAYMENT_REQUEST: handled directly in send()
   -> else transition(event, step, ctx, ...)
         handleExecute / handleAmountEntered / handleMintSelected / ...
         -> resolveNext(intent, ctx, walletCtx) | resolveFromContext(ctx, walletCtx)
         -> stamp offline onto every result.context
         -> {step, context, data}
+        -> or {kind:'unchanged'} when the step does not handle the event
+           (a stray PROOFS_CHOSEN / SEND_MEMO_SUBMITTED, a CONFIRM_* off
+           its step): step, data and context
+           stay, nothing is dispatched, the turn finishes
   -> setStep(step, data); flowCtx = merged context
   -> if step is confirmSend/createMintQuote AND operations present:
         intercept -> run async effect -> setStep(result | error)
   -> if step not in INPUT_STEPS: handlerExecuting=true; notify();
         dispatchHandler(step, data); handlerExecuting=false; notify()
   -> if step === 'error': fire notifications[code] fire-and-forget
-  -> sendLocked released
+  -> finishTurn
 ```
+
+Every exit of a turn goes through `finishTurn` (`createMachine.ts`, section
+"Turn"), which frees the lock only while the turn still owns it. The turn's
+state (generation, lock, `isExecuting` and the commit generation) is written
+only by the functions in that section. `__tests__/flows/turn-exits.test.ts` pins every exit. Every host
+notification goes through one helper (`tell`): one that throws or rejects is
+logged, and the payment, the turn, the next step's handler and the caller's
+outcome carry on. Once a payment settles its step records it first, and its
+link and notifications go out afterwards (`announcePayment`, through the same
+helper). A listener or handler that
+throws reaches the caller only after the turn finished. An NFC tap's tag
+session and unit switch are one `NfcTap`, opened as its EXECUTE turn starts and
+ended in one place after the auto-resolve loop: every way out, a throw
+included, releases the session unless the write-back already did and switches
+the unit back unless the tap paid (its token is on the tag). The tap checks its
+turn after every await; a tap a reset overtook still releases the session and
+switches the unit back, and touches nothing else (`endNfcTap`). Each only while
+it is still the tap's own: an NFC read begun since took the session over
+(`nfcRead`), and a tap the machine ran since owns the unit (`latestNfcTap`).
+Which read a tap is, and that it is an NFC read at all, is fixed when its scan
+begins and travels with the scanned input (`ScanOrigin`), so a read that
+finishes after a newer one began keeps its own identity, and a read the
+machine did not take never turns a later input into a tap. The host's adapter
+releases a session only for a read that failed; after a read, releasing is
+the tap's alone, a failed write included. A read no tap took (its EXECUTE was
+dropped while money moved, or its input was not run) is let go by the scan
+that read it, under the same newer-read rule, and one dropped while money
+moved fires `onScanError('nfc')` (`endUntakenNfcRead`). A `confirmPaymentRequest()` call hands its turn the holder its
+result goes in, so the result is settled only by its own turn's send, and a tap
+that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
 (`resolveNext.ts:256-264`).
 
 ### Generations and staleness
 
-`flowGeneration` is incremented ONLY in `resetInternal`
-(`createMachine.ts:227`). A plain `send()` does not bump the generation; it
-snapshots it (`sendGeneration = flowGeneration`). Every async effect captures
-`isStale = (op) => isStaleGeneration(sendGeneration, op)`. After any `await`, a
+`flowGeneration` is incremented by a reset and by an event that supersedes a
+running turn (fresh intent while a resolve is in flight). A turn that begins
+on a free machine does not bump the generation; it snapshots it
+(`sendGeneration = flowGeneration`). Every async effect captures the turn's
+`stale = (op) => isStaleGeneration(sendGeneration, op)` as its `isStale`. After
+any `await`, a
 stale generation returns `kind:'stale'` and the machine returns early without a
 `setStep`. This is the guard that stops a superseded send/quote (after `reset()`,
 `startX({reset:true})`, or `execute(..,{reset:true})`) from clobbering newer
-state or double-firing notifications. A newer EXECUTE without `reset` runs at the
-same generation and does NOT supersede an in-flight effect by generation.
+state or double-firing notifications. A stale continuation owns nothing: it
+returns without freeing the lock a newer turn holds.
+
+A generation names a flow, not a turn or a picker: later turns of the same flow
+share it. The mint list loads in the background past its turn, so it carries
+its own count (`mintListLoad`): each `selectMint` that opens begins a load, and
+only the latest load is applied, so a list that finished loading for a picker
+already closed never replaces the rows of the one now open.
 
 ### handlerExecuting / notify cycle
 
-`INPUT_STEPS` (`createMachine.ts:163-170`) gate `isExecuting`: no spinner while
+`INPUT_STEPS` (`createMachine.ts`) gate `isExecuting`: no spinner while
 the user is inputting. For all other steps, `handlerExecuting` is toggled
 `true`/`false` around the handler dispatch with a `notify()` on each edge, so the
-screen sees a loading edge for action and navigate steps. `inspect()` returns a
-stable reference between notifications and only promotes a new reference when the
-`ExecutionState` actually changes.
+screen sees a loading edge for action and navigate steps. `inspect()` returns
+the same reference between notifications; every notification builds a new one
+(`notify`), whether or not the `ExecutionState` changed.
 
 ### Recipient resolution
 
@@ -344,7 +387,7 @@ START_SEND_ECASH / EXECUTE / AMOUNT_ENTERED
 | `operations.executeSend` | online (path C) | always |
 | `notifications.onTransactionCreated` | on `sendComplete` | n/a |
 
-Failure + fallback (`effects.ts:734-837`): an online `executeSend` failure with a
+Failure + fallback (`handleConfirmSendFailure` in `effects.ts`): an online `executeSend` failure with a
 mint-offline cause + exact local proofs + `executeOfflineSend` runs the
 offlineFallback send (`createdOffline:true`). A failure with non-exact proofs but
 a round-up/round-down suggestion routes to `chooseProofs` instead of a hard
@@ -363,18 +406,19 @@ MUST:
   re-enter `resolveFromContext`. `transitions.ts:282-329`.
 - The offlineFallback path runs `executeOfflineSend` only when the cause is a
   mint-offline error, `executeOfflineSend` exists, `proofAmounts` is non-empty,
-  and the amount is an exact local match. `effects.ts:753-763`.
+  and the amount is an exact local match. `handleConfirmSendFailure`.
 - Every async send branch short-circuits to `stale` on a generation bump.
-  `effects.ts:742,769,790,1196,1233`.
+  `runConfirmSendEffect`, `handleConfirmSendFailure`.
 - `executeSend`/`executeOfflineSend` never return a tokenless entry; the history
   entry is enriched or synthesized to carry the token.
   `defaultOperations.ts:373-379,399-405`.
-- `executeSend`/`executeOfflineSend`/`executeNfcSend` route execute through
-  `executeSendWithRescue`: when `ops.send.execute` throws after prepare, the
-  prepared operation is cancelled (best-effort, original error rethrown) so
-  proofs never stay reserved and no phantom pending row lingers. The dev
+- `executeSend`/`executeOfflineSend`/`executeNfcSend` and the Nostr branch of
+  `executePaymentRequest` route execute through `executeSendWithRescue`: when
+  `ops.send.execute` throws after prepare, the prepared operation is cancelled
+  (best-effort, original error rethrown), so a send Coco could not start does
+  not keep its proofs reserved under a prepared row. Coco cancels only a
+  prepared send: one cut off mid-swap stays `executing` until recovery. The dev
   mock-fail gate sits inside the rescue so QA exercises it.
-  `defaultOperations.ts:191-238`.
 - `PROOFS_CHOSEN` / `SEND_MEMO_SUBMITTED` are handled only from their owning
   steps (`chooseProofs` / `enterSendMemo`) and are not in `INTENT_EVENTS` — a
   stray event must not supersede in-flight resolve work.
@@ -385,7 +429,7 @@ MUST NOT:
 - Online ecash sends must not pre-show `chooseProofs`; only a send failure may
   surface it. `resolveNext.ts:166-169`.
 - `mintUnreachableConfirmed` must not be set for a deliberate local/offline send
-  (`forceLocalSend`) or a local-first attempt. `effects.ts:717-732`.
+  (`forceLocalSend`) or a local-first attempt. `buildMintUnreachableContextPatch`.
 - The dev-only mock-fail send toggle must not take effect in production.
   `defaultOperations.ts:341-351`.
 
@@ -405,8 +449,10 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
         [quote-first: operations.quoteMelt creates the melt quote BEFORE the
          preview dispatches; its fee_reserve + quoted amount ride the step data]
    -> CONFIRM_MELT -- in place --> operations.executeMelt({ …, quoteId })
-        success: setStep('navigateToMeltPreview', {...data, historyEntry})  (step STAYS)
+        success: setStep('navigateToMeltPreview', {...data, phase: settled {historyEntry}})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
+   -> CONFIRM_MELT (quote expired, or used by a failed attempt) -- in place -->
+        operations.quoteMelt -> the preview again with the new quote; nothing is paid
 ```
 
 | Effect / operation | When | Network |
@@ -417,7 +463,12 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
 | `operations.rollbackMelt` | screen action `meltQuote.cancel` | conditional |
 
 Failure + fallback: a single-option melt failure leaves the step on
-`navigateToMeltPreview` so the user can retry Pay; no `error` step is set. A
+`navigateToMeltPreview` so the user can retry Pay; no `error` step is set. The
+failed attempt used up the quote the preview showed (`flowCtx.spentMeltQuoteId`
+names it), so the first Pay after it pays nothing: it asks `quoteMelt` for a new
+quote, puts it on the step and dispatches the preview again, and the next Pay
+executes against that quote. A preview that showed no quote (onchain, or quote
+creation failed) retries at once. A
 BIP321 multi-option failure routes to `chooseFallbackOption` (failed option
 disabled) or `error` `ALL_OPTIONS_DISABLED`. If `melt.execute` throws after
 prepare, `executeMelt` cancels the melt operation to release reserved proofs,
@@ -431,8 +482,11 @@ data and `flowCtx.meltQuotePreview`; the confirm screen renders Amount
 against THAT quote — the displayed fee is the charged fee. Quote creation is
 best-effort: a failure navigates without a quote and Pay falls back to creating
 one at execution. A mint/amount/unit/target change invalidates the stored quote
-(`meltQuotePreviewMatches`) and re-quotes. Onchain targets keep the at-execution
-NUT-30 fee picker instead.
+(`meltQuotePreviewMatches`) and re-quotes. A Pay on a preview whose quote has
+expired, or went with a failed attempt, re-quotes too and waits for a second
+tap, even when the fee is unchanged; if that re-quote fails nothing is paid and
+the next Pay tries it again. Onchain targets keep the at-execution NUT-30 fee
+picker instead.
 
 MUST:
 
@@ -442,8 +496,8 @@ MUST:
   `LNURL_INVOICE_AMOUNT_MISMATCH` is thrown before any mint melt. `lnurl.ts:268-279`.
 - The LNURL callback must be https (or http only for `.onion`); `.onion` hosts
   throw `LNURL_TOR_REQUIRED` up front. `lnurl.ts:115-130,172-177`.
-- On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with
-  `historyEntry` merged. `createMachine.ts:634`; `effects.ts:504-510`.
+- On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with its
+  phase `settled { historyEntry }`. `createMachine.ts:634`; `buildConfirmMeltResult`.
 - `FlowContext.amount` is ALWAYS denominated in `ctx.unit`. Scanned fixed
   amounts (BIP-321 `amount=`, fixed bolt11/bolt12) are sat-denominated, so on a
   fiat-unit account the seeding arms re-denominate ONCE via the live pricelist
@@ -465,14 +519,42 @@ MUST NOT:
 - `CONFIRM_MELT` must not execute unless `step === 'navigateToMeltPreview'` and
   `operations.executeMelt` is provided; otherwise it falls through `transition()`
   unchanged. `createMachine.ts:589`.
+- `CONFIRM_MELT` must not execute again once the step's phase is `settled`: a
+  second Pay is ignored (for a Lightning address it would fetch a fresh
+  invoice and pay twice). A failed attempt leaves the phase `preview`, so Pay
+  after a failure still retries.
+- `CONFIRM_MELT` must not execute against a quote the preview did not show:
+  when the step's quote has expired or a failed attempt used it up, Pay shows
+  a new quote and only the following Pay executes.
+- A settled payment (melt `settled`, payment request `settled` or
+  `undelivered`, and `sendComplete`, whose token exists) is final for its
+  flow. Only an event that starts another flow (`EXECUTE`, a
+  `START_*`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`) leaves it; every other event
+  changes nothing, since re-resolving the amount, mint or option would rebuild
+  a preview that Pay sends again, or resolve an ecash send to `confirmSend`
+  and make a second token (`LEAVES_SETTLED_PAYMENT`, `createMachine.ts`;
+  `__tests__/flows/settled-preview-final.test.ts`). Each leaving event starts
+  from a fresh context that carries nothing of the settled payment
+  (`REVIEW_MINT` keeps the context only when it interrupts a token receive),
+  so nothing done in the new flow rebuilds the old preview. The amount
+  screen of a finished ecash send stays mounted under the token screen: its
+  Next and its mint list first start a new ecash send
+  (`startNewEcashSendIfFinished`, `defaultHandlers.ts`), which keeps the
+  recipient, their mints and the lock and nothing of the finished payment. A
+  melt or payment-request amount screen under a settled preview gets no such
+  restart (paying the same invoice or request again would be the old
+  payment), so its Next changes nothing.
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.
 
 Stuck-on-selectMint recovery: if the user dismissed the mint selector opened from
 the preview, `CONFIRM_MELT` restores `navigateToMeltPreview` from ctx -- but ONLY
-when both `flowCtx.mintUrl` and `flowCtx.amount` are truthy
-(`createMachine.ts:565-587`). When the guard fails (no mint ever chosen) the
+when the list was opened over a preview awaiting Pay (`mintListOverPreview`)
+and both `flowCtx.mintUrl` and `flowCtx.amount` are truthy. A list opened
+anywhere else (the screen after an NFC tap paid, say) restores nothing, so a
+paid payment's context never comes back as a preview. Opening the list again
+while it is open keeps what it was first opened over. When the guard fails the
 machine fires `onMissingMintForAmount` and re-dispatches the `selectMint`
 handler — the confirm tap is never silently dropped.
 
@@ -503,16 +585,15 @@ terminal `MINT_QUOTE_FAILED`; no retry.
 MUST:
 
 - Offline mint quotes are rejected before any I/O; `executeMintQuote` is never
-  called offline. `effects.ts:852-856`. This gate uses the machine `getOffline`
+  called offline. `runMintQuoteEffect`. This gate uses the machine `getOffline`
   provider only, NOT `ctx.offline`.
-- Onchain mint quotes are unsupported; `executeMintQuote` throws on `'onchain'`
-  and always prepares `'bolt11'`. `defaultOperations.ts:411-413,418`.
-- Only `'sat'` is supported (`requireSatUnit`). `defaultOperations.ts:118-121`.
+- `executeMintQuote` has no default: the host supplies it
+  (`createExecuteMintQuote`, `operations/receiveOperations.ts`).
 - The created quote invoice is UNPAID at creation; the machine never awaits
-  payment. `defaultOperations.ts:437`.
+  payment.
 - `onTransactionCreated` fires only when the parsed `historyEntry` has an id; a
   malformed entry silently drops the wallet's only minting handoff signal.
-  `effects.ts:415-416`.
+  `buildTransactionCreatedNotifications`.
 
 MUST NOT:
 
@@ -524,8 +605,8 @@ MUST NOT:
 Intent: redeem an incoming ecash token. The token resolves to `receiveToken` with
 NO machine-level trust check; the app's `receiveToken.redeem` screen action runs
 `operations.isMintTrusted` and either calls `operations.executeReceive` (trusted)
-or routes through `reviewMint` -> `MINT_TRUSTED` -> `trustMint` ->
-`receiveToken` (untrusted). This is distinct from `startReceive` /
+or routes to `reviewMint` (untrusted), whose handler opens the mint page; its
+`mintInfo.trust` screen action runs `operations.trustMint`. This is distinct from `startReceive` /
 `startReceiveLightning`, which GENERATE a receive address / quote and never touch
 `executeReceive`.
 
@@ -535,7 +616,7 @@ EXECUTE(ecashToken) -> receiveToken                       (no trust gate here)
         unit !== 'sat' -> onUnsupportedTokenUnit; return
         isMintTrusted? false -> machine.reviewMint(mintUrl, token); return
         true -> onReceiveProcessing -> executeReceive -> onReceiveConfirmed
-   reviewMint -> MINT_TRUSTED -> trustMint (same dispatch) -> receiveToken
+   reviewMint -> mint page -> mintInfo.trust -> trustMint
         user presses Redeem AGAIN (isMintTrusted now true) -> executeReceive
 ```
 
@@ -543,7 +624,7 @@ EXECUTE(ecashToken) -> receiveToken                       (no trust gate here)
 | --- | --- | --- |
 | `operations.isMintTrusted` | redeem trust gate | never (local) |
 | `operations.buildMintReviewInfo` | entering `reviewMint` | conditional |
-| `operations.trustMint` | `MINT_TRUSTED` | conditional |
+| `operations.trustMint` | `mintInfo.trust` screen action | conditional |
 | `operations.executeReceive` | redeem trusted path | always |
 | `operations.linkTransaction` | redeem success | never (app-provided; default omits it) |
 
@@ -559,12 +640,10 @@ MUST:
   `defaultHandlers.ts:224-232`.
 - Redeem must reject non-sat tokens via `onUnsupportedTokenUnit`.
   `defaultHandlers.ts:212-217`.
-- `MINT_TRUSTED` transitions to `receiveToken` only when `ctx.reviewToken` is
-  present; otherwise it is a no-op. `transitions.ts:430-439`.
-- `trustMint` runs in the SAME dispatch as `MINT_TRUSTED`; trust-then-redeem is a
-  two-press loop and `MINT_TRUSTED` does NOT auto-redeem. `createMachine.ts:1151-1171`.
-- The synthetic receive fallback must not echo the encoded token into
-  `onTransactionCreated`. `defaultOperations.ts:714-727`.
+- Trust-then-redeem is a two-press loop: trusting on the mint page does NOT
+  auto-redeem.
+- `executeReceive` has no default: the host supplies it
+  (`createExecuteReceive`, `operations/receiveOperations.ts`).
 - `linkTransaction` must prefer `flowCtx.rawInput` over the re-encoded token so
   the scan store can match `processed === raw`. `defaultHandlers.ts:261-269`.
 - `resolveNext` short-circuits a `receiveToken` intent to
@@ -594,9 +673,13 @@ intentionally skipped.
 EXECUTE(paymentRequest) / OPTION_CHOSEN(paymentRequest)
    -> enterAmount? -> selectMint? (supportedMintUrls-constrained) -> navigateToPaymentRequest
    -> CONFIRM_PAYMENT_REQUEST -- in place --> executePaymentRequest
-        completed  -> step STAYS navigateToPaymentRequest, +historyEntry
-        rolledBack -> settle(true); routeOperationFailure(..,{rolledBack:true})
-        thrown     -> settle(false); routeOperationFailure(..)
+        completed  -> step STAYS navigateToPaymentRequest, phase settled {historyEntry}; outcome delivered
+        rolledBack -> outcome rolledBack; routeOperationFailure(..,{rolledBack:true})
+        thrown     -> outcome undelivered (PaymentRequestUndeliveredError) or failed;
+                      undelivered also sets phase undelivered {operationId}, and a
+                      further event of the same flow is ignored
+                      routeOperationFailure(..)
+        stale / locked out -> outcome ignored
    NFC: source==='nfc' on navigateToPaymentRequest -> runNfcWriteBackEffect -> sendComplete
 ```
 
@@ -618,10 +701,16 @@ MUST:
 - `checkProofComposition` returns null for `paymentRequest`; the proof picker
   must not be shown from the normal gate. `resolveNext.ts:158-161`.
 - `CONFIRM_PAYMENT_REQUEST` is gated on `step === 'navigateToPaymentRequest'` AND
-  `operations.executePaymentRequest`. `createMachine.ts:661`.
+  `operations.executePaymentRequest`. `createMachine.ts:661`. Once the step's
+  phase is `settled` or `undelivered`, a further confirm is ignored (outcome
+  `ignored`) instead of sending again, and the preview is final as for a melt
+  (Section 5.2).
 - On delivery failure the operation must attempt rollback (cancel if `prepared`,
   reclaim if executing/pending) and only return `rolledBack` when that
-  cancel-or-reclaim succeeds; otherwise rethrow. The decision is taken at the
+  cancel-or-reclaim succeeds; otherwise throw `PaymentRequestUndeliveredError`
+  with the operation id, so the screen says "created, not sent" and offers no
+  retry. Any other throw means no ecash was created: the screen entry stays a
+  preview and Pay can be tried again. The decision is taken at the
   transport call sites (`defaultOperations.ts:959-973` Nostr, `992-1006` HTTP)
   via the `attemptRollback` helper (`defaultOperations.ts:188-216`).
 - `executePaymentRequest` re-decodes the request and throws
@@ -677,6 +766,12 @@ source==='nfc':
        -> sendComplete
 ```
 
+Once `writeToken` succeeds the tag holds the token and the payment is
+delivered: the session is released afterwards, and a release that fails is
+logged without a rollback or an error (the receiver may already have redeemed
+it). A paid tap leaves the flow context with only its unit, source and scanned
+input, so nothing done on the screen that follows rebuilds the request.
+
 Before the first transition, NFC reads the request's single unit. When it differs
 from the active unit, a trusted mint accepted by `m` must already hold at least
 `a` in that unit. Otherwise it fails with `UNIT_NOT_FUNDED`; balances at other
@@ -705,13 +800,19 @@ run for this change.
 | Effect / operation | When | Network |
 | --- | --- | --- |
 | `operations.executeNfcSend` | NFC write-back | always (mint) |
-| `operations.rollbackSend` | NFC failure (not stale) | conditional |
+| `operations.rollbackSend` | NFC failure, or a stale tap whose token is not on the tag | conditional |
 
 MUST:
 
 - NFC skips `enterSendMemo` entirely; it never prompts for a memo.
 - On a genuine `executeNfcSend` failure the effect rolls back the pending send
-  via `operations.rollbackSend` before surfacing the error (`effects.ts:1085`).
+  via `operations.rollbackSend` before surfacing the error
+  (`runNfcWriteBackEffect`).
+- When the write failed and that rollback failed, could not tell what
+  happened (`unknown`) or is missing (`tokenOutstanding`), the token may have
+  reached the terminal: the error
+  says so (`NFC_WRITE_OUTCOME_UNKNOWN`), and the flow context keeps nothing
+  that could rebuild the request, as after a paid tap (`forgetNfcPayment`).
 
 MUST NOT:
 
@@ -720,10 +821,16 @@ MUST NOT:
 
 Known nuances:
 
-- A STALE interruption (a newer flow superseded the tap) returns `stale` WITHOUT
-  rolling back (`effects.ts:1081-1083`) and leaves the step unchanged
-  (`createMachine.ts:962`) -- no `sendComplete`, no `error`. This differs from the
-  failure path, which does roll back.
+- A STALE interruption (a newer flow superseded the tap) returns `stale` and
+  leaves the step unchanged -- no `sendComplete`, no `error`. A token it created
+  that is not on the tag because the reset came before its write began is
+  taken back with the same best-effort `rollbackSend` the
+  failure path uses, and the result is logged. A reset during the write itself
+  cannot stop the write: a token that reached the tag counts as delivered and
+  is never taken back, and neither is one whose write began and then failed
+  after the reset: the terminal may hold it (the last acknowledgement can be
+  lost), so its outcome is unknown. A reset before the write began still takes
+  the token back.
 - An NFC failure goes straight to `error` (`createMachine.ts:979-986`); it does
   NOT enter `routeOperationFailure`, so there is no BIP321 fallback. Lightning
   fallback after an ecash NFC failure, and an auto offline-send range, are NOT
@@ -807,7 +914,10 @@ ctx.offline (stamped per event from getOffline, transitions.ts:385) --+--> colla
 ctx.localProofSend (set when user accepts an exact proof suggestion) --/
 
 appOffline      = getOffline() || context.offline === true
-forceLocalSend  = appOffline || context.localProofSend === true     (effects.ts:1181-1182)
+forceLocalSend  = !p2pkLocked && (appOffline
+                                  || context.localProofSend === true
+                                  || context.mintUnreachableConfirmed === true)
+                                                        (runConfirmSendEffect)
 ```
 
 `getOffline` defaults to `() => false` if the app injects none. `ctx.offline` is
@@ -819,17 +929,17 @@ sendEcash destination (`transitions.ts:279`).
 ### Three send paths
 
 ```
-runConfirmSendEffect (effects.ts:1164-1255)
+runConfirmSendEffect
   |
   | hasExactLocalProofs = proofAmounts.length>0 && composeSatoshis exactMatch
-  | shouldCreateLocalTokenFirst = hasExactLocalProofs && !!executeOfflineSend
+  | shouldCreateLocalTokenFirst = !p2pkLocked && hasExactLocalProofs && !!executeOfflineSend
   |
   +-- shouldCreateLocalTokenFirst? --YES--> Path A localFirst
   |        executeOfflineSend (runs even when ONLINE)
   |        -> sendComplete (createdOffline:true)
   |
   +-- forceLocalSend && executeOfflineSend (and not A)? --YES--> Path B forceLocalSend
-  |        synthesize MintFetchError (createOfflineSendError)
+  |        synthesize MintFetchError (createOfflineError)
   |        -> handleConfirmSendFailure:
   |             exact match  -> executeOfflineSend -> sendComplete (offlineFallback)
   |             non-exact + suggestion -> chooseProofs
@@ -846,9 +956,9 @@ runConfirmSendEffect (effects.ts:1164-1255)
 `isMintOfflineError` (`src/errors.ts:8-13`) is the SOLE classifier turning a
 failure into "Mint unreachable". It returns true for `NetworkError`,
 `HttpResponseError` with status >= 500, or any `Error` whose
-`name === 'MintFetchError'`. `createOfflineSendError` and
-`createOfflineMintQuoteError` both set `error.name = 'MintFetchError'`
-(`effects.ts:395-405`) so the synthetic forced-offline error classifies as
+`name === 'MintFetchError'`. `createOfflineError` (`effects.ts`), used for a
+forced-offline send and an offline mint quote, sets
+`error.name = 'MintFetchError'` so the synthetic forced-offline error classifies as
 mint-unreachable and resolves to `t('MINT_UNREACHABLE')` ("Mint unreachable").
 `executeOfflineSend`'s own `needsSwap` rejection throws a PLAIN `Error` (not a
 `MintFetchError`), so it surfaces as `SEND_FAILED`, not `MINT_UNREACHABLE`.
@@ -880,17 +990,19 @@ contract.
 MUST / MUST NOT:
 
 - `runMintQuoteEffect` must short-circuit when `getOffline()` is true and reject
-  before calling `executeMintQuote`. `effects.ts:852-856`.
+  before calling `executeMintQuote`.
 - `mintUnreachableConfirmed` must not be set when `forceLocalSend` or
-  `shouldCreateLocalTokenFirst` is true. `effects.ts:717-732`.
-- `createOfflineSendError` / `createOfflineMintQuoteError` must keep
-  `name === 'MintFetchError'`. `effects.ts:395-405`.
+  `shouldCreateLocalTokenFirst` is true. `buildMintUnreachableContextPatch`.
+- `createOfflineError` must keep
+  `name === 'MintFetchError'`.
 - `transition()` must stamp `offline` onto every `result.context` (when the
   provider value is non-null) so fresh contexts see the real-time value.
   `transitions.ts:384-387`.
 - Melt and payment-request flows must have no offline branch; they always attempt
   the mint. Send-token Cancel must short-circuit offline with
-  `onSendCancelFailed {offline:true}`. `defaultHandlers.ts:155-163`.
+  `onSendCancelFailed {offline:true}`. `defaultHandlers.ts:155-163`. A
+  cancel whose `rollbackSend` could not tell what happened (`unknown`)
+  reports `onSendCancelFailed`, never `onSendCancelled`.
 
 The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 `SEND_FAILED` it is "Failed to create token"; for `MINT_QUOTE_FAILED` it is
@@ -902,8 +1014,7 @@ The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 `destination`, `mintQuoteMethod`, `meltQuoteMethod`, `unit` (required),
 `paymentRequest`, `meltTarget`, `recipientPubkey`, `recipientProfile`,
 `amountEntryDisplay`, `localProofSend`, `memo`, `sendMemoHandled`,
-`mintUnreachableConfirmed`, `supportedMintUrls`, `offline`, `reviewToken`,
-`rawInput`, `source`, `originalOptions`, `failedOptionValues`
+`mintUnreachableConfirmed`, `supportedMintUrls`, `offline`, `rawInput`, `source`, `originalOptions`, `failedOptionValues`
 (`types.ts:215-287`).
 
 ### Root-entry context clearing
@@ -915,7 +1026,7 @@ The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 | `MINT_SELECTED` with a new `destination` | rebuild keeping `unit` + event mint/amount/destination + whitelisted prior fields (methods, paymentRequest, meltTarget, recipients, display). `transitions.ts:231-245` |
 | `OPTION_CHOSEN` | explicitly clears `destination`/methods/`supportedMintUrls`/`paymentRequest`/`meltTarget` before re-extracting. `transitions.ts:113-123` |
 | `REQUEST_MINT_SELECTOR` (no destination) | drops everything but `unit`. `contextResolution.ts:250` |
-| `RESET` | `{step:'idle', context:{unit}}`; bumps `flowGeneration`. `transitions.ts:393-394` |
+| `machine.reset()` (not an event) | `resetInternal`: `{step:'idle', context:{unit}}`, and bumps `flowGeneration`. |
 
 ### Amount survival across mint change
 
@@ -953,11 +1064,11 @@ during verification and the invariant rests on source review.
 - [ ] After `PROOFS_CHOSEN`, no re-entry to `resolveFromContext`
       (`transitions.ts:282-329`).
 - [ ] offlineFallback only on mint-offline + exact + `executeOfflineSend`
-      (`effects.ts:753-763`).
+      (`handleConfirmSendFailure`).
 - [ ] `mintUnreachableConfirmed` excluded for `forceLocalSend` /
-      `shouldCreateLocalTokenFirst` (`effects.ts:717-732`).
+      `shouldCreateLocalTokenFirst` (`buildMintUnreachableContextPatch`).
 - [ ] Stale-generation short-circuit on every async branch
-      (`effects.ts:742,769,790,1196,1233`).
+      (`runConfirmSendEffect`, `handleConfirmSendFailure`).
 - [ ] Mock-fail send disabled in production (`defaultOperations.ts:341-351`).
 
 ### Melt
@@ -974,11 +1085,11 @@ during verification and the invariant rests on source review.
 
 ### Mint quote
 
-- [ ] Offline mint quote rejected before I/O (`effects.ts:852-856`).
+- [ ] Offline mint quote rejected before I/O (`runMintQuoteEffect`).
 - [ ] Onchain unsupported; always prepares `bolt11`
       (`defaultOperations.ts:411-418`).
 - [ ] Machine never awaits invoice payment; `onTransactionCreated` is the handoff
-      (`effects.ts:434-447`).
+      (`buildTransactionCreatedNotifications`).
 
 ### Receive / redeem
 
@@ -986,7 +1097,6 @@ during verification and the invariant rests on source review.
       (`defaultHandlers.ts:224-232`).
 - [ ] Non-sat token rejected via `onUnsupportedTokenUnit`
       (`defaultHandlers.ts:212-217`).
-- [ ] `MINT_TRUSTED` no-op without `reviewToken` (`transitions.ts:430-439`).
 - [ ] Synthetic receive entry omits the encoded token
       (`defaultOperations.ts:714-727`).
 - [ ] `linkTransaction` prefers `flowCtx.rawInput` (`defaultHandlers.ts:261-269`).
@@ -994,7 +1104,8 @@ during verification and the invariant rests on source review.
 ### Payment request
 
 - [ ] No `chooseProofs` from the normal gate (`resolveNext.ts:158-161`).
-- [ ] Rollback returns `rolledBack` only on successful reclaim, else rethrows
+- [ ] Rollback returns `rolledBack` only on successful reclaim, else throws
+      `PaymentRequestUndeliveredError`
       (`defaultOperations.ts:188-216`).
 - [ ] `rolledBack` routes through `routeOperationFailure {rolledBack:true}`
       (`createMachine.ts:698-712`).
@@ -1006,12 +1117,13 @@ during verification and the invariant rests on source review.
 
 ### Offline keystone
 
-- [ ] `appOffline` / `forceLocalSend` 3-way OR (`effects.ts:1181-1182`).
+- [ ] `appOffline` / `forceLocalSend` 3-way OR, never for a locked send
+      (`runConfirmSendEffect`).
 - [ ] `executeOfflineSend` exact-match must not contact the mint (Section 7
       contract; classifier `errors.ts:11`). Untested at the Colada boundary
       because it depends on out-of-package wallet I/O.
 - [ ] Synthetic offline errors keep `name:'MintFetchError'`
-      (`effects.ts:395-405`).
+      (`createOfflineError`).
 - [ ] `offline` stamped onto every result context (`transitions.ts:384-387`).
 
 ### Context / mint selection
@@ -1021,7 +1133,7 @@ during verification and the invariant rests on source review.
 - [ ] Destination change rebuilds context (`transitions.ts:178-194,231-245`).
 - [ ] `OPTION_CHOSEN` clears stale intent-specific fields
       (`transitions.ts:113-123`).
-- [ ] `RESET` reduces to `{unit}` and bumps generation (`transitions.ts:393-394`).
+- [ ] `reset()` reduces the context to `{unit}` and bumps the generation (`resetInternal`).
 
 ### Integration boundary
 
@@ -1047,8 +1159,9 @@ during verification and the invariant rests on source review.
       (`resolveNext.ts:489-513`).
 - [ ] NFC skips `enterSendMemo` and shows no mint / option / confirm prompt
       (`createMachine.ts:879-998`).
-- [ ] NFC rolls back on failure but NOT on stale interruption
-      (`effects.ts:1081-1083,1085`).
+- [ ] NFC rolls back on failure, and on a stale interruption before the
+      write began; never once the write began under a reset, nor once the
+      token is on the tag (`runNfcWriteBackEffect`).
 - [ ] Onchain send/receive stay gated off while `isMethodImplemented('onchain')`
       is false (`availability.ts:318-323`, `resolveNext.ts:284-296`).
 
@@ -1056,11 +1169,11 @@ during verification and the invariant rests on source review.
 
 | File | Responsibility |
 | --- | --- |
-| `src/machine/createMachine.ts` | `send()` dispatcher, `deriveExecutionState`, step interception (`confirmSend`/`createMintQuote`/`reviewMint`/`openMint`), NFC auto-execute, `routeOperationFailure`, generation guards, bound methods, notify bus |
+| `src/machine/createMachine.ts` | `send()` dispatcher, `inspect()` projection, step interception (`confirmSend`/`createMintQuote`/`reviewMint`/`openMint`), NFC auto-execute, `routeOperationFailure`, generation guards, bound methods, notify bus |
 | `src/machine/transitions.ts` | `transition()`, handlers (`handleExecute`/`handleAmountEntered`/`handleMintSelected`/`handleProofsChosen`/`handleSendMemoSubmitted`/`handleOptionChosen`), offline stamping, context reset/merge |
-| `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, mint gather, method requirements |
+| `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, `previewStep` (the melt and payment-request preview data), mint gather, method requirements |
 | `src/machine/contextResolution.ts` | `resolveFromContext` (intent-less continuation), `revalidateMintForAmount`, `requestMintSelector` |
-| `src/machine/effects.ts` | `runConfirmSendEffect`, `runConfirmMeltEffect`, `runConfirmPaymentRequestEffect`, `runMintQuoteEffect`, `runNfcWriteBackEffect`, `runMintReviewInfoEffect`, `runTrustMintEffect`, `handleConfirmSendFailure`, offline error builders |
+| `src/machine/effects.ts` | `runConfirmSendEffect`, `runConfirmMeltEffect`, `runConfirmPaymentRequestEffect`, `runMintQuoteEffect`, `runNfcWriteBackEffect`, `runMintReviewInfoEffect`, `handleConfirmSendFailure`, offline error builders |
 | `src/machine/amountFallback.ts` | `buildProofSuggestions`, `buildChooseProofsData`, `buildChooseAmountFallback`, `buildBalanceSuggestions` |
 | `src/machine/flows/send.ts` | `startSendEcashFlow`, mint pre-resolution |
 | `src/machine/flows/receive.ts` | `startReceiveFlow`, `startReceiveLightningFlow` |
@@ -1101,7 +1214,7 @@ pre-send mint-reachability probe.
   `ctx.offline === true` (`resolveNext.ts:166-169`). With the device online and
   the mint unreachable, the flow attempts `executeSend`; only on failure does
   `handleConfirmSendFailure` surface `chooseProofs` (non-exact + suggestion) or
-  an `offlineFallback` exact send (`effects.ts:753-828`).
+  an `offlineFallback` exact send.
 - Current: `chooseProofs` carries no reason for why it appeared; its step data
   (`types.ts:120-134`) has no offline / mint-unreachable field and
   `buildChooseProofsData` sets none (`amountFallback.ts:58-78`). The only
@@ -1116,14 +1229,14 @@ pre-send mint-reachability probe.
 
 - Current: the auto `offlineFallback` exact send runs only when
   `isMintOfflineError(cause)` AND an exact local match exists
-  (`effects.ts:753-763`). Because the forced-local path synthesizes a
-  `MintFetchError` (`createOfflineSendError`, `effects.ts:401-404`), the only
+  (`handleConfirmSendFailure`). Because the forced-local path synthesizes a
+  `MintFetchError` (`createOfflineError`), the only
   cause that can reach `handleConfirmSendFailure` as NON-mint-offline is a real
-  online `executeSend` failure (`effects.ts:1231-1254`).
+  online `executeSend` failure (`runConfirmSendEffect`).
 - Current: a non-exact failure of ANY cause reaches `chooseProofs` when a
-  suggestion exists (`effects.ts:808-828`); but an EXACT-match online failure
+  suggestion exists; but an EXACT-match online failure
   whose cause is not mint-offline falls straight to a hard `SEND_FAILED`
-  (`effects.ts:830-836`) -- no offline send is attempted.
+  -- no offline send is attempted.
 - Target: for ecash, any send failure with usable local proofs should attempt
   the local exact send or offer `chooseProofs`, regardless of the cause's
   classification, so a flaky-network swap failure degrades to offline instead of
@@ -1132,9 +1245,9 @@ pre-send mint-reachability probe.
 ### 11.3 Payment request when the mint is offline (device online) -- gap
 
 - Current: the payment-request confirm path is offline-blind by type --
-  `RunConfirmPaymentRequestEffectConfig` has no `getOffline`
-  (`effects.ts:294-299`), unlike the mint-quote and send effect configs
-  (`effects.ts:272,282`). `operations.executePaymentRequest` creates the token
+  `RunConfirmPaymentRequestEffectConfig` has no `getOffline`, unlike the
+  mint-quote and send effect configs (`RunMintQuoteEffectConfig`,
+  `RunConfirmSendEffectConfig`). `operations.executePaymentRequest` creates the token
   via `mgr.ops.send.prepare`/`execute` (`defaultOperations.ts:938-985`), so an
   unreachable mint fails the send; there is no local-first / round fallback for
   `paymentRequest` (`buildChooseAmountFallback` returns null for it,
@@ -1348,8 +1461,7 @@ Shipped NFC behavior is Section 5.6. The following are intended, not shipped:
 
 - Current: onchain is a recognized capability type (`METHODS = ['bolt11','onchain']`,
   `mint-capabilities.ts`) but is operationally OFF. Onchain RECEIVE forwards to
-  `operations.executeMintQuote`, whose default throws on `'onchain'`
-  (`defaultOperations.ts:411-413`); onchain SEND errors before any preview
+  `operations.executeMintQuote`, which the host supplies; onchain SEND errors before any preview
   (`UNSUPPORTED_PAYMENT_METHOD`, `resolveNext.ts:284-296`). The variant menu never
   builds an onchain row because `isMethodImplemented('onchain')` is false
   (`availability.ts:318-323`).
@@ -1372,9 +1484,9 @@ Shipped NFC behavior is Section 5.6. The following are intended, not shipped:
 ### 11.15 Review mint: trust / don't-trust with auto-melt -- gap
 
 - Current: the `reviewMint` step is entered only by `REVIEW_MINT`
-  (`transitions.ts:424-429`) and has exactly two exits: `MINT_TRUSTED` ->
-  `trustMint` -> `receiveToken` (`transitions.ts:430-440`,
-  `createMachine.ts:1153-1171`), or the app `back`. The `mintInfo` action surface
+  (`transitions.ts:424-429`); the machine has no exit from it of its own. The
+  app's `reviewMint` handler opens the mint page, where `trust` runs
+  `operations.trustMint`, or the app `back`. The `mintInfo` action surface
   is `trust | copy | share | back` (`src/screen-actions/types.ts:54`); there is
   NO don't-trust / reject action and NO `MINT_DISTRUSTED` event.
 - Current: the redeem trust gate runs BEFORE `executeReceive`

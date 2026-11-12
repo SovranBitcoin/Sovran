@@ -2,7 +2,7 @@
  * @fileoverview Camera screen — scan QR, paste, gallery. Uses machine.scan directly.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
@@ -71,48 +71,21 @@ interface ScanOutcome {
 }
 
 /**
- * One scan attempt with the busy flags the overlay reads. Every entry point
- * (live barcode, paste, gallery) must leave `isProcessingRef` / `loading` /
- * `progress` unwound on failure or the screen stays stuck mid-scan with no
- * way back. Module-scope because the try/catch (value blocks inside it) bails
- * the React Compiler when it lives in a render-scoped function.
+ * One scan attempt: its outcome, or `null` once a failure is logged. Module
+ * scope because the try/catch (value blocks inside it) bails the React
+ * Compiler when it lives in a render-scoped function.
  */
-async function runScanAttempt(ctx: {
-  failureEvent: string;
-  scan: () => Promise<ScanOutcome | undefined> | undefined;
-  setProgress: (n: number) => void;
-  setLoading: (b: boolean) => void;
-  isProcessingRef: React.MutableRefObject<boolean>;
-}) {
-  const { failureEvent, scan, setProgress, setLoading, isProcessingRef } = ctx;
-  isProcessingRef.current = true;
-  setLoading(true);
+async function attemptScan(
+  failureEvent: string,
+  scan: () => Promise<ScanOutcome | undefined> | undefined
+): Promise<ScanOutcome | null> {
   try {
-    const result = await scan();
-    applyScanResult(result, setProgress, setLoading, isProcessingRef);
+    return (await scan()) ?? {};
   } catch (err) {
     log.error(failureEvent, {
       error: err instanceof Error ? err : new Error(String(err)),
     });
-    setLoading(false);
-    setProgress(0);
-    isProcessingRef.current = false;
-  }
-}
-
-function applyScanResult(
-  result: ScanOutcome | undefined,
-  setProgress: (n: number) => void,
-  setLoading: (b: boolean) => void,
-  isProcessingRef: React.MutableRefObject<boolean>
-) {
-  const urInProgress = result?.urInProgress ?? false;
-  const lockedPending = result?.lockedPending ?? false;
-  if (typeof result?.progress === 'number') setProgress(result.progress);
-  if (!urInProgress && !lockedPending) {
-    setLoading(false);
-    setProgress(0);
-    isProcessingRef.current = false;
+    return null;
   }
 }
 
@@ -208,10 +181,25 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     }
   };
 
-  const runScan = (
+  /**
+   * Every entry point (live barcode, paste, gallery) runs through here, so the
+   * busy flags the overlay reads are always unwound when a scan fails or ends;
+   * otherwise the screen stays stuck mid-scan with no way back. A multi-frame
+   * UR or a locked token waiting on a choice stays busy.
+   */
+  const runScan = async (
     failureEvent: string,
     scan: () => Promise<ScanOutcome | undefined> | undefined
-  ) => runScanAttempt({ failureEvent, scan, setProgress, setLoading, isProcessingRef });
+  ) => {
+    isProcessingRef.current = true;
+    setLoading(true);
+    const outcome = await attemptScan(failureEvent, scan);
+    if (typeof outcome?.progress === 'number') setProgress(outcome.progress);
+    if (outcome?.urInProgress || outcome?.lockedPending) return;
+    setLoading(false);
+    setProgress(0);
+    isProcessingRef.current = false;
+  };
 
   const handleScan = async (data: ScanningData) => {
     const isUr = data.data.toLowerCase().startsWith('ur:');

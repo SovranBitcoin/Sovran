@@ -1,6 +1,7 @@
 import { fixture as previous } from './E19-0.1.2';
 import upgraded from './E20-0.1.4.upgraded.json';
-import { ACCOUNTS, accountKey, zustandRow } from './format';
+import records from './E20-0.1.4.records.json';
+import { ACCOUNTS, PHRASE_HASH, accountKey, zustandRow } from './format';
 import type { ReleaseFixture } from './format';
 
 const A0 = ACCOUNTS[0].pubkey;
@@ -15,6 +16,33 @@ function withState(key: string, added: object): { state: object; version: number
   const row = disk[key] as { state: object; version: number };
   return zustandRow(row.version, { ...row.state, ...added });
 }
+
+/**
+ * Rows this build's own code wrote outside the store registry, on top of the
+ * upgraded disk: a Whitenoise group state and DM index entry, the
+ * nearby-payment journal and one Routstr SDK recovery record in their secure
+ * vaults, and the vault index those writes updated. `E20-0.1.4.records.json`;
+ * regenerate it with `WRITE_E20_RECORDS=1 bun run test --
+ * __tests__/releaseFixtureE20Records.test.ts --runInBand` while 0.1.4 is
+ * unreleased, never after. That test also reads them back after the launch.
+ */
+const written: { asyncStorage: Record<string, string>; secureStore: Record<string, string> } =
+  records;
+const keptWritten = (keys: Record<string, string>) =>
+  Object.keys(keys).filter((key) => key !== 'secure_key_index');
+
+const PROFILES = (disk['profile-store'] as { state: { profiles: { accountIndex: number }[] } })
+  .state.profiles;
+const IMPORTED_INDEX = 112_058_190;
+const SWAP_GROUP = 'swap-1788422400000-1';
+const SWAP_A0 = disk[accountKey('swap-transactions-store', A0)] as {
+  state: { groups: Record<string, { legs: object[] }> };
+  version: number;
+};
+const SWAP_GROUP_A0 = {
+  ...SWAP_A0.state.groups[SWAP_GROUP],
+  legs: [{ ...SWAP_A0.state.groups[SWAP_GROUP].legs[0], mintOperationId: 'mint-op-fixture-1' }],
+};
 
 const LAST_KNOWN_VERSION = { version: '0.1.5', minVersion: '0.1.2', fetchedAt: 1_790_000_000_000 };
 const PROVIDER = {
@@ -87,7 +115,34 @@ export const fixture: ReleaseFixture = {
     'Routstr version 3 and its secure vault; BTCMap in a cache file; unreadable blobs kept aside; new stores',
   asyncStorage: {
     ...disk,
+    ...written.asyncStorage,
+    // shared/stores/global/profileStore.ts:131,134@87b8afffe: every account's
+    // wallet database was opened on this install (`setWalletDatabaseCreated`
+    // :324); the imported account records `hashMnemonic` of the phone's phrase
+    // (`recordWalletPhraseFingerprint` :273, imported rows only).
+    'profile-store': withState('profile-store', {
+      profiles: PROFILES.map((profile) => ({
+        ...profile,
+        walletDatabaseCreated: true,
+        ...(profile.accountIndex === IMPORTED_INDEX
+          ? { walletPhraseFingerprint: PHRASE_HASH }
+          : {}),
+      })),
+    }),
+    // shared/stores/profile/swapTransactionsStore.ts:162,279@87b8afffe: the
+    // mint operation of a swap leg, tagged with its quote.
+    [accountKey('swap-transactions-store', A0)]: zustandRow(SWAP_A0.version, {
+      ...SWAP_A0.state,
+      groups: { ...SWAP_A0.state.groups, [SWAP_GROUP]: SWAP_GROUP_A0 },
+    }),
     // shared/stores/global/settingsStore.ts: PersistedSettings
+    // shared/stores/profile/nutDropRedeemQueueStore.ts (`recoveredCopy`): which
+    // set-aside copy of the queue was merged back in; none on this install.
+    ...Object.fromEntries(
+      Object.keys(disk)
+        .filter((key) => key.startsWith('nut-drop-redeem-queue:profile:'))
+        .map((key) => [key, withState(key, { recoveredCopy: null })])
+    ),
     'settings-store': withState('settings-store', {
       lastKnownAppVersion: LAST_KNOWN_VERSION,
       vertexCreditsEnabled: false,
@@ -140,13 +195,18 @@ export const fixture: ReleaseFixture = {
     [accountKey('vertex-budget-store', A0)]: VERTEX_BUDGET,
     [accountKey('vertex-budget-store', A1)]: zustandRow(1, { day: '2026-10-02', used: 1 }),
   },
-  secureStore: upgraded.secureStore,
+  secureStore: { ...upgraded.secureStore, ...written.secureStore },
   files: upgraded.files,
   sqliteDatabases: previous.sqliteDatabases,
   survives: {
     ...previous.survives,
     facts: [
-      ...previous.survives.facts.filter((fact) => !notKept.has(fact.what)),
+      ...previous.survives.facts
+        .filter((fact) => !notKept.has(fact.what))
+        // The group now holds the mint operation of its leg.
+        .map((fact) =>
+          fact.what === 'the swap history of account 0' ? { ...fact, equals: SWAP_GROUP_A0 } : fact
+        ),
       {
         what: 'the newest version it was told of',
         store: 'settings-store',
@@ -255,12 +315,39 @@ export const fixture: ReleaseFixture = {
         path: ['history', 'name', 0, 'value'],
         equals: 'An earlier name',
       },
+      ...PROFILES.map((profile, position) => ({
+        what: `that the wallet database of account ${profile.accountIndex} was made here`,
+        store: 'profile-store',
+        path: ['profiles', position, 'walletDatabaseCreated'],
+        equals: true,
+      })),
+      {
+        what: 'which phrase the wallet of the imported account was made from',
+        store: 'profile-store',
+        path: [
+          'profiles',
+          PROFILES.findIndex((profile) => profile.accountIndex === IMPORTED_INDEX),
+          'walletPhraseFingerprint',
+        ],
+        equals: PHRASE_HASH,
+      },
+      {
+        what: 'the mint operation of a swap of account 0',
+        store: 'swap-transactions-store',
+        accountIndex: 0,
+        path: ['groups', SWAP_GROUP, 'legs', 0, 'mintOperationId'],
+        equals: 'mint-op-fixture-1',
+      },
     ],
     keptAsyncStorage: [
       ...previous.survives.keptAsyncStorage,
       accountKey('vertex-budget-store', A0),
       accountKey('vertex-budget-store', A1),
+      // Whitenoise keys its rows by account index; nothing reads them at startup.
+      ...keptWritten(written.asyncStorage),
     ],
+    // The journal and SDK vaults: nothing reads them at startup.
+    keptSecureStore: [...previous.survives.keptSecureStore, ...keptWritten(written.secureStore)],
   },
   defaultRows: ['mint-changes-cache', 'mint-discover-cache', 'own-profile-stats-cache'],
   knownGaps: [],

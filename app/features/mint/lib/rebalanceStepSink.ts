@@ -12,14 +12,38 @@ import {
   type TransferStep,
 } from '@/features/mint/components/rebalance';
 import { formatCandidateRoutingDetail } from '@/features/mint/lib/rebalanceRunState';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { describeError } from '@/shared/lib/errors';
 import { mintLocalId } from '@/shared/lib/id';
+import { cashuLog } from '@/shared/lib/logger';
 import { extractDomain } from '@/shared/lib/url';
 import {
   useSwapTransactionsStore,
   type SwapLegLocalStatus,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+
+/** A swap history group, with the account it was started for. */
+export interface StartedGroup {
+  id: string;
+  account: string | undefined;
+}
+
+/**
+ * Whether the profile stores (swap history, transaction annotations) still
+ * hold `account`'s data. After an account switch they hold another's, and a
+ * late write from a run started for the old one must not land there.
+ */
+function profileStoresHold(account: string | undefined): boolean {
+  if (activePubkey() === account) return true;
+  cashuLog.info('mint.rebalance.group_write_skipped_other_account');
+  return false;
+}
+
+/** The swap history store, while it still holds `account`'s groups. */
+export function swapHistoryOf(account: string | undefined) {
+  return profileStoresHold(account) ? useSwapTransactionsStore.getState() : null;
+}
 
 /** Row copy for a melt the wallet sent but could not yet confirm. */
 export const PAYMENT_PENDING_DETAIL =
@@ -95,21 +119,30 @@ function toSwapLegStatus(status: RebalanceLegStatus): SwapLegLocalStatus | null 
  */
 export function createRebalanceStepSink({
   step,
-  groupId,
+  group,
   swapLegIds,
   updateStepState,
   insertChainRows,
 }: {
   step: TransferStep;
-  /** Swap group of the current run; null records row state only. */
-  groupId: string | null;
+  /**
+   * Swap group of the current run; null records row state only. History
+   * writes go to its account only, however late they come.
+   */
+  group: StartedGroup | null;
   /** Engine leg id → persisted swap leg id, shared across a run's retries. */
   swapLegIds: Record<string, string>;
   updateStepState: (stepId: string, update: Partial<StepState>) => void;
   /** Show hop rows after `afterStepId`, which is marked skipped with `routingDetail`. */
   insertChainRows: (afterStepId: string, hopSteps: TransferStep[], routingDetail: string) => void;
 }): RebalanceEventSink {
-  const swapStore = () => useSwapTransactionsStore.getState();
+  const groupId = group?.id ?? null;
+  const swapStore = () => swapHistoryOf(group?.account);
+  const annotate = (quoteId: string, legId: string, role: 'mint' | 'melt') => {
+    if (groupId && profileStoresHold(group?.account)) {
+      setTransactionAnnotation(`quote:${quoteId}`, swapAnnotation(groupId, legId, role));
+    }
+  };
   const chainByLeg: Record<string, { chainId?: string; hopIndex?: number }> = {};
   const swapAnnotation = (swapGroupId: string, legId: string, role: 'mint' | 'melt') => {
     const chain = chainByLeg[legId];
@@ -126,37 +159,40 @@ export function createRebalanceStepSink({
   return {
     legOpened(legId, leg) {
       chainByLeg[legId] = { chainId: leg.chainId, hopIndex: leg.chainHopIndex };
-      if (!groupId || swapLegIds[legId]) return;
-      const swapLegId = swapStore().addLeg(groupId, leg);
+      const history = swapStore();
+      if (!groupId || swapLegIds[legId] || !history) return;
+      const swapLegId = history.addLeg(groupId, leg);
       swapLegIds[legId] = swapLegId;
-      swapStore().setLegStatus(groupId, swapLegId, { localStatus: 'pending' });
+      history.setLegStatus(groupId, swapLegId, { localStatus: 'pending' });
     },
     legUpdated(legId, update) {
       updateStepState(legId, legUpdateToStepState(update));
       const swapLegId = swapLegIds[legId];
       const localStatus = update.status ? toSwapLegStatus(update.status) : null;
       if (!groupId || !swapLegId || !localStatus) return;
-      swapStore().setLegStatus(groupId, swapLegId, {
-        localStatus,
-        errorMessage:
-          localStatus === 'failed' ? describeError(update.error, 'cashu').text : undefined,
-      });
+      swapStore()?.setLegStatus(
+        groupId,
+        swapLegId,
+        localStatus === 'failed'
+          ? { localStatus, errorMessage: describeError(update.error, 'cashu').text }
+          : { localStatus }
+      );
     },
     mintReceiptCreated(legId, receipt) {
       const swapLegId = swapLegIds[legId];
       if (!groupId || !swapLegId || !receipt.quoteId) return;
-      swapStore().tagMintQuote(groupId, swapLegId, {
+      swapStore()?.tagMintQuote(groupId, swapLegId, {
         quoteId: receipt.quoteId,
         operationId: receipt.id,
       });
-      setTransactionAnnotation(`quote:${receipt.quoteId}`, swapAnnotation(groupId, legId, 'mint'));
+      annotate(receipt.quoteId, legId, 'mint');
     },
     meltPrepared(legId, melt) {
       updateStepState(legId, { operationId: melt.id });
       const swapLegId = swapLegIds[legId];
       if (!groupId || !swapLegId || !melt.quoteId) return;
-      swapStore().tagMelt(groupId, swapLegId, { quoteId: melt.quoteId, operationId: melt.id });
-      setTransactionAnnotation(`quote:${melt.quoteId}`, swapAnnotation(groupId, legId, 'melt'));
+      swapStore()?.tagMelt(groupId, swapLegId, { quoteId: melt.quoteId, operationId: melt.id });
+      annotate(melt.quoteId, legId, 'melt');
     },
     routeAttemptStarted(stepId, { route, index, count }) {
       const chainId = mintLocalId('chain');

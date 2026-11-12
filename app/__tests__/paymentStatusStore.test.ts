@@ -13,7 +13,7 @@ jest.mock('@/shared/lib/logger', () => ({
 describe('paymentStatusStore', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    usePaymentStatusStore.getState().setActive(null);
+    usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState());
   });
 
   it('marks recoverable receive failures as waiting with custom copy', () => {
@@ -126,5 +126,107 @@ it('presents wrapped mint errors through the shared catalog in the payment toast
     state: 'failed',
     errorMessage:
       'The mint has already issued ecash for this quote. Check transaction history or use wallet recovery.',
+  });
+});
+
+describe('binding a toast to its payment', () => {
+  const processingMelt = {
+    variant: 'melt' as const,
+    id: 'melt-1',
+    owner: { kind: 'pending' as const, key: 'melt-1' },
+    mintUrl: 'https://mint.example',
+    amount: 10,
+    unit: 'sat',
+    state: 'processing' as const,
+  };
+
+  it('binds the toast its starter opened under the key', () => {
+    usePaymentStatusStore.getState().setActive(processingMelt);
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-1' });
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      id: 'melt-1',
+      owner: { kind: 'melt', quoteId: 'mq-1' },
+      state: 'processing',
+    });
+  });
+
+  it('binds nothing under another key, and never rebinds a bound toast', () => {
+    usePaymentStatusStore.getState().setActive(processingMelt);
+    usePaymentStatusStore.getState().bindOwner('melt-2', { kind: 'melt', quoteId: 'mq-2' });
+    expect(usePaymentStatusStore.getState().active?.id).toBe('melt-1');
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      owner: { kind: 'pending', key: 'melt-1' },
+    });
+
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-1' });
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-other' });
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      owner: { kind: 'melt', quoteId: 'mq-1' },
+    });
+  });
+});
+
+describe('results held for a toast still waiting to be bound', () => {
+  const MINT = 'https://mint.example';
+  beforeEach(() => usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState()));
+
+  const meltResult = (quoteId: string) => {
+    const owner = { kind: 'melt' as const, quoteId };
+    return {
+      owner,
+      operationId: `op-${quoteId}`,
+      toast: {
+        variant: 'melt' as const,
+        id: quoteId,
+        owner,
+        mintUrl: MINT,
+        amount: 10,
+        unit: 'sat',
+        state: 'confirmed' as const,
+      },
+    };
+  };
+  const waitingMelt = (key: string) =>
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: key,
+      owner: { kind: 'pending', key },
+      mintUrl: MINT,
+      amount: 10,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+  it('keeps the waiting toast’s own result however many others are held after it', () => {
+    waitingMelt('toast');
+    const store = usePaymentStatusStore.getState();
+    store.deliverResult(meltResult('own'), ['melt']);
+    for (let i = 0; i < 25; i += 1) store.deliverResult(meltResult(`other-${i}`), ['melt']);
+
+    usePaymentStatusStore.getState().bindOwner('toast', { kind: 'melt', quoteId: 'own' });
+
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      id: 'toast',
+      state: 'confirmed',
+      operationId: 'op-own',
+    });
+  });
+
+  it('still drops the oldest results once no toast is waiting for them', () => {
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'bound',
+      owner: { kind: 'melt', quoteId: 'bound' },
+      mintUrl: MINT,
+      amount: 10,
+      unit: 'sat',
+      state: 'processing',
+    });
+    const store = usePaymentStatusStore.getState();
+    for (let i = 0; i < 25; i += 1) store.deliverResult(meltResult(`other-${i}`), ['melt']);
+
+    const held = usePaymentStatusStore.getState().held;
+    expect(held).toHaveLength(20);
+    expect(held[0]?.owner).toEqual({ kind: 'melt', quoteId: 'other-5' });
   });
 });

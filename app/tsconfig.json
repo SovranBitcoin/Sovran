@@ -47,6 +47,7 @@
       "wallet/units": ["../wallet/src/units/index.ts"],
       "wallet/safeFetch": ["../wallet/src/safeFetch.ts"],
       "wallet/operations": ["../wallet/src/operations/index.ts"],
+      "wallet/redeemEntry": ["../wallet/src/transport/redeemEntry.ts"],
       "@/*": ["./*"],
       "@/shared/*": ["./shared/*"],
       "@/features/*": ["./features/*"],

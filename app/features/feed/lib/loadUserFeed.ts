@@ -14,18 +14,14 @@ export interface UserFeedLoadCtx {
   hasMoreRef: { current: boolean };
   paginationCursorRef: { current: FeedParseResult['paginationCursor'] };
   paginationUntilRef: { current: number };
-  paginationOffsetRef: { current: number };
   loadingMoreRef: { current: boolean };
   feedItemIdsRef: { current: Set<string> };
   activeLoadMoreIdRef: { current: string | null };
-  isFirstRender: { current: boolean };
   deletedRepostIdsRef: { current: Record<string, number> | null };
   quotedRef: UserFeedContentState['quotedRef'];
   profilesRef: UserFeedContentState['profilesRef'];
-  applyPage: UserFeedContentState['applyPage'];
   appendPage: UserFeedContentState['appendPage'];
   applyEnrichment: UserFeedContentState['applyEnrichment'];
-  resetContent: UserFeedContentState['resetContent'];
   setIsLoadingMore: (value: boolean) => void;
 }
 

@@ -30,9 +30,15 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
-import { PaymentRequestTransportType, type PaymentRequestTransport } from '@cashu/cashu-ts';
+import {
+  JSONInt,
+  PaymentRequestTransportType,
+  decodePaymentRequest,
+  type PaymentRequestTransport,
+} from '@cashu/cashu-ts';
 import type { Plugin } from '@cashu/coco-core/plugin';
 import type { PaymentRequestReceiveOperation } from '@cashu/coco-core';
+import { paymentRequestEncodingsHandedOut, paymentRequestEncodingsVersion } from 'wallet';
 
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { PAYMENT_RELAYS } from '@/shared/lib/nostr/sendDirectMessage';
@@ -88,22 +94,63 @@ function looksLikePaymentRequestPayload(content: string): boolean {
   return trimmed.startsWith('{') && trimmed.includes('"proofs"') && trimmed.includes('"mint"');
 }
 
-/**
- * NUT-18 makes `unit` default to sat, but coco rejects a payload without one.
- * Fill it in rather than drop a payer's ecash; otherwise pass the raw string
- * through untouched so coco's integer-safe parse and payload hash still apply.
- */
-export function withDefaultUnit(content: string): string {
+function isEncodedPaymentRequest(value: string): boolean {
+  if (!value.startsWith('creq')) return false;
   try {
-    const raw: unknown = JSON.parse(content);
-    if (raw && typeof raw === 'object' && !('unit' in raw && (raw as { unit?: unknown }).unit)) {
-      return JSON.stringify({ ...raw, unit: 'sat' });
-    }
+    decodePaymentRequest(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A rumor ready for Coco, or one no request this wallet holds can claim. */
+type PreparedPayload = { claimable: true; content: string } | { claimable: false };
+
+/**
+ * Shape a payer's payload for Coco.
+ *
+ * - NUT-18 makes `unit` default to sat, but Coco rejects a payload without
+ *   one: fill it in rather than drop a payer's ecash.
+ * - 0.1.3 sends the whole encoded request it scanned as the payload `id`
+ *   (wallet/src/operations/defaultOperations.ts:1821 at d9ad12c4b); Coco
+ *   routes by the request's own id. `requestIdFor` answers only for a string
+ *   byte-equal to one this wallet handed out for a request it holds, and that
+ *   request's id replaces it. Any other `id` that decodes as a payment request
+ *   can never be claimed here.
+ *
+ * Content that needs neither passes through byte for byte. Changed content
+ * goes through cashu-ts's integer-safe JSON, so no amount is rounded and the
+ * proofs keep their order and fields.
+ */
+export function preparePayload(
+  content: string,
+  requestIdFor: (encodedRequest: string) => string | undefined
+): PreparedPayload {
+  let raw: unknown;
+  try {
+    raw = JSONInt.parse(content);
   } catch {
     // Not JSON: coco reports it.
+    return { claimable: true, content };
   }
-  return content;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { claimable: true, content };
+  const fields = raw as { id?: unknown; unit?: unknown };
+  const patch: { id?: string; unit?: string } = {};
+  if (!fields.unit) patch.unit = 'sat';
+  if (typeof fields.id === 'string') {
+    const requestId = requestIdFor(fields.id);
+    if (requestId !== undefined) patch.id = requestId;
+    else if (isEncodedPaymentRequest(fields.id)) return { claimable: false };
+  }
+  if (patch.id === undefined && patch.unit === undefined) return { claimable: true, content };
+  return { claimable: true, content: JSONInt.stringify({ ...raw, ...patch }) ?? content };
 }
+
+/** How many unclaimable wraps are kept for another look. */
+const MAX_SET_ASIDE_WRAPS = 200;
+
+type SetAsideEnvelope = { id: string; kind: number; content: string; pubkey: string };
 
 export function createPaymentRequestNostrTransportPlugin(
   config: NostrTransportPluginConfig
@@ -120,30 +167,57 @@ export function createPaymentRequestNostrTransportPlugin(
           return buildNostrDataLayer();
         });
 
-      const activeOps = new Set<string>();
+      const activeOps = new Map<
+        string,
+        Pick<PaymentRequestReceiveOperation, 'requestId' | 'encodedRequest'>
+      >();
+      /** Counts activations, so a wrap set aside as unclaimable is looked at
+       *  again once the wallet holds a request it did not hold before. */
+      let activations = 0;
+      /** Changes whenever the set of requests a payload may name can grow:
+       *  a request activates, or the wallet hands out a new encoding. */
+      const knownRequestsVersion = () => activations + paymentRequestEncodingsVersion();
+      /** The id of the active request this wallet handed out `encoded` for. */
+      const requestIdFor = (encoded: string): string | undefined => {
+        for (const op of activeOps.values()) {
+          if (op.requestId === undefined) continue;
+          if (
+            encoded === op.encodedRequest ||
+            paymentRequestEncodingsHandedOut(op.encodedRequest)?.has(encoded)
+          ) {
+            return op.requestId;
+          }
+        }
+        return undefined;
+      };
       // Terminal wraps stay deduplicated for the whole manager/profile session.
-      let inboxSession: {
+      type InboxSession = {
         viewerPubkey: string;
         newestCreatedAtSec: number | undefined;
         seenWraps: Set<string>;
         inFlightWraps: Set<string>;
-      } = {
-        viewerPubkey: '',
+        /** Wraps naming a payment request this wallet does not hold, with the
+         *  `knownRequestsVersion` they were checked against. The envelope is
+         *  kept so it can be offered again once the wallet holds more requests:
+         *  by then the inbox read window may have moved past it. */
+        unclaimableWraps: Map<string, { version: number; envelope: SetAsideEnvelope }>;
+      };
+      const newSession = (viewerPubkey: string): InboxSession => ({
+        viewerPubkey,
         newestCreatedAtSec: undefined,
         seenWraps: new Set<string>(),
         inFlightWraps: new Set<string>(),
-      };
+        unclaimableWraps: new Map<string, { version: number; envelope: SetAsideEnvelope }>(),
+      });
+      let inboxSession = newSession('');
       const sessionFor = (viewerPubkey: string) => {
-        if (inboxSession.viewerPubkey !== viewerPubkey) {
-          inboxSession = {
-            viewerPubkey,
-            newestCreatedAtSec: undefined,
-            seenWraps: new Set<string>(),
-            inFlightWraps: new Set<string>(),
-          };
-        }
+        if (inboxSession.viewerPubkey !== viewerPubkey) inboxSession = newSession(viewerPubkey);
         return inboxSession;
       };
+      const isSettled = (session: InboxSession, wrapId: string) =>
+        session.seenWraps.has(wrapId) ||
+        session.inFlightWraps.has(wrapId) ||
+        session.unclaimableWraps.get(wrapId)?.version === knownRequestsVersion();
       const appState = config.appState ?? AppState;
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
@@ -175,8 +249,9 @@ export function createPaymentRequestNostrTransportPlugin(
         if (!secretKey) return false;
         const viewerPubkey = getPublicKey(secretKey);
         if (viewerPubkey !== expectedViewerPubkey) return false;
-        const { seenWraps, inFlightWraps } = sessionFor(viewerPubkey);
-        if (seenWraps.has(envelope.id) || inFlightWraps.has(envelope.id)) return false;
+        const session = sessionFor(viewerPubkey);
+        const { seenWraps, inFlightWraps, unclaimableWraps } = session;
+        if (isSettled(session, envelope.id)) return false;
         inFlightWraps.add(envelope.id);
         try {
           const rumor = giftWrapCache.unwrap(
@@ -190,7 +265,35 @@ export function createPaymentRequestNostrTransportPlugin(
             return false;
           }
           if (disposed) return false;
-          const result = await service.ingestPayload(withDefaultUnit(rumor.content), {
+          const prepared = preparePayload(rumor.content, requestIdFor);
+          if (!prepared.claimable) {
+            // Names a payment request this wallet does not hold: Coco could
+            // only refuse it. Set aside until the wallet holds more requests.
+            // Re-inserted so the oldest entry is the least recently checked.
+            unclaimableWraps.delete(envelope.id);
+            unclaimableWraps.set(envelope.id, {
+              version: knownRequestsVersion(),
+              envelope: {
+                id: envelope.id,
+                kind: envelope.kind,
+                content: envelope.content,
+                pubkey: envelope.pubkey,
+              },
+            });
+            // Anyone can send these; keep the newest and let the oldest go
+            // back to depending on the inbox read.
+            if (unclaimableWraps.size > MAX_SET_ASIDE_WRAPS) {
+              const oldest = unclaimableWraps.keys().next().value;
+              if (oldest !== undefined) unclaimableWraps.delete(oldest);
+            }
+            cashuLog.debug('cashu.creq.transport.payload_unclaimable', {
+              source,
+              contentLength: rumor.content.length,
+            });
+            return false;
+          }
+          unclaimableWraps.delete(envelope.id);
+          const result = await service.ingestPayload(prepared.content, {
             transport: 'nostr',
             transportMessageId: envelope.id,
             senderPubkey: rumor.senderPubkey,
@@ -294,8 +397,14 @@ export function createPaymentRequestNostrTransportPlugin(
               session.newestCreatedAtSec ?? envelope.createdAtSec,
               envelope.createdAtSec
             );
-            if (session.seenWraps.has(envelope.id) || session.inFlightWraps.has(envelope.id))
-              continue;
+            if (isSettled(session, envelope.id)) continue;
+            if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
+          }
+          // Wraps set aside earlier that this read did not return: offer each
+          // again if the wallet holds requests it did not hold when checked.
+          for (const { envelope } of [...session.unclaimableWraps.values()]) {
+            if (disposed || activeOps.size === 0 || inboxSession !== session) break;
+            if (isSettled(session, envelope.id)) continue;
             if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
           }
           cashuLog.debug('cashu.creq.transport.poll_done', {
@@ -463,7 +572,11 @@ export function createPaymentRequestNostrTransportPlugin(
           };
         },
         activate(operation) {
-          activeOps.add(operation.id);
+          activeOps.set(operation.id, {
+            requestId: operation.requestId,
+            encodedRequest: operation.encodedRequest,
+          });
+          activations += 1;
           cashuLog.info('cashu.creq.transport.activated', {
             operationId: operation.id,
             activeOps: activeOps.size,

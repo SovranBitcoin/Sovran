@@ -18,11 +18,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { cashuLog } from '../logger';
+import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import {
   PROFILE_STORE_PERSIST_VERSION,
   useProfileStore,
 } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 
 const isRecorded = (accountIndex: number): boolean =>
   useProfileStore.getState().profiles.find((p) => p.accountIndex === accountIndex)
@@ -42,18 +44,11 @@ export function askForRestoreIfWalletDatabaseLost(accountIndex: number, wasEmpty
   cashuLog.warn('cashu.wallet_database.lost', { accountIndex });
   const ask = () => {
     const { restoreStatus, setRestoreStatus } = useWalletLifecycleStore.getState();
-    if (restoreStatus !== 'pending' && restoreStatus !== 'failed') setRestoreStatus('pending');
+    // Already on the recovery screen: a failed run keeps showing its error.
+    if (!isRestoreAsked(restoreStatus)) setRestoreStatus('pending');
   };
-  const { persist } = useWalletLifecycleStore;
-  if (persist.hasHydrated()) {
-    ask();
-    return;
-  }
   // Loading the saved status afterwards would put `complete` back over it.
-  const stop = persist.onFinishHydration(() => {
-    stop();
-    ask();
-  });
+  onceLoaded(useWalletLifecycleStore, ask);
 }
 
 /** Call once an account's database has been opened and migrated. */

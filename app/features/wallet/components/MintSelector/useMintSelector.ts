@@ -1,18 +1,10 @@
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
-
-import type { MintAvailability } from 'wallet';
 
 import { useBalanceContext } from '@cashu/coco-react';
 
 import { useMintManagement } from '@/features/mint';
-import {
-  getContentWidthFromButtonWidth,
-  getHeaderTitleWidthFromWidth,
-  HEADER_LAYOUT,
-} from '@/features/wallet/lib/walletHeader';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from 'wallet/amount';
 import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -25,8 +17,6 @@ export interface MintSelectorProps {
   selectedMintUrl?: string;
   /** Called when user taps to open the full mint list. Omit to render a non-interactive pill. */
   onRequestMintList?: () => void;
-  /** Availability info per trusted mint. Filters the dropdown. */
-  trustedMints?: MintAvailability[];
   /** Unit for balance display. Default: 'sat'. */
   unit?: string;
   /** Override button width (e.g. 280 for quote screens). Otherwise auto-calculated from window. */
@@ -47,18 +37,12 @@ interface MintSelectorShared {
   isLoading: boolean;
   unit: string;
   onRequestMintList: (() => void) | undefined;
-  dimensions: {
-    buttonWidth: number;
-    contentWidth: number;
-    contentHeight: number;
-  };
 }
 
 export function useMintSelector({
   selectedMintUrl,
   onRequestMintList,
   unit = 'sat',
-  width,
 }: MintSelectorProps): MintSelectorShared {
   const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { balances: liveBalances } = useBalanceContext();
@@ -89,15 +73,6 @@ export function useMintSelector({
   // with no selection — in those cases the component shows a "Select Mint" placeholder.
   const isLoading = Boolean(mintUrl && !mintData && isMintsLoading);
 
-  const { width: windowWidth } = useWindowDimensions();
-
-  const dimensions = useMemo(() => {
-    const buttonWidth = width ?? getHeaderTitleWidthFromWidth(windowWidth);
-    const contentWidth = getContentWidthFromButtonWidth(buttonWidth) ?? buttonWidth;
-    const contentHeight = HEADER_LAYOUT.BUTTON_HEIGHT - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
-    return { buttonWidth, contentWidth, contentHeight };
-  }, [width, windowWidth]);
-
   useEffect(() => {
     walletLog.debug('mintSelector.state', {
       ...mintUrlLogFields(mintUrl),
@@ -112,13 +87,9 @@ export function useMintSelector({
       isMintsLoading,
       isLoading,
       hasRequestMintList: !!onRequestMintList,
-      buttonWidth: dimensions.buttonWidth,
-      contentWidth: dimensions.contentWidth,
     });
   }, [
     balance,
-    dimensions.buttonWidth,
-    dimensions.contentWidth,
     isLoading,
     isMintsLoading,
     mintData,
@@ -140,6 +111,5 @@ export function useMintSelector({
     isLoading,
     unit,
     onRequestMintList,
-    dimensions,
   };
 }

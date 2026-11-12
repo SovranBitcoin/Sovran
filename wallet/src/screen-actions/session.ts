@@ -27,7 +27,7 @@ export type ScreenActionEntrySeed =
   | string
   | undefined;
 
-export type ScreenActionEntryUpdateSubscriber = (
+type ScreenActionEntryUpdateSubscriber = (
   callback: (entry: Record<string, unknown>) => void,
 ) => () => void;
 
@@ -54,7 +54,7 @@ export interface ScreenActionSession<S extends ScreenType> {
   dispose: () => void;
 }
 
-export interface CreateScreenActionSessionConfig<S extends ScreenType> {
+interface CreateScreenActionSessionConfig<S extends ScreenType> {
   screenType: S;
   handlers: ScreenActionHandlerMap[S];
   defaultHandlers?: ScreenActionHandlerMap[S];

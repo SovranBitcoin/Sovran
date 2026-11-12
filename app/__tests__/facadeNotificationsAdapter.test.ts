@@ -13,16 +13,15 @@ function event(id: string, created_at: number) {
 }
 
 describe('toFacadeNotificationsRequest', () => {
-  it('maps ALL/MENTIONS tabs + until→cursor; falls back (null) for APP', () => {
+  it('maps ALL/MENTIONS tabs + until→cursor', () => {
     const req = toFacadeNotificationsRequest({
       viewerPubkey: PUB,
       tab: 'MENTIONS',
       until: 500,
       limit: 30,
     });
-    expect(req?.tab).toBe('MENTIONS');
-    expect(req?.cursor).toEqual({ createdAt: 500, id: '' });
-    expect(toFacadeNotificationsRequest({ viewerPubkey: PUB, tab: 'APP' as never })).toBeNull();
+    expect(req.tab).toBe('MENTIONS');
+    expect(req.cursor).toEqual({ createdAt: 500, id: '' });
   });
 });
 
@@ -87,7 +86,7 @@ describe('ownEventIds pass-through', () => {
       tab: 'ALL',
       ownEventIds: ['a'.repeat(64)],
     });
-    expect(request?.ownEventIds).toEqual(['a'.repeat(64)]);
+    expect(request.ownEventIds).toEqual(['a'.repeat(64)]);
   });
 
   it('omits an empty ownEventIds list', () => {
@@ -96,6 +95,6 @@ describe('ownEventIds pass-through', () => {
       tab: 'ALL',
       ownEventIds: [],
     });
-    expect(request?.ownEventIds).toBeUndefined();
+    expect(request.ownEventIds).toBeUndefined();
   });
 });

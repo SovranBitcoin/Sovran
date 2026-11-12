@@ -17,6 +17,8 @@ let mockRetryAt: number | null = null;
 let mockDue = false;
 const mockHydrationListeners = new Set<() => void>();
 let mockLive: ((page: DmEnvelopePage) => void) | undefined;
+// Cache hydrations (with their viewer) and decrypts, in the order they ran.
+const mockSteps: string[] = [];
 
 jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
   fetchDmEnvelopes: (params: unknown) => mockFetch(params),
@@ -28,7 +30,11 @@ jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
 // One message per envelope, carrying the envelope id, so intake calls can be
 // traced back to pages.
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
-  decryptDmEnvelopes: (envelopes: { id: string }[]) => envelopes.map(({ id }) => ({ id })),
+  hydrateDmDecryptCaches: jest.requireActual<
+    typeof import('@/features/payments/data/dmDecryptPipeline')
+  >('@/features/payments/data/dmDecryptPipeline').hydrateDmDecryptCaches,
+  decryptDmEnvelopes: (envelopes: { id: string }[]) =>
+    (mockSteps.push('decrypt'), envelopes).map(({ id }) => ({ id })),
 }));
 jest.mock('@/features/payments/lib/dmEcashIntake', () => ({
   intakeDmEcash: (dm: { id: string }, deps: { stillCurrent: () => boolean }) => {
@@ -42,16 +48,18 @@ jest.mock('@/features/payments/lib/dmEcashRecovery', () => ({
 jest.mock('@/features/nearPay/lib/nutDropAutoRedeem', () => ({
   drainNutDropRedeemQueue: () => mockDrain(),
 }));
-jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  getActiveProfilePubkey: () => mockActiveProfile,
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => mockActiveProfile,
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { isInitialized: () => false } }));
 jest.mock('@/shared/lib/routstr/spentProbe', () => ({ isTokenSpent: jest.fn() }));
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
-  giftWrapCache: { cache: { hydrate: async () => undefined } },
+  giftWrapCache: {
+    cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip17:${viewer}`) },
+  },
 }));
 jest.mock('@/shared/lib/nostr/nip04Cache', () => ({
-  nip04Cache: { hydrate: async () => undefined },
+  nip04Cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip04:${viewer}`) },
 }));
 jest.mock('@/shared/lib/protocolIds', () => ({ cashuP2pkPubkeyFromNostrHex: () => '02ab' }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
@@ -67,7 +75,7 @@ jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
     getState: () => ({ byTokenHash: {} }),
     persist: {
       hasHydrated: () => mockHydrated,
-      onHydrate: () => () => undefined,
+      getOptions: () => ({ name: 'nut-drop-redeem-queue' }),
       onFinishHydration: (listener: () => void) => {
         mockHydrationListeners.add(listener);
         return () => mockHydrationListeners.delete(listener);
@@ -136,6 +144,7 @@ beforeEach(() => {
   mockDrain.mockClear();
   mockIntake.mockReset().mockResolvedValue('not-a-token');
   mockLive = undefined;
+  mockSteps.length = 0;
   mockQueueHasWork = false;
   mockActiveProfile = 'a'.repeat(64);
   mockHydrated = true;
@@ -154,6 +163,16 @@ afterEach(() => {
 });
 
 describe('reading the message inbox for ecash', () => {
+  it('warms both decryption caches for the profile before each pass decrypts', async () => {
+    const viewer = 'a'.repeat(64);
+    mockFetch.mockResolvedValue(page(['a'], 1000, false));
+    await mount();
+    expect(mockSteps).toEqual([`nip17:${viewer}`, `nip04:${viewer}`, 'decrypt']);
+    mockSteps.length = 0;
+    await returnToForeground();
+    expect(mockSteps).toEqual([`nip17:${viewer}`, `nip04:${viewer}`, 'decrypt']);
+  });
+
   it('walks back page by page until the inbox ends', async () => {
     mockFetch
       .mockResolvedValueOnce(page(['a', 'b'], 1000, true))
@@ -231,6 +250,31 @@ describe('reading the message inbox for ecash', () => {
     await settle();
     expect(mockDrain).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['unknown', 'complete', 1],
+    ['pending', 'complete', 1],
+    ['in-progress', 'complete', 1],
+    ['failed', 'complete', 1],
+    ['pending', 'not-needed', 1],
+    ['not-needed', 'complete', 0],
+    ['pending', 'failed', 0],
+    ['pending', 'unknown', 0],
+  ] as const)(
+    'serves the queue when the restore status moves from %s to %s: %s drain',
+    async (from, to, drains) => {
+      useWalletLifecycleStore.setState({ restoreStatus: from });
+      mockFetch.mockResolvedValue(page([], 0, false));
+      await mount();
+      mockQueueHasWork = true;
+      mockDrain.mockClear();
+      act(() => {
+        useWalletLifecycleStore.setState({ restoreStatus: to });
+      });
+      await settle();
+      expect(mockDrain).toHaveBeenCalledTimes(drains);
+    }
+  );
 
   it('stops when the transport ignores the cursor and returns the same inbox again', async () => {
     // The relay tier answers every request with the whole inbox.

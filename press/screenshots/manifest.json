@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "baselineDenominator": 212,
+  "baselineDenominator": 228,
   "inventory": [
     {
       "platform": "android",
@@ -196,7 +196,7 @@
       "privacy": "disposable-profile",
       "platform": "android",
       "baseline": false,
-      "stepId": "T17",
+      "stepId": "T19",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -207,7 +207,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T18"
       ],
       "routes": [],
       "capture": "android/onboarding-carousel--privacy.png"
@@ -224,7 +224,7 @@
       "privacy": "disposable-profile",
       "platform": "android",
       "baseline": false,
-      "stepId": "T15",
+      "stepId": "T16",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -235,7 +235,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T14"
+        "T15"
       ],
       "routes": [],
       "capture": "android/onboarding-carousel--profile.png"
@@ -252,7 +252,7 @@
       "privacy": "disposable-profile",
       "platform": "android",
       "baseline": false,
-      "stepId": "T19",
+      "stepId": "T22",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -263,38 +263,10 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T18"
+        "T21"
       ],
       "routes": [],
       "capture": "android/onboarding-carousel--start-small.png"
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "welcome",
-      "occurrence": 1,
-      "state": "default",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Welcome to Sovran"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "android",
-      "baseline": true,
-      "stepId": "T21",
-      "status": "stale",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "android",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T20"
-      ],
-      "routes": [],
-      "capture": "android/welcome.png"
     },
     {
       "scenario": "marketing.screenshots.wallpapers",
@@ -349,7 +321,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "P32"
+        "P34"
       ],
       "routes": [
         "(drawer)/(tabs)/index/index.tsx"
@@ -874,7 +846,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T46",
+      "stepId": "T47",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -885,7 +857,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T45"
+        "T46"
       ],
       "routes": [
         "(receive-flow)/receive.tsx"
@@ -1114,7 +1086,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T14",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -1125,7 +1097,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T12"
+        "T13"
       ],
       "routes": [
         "(receive-flow)/lightningReceive.tsx",
@@ -1147,9 +1119,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T22",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1235,9 +1207,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T15",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1267,9 +1239,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T10",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1940,6 +1912,110 @@
       "capture": "android/dm-chat.png"
     },
     {
+      "platform": "android",
+      "page": "details",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review details.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "details.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "android",
+      "page": "picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review picker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "picker.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "android",
+      "page": "emoji-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review emojiPicker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "emojiPicker.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "android",
+      "page": "note-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review notes.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "notes.tsx"
+      ],
+      "capture": null
+    },
+    {
       "scenario": "capture.local-navigation",
       "page": "camera",
       "occurrence": 1,
@@ -2131,7 +2207,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T35",
+      "stepId": "T36",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2142,7 +2218,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T34"
+        "T35"
       ],
       "routes": [
         "(drawer)/(tabs)/contacts/index.tsx"
@@ -2221,7 +2297,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T30",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2232,7 +2308,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T29"
       ],
       "routes": [
         "(drawer)/(tabs)/ai/index.tsx"
@@ -2246,7 +2322,7 @@
       "state": "model-picker",
       "evidenceClass": "native-fixture",
       "readiness": [
-        "e2e-action-menu-open:model-picker"
+        "Model"
       ],
       "privacy": "public-fixture",
       "platform": "android",
@@ -2371,7 +2447,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T11",
+      "stepId": "T12",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2382,7 +2458,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T10"
+        "T11"
       ],
       "routes": [
         "(transactions-flow)/transactions.tsx"
@@ -2401,7 +2477,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T42",
+      "stepId": "T43",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2412,7 +2488,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T41"
+        "T42"
       ],
       "routes": [
         "(mint-flow)/distribution.tsx"
@@ -2458,9 +2534,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T29",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -3120,6 +3196,32 @@
       "capture": "android/profile-share.png"
     },
     {
+      "platform": "android",
+      "page": "receive-message-ecash",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (receive-flow)/messageEcash.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(receive-flow)/messageEcash.tsx"
+      ],
+      "capture": null
+    },
+    {
       "scenario": "capture.receive-rails",
       "page": "receive-rails",
       "occurrence": 3,
@@ -3281,7 +3383,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T17",
+      "stepId": "T25",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3292,7 +3394,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T24"
       ],
       "routes": [
         "(settings-flow)/design-system-empty-states.tsx"
@@ -3311,7 +3413,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T37",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3322,7 +3424,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T36"
       ],
       "routes": [
         "(settings-flow)/design-system-fade-stress.tsx"
@@ -3341,7 +3443,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T05",
+      "stepId": "T13",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3352,7 +3454,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T04"
+        "T12"
       ],
       "routes": [
         "(settings-flow)/design-system-foundations.tsx"
@@ -3371,7 +3473,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T09",
+      "stepId": "T17",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3382,7 +3484,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T08"
+        "T16"
       ],
       "routes": [
         "(settings-flow)/design-system-loading.tsx"
@@ -3401,7 +3503,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T34",
+      "stepId": "T42",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3412,12 +3514,125 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T33"
+        "T41"
       ],
       "routes": [
         "(settings-flow)/design-system-posts.tsx"
       ],
       "capture": "android/settings-design-system-posts.png"
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-screens",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-screens-unit-sat"
+      ],
+      "privacy": "public-fixture",
+      "platform": "android",
+      "baseline": true,
+      "stepId": "T05",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T04"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-screens.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "android",
+      "page": "settings-design-system-prompts",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompts.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompts.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "android",
+      "page": "settings-design-system-prompt",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompt.tsx, (prompt-flow)/cta-sample.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompt.tsx",
+        "(prompt-flow)/cta-sample.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-variations",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-subject-transaction-row"
+      ],
+      "privacy": "public-fixture",
+      "platform": "android",
+      "baseline": true,
+      "stepId": "T09",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T08"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-variations.tsx"
+      ],
+      "capture": null
     },
     {
       "scenario": "capture.design-system",
@@ -3431,9 +3646,9 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T21",
       "status": "blocked",
-      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T21",
       "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
@@ -3459,7 +3674,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T22",
+      "stepId": "T30",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3470,7 +3685,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T21"
+        "T29"
       ],
       "routes": [
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
@@ -4240,9 +4455,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T06",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -4509,7 +4724,7 @@
       "privacy": "disposable-profile",
       "platform": "ios",
       "baseline": false,
-      "stepId": "T17",
+      "stepId": "T19",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4520,7 +4735,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T18"
       ],
       "routes": [],
       "capture": "ios/onboarding-carousel--privacy.png"
@@ -4537,7 +4752,7 @@
       "privacy": "disposable-profile",
       "platform": "ios",
       "baseline": false,
-      "stepId": "T15",
+      "stepId": "T16",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4548,7 +4763,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T14"
+        "T15"
       ],
       "routes": [],
       "capture": "ios/onboarding-carousel--profile.png"
@@ -4565,7 +4780,7 @@
       "privacy": "disposable-profile",
       "platform": "ios",
       "baseline": false,
-      "stepId": "T19",
+      "stepId": "T22",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4576,38 +4791,10 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T18"
+        "T21"
       ],
       "routes": [],
       "capture": "ios/onboarding-carousel--start-small.png"
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "welcome",
-      "occurrence": 1,
-      "state": "default",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Welcome to Sovran"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "ios",
-      "baseline": true,
-      "stepId": "T21",
-      "status": "stale",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "sim",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T20"
-      ],
-      "routes": [],
-      "capture": "ios/welcome.png"
     },
     {
       "scenario": "marketing.screenshots.wallpapers",
@@ -4662,7 +4849,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "P32"
+        "P34"
       ],
       "routes": [
         "(drawer)/(tabs)/index/index.tsx"
@@ -5187,7 +5374,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T46",
+      "stepId": "T47",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -5198,7 +5385,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T45"
+        "T46"
       ],
       "routes": [
         "(receive-flow)/receive.tsx"
@@ -5278,7 +5465,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5427,7 +5614,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T14",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -5438,7 +5625,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T12"
+        "T13"
       ],
       "routes": [
         "(receive-flow)/lightningReceive.tsx",
@@ -5460,9 +5647,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T22",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "stale",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -5492,7 +5679,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T19",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5548,9 +5735,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "stale",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -5580,9 +5767,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T10",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "stale",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -5762,7 +5949,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T03",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5883,7 +6070,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T06",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6232,7 +6419,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T27",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6251,6 +6438,110 @@
         "userMessages.tsx"
       ],
       "capture": "ios/dm-chat.png"
+    },
+    {
+      "platform": "ios",
+      "page": "details",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review details.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "details.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "ios",
+      "page": "picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review picker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "picker.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "ios",
+      "page": "emoji-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review emojiPicker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "emojiPicker.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "ios",
+      "page": "note-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review notes.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "notes.tsx"
+      ],
+      "capture": null
     },
     {
       "scenario": "capture.local-navigation",
@@ -6325,7 +6616,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T50",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6355,7 +6646,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T32",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6444,7 +6735,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T35",
+      "stepId": "T36",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6455,7 +6746,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T34"
+        "T35"
       ],
       "routes": [
         "(drawer)/(tabs)/contacts/index.tsx"
@@ -6475,7 +6766,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T37",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6534,7 +6825,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T30",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6545,7 +6836,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T29"
       ],
       "routes": [
         "(drawer)/(tabs)/ai/index.tsx"
@@ -6559,13 +6850,13 @@
       "state": "model-picker",
       "evidenceClass": "native-fixture",
       "readiness": [
-        "e2e-action-menu-open:model-picker"
+        "Model"
       ],
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": false,
       "stepId": "T44",
-      "status": "stale",
+      "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6684,7 +6975,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T11",
+      "stepId": "T12",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6695,7 +6986,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T10"
+        "T11"
       ],
       "routes": [
         "(transactions-flow)/transactions.tsx"
@@ -6714,7 +7005,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T42",
+      "stepId": "T43",
       "status": "verified",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6725,7 +7016,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T41"
+        "T42"
       ],
       "routes": [
         "(mint-flow)/distribution.tsx"
@@ -6771,9 +7062,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T29",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "stale",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -7433,6 +7724,32 @@
       "capture": "ios/profile-share.png"
     },
     {
+      "platform": "ios",
+      "page": "receive-message-ecash",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (receive-flow)/messageEcash.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(receive-flow)/messageEcash.tsx"
+      ],
+      "capture": null
+    },
+    {
       "scenario": "capture.receive-rails",
       "page": "receive-rails",
       "occurrence": 3,
@@ -7594,7 +7911,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T17",
+      "stepId": "T25",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7605,7 +7922,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T24"
       ],
       "routes": [
         "(settings-flow)/design-system-empty-states.tsx"
@@ -7624,7 +7941,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T37",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7635,7 +7952,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T36"
       ],
       "routes": [
         "(settings-flow)/design-system-fade-stress.tsx"
@@ -7654,7 +7971,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T05",
+      "stepId": "T13",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7665,7 +7982,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T04"
+        "T12"
       ],
       "routes": [
         "(settings-flow)/design-system-foundations.tsx"
@@ -7684,7 +8001,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T09",
+      "stepId": "T17",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7695,7 +8012,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T08"
+        "T16"
       ],
       "routes": [
         "(settings-flow)/design-system-loading.tsx"
@@ -7714,7 +8031,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T34",
+      "stepId": "T42",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7725,12 +8042,125 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T33"
+        "T41"
       ],
       "routes": [
         "(settings-flow)/design-system-posts.tsx"
       ],
       "capture": "ios/settings-design-system-posts.png"
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-screens",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-screens-unit-sat"
+      ],
+      "privacy": "public-fixture",
+      "platform": "ios",
+      "baseline": true,
+      "stepId": "T05",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T04"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-screens.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "ios",
+      "page": "settings-design-system-prompts",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompts.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompts.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "platform": "ios",
+      "page": "settings-design-system-prompt",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompt.tsx, (prompt-flow)/cta-sample.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompt.tsx",
+        "(prompt-flow)/cta-sample.tsx"
+      ],
+      "capture": null
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-variations",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-subject-transaction-row"
+      ],
+      "privacy": "public-fixture",
+      "platform": "ios",
+      "baseline": true,
+      "stepId": "T09",
+      "status": "planned",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T08"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-variations.tsx"
+      ],
+      "capture": null
     },
     {
       "scenario": "capture.design-system",
@@ -7744,9 +8174,9 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T21",
       "status": "blocked",
-      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T21",
       "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
@@ -7772,7 +8202,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T22",
+      "stepId": "T30",
       "status": "stale",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7783,7 +8213,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T21"
+        "T29"
       ],
       "routes": [
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
@@ -8553,9 +8983,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T06",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "stale",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -8695,30 +9125,30 @@
       "scenario": "store.screenshots",
       "occurrence": 1,
       "stepId": "T01",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:43:21.963Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:29:26.636Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "19a028ce28f32e3b6090bfb272ed0a52d557a094f481c0446d4d7063d23679c0",
-      "sha256": "d0166a0b8d4292cf744d00546bb405523c62dc78940613afe523e931637f84a5",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "2f3ccbb50c72379ecca06bb2744f85df47fa18042529c63a3482a243eb2feee8",
+      "sha256": "1fa9abca0b6a8e78dc6a41c3de333badcf32ee70218c1a54341ba9dcb2ba5731",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -8748,31 +9178,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T11",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:44:08.385Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T12",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:30:15.472Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "3a03e50ba9f4a669998fa2e5b5357b821f67c2b37d0cef75e0c41a683034a657",
-      "sha256": "f8d35932acb8c326dc19f6bfbefd50fae648a381e2e4e808df140cdb1acee10b",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "f91b879995fc578ed259a4a4c0793b22059737b58900c0bbba46c49bb75047ab",
+      "sha256": "6b9275261dbc7b4f06907f386c9493be91dd6beec6ed65d0c1c4d91deca73f94",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -8802,31 +9232,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T13",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:44:16.305Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T14",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:30:23.563Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "4ac9b514093c762bace435589c6f37f0ce7a4dab395bdf63c26c0012a50ee661",
-      "sha256": "e6b4864e82494b5ab9badb395cfacf44df21879c0d3da2f1350cfe0fe367b323",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "f33d5b42d83bb98936985707f739ad17e06db8f0440ca402196ad490d2139f71",
+      "sha256": "b3a84b65e6dd1e829d2f525271dd8cef3f44a09c960d5053fa9c46d252bcc226",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -8856,31 +9286,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T29",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:45:45.504Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T30",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:32:10.327Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "fee25a405de4069a78005ec65dc5297db5152fec46e739211176ba2d68ece849",
-      "sha256": "e35d813fd72cee900ed1f6ff3ebe86652198ded1e6208c8e8b1a605ff3ccf001",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "790174bc3aad39044051615266dc271955c236a7707d161684351c2259444876",
+      "sha256": "a23ef4a897a065f76b449013302b6ea0a73ece751d3307fc7924ec0f8b9b9755",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -8910,31 +9340,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T35",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:46:14.434Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T36",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:32:40.799Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "a445b3f87d0ac743fb96540a68aefa3fa96b06ba2ad32bd7499296ce5d2f9941",
-      "sha256": "b08bd4a1df26a8425b5c9e0c0ae553276970eb5e1ea45c3af1a915d80b624e5f",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "6480ff1b2579cc7185c3f78c824796fc2e926d5a05bcacb7e0916d58a6d26dbc",
+      "sha256": "7eb920d925457e2befc0ae6786da2488dc1703eab9b12b2dcc8cd8cd20fd8af3",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -8964,31 +9394,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T42",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:46:49.135Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T43",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:33:17.100Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "695ff4242e1caf18742fcd3dda7599e7a3af3cec19d5fc64502d5c885052fef2",
-      "sha256": "a253acf897440be7a029cab6398f84fcd8f2394e6497db5b52912b7744ca9fa4",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "d8c44fc4496ea5504402138d1854c0972e2989ff1c213e290ce340701ccc06ff",
+      "sha256": "cf22cbd2ddab1d5eb33f1a1b2efffa6d8afc3ebe7d1dd7abca9742b137c9480d",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9018,31 +9448,31 @@
       "status": "verified",
       "scenario": "store.screenshots",
       "occurrence": 1,
-      "stepId": "T46",
-      "runId": "2026-09-28T04-40-54-232Z-d1e4941a",
-      "capturedAt": "2026-09-28T04:47:13.046Z",
-      "sourceFingerprint": "3fff29e30592539f23b701778c121a42fc6d733d6f6f75ef3da9ab7364287032",
+      "stepId": "T47",
+      "runId": "2026-11-12T02-26-40-784Z-41a69cc9",
+      "capturedAt": "2026-11-12T02:33:40.912Z",
+      "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
       "appSource": {
-        "fingerprint": "98b437a54a3d82ffbbe400f0b03ba4009e7b79b50ab28125461731c4db8cc2c2",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "bb03f3aceab99c219e6f1f092b84f85cfd5d8d97",
         "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "fc011026ee3d1a1ac5ffe30e9f750af7a1c0c870",
-        "appVersion": "0.1.4",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
+        "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "8294122dd49bd0a56dec7aa610643b36742dd008",
-        "builtAt": "2026-09-28T04:40:42.086Z",
-        "artifactSha256": "8de2b199bfc9b058fce68a57303951a73c71db253dd135d513572f33529fcff5"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-      "manifestSha256": "61b9dd3b0a7631d79caee18eaae891647179b0a4ca12cae640a6d38c080b5b7d",
-      "eventsSha256": "a8c75970457e76f318403f29a872d5417cff76453fd0b5525d62c970d3940a0d",
-      "originalSha256": "cb3aaad6552a36f7ee5af2ea2fe4f8ca997ebf9a4e2991c648de4c376845a22f",
-      "sha256": "19c34989d37d246a523c92b9c90d4f17e7b9d0461daa5f048ddf06866883099b",
+      "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+      "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+      "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+      "originalSha256": "65db8dd8584e73f8713e50c4c4e8f273ac3c3162bff46f3a1e47adfc36cd655c",
+      "sha256": "ae7ef592d3a34d796b1f995606dcdc064852cf8c83be60bc82a9d2794f8f2d03",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "3ce6bd80d8de86c7de2a247f58ec80f9a6302bb7a57c89410caabc0e0db9ef37",
+      "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9073,30 +9503,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T03",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:44:18.280Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:14:23.919Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "d9ed04f007679fd8e6e7cb8dba47fad8a6a8f39f848578447e24914b4a313bd7",
-      "sha256": "cc472389af05665460ddb5bb74e2bcbc62d8dd7de6d9b8478a0340885dfbf168",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "b0c6a1b3362bbc764c400e8045f15ae8bdfff4ff21d6445c5cfeed604f9a2bb2",
+      "sha256": "58c97065d5d7edf57ceda742d14094d96cdef662e3fbd8e89de0ac57ed26c19d",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9127,30 +9557,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T06",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:44:25.135Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:14:31.328Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "7415599aaaa4e59ceb18b133f8c179e6cf0dad1da53d5c30e415b1427fe07f9a",
-      "sha256": "f9c9c79a0fe1913af987774e16fadc2a0f27d65ece0c588d8a67d66020e35c21",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "98d8297f660338f01373f2ac8f51b6264171dc0e25cc28d68c5ad7e968c9f953",
+      "sha256": "380116d3db13e12494eb4fa03f81f579085c3719ea88d84db1022fa7c9b88801",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9181,30 +9611,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T15",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:45:11.894Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:15:20.101Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "2b46d10072051de259c31bea7c1d1e4d2263fd805140a52d1a41ca9ae77801ed",
-      "sha256": "d81e6c38de24844b6676f71a3bdcc72fc15f0dae31cd02495f879b1325c02c12",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "3a68cd9deb86e85e28bad1e9c6ebcbbb714480f2f160c06ef52379331f89c5a3",
+      "sha256": "d4be454d37353aaab2e73a31e7b4684c458c610d5e72e7c5f17b22437a3e3e6e",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9235,30 +9665,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T19",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:45:35.367Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:15:42.889Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "ceca215c2322aa4fa9053c80f601e8716fd9cc28d4cd71b08212002670185d27",
-      "sha256": "28ffd6776cae1117a2b880a5797426f4b06b3da9351a28dc1b7522a00dddda25",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "23511653d9ddbbcc983797a17340e821f659f49b3ebe11011adfb8b973dc2489",
+      "sha256": "5204108c6d76678b55d157f6fdf133e98c1e77c8ffce7c96a22d8738e634153c",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9289,30 +9719,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T27",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:46:11.498Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:16:21.380Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "01048904d807a7648edd396f5c01c25e76c697f145f1216f869c548119fde82a",
-      "sha256": "2427581005326d194e35816cb8609040e9e8a2213eedee2fadac1c8693f81c62",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "966908271b3080519c7a602cebd16ab626c35a903cbc475e64de235312785f14",
+      "sha256": "e57df33b6c1516876774c02fa9272ea29a1f94f19d37ce993da4b16969500011",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9343,30 +9773,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T32",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:46:38.848Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:16:49.412Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "6ba6a8b8d39740bd1a71bc103e5d69795df972384ba0594277a795b9f7ed9697",
-      "sha256": "daa675594625e774d094b79a6ee6f8c78ef054e84080234a2880d77ec18b8dcc",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "7db86b21fdd4e828c6306b1bd06072efd21ade6dbfc1066052accd78db5a4e78",
+      "sha256": "868c6af788011549dd009d59f52965d86f4ea8890fd3da5d4a604a77d52b18ca",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9397,30 +9827,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T37",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:47:10.015Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:17:20.691Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
       "originalSha256": "d692041ceebd74d2076ba30f1886bae110d418f12728a10eecfde187186bcf08",
       "sha256": "3fe5f5ee0168038e4186f9865dd4aa159a81d10866d8a5643d4232517566b73f",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9451,30 +9881,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 2,
       "stepId": "T44",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:47:45.607Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:17:55.635Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "4d9a96a371549b068928528755d83580293870d5ff48d44361a0427891353bf7",
-      "sha256": "41a90534bf05304f2def3479ae3b5376e2e0041e8fbff60beb34bc20574a9d9e",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "f1297393beb9fdb75b2e68a7888d31320938d9352c406c240010b141c749fa9f",
+      "sha256": "cd3652748e8548bc59bd7fb7910784bc5db58028f716f82c85004cf2bbec8b73",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",
@@ -9505,30 +9935,30 @@
       "scenario": "marketing.screenshots",
       "occurrence": 1,
       "stepId": "T50",
-      "runId": "2026-09-25T22-41-50-980Z-50222993",
-      "capturedAt": "2026-09-25T22:48:32.270Z",
-      "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
+      "runId": "2026-11-12T02-11-40-025Z-902ef0bc",
+      "capturedAt": "2026-11-12T02:18:44.690Z",
+      "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
       "appSource": {
-        "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
-        "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
-        "gitDirty": true
+        "fingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
+        "gitSha": "20a555fb3a4d6e9f910593f06e0254c5ab40b5ed",
+        "gitDirty": false
       },
       "nativeBuild": {
-        "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+        "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
         "appVersion": "0.1.3",
         "buildNumber": "1",
-        "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-        "builtAt": "2026-09-25T15:26:45.855Z",
-        "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+        "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+        "builtAt": "2026-11-12T01:57:25.941Z",
+        "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
       },
-      "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-      "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-      "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-      "originalSha256": "037584e389ab058ee2ec3ef6714566c2a983cda53cc48afe5b91cd793cdeb88a",
-      "sha256": "e4d8dc1871950cc73a15dad2183024b0edd6a22965a6782e340a0987a13f56da",
+      "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+      "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+      "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+      "originalSha256": "3071be3afac7c8579433c3b892a9749efc14c3decf316999cc41a586f93a0e57",
+      "sha256": "9c83c7f5a6003393f6889517ebed0e2d2d6e41f22796f982cc464d489ca2c878",
       "width": 1320,
       "height": 2868,
-      "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5",
+      "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683",
       "captureProfile": {
         "profile": "library-v1",
         "model": "iPhone 17 Pro Max",

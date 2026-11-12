@@ -4,10 +4,10 @@ export { groupStepsForDisplay, type StepState } from './groupSteps';
 export {
   computeRebalancePlan,
   isAlreadyBalanced,
-  MIN_FEE_RESERVE,
   type TransferStep,
   type RebalancePlan,
 } from './rebalancePlanner';
+export { MIN_FEE_RESERVE } from './transferFee';
 export {
   buildSwapGraph,
   pickIntermediaryPath,

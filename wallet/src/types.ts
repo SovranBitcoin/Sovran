@@ -298,7 +298,7 @@ export interface DestinationAmount {
   unit: string;
 }
 
-export type DestinationRecipientRef =
+type DestinationRecipientRef =
   | { type: 'npub'; value: string } // bech32 npub
   | { type: 'lightningAddress'; value: string } // user@domain (LUD-16)
   | { type: 'pubkey'; value: string }; // 33-byte 02-prefixed P2PK lock from a creq
@@ -469,7 +469,7 @@ export type MintReviewsFetcher = (
  * the mint list screen requires no data fetching — all balances, scores, and availability
  * are pre-computed and passed as props.
  *
- * `status` / `reason` are derived from `MintAvailability` and encode whether the mint is
+ * `status` / `reason` encode whether the mint is
  * selectable in the current flow context (e.g. insufficient balance, not in payment request).
  *
  * Catalog fields (`kymScore`, `auditScore`, etc.) come from `fetchMintCatalog`
@@ -580,22 +580,6 @@ export interface GuardResult {
 // required capabilities for a given intent are covered.
 // ---------------------------------------------------------------------------
 
-export type WalletCapability =
-  | 'amountEntry'
-  | 'mintSelection'
-  | 'optionSelection'
-  | 'proofSelection'
-  | 'meltQuoteFetch'
-  | 'tokenReceive'
-  | 'httpTransport'
-  | 'mintInfo'
-  | 'profileView';
-
-export interface CapabilityCheckResult {
-  covered: boolean;
-  missing: WalletCapability[];
-}
-
 // ---------------------------------------------------------------------------
 // Proof Composition — pure math primitives for subset-sum analysis.
 // The wallet uses these to power its own proof selection UX.
@@ -604,11 +588,6 @@ export interface CapabilityCheckResult {
 export interface ExactOfflineAmountIndex {
   reachableSums: number[];
   totalReadyBalance: number;
-}
-
-export interface FiatMinorUnitSatRange {
-  minSat: number;
-  maxSat: number;
 }
 
 export interface CompositionResult {

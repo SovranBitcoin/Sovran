@@ -10,7 +10,8 @@ import {
   type PrimalConnection,
   type RawPrimalEvent,
 } from '../src/facade/primal';
-import { createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createNostrDataLayer } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 import type { NaggError } from '../src/errors';
 
 const ID_A = 'a'.repeat(64);

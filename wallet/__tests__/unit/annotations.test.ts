@@ -12,7 +12,6 @@ import {
   createInMemoryAnnotationStore,
   decodeAnnotation,
   encodeAnnotation,
-  firstAnnotationRecord,
   mergeAnnotationRecords,
   getCounterparty,
   getScanSource,
@@ -529,18 +528,6 @@ describe("in-memory annotation store", () => {
     });
   });
 
-  it("getMany + firstAnnotationRecord resolves the first hit across candidate keys", () => {
-    const store = createInMemoryAnnotationStore();
-    store.set("op:OP", { scanMethod: "qr" });
-    const entry: AnnotationEntryLike = {
-      id: "real",
-      type: "receive",
-      operationId: "OP",
-    };
-    const record = firstAnnotationRecord(store.getMany(candidateKeys(entry)));
-    expect(record).toEqual({ scanMethod: "qr" });
-  });
-
   it("linkAnnotation pattern bridges a raw key to the final entry key", () => {
     // The write hook implements linkAnnotation as get(from) → set(to). Verify
     // that an entry resolves the scan written under its raw key once bridged.
@@ -559,7 +546,9 @@ describe("in-memory annotation store", () => {
     const bridged = store.get(rawKey);
     if (bridged) store.set(annotationKey(entry), bridged);
 
-    const record = firstAnnotationRecord(store.getMany(candidateKeys(entry)));
+    const record = store
+      .getMany(candidateKeys(entry))
+      .find((found) => found !== undefined);
     const bridgedEntry: ReadModelEntry = { id: "r" };
     expect(
       getScanSource(mergeAnnotationsIntoEntry(bridgedEntry, record)),

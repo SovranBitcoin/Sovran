@@ -1,3 +1,4 @@
+import { supersedes } from 'nostr';
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import type { FeedItem } from '../components/nostr/feedTypes';
 
@@ -11,11 +12,8 @@ export type MuteList = {
 };
 
 export function isNewerMuteList(next: MuteList, current: MuteList | null): boolean {
-  return (
-    !current ||
-    next.createdAt > current.createdAt ||
-    (next.createdAt === current.createdAt && next.id < current.id)
-  );
+  const dated = (list: MuteList) => ({ created_at: list.createdAt, id: list.id });
+  return !current || supersedes(dated(next), dated(current));
 }
 
 export function mutedValues(list: MuteList | null, type: 'p' | 'e'): string[] {

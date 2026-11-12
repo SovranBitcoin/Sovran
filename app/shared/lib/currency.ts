@@ -85,7 +85,7 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
   const amount = amountToNumber(input.amount);
 
   if (options.useUserPreference && inputUnit === 'sats') {
-    const displayBtc = options.displayPreference ?? useSettingsStore.getState().getDisplayBtc();
+    const displayBtc = options.displayPreference ?? useSettingsStore.getState().displayBtc;
     const asBtc = displayBtc === 0;
     const value = asBtc ? amount / 100_000_000 : amount;
     const formatted = (asBtc ? btcFormatter : satsFormatter).format(value);

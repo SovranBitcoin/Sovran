@@ -514,9 +514,10 @@ function compactValue(
     return {
       _kind: 'error',
       name: value.name,
-      message: value.message,
+      message: redactKnownSecretSubstrings(value.message),
       stack: (value.stack ?? '')
         .split('\n')
+        .map(redactKnownSecretSubstrings)
         .map((l) => l.trim())
         .filter(Boolean)
         .slice(0, 10),

@@ -22,6 +22,17 @@ import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
+/**
+ * What a saved group can become next. A run ends its group once; a retry
+ * reopens it as running and ends it again. Finished and cancelled never
+ * replace each other.
+ */
+const GROUP_MOVES: Record<SwapGroupState, readonly SwapGroupState[]> = {
+  running: ['finished', 'cancelled'],
+  finished: ['running'],
+  cancelled: ['running'],
+};
+
 export type SwapLegLocalStatus =
   | 'pending'
   | 'creatingInvoice'
@@ -34,6 +45,31 @@ export type SwapLegLocalStatus =
   | 'settling'
   | 'done'
   | 'failed';
+
+/**
+ * What a saved leg can become next, in the order the rebalance engine moves a
+ * transfer (an invoice, then the melt, then the destination's mint) plus the
+ * reconciler's moves from Coco's operations. Done is final. A failed leg goes
+ * again only through a new attempt, which starts with a new invoice.
+ */
+const LEG_MOVES: Record<SwapLegLocalStatus, readonly SwapLegLocalStatus[]> = {
+  pending: ['creatingInvoice', 'invoiceReady', 'melting', 'failed'],
+  creatingInvoice: ['invoiceReady', 'failed'],
+  // A melt whose inputs fell short is prepared again for a smaller invoice,
+  // and paid from here: a leg left here with a melt settles from that melt.
+  invoiceReady: ['melting', 'verifying', 'paymentPending', 'settling', 'failed'],
+  melting: ['invoiceReady', 'verifying', 'paymentPending', 'settling', 'failed'],
+  verifying: ['settling', 'done', 'failed'],
+  paymentPending: ['settling', 'failed'],
+  settling: ['done', 'failed'],
+  done: [],
+  failed: ['creatingInvoice'],
+};
+
+/** A leg status to save; an error message belongs to a failure only. */
+export type SwapLegStatusUpdate =
+  | { localStatus: 'failed'; errorMessage?: string }
+  | { localStatus: Exclude<SwapLegLocalStatus, 'failed'> };
 
 export interface SwapLeg {
   id: string;
@@ -106,9 +142,32 @@ function patchLeg(
   };
 }
 
+/** Move one group along `GROUP_MOVES`; returns the original state when it cannot. */
+function moveGroup(
+  state: SwapTransactionsState,
+  groupId: string,
+  nextState: SwapGroupState
+): SwapTransactionsState {
+  const group = state.groups[groupId];
+  if (!group || group.state === nextState) return state;
+  if (!GROUP_MOVES[group.state].includes(nextState)) {
+    storeLog.warn('store.swap_tx.group_move_refused', {
+      groupId,
+      from: group.state,
+      to: nextState,
+    });
+    return state;
+  }
+  storeLog.info('store.swap_tx.move_group', { groupId, from: group.state, to: nextState });
+  return { ...state, groups: { ...state.groups, [groupId]: { ...group, state: nextState } } };
+}
+
 interface SwapTransactionsActions {
   startGroup: (params: { unit: string; title?: string }) => string;
+  /** End a running group; a group that already ended keeps its end. */
   finalizeGroup: (groupId: string, state: Exclude<SwapGroupState, 'running'>) => void;
+  /** Mark an ended group running again, for a retry of its legs. */
+  reopenGroup: (groupId: string) => void;
 
   addLeg: (
     groupId: string,
@@ -126,11 +185,8 @@ interface SwapTransactionsActions {
     params: { quoteId: string; operationId: string }
   ) => void;
 
-  setLegStatus: (
-    groupId: string,
-    legId: string,
-    params: { localStatus: SwapLegLocalStatus; errorMessage?: string }
-  ) => void;
+  /** Move a leg along `LEG_MOVES`; a move the table does not list is refused. */
+  setLegStatus: (groupId: string, legId: string, update: SwapLegStatusUpdate) => void;
 
   getGroup: (groupId: string) => SwapGroup | null;
 }
@@ -153,6 +209,12 @@ const SwapLegLocalStatusSchema = z
   .catch('failed');
 const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']).catch('cancelled');
 
+/** Longest leg error message kept. */
+const MAX_ERROR_MESSAGE = 2048;
+
+/** A leg's error message as saved: clipped to what the reader accepts. */
+const clipErrorMessage = (message: string | undefined) => message?.slice(0, MAX_ERROR_MESSAGE);
+
 const PersistedLeg = z.looseObject({
   id: z.string().max(128),
   fromMintUrl: z.string().max(2048),
@@ -166,7 +228,10 @@ const PersistedLeg = z.looseObject({
   chainPath: z.array(z.string().max(2048)).max(16).optional(),
   chainHopIndex: z.number().int().nonnegative().optional(),
   localStatus: SwapLegLocalStatusSchema.optional(),
-  errorMessage: z.string().max(2048).optional(),
+  // A message too long to read is read as absent: 0.1.3 saved it with no
+  // limit, and rejecting it would discard every swap group and the quote
+  // index. New messages are clipped by `clipErrorMessage`.
+  errorMessage: z.string().max(MAX_ERROR_MESSAGE).optional().catch(undefined),
 });
 
 const PersistedSwapGroup = z.looseObject({
@@ -226,20 +291,8 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
         return id;
       },
 
-      finalizeGroup: (groupId, nextState) => {
-        storeLog.info('store.swap_tx.finalize_group', { groupId, nextState });
-        set((state) => {
-          const group = state.groups[groupId];
-          if (!group) return state;
-          return {
-            ...state,
-            groups: {
-              ...state.groups,
-              [groupId]: { ...group, state: nextState },
-            },
-          };
-        });
-      },
+      finalizeGroup: (groupId, nextState) => set((state) => moveGroup(state, groupId, nextState)),
+      reopenGroup: (groupId) => set((state) => moveGroup(state, groupId, 'running')),
 
       addLeg: (groupId, leg) => {
         const legId = mintLocalId('leg');
@@ -255,7 +308,13 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
           const group = state.groups[groupId];
           if (!group) return state;
 
-          const nextLeg: SwapLeg = { ...leg, id: legId };
+          const nextLeg: SwapLeg = {
+            ...leg,
+            id: legId,
+            ...(leg.errorMessage !== undefined
+              ? { errorMessage: clipErrorMessage(leg.errorMessage) }
+              : {}),
+          };
           return {
             ...state,
             groups: {
@@ -310,7 +369,9 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
         });
       },
 
-      setLegStatus: (groupId, legId, { localStatus, errorMessage }) => {
+      setLegStatus: (groupId, legId, update) => {
+        const { localStatus } = update;
+        const errorMessage = update.localStatus === 'failed' ? update.errorMessage : undefined;
         storeLog.debug('store.swap_tx.set_leg_status', {
           groupId,
           legId,
@@ -318,11 +379,29 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
           errorMessage,
         });
         set((state) =>
-          patchLeg(state, groupId, legId, (leg) => ({
-            ...leg,
-            localStatus,
-            errorMessage: errorMessage ?? (localStatus === 'failed' ? leg.errorMessage : undefined),
-          }))
+          patchLeg(state, groupId, legId, (leg) => {
+            const from = leg.localStatus;
+            if (
+              from !== undefined &&
+              from !== localStatus &&
+              !LEG_MOVES[from].includes(localStatus)
+            ) {
+              storeLog.warn('store.swap_tx.leg_move_refused', {
+                groupId,
+                legId,
+                from,
+                to: localStatus,
+              });
+              return leg;
+            }
+            return {
+              ...leg,
+              localStatus,
+              errorMessage:
+                clipErrorMessage(errorMessage) ??
+                (localStatus === 'failed' ? leg.errorMessage : undefined),
+            };
+          })
         );
       },
 

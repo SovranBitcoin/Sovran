@@ -253,7 +253,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const revokePeerDecryptGrant = useNip46ConnectionsStore((s) => s.revokePeerDecryptGrant);
   const setPeerDecryptGrant = useNip46ConnectionsStore((s) => s.setPeerDecryptGrant);
   const revokeSessionGrant = useNip46RequestsStore((s) => s.revokeSessionGrant);
-  const revokeSessionAllows = useNip46RequestsStore((s) => s.revokeSessionAllows);
+  const endClientSession = useNip46RequestsStore((s) => s.endClientSession);
   // Cooldown end (epoch ms). The engine only writes the flag during an
   // active rate-limit cooldown, so `> now` is the banner condition.
   const throttledUntil = useNip46RequestsStore((s) =>
@@ -355,7 +355,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               close();
               for (const peer of peers) {
                 revokePeerDecryptGrant(clientPubkey, peer);
-                revokeSessionGrant(clientPubkey, undefined, peer);
+                revokeSessionGrant(clientPubkey, peer);
               }
             },
           },
@@ -583,8 +583,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
           testID: 'signer-app-disconnect-confirm',
           onPress: (close) => {
             close();
-            revokeSessionGrant(clientPubkey);
-            revokeSessionAllows(clientPubkey);
+            endClientSession(clientPubkey);
             disconnectApp(clientPubkey);
             popup({ message: `${nameAtConfirm} disconnected`, type: 'success' });
             router.back();

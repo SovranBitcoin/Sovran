@@ -32,7 +32,7 @@ interface ThemeDraftState {
 
 interface ThemeDraftActions {
   /** Start a draft, snapshotting the current themeStore state. */
-  beginDraft: (unitIds: UnitId[]) => void;
+  beginDraft: () => void;
   /** Replace the album and re-randomise unit wallpapers from its pool. */
   setAlbum: (albumSlug: string, unitIds: UnitId[]) => void;
   /** Override a single unit in the draft. */
@@ -44,8 +44,6 @@ interface ThemeDraftActions {
    * the main themeStore resolver (which walks album → fallback).
    */
   resolveUnitTheme: (unitId: UnitId) => string;
-  /** Revert draft to committed themeStore state. */
-  resetDraft: () => void;
   /** Drop the draft entirely. */
   discard: () => void;
   /** Whether the current draft differs from the committed store state. */
@@ -53,9 +51,11 @@ interface ThemeDraftActions {
   /**
    * Commit the draft. Awaits the primary-unit wallpaper download (so the
    * chrome can apply the correct CSS vars before returning), then
-   * fire-and-forget the other unit downloads.
+   * fire-and-forget the other unit downloads. Resolves `false` without
+   * saving anything when the draft was discarded (or a new one begun)
+   * while the download ran.
    */
-  commit: () => Promise<void>;
+  commit: () => Promise<boolean>;
 }
 
 type ThemeDraftStore = ThemeDraftState & ThemeDraftActions;
@@ -110,6 +110,10 @@ function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitI
   return assigned;
 }
 
+// Bumped whenever a draft begins or is discarded: an Apply still waiting on
+// its download when that happens belongs to a draft that no longer exists.
+let draftRevision = 0;
+
 function equalRecords(a: Record<string, string>, b: Record<string, string>): boolean {
   const ak = Object.keys(a);
   const bk = Object.keys(b);
@@ -124,13 +128,14 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
     unitWallpapers: {},
     mode: 'dark',
 
-    beginDraft: (_unitIds) => {
+    beginDraft: () => {
       // Snapshot verbatim from the store. Do NOT pre-fill resolved defaults
       // for unassigned units — that would immediately mark the draft as dirty
       // (every unit would differ from the store's empty map). Instead, the
       // renderer falls back to the resolver for unset units, and only actual
       // user edits populate the draft.
       const snap = snapshotFromStore();
+      draftRevision += 1;
       set({
         active: true,
         activeAlbumSlug: snap.activeAlbumSlug,
@@ -165,16 +170,10 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
       return resolveUnitWallpaper(unitId, themeState, catalog);
     },
 
-    resetDraft: () => {
-      const snap = snapshotFromStore();
-      set({
-        activeAlbumSlug: snap.activeAlbumSlug,
-        unitWallpapers: snap.unitWallpapers,
-        mode: snap.mode,
-      });
+    discard: () => {
+      draftRevision += 1;
+      set({ active: false, activeAlbumSlug: null, unitWallpapers: {}, mode: 'dark' });
     },
-
-    discard: () => set({ active: false, activeAlbumSlug: null, unitWallpapers: {}, mode: 'dark' }),
 
     isDirty: () => {
       const snap = snapshotFromStore();
@@ -188,6 +187,7 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
 
     commit: async () => {
       const { activeAlbumSlug, unitWallpapers, mode } = get();
+      const revision = draftRevision;
       const wallpaperState = useWallpaperStore.getState();
       const primary = unitWallpapers[PROFILE_PRIMARY_UNIT_ID];
 
@@ -204,6 +204,10 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
           await wallpaperState.downloadWallpaper(entry);
           log.info('theme.commit.primary_download_done', { theme: primary });
         }
+      }
+      if (revision !== draftRevision) {
+        log.info('theme.commit.cancelled', { theme: primary });
+        return false;
       }
 
       useThemeStore.setState({
@@ -234,6 +238,7 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
       // above propagates the new primary wallpaper through the resolver and
       // re-applies CSS vars. No legacy bridge needed.
       set({ active: false, activeAlbumSlug: null, unitWallpapers: {}, mode: 'dark' });
+      return true;
     },
   })
 );

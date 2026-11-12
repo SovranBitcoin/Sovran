@@ -2,7 +2,7 @@
  * Pure media-pipeline logic: imeta tag construction, Blossom auth event shape,
  * sha256 content addressing, and Authorization header encoding.
  */
-import { buildImetaTag, buildImetaTags } from '@/shared/lib/nostr/media/imeta';
+import { buildImetaTag } from '@/shared/lib/nostr/media/imeta';
 import {
   BLOSSOM_AUTH_KIND,
   buildBlossomAuthEvent,
@@ -35,10 +35,6 @@ describe('imeta', () => {
   it('omits absent fields', () => {
     const tag = buildImetaTag({ url: 'https://x/y.png', sha256: '', mimeType: 'image/png' });
     expect(tag).toEqual(['imeta', 'url https://x/y.png', 'm image/png']);
-  });
-
-  it('builds one tag per descriptor', () => {
-    expect(buildImetaTags([FULL, FULL])).toHaveLength(2);
   });
 });
 

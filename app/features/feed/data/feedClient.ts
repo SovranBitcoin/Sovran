@@ -65,7 +65,6 @@ export type FeedParseResult = {
   missingQuotedIds: string[];
   missingProfilePubkeys: string[];
   paginationUntil: number;
-  paginationOffset: number;
   paginationCursor: NostrCursor;
   hasMore: boolean | undefined;
   retryAfterMs?: number;
@@ -88,8 +87,6 @@ export type FeedPageRequest = RequestControls & {
   userPubkey?: string;
   limit?: number;
   cursor?: NostrCursor;
-  until?: number;
-  offset?: number;
   refresh?: boolean;
 };
 
@@ -99,8 +96,6 @@ export type UserFeedPageRequest = RequestControls & {
   authorPicture?: string;
   limit?: number;
   cursor?: NostrCursor;
-  until?: number;
-  offset?: number;
   refresh?: boolean;
 };
 
@@ -108,8 +103,6 @@ export type PostsByPubkeysRequest = RequestControls & {
   pubkeys: string[];
   limit?: number;
   cursor?: NostrCursor;
-  until?: number;
-  offset?: number;
   refresh?: boolean;
 };
 
@@ -264,7 +257,6 @@ export function emptyFeedParseResult(read?: ReadStatusMeta): FeedParseResult {
     missingQuotedIds: [],
     missingProfilePubkeys: [],
     paginationUntil: 0,
-    paginationOffset: 0,
     paginationCursor: null,
     hasMore: false,
     ...(read ? { read } : {}),

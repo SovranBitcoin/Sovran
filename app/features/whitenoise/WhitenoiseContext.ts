@@ -7,7 +7,6 @@ type WhitenoiseClient = MarmotClient<WhitenoiseGroupHistory>;
 export type WhitenoiseContextValue = {
   client: WhitenoiseClient | null;
   inviteReader: InviteReader | null;
-  relays: readonly string[];
   accountIndex: number;
 };
 

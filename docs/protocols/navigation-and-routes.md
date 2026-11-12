@@ -13,7 +13,7 @@ inside**. The root presents the group once; every step after that is a push insi
   inside that one sheet. Navigating to a route _outside_ the group adds a second root entry,
   which opens as a second sheet on top of the first, or underneath the page you are on.
 - **On Android** the group is a pushed page with the native header
-  ([ADR 0025](../../app/docs/adr/0025-android-flows-are-pushed-screens.md)). The nested stack
+  ([ADR 0025](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0025-android-flows-are-pushed-screens.md)). The nested stack
   is still what makes the journey one unit that Back leaves step by step.
 
 So when a screen needs a next step, **add the step to the group you are already in**. If the
@@ -32,7 +32,7 @@ own flow.
 
 Android's three sheets are listed in `app/config/androidFlowPresentation.ts`. Details and
 pickers are sheets on iPhone and pages on Android
-([ADR 0026](../../app/docs/adr/0026-details-and-pickers-are-sheets.md)). A menu opened from
+([ADR 0026](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0026-details-and-pickers-are-sheets.md)). A menu opened from
 inside a sheet needs a host above it: [modal menu contract](../review/modal-menu-contract.md).
 Headers: [header contract](../review/header-contract.md).
 
@@ -56,7 +56,7 @@ Navigate through `guardedRouter` (`app/shared/hooks/useGuardedRouter.ts`); lint 
 2. A `Stack.Screen` in the group's `_layout.tsx`, or an entry in `MODAL_SCREENS` for a root
    route.
 3. `app/shared/lib/nav/featureRoutes.ts` if the feature can be switched off in a build
-   ([ADR 0021](../../app/docs/adr/0021-a-build-chooses-its-modules.md)).
+   ([ADR 0021](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0021-a-build-chooses-its-modules.md)).
 4. `CANONICAL_PAGES` and `PAGE_ROUTES`, so the native harness can reach it.
 
 The screen reads its params through `useRouteParams` (`app/shared/lib/nav/useRouteParams.ts`),

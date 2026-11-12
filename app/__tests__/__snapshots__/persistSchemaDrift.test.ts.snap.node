@@ -2477,7 +2477,6 @@ exports[`persisted schema drift nostr-relay-list-store schema matches the golden
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
         "hasPublished": {
@@ -2526,7 +2525,6 @@ exports[`persisted schema drift nostr-relay-list-store schema matches the golden
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
         "hasPublished": {
@@ -2569,20 +2567,16 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
       "properties": {
         "contactsContent": {
           "default": "",
-          "maxLength": 65536,
           "type": "string",
         },
         "contactsTags": {
           "default": [],
           "items": {
             "items": {
-              "maxLength": 2048,
               "type": "string",
             },
-            "maxItems": 16,
             "type": "array",
           },
-          "maxItems": 50000,
           "type": "array",
         },
         "contactsUpdatedAt": {
@@ -2876,20 +2870,16 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
       "properties": {
         "contactsContent": {
           "default": "",
-          "maxLength": 65536,
           "type": "string",
         },
         "contactsTags": {
           "default": [],
           "items": {
             "items": {
-              "maxLength": 2048,
               "type": "string",
             },
-            "maxItems": 16,
             "type": "array",
           },
-          "maxItems": 50000,
           "type": "array",
         },
         "contactsUpdatedAt": {
@@ -3294,7 +3284,6 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "mintUrl": {
-                "maxLength": 2048,
                 "minLength": 1,
                 "type": "string",
               },
@@ -3340,12 +3329,10 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "token": {
-                "maxLength": 60000,
                 "minLength": 1,
                 "type": "string",
               },
               "unit": {
-                "maxLength": 16,
                 "type": "string",
               },
             },
@@ -3366,6 +3353,18 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
             "type": "string",
           },
           "type": "object",
+        },
+        "recoveredCopy": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
         },
       },
       "type": "object",
@@ -3393,7 +3392,6 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "mintUrl": {
-                "maxLength": 2048,
                 "minLength": 1,
                 "type": "string",
               },
@@ -3439,12 +3437,10 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "token": {
-                "maxLength": 60000,
                 "minLength": 1,
                 "type": "string",
               },
               "unit": {
-                "maxLength": 16,
                 "type": "string",
               },
             },
@@ -3467,9 +3463,22 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
           },
           "type": "object",
         },
+        "recoveredCopy": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "byTokenHash",
+        "recoveredCopy",
       ],
       "type": "object",
     },
@@ -3497,7 +3506,6 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                 "additionalProperties": {},
                 "properties": {
                   "content": {
-                    "maxLength": 65536,
                     "type": "string",
                   },
                   "created_at": {
@@ -3521,13 +3529,10 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                   "tags": {
                     "items": {
                       "items": {
-                        "maxLength": 8192,
                         "type": "string",
                       },
-                      "maxItems": 200,
                       "type": "array",
                     },
-                    "maxItems": 5000,
                     "type": "array",
                   },
                 },
@@ -3589,7 +3594,6 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                 "additionalProperties": {},
                 "properties": {
                   "content": {
-                    "maxLength": 65536,
                     "type": "string",
                   },
                   "created_at": {
@@ -3613,13 +3617,10 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                   "tags": {
                     "items": {
                       "items": {
-                        "maxLength": 8192,
                         "type": "string",
                       },
-                      "maxItems": 200,
                       "type": "array",
                     },
-                    "maxItems": 5000,
                     "type": "array",
                   },
                 },
@@ -6010,7 +6011,6 @@ exports[`persisted schema drift search-history-store schema matches the golden s
                   "type": "string",
                 },
                 "query": {
-                  "maxLength": 2048,
                   "type": "string",
                 },
                 "timestamp": {
@@ -6052,7 +6052,6 @@ exports[`persisted schema drift search-history-store schema matches the golden s
                   "type": "string",
                 },
                 "query": {
-                  "maxLength": 2048,
                   "type": "string",
                 },
                 "timestamp": {

@@ -8,9 +8,17 @@ import { useTransactionLocationStore } from '@/shared/stores/profile/transaction
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 
 let mockActivePubkey = 'profile-a';
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ getActiveProfile: () => ({ pubkey: mockActivePubkey }) }) },
-}));
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
+    getState: () => ({ getActiveProfile: () => ({ pubkey: mockActivePubkey }) }),
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 
 const mockWrite = jest.fn(async (_name: string, _value: string) => {});
 
@@ -43,7 +51,7 @@ describe('v0.1.0 transaction side-data migration', () => {
     await Promise.all(stores.map((store) => store.persist.rehydrate()));
     useDataMigrationStore.setState({ level: 0 });
     useTransactionAnnotationStore.setState({ annotations: {} });
-    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+    useScanHistoryStore.setState({ entries: [] });
     useTransactionDistributionStore.setState({ distributions: {} });
     useTransactionLocationStore.setState({ locations: {} });
     useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });

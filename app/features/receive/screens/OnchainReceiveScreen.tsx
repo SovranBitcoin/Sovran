@@ -41,7 +41,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
-import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Notice } from '@/shared/ui/composed/Notice';
@@ -58,7 +57,6 @@ interface OnchainReceiveScreenProps {
   source: string | null;
   mintUrl?: string;
   mintInfo: GetInfoResponse | null;
-  extraButtons?: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }
 
@@ -68,7 +66,6 @@ export function OnchainReceiveScreen({
   source,
   mintUrl,
   mintInfo,
-  extraButtons = [],
   onRequestMintList,
 }: OnchainReceiveScreenProps) {
   useLifecycleLogger('OnchainReceiveScreen');
@@ -142,7 +139,6 @@ export function OnchainReceiveScreen({
       confirmationRequired: onchainConfirmationProgress.requiredConfirmations,
       bip321: bip321.isBip321,
       optionKindCount: bip321.optionKinds?.length ?? 0,
-      extraButtonCount: extraButtons.length,
       actionNames: Object.keys(actions),
     });
   }, [
@@ -150,7 +146,6 @@ export function OnchainReceiveScreen({
     bip321.isBip321,
     bip321.optionKinds?.length,
     entry,
-    extraButtons.length,
     isPaid,
     mintInfo,
     mintUrl,
@@ -211,7 +206,6 @@ export function OnchainReceiveScreen({
               },
               condition: actions.share.available,
             },
-            ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
           ]}
         />
       </HStack>

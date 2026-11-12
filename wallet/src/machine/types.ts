@@ -153,6 +153,27 @@ export interface AmountEntryDisplayMetadata {
 // Step Data — typed payload delivered to each handler
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a melt preview is. A successful melt keeps the step (the person is
+ * already on the screen) and moves it to `settled`, which no Pay or mint
+ * change can leave: paying again would pay twice. An `unconfirmed` melt
+ * may still pay, so the same guard holds it until a new intent starts.
+ */
+export type MeltPreviewPhase =
+  | { kind: "preview" }
+  | { kind: "settled"; historyEntry: string }
+  | { kind: "unconfirmed"; operationId: string };
+
+/**
+ * Where a payment request preview is. Besides `preview` and `settled`
+ * (delivered), `undelivered` means its ecash left the wallet, was not
+ * confirmed delivered and could not be taken back: the recipient may hold
+ * it, so this preview must not send again.
+ */
+export type PaymentRequestPreviewPhase =
+  | Exclude<MeltPreviewPhase, { kind: "unconfirmed" }>
+  | { kind: "undelivered"; operationId: string };
+
 export interface StepDataMap {
   idle: Record<string, never>;
   /**
@@ -276,8 +297,7 @@ export interface StepDataMap {
      * quote failure (Pay falls back to creating a fresh quote at execution).
      */
     meltQuote?: MeltQuotePreview;
-    /** Populated after a successful melt so the screen can link to the new transaction. */
-    historyEntry?: string;
+    phase: MeltPreviewPhase;
   };
   navigateToPaymentRequest: {
     mintUrl: string;
@@ -286,8 +306,7 @@ export interface StepDataMap {
     unit: string;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
-    /** Populated after a successful payment request send. */
-    historyEntry?: string;
+    phase: PaymentRequestPreviewPhase;
   };
   createMintQuote: {
     mintUrl: string;
@@ -472,6 +491,13 @@ export interface FlowContext {
    */
   meltQuotePreview?: MeltQuotePreview;
   /**
+   * The id of the preview quote a failed Pay was sent with. The attempt used
+   * that quote up, so the next Pay on a preview still holding it asks for a
+   * new quote and shows it instead of paying. Cleared when a new quote is
+   * attached.
+   */
+  spentMeltQuoteId?: string;
+  /**
    * When true, use local proof routing for ecash sends instead of relying on
    * an online swap. Exact local composition can still go straight to token
    * creation; non-exact composition asks the user to choose a nearby amount.
@@ -481,11 +507,9 @@ export interface FlowContext {
    * the swap server-side.
    */
   offline?: boolean;
-  /** Token held during mint trust review. Set on REVIEW_MINT, consumed on MINT_TRUSTED. */
-  reviewToken?: string;
   /** Original raw input string from scan/execute. Available after EXECUTE. */
   rawInput?: string;
-  /** Scan source hint. Persisted for the flow's lifetime (cleared on RESET). */
+  /** Scan source hint. Persisted for the flow's lifetime (cleared on reset). */
   source?: string;
   /** Original annotated options from BIP321 multi-option flow. Captured on first OPTION_CHOSEN. */
   originalOptions?: AnnotatedOption[];
@@ -497,64 +521,20 @@ export interface FlowContext {
 // Machine Snapshot — full state at a point in time
 // ---------------------------------------------------------------------------
 
-export interface MachineSnapshot<S extends FlowStep = FlowStep> {
-  step: S;
-  context: FlowContext;
-  data: S extends keyof StepDataMap ? StepDataMap[S] : never;
-}
-
 // ---------------------------------------------------------------------------
 // Execution State — derived from snapshot for UI consumption
 // ---------------------------------------------------------------------------
 
-export type ExecutionState =
-  | {
-      status: "ready";
-      code: "READY";
-      message: null;
-      isExecutable: true;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    }
-  | {
-      status: "needsInput";
-      code:
-        | "NO_AMOUNT"
-        | "MINT_SELECTION_REQUIRED"
-        | "OPTION_SELECTION_REQUIRED"
-        | "FALLBACK_OPTION_REQUIRED"
-        | "PROOF_SELECTION_REQUIRED"
-        | "SEND_MEMO_REQUIRED";
-      message: string;
-      isExecutable: false;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    }
-  | {
-      status: "blocked";
-      code:
-        | "UNSUPPORTED_INPUT"
-        | "NO_VALID_MINT"
-        | "INSUFFICIENT_BALANCE"
-        | "NO_BALANCE"
-        | "ALL_OPTIONS_DISABLED"
-        | "UNSUPPORTED_PAYMENT_METHOD"
-        | "SEND_FAILED"
-        | "MINT_QUOTE_FAILED"
-        | "MELT_FAILED"
-        | "PAYMENT_REQUEST_FAILED"
-        | "NFC_WRITE_FAILED"
-        | "NFC_SESSION_LOST"
-        | "NFC_READ_FAILED"
-        | "UNIT_NOT_FUNDED";
-      message: string;
-      isExecutable: false;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    };
+export interface ExecutionState {
+  step: FlowStep;
+  /** A step handler is running (the screen shows its spinner). */
+  isExecuting: boolean;
+  /**
+   * The step's data while it waits for input, and on `error` (then
+   * `StepDataMap["error"]`: its `code`, `message` and `data`).
+   */
+  details?: Record<string, unknown>;
+}
 
 // ---------------------------------------------------------------------------
 // Flow Events — user actions that drive the machine
@@ -650,10 +630,8 @@ export type FlowEvent =
   | { type: "START_RECEIVE" }
   | { type: "SHOW_RECEIVE_QR" }
   | { type: "REVIEW_MINT"; mintUrl: string; token: string }
-  | { type: "MINT_TRUSTED" }
   | { type: "CONFIRM_MELT" }
-  | { type: "CONFIRM_PAYMENT_REQUEST" }
-  | { type: "RESET" };
+  | { type: "CONFIRM_PAYMENT_REQUEST" };
 
 // ---------------------------------------------------------------------------
 // Step Handler Map — wallet provides one handler per step
@@ -747,6 +725,12 @@ export type NotificationHandlerMap = {
      * slow-settling methods (onchain) and show only the terminal one.
      */
     method?: MeltQuoteMethod;
+    /**
+     * The melt quote this payment executes, when it was created before the
+     * user confirmed (BTC-05). Every later event of the melt carries it, so
+     * the wallet can tell this payment's events from another's.
+     */
+    quoteId?: string;
   }) => MaybeAsync;
   /**
    * Called when a multi-step operation completes successfully.
@@ -983,6 +967,22 @@ export type NotificationHandlerMap = {
 // ---------------------------------------------------------------------------
 
 /**
+ * What taking back a send did. `reclaimed`: its ecash is back in the wallet,
+ * taken back now or before. `neverExecuted`: no token left the wallet (a
+ * prepared send was cancelled, or one was never prepared). `unknown`: it
+ * could not tell (no wallet, the send could not be looked up or was not
+ * found, or it was redeemed or is already being taken back), so the token
+ * may still be out.
+ */
+export type SendRollbackResult =
+  | { kind: "reclaimed" }
+  | { kind: "neverExecuted" }
+  | {
+      kind: "unknown";
+      reason: "noManager" | "lookupFailed" | "notFound" | "redeemed" | "rollingBack";
+    };
+
+/**
  * Async callbacks the machine executes for action steps (confirmSend,
  * createMintQuote, selectMint). When provided, the machine handles
  * success/failure routing and only dispatches external handlers for the
@@ -1035,11 +1035,7 @@ export interface MachineOperations {
   buildMintListItems: (
     data: StepDataMap["selectMint"],
   ) => Promise<MintListItem[]>;
-  /**
-   * Trust a mint. Called internally by `mintTrusted()` when the machine is
-   * in the `reviewMint` step. The machine transitions to `receiveToken`
-   * on success or `error` on failure.
-   */
+  /** Trust a mint. Run by the `mintInfo` screen's `trust` action. */
   trustMint?: (mintUrl: string) => Promise<void>;
   /**
    * Load detailed mint info for the trust review screen.
@@ -1058,7 +1054,8 @@ export interface MachineOperations {
   /**
    * Execute a lightning melt. Called when the user confirms a melt from the
    * preview screen via `confirmMelt()`. The machine routes to the result
-   * handler on success or BIP321 fallback / error on failure.
+   * handler on success or BIP321 fallback / error on failure. An unresolved
+   * execution throws MeltOutcomeUnknownError so the machine blocks another pay.
    *
    * When `quoteId` references a quote previously created via
    * `quoteMelt` (BTC-05 quote-first), the implementation MUST execute
@@ -1118,10 +1115,12 @@ export interface MachineOperations {
     unit?: string;
   }) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
-   * Roll back a pending send operation. Called when NFC write-back fails
-   * after token creation to reclaim the ecash proofs.
+   * Take back a send: reclaim its ecash, or cancel it before it executed.
+   * Says what it did; a caller reads only `reclaimed` and `neverExecuted` as
+   * a token that is not outstanding. Throws when the cancel or the reclaim
+   * itself fails.
    */
-  rollbackSend?: (operationId: string) => Promise<void>;
+  rollbackSend?: (operationId: string) => Promise<SendRollbackResult>;
   /**
    * Whether a NUT-18 payment request can be paid from this mint at all —
    * the same gate `executeNfcSend` applies before reserving proofs, asked
@@ -1354,6 +1353,23 @@ export interface CreateMachineConfig {
 // Machine interface
 // ---------------------------------------------------------------------------
 
+/**
+ * How one `confirmPaymentRequest()` call ended.
+ * - `delivered`: the transport took the ecash.
+ * - `rolledBack`: delivery failed and the ecash was taken back.
+ * - `failed`: it failed before any ecash existed; Pay can be tried again.
+ * - `undelivered`: ecash was created, delivery failed and taking it back
+ *   failed too. It may already be out, so Pay must not be offered again.
+ * - `ignored`: this call did not run the send (another one was in flight,
+ *   the step was not the preview, or the flow was reset meanwhile).
+ */
+export type PaymentRequestConfirmOutcome =
+  | { kind: "delivered" }
+  | { kind: "rolledBack" }
+  | { kind: "failed" }
+  | { kind: "undelivered"; operationId: string }
+  | { kind: "ignored" };
+
 export interface PaymentMachine {
   /** Send any event to advance the machine. */
   send: (event: FlowEvent) => Promise<void>;
@@ -1447,13 +1463,6 @@ export interface PaymentMachine {
    */
   reviewMint: (mintUrl: string, token: string) => Promise<void>;
   /**
-   * Trust the mint currently being reviewed.
-   * Calls `operations.trustMint(mintUrl)` internally, then transitions
-   * from `reviewMint` back to `receiveToken` so the user can retry the
-   * redeem. On failure, transitions to `error`.
-   */
-  mintTrusted: () => Promise<void>;
-  /**
    * Confirm and execute a melt from the preview screen.
    * Requires `operations.executeMelt` to be provided. On success, dispatches
    * the result handler. On failure in a BIP321 multi-option flow, transitions
@@ -1465,8 +1474,9 @@ export interface PaymentMachine {
    * Requires `operations.executePaymentRequest` to be provided. On success,
    * dispatches the result handler. On failure in a BIP321 multi-option flow,
    * transitions to `chooseFallbackOption` with the failed option disabled.
+   * Resolves with what this call did; see `PaymentRequestConfirmOutcome`.
    */
-  confirmPaymentRequest: () => Promise<{ rolledBack: boolean }>;
+  confirmPaymentRequest: () => Promise<PaymentRequestConfirmOutcome>;
   /** Clear all flow state. */
   reset: () => void;
   /**

@@ -397,7 +397,6 @@ export function MerchantDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   scrollView: { flex: 1 },
   loadingContainer: {
     flex: 1,

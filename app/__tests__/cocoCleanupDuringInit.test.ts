@@ -255,13 +255,21 @@ it('reports a delete-all that could not remove a wallet database', async () => {
  */
 describe('background start-up and a teardown', () => {
   type Privates = {
-    instance: unknown;
+    life: unknown;
     npcPlugin: { addAccount: jest.Mock } | null;
     npcAccount: unknown;
     npcPluginRegistered: boolean;
     getCurrentProfileSigner: () => Promise<unknown>;
   };
   const privates = () => CocoManager as unknown as Privates;
+  /** Makes `wallet` the open wallet, as if it had finished opening. */
+  const openAs = (wallet: unknown) => {
+    privates().life = {
+      phase: 'ready',
+      instance: wallet,
+      db: { closeAsync: async () => undefined },
+    };
+  };
 
   /** A wallet whose plugin start-up is parked until `finishPlugins` is called. */
   function parkedWallet() {
@@ -275,7 +283,7 @@ describe('background start-up and a teardown', () => {
           })
       ),
     };
-    privates().instance = wallet;
+    openAs(wallet);
     privates().npcAccount = null;
     privates().npcPluginRegistered = false;
     privates().npcPlugin = { addAccount: jest.fn() };
@@ -289,7 +297,7 @@ describe('background start-up and a teardown', () => {
   }
 
   afterEach(() => {
-    privates().instance = null;
+    privates().life = { phase: 'closed' };
     privates().npcPlugin = null;
     privates().npcAccount = null;
     jest.restoreAllMocks();
@@ -307,13 +315,13 @@ describe('background start-up and a teardown', () => {
     await tick();
     // The wallet is still in use by the background start-up.
     expect(cleaned).toBe(false);
-    expect(privates().instance).not.toBeNull();
+    expect(CocoManager.peekInstance()).not.toBeNull();
 
     finishPlugins();
     await background;
     await cleanup;
     expect(cleaned).toBe(true);
-    expect(privates().instance).toBeNull();
+    expect(CocoManager.peekInstance()).toBeNull();
   });
 
   it('creates no account for another wallet when the wallet changed under it', async () => {
@@ -326,7 +334,7 @@ describe('background start-up and a teardown', () => {
     await tick();
 
     // The teardown gave up waiting, the account flipped, and another wallet is open.
-    privates().instance = { other: 'wallet' };
+    openAs({ other: 'wallet' });
     finishPlugins();
     await background;
 
@@ -341,7 +349,7 @@ describe('background start-up and a teardown', () => {
     jest.spyOn(privates(), 'getCurrentProfileSigner').mockResolvedValue({ signEvent: jest.fn() });
     const nextWallet = { other: 'wallet' };
     privates().npcPlugin!.addAccount.mockImplementation(async () => {
-      privates().instance = nextWallet;
+      openAs(nextWallet);
       return { getInfo: jest.fn() };
     });
     const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
@@ -385,7 +393,7 @@ describe('background start-up and a teardown', () => {
     await tick();
     expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(true);
 
-    privates().instance = { next: 'wallet' };
+    openAs({ next: 'wallet' });
     expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(false);
   });
 });

@@ -28,7 +28,7 @@ const sourceItems = [
   ['payments-14', 'planned', "Respect a Lightning address's own limits:", ['minimum and maximum', 'Lightning address', 'amount entry', 'limits']],
   ['payment-requests-01', 'complete', 'Pay a NUT-18 request from scan, paste, chat, or an app link:', ['NUT-18', 'scan, paste, chat, or an app link', 'review step', 'trusted mints', 'gift-wrapped', 'NIP-17']],
   ['payment-requests-02', 'planned', 'Create your own payment requests', ['generate, cancel, recover, and deliver', 'Nostr', 'ask for money']],
-  ['mints-01', 'complete', 'Vet a mint before you trust it:', ['operator', 'Nostr reviews', 'star rating', 'live audit data', 'swap success rate', 'verify mode', 'accept or reject']],
+  ['mints-01', 'complete', 'Vet a mint before you trust it:', ['operator', 'Nostr reviews', 'star rating', 'live audit data', 'success rate of its mint and melt operations', 'verify mode', 'accept or reject']],
   ['mints-02', 'planned', 'Leave your own review:', ['Rate a mint', 'short review', 'Publish it to Nostr', 'ratings and reviews']],
   ['mints-03', 'planned', 'Adding mints shows live progress instead of a blank wait:', ['each mint', 'connects, resolves, and verifies', 'success, retry, and failure', 'several mints']],
   ['mints-04', 'planned', 'Decline a mint without leaving the money behind:', ['reject', 'redeem its proofs directly', 'mint you trust', 'melt', 'Retry across', 'already-failed choices disabled']],

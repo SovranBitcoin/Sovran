@@ -83,13 +83,8 @@ describe('mint flow e2e selectors', () => {
     expect(source).toContain("testID: 'mint-add-cancel'");
   });
 
-  it.each(['GlassSearchBar.ios.tsx', 'GlassSearchBar.android.tsx'])(
-    'forwards testID to the %s TextInput',
-    (file) => {
-      const source = read(`shared/ui/composed/GlassSearchBar/${file}`);
-      expect(source).toContain('testID={testID}');
-    }
-  );
+  // That GlassSearchBar forwards its testID on both platforms is rendered in
+  // glassSearchBarInput.test.tsx.
 
   it('pins the mint info trust decision buttons on every ButtonHandler variant', () => {
     const source = read('features/mint/screens/MintInfoScreen.tsx');

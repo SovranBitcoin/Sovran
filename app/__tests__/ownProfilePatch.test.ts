@@ -1,7 +1,5 @@
-import {
-  applyProfilePatch,
-  nextProfileCreatedAtSec,
-} from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
+import { applyProfilePatch } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
+import { nextReplaceableCreatedAt } from '@/shared/lib/nostr/ownReplaceableEvent';
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { info: jest.fn(), warn: jest.fn() },
   storeLog: { warn: jest.fn() },
@@ -33,19 +31,15 @@ const mockIngest = jest.fn();
 const mockDelete = jest.fn();
 jest.mock('@/shared/lib/nostr/publish/publishEvent', () => ({ publishEvent: jest.fn() }));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({ getOwnWriteRelays: () => [] }));
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: jest.fn(),
-    normalizeRelayUrl: (url: string) => url,
-    NDKEvent: class {
-      id = 'e'.repeat(64);
-      sign = jest.fn(async () => {});
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  normalizeRelayUrl: (url: string) => url,
+  NDKEvent: class {
+    id = 'e'.repeat(64);
+    sign = jest.fn(async () => {});
+  },
+}));
 
 it('preserves unknown keys and untouched metadata', () => {
   const base = {
@@ -92,15 +86,15 @@ it('sets, keeps and removes the address and about fields independently', () => {
   expect(base.nip05).toBe('old@id.example');
 });
 it('keeps created_at monotonic even with clock skew or same-second saves', () => {
-  expect(nextProfileCreatedAtSec(100, 50)).toBe(101);
-  expect(nextProfileCreatedAtSec(100, 100)).toBe(101);
-  expect(nextProfileCreatedAtSec(100, 120)).toBe(120);
+  expect(nextReplaceableCreatedAt(100, 50)).toBe(101);
+  expect(nextReplaceableCreatedAt(100, 100)).toBe(101);
+  expect(nextReplaceableCreatedAt(100, 120)).toBe(120);
 });
 
 it('always supersedes a future-dated base instead of capping below it', () => {
   // Kind-0 is replaceable: a lower created_at than the current event is ignored
   // by relays, so a stray future base is still superseded by +1 (and logged).
-  expect(nextProfileCreatedAtSec(10000, 100)).toBe(10001);
-  expect(nextProfileCreatedAtSec(400, 100)).toBe(401);
-  expect(nextProfileCreatedAtSec(399, 100)).toBe(400);
+  expect(nextReplaceableCreatedAt(10000, 100)).toBe(10001);
+  expect(nextReplaceableCreatedAt(400, 100)).toBe(401);
+  expect(nextReplaceableCreatedAt(399, 100)).toBe(400);
 });

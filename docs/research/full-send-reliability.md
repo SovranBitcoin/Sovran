@@ -4,7 +4,7 @@ Research date: 2026-10-16. Controller audit baseline: `f12db054d`;
 second history/native-source audit: `db007cc61`.
 Implementation observations below describe those pinned audit baselines, not the current checkout.
 This is a researched design, not a second implementation-status ledger.
-The [harness README](../../harness/README.md) describes implemented behavior; the
+The [harness README](https://github.com/SovranBitcoin/Sovran/blob/main/harness/README.md) describes implemented behavior; the
 [follow-up ledger](../follow-ups/README.md) owns unfinished work.
 
 The owner selected availability fallback: if Claude is out of quota, GPT-only completion
@@ -209,7 +209,7 @@ and a preservation decision, or an explicit unresolved gap**. â€œ100% know whyâ€
 when intent was never recorded, history was squashed, or the relevant discussion is missing.
 Do not fill those gaps with confident stories.
 
-Reuse the existing [audit-commit history procedure](../../.agents/skills/audit-commit/SKILL.md)
+Reuse the existing [audit-commit history procedure](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/audit-commit/SKILL.md)
 before editing, with the post-commit audit checking that the resulting change honored it:
 
 1. Pin the base revision and identify the behavior/callers to change. Collect targeted
@@ -350,9 +350,9 @@ absent sealed permission, keep required evidence fail-closed.
 
 ### The historical action-once contradiction
 
-[ADR 0033](../../app/docs/adr/0033-an-end-to-end-test-is-one-user-story-run-fast.md)
+[ADR 0033](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0033-an-end-to-end-test-is-one-user-story-run-fast.md)
 requires issuing each action once. At the native-source audit baseline, the
-[story runner](../../app/e2e/stories/play.ts) could issue a second tap when touch logs/pixel
+[story runner](https://github.com/SovranBitcoin/Sovran/blob/main/app/e2e/stories/play.ts) could issue a second tap when touch logs/pixel
 change have not been observed. Blame and the introducing diff (`9654087556`, refined by
 `60a8856342`) show an intentional workaround for taps lost while sheets open; its unit
 test explicitly expects two taps. That explains its purpose, but absent feedback does

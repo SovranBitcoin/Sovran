@@ -185,8 +185,6 @@ export interface Nip46EngineDeps {
   mintRpcId: () => string;
 }
 
-type OnUserVerdictNeeded = (request: Nip46PendingRequest) => void;
-
 // ── Internals ───────────────────────────────────────────────────
 
 const NOT_STARTED: Nip46EngineError = { type: 'not-started' };
@@ -237,8 +235,6 @@ export interface Nip46Engine {
     requestId: string,
     decision: Nip46RequestDecision
   ): ResultAsync<void, Nip46EngineError>;
-  /** UI hook for "a prompt is needed"; returns unsubscribe. Default: no listeners. */
-  onUserVerdictNeeded(callback: OnUserVerdictNeeded): () => void;
 }
 
 export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip46Engine {
@@ -265,7 +261,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
   const dedupe = new LruSet(DEDUPE_LRU_SIZE);
   const awaitedPairings = new Map<string, ParsedNostrConnectUri>();
   const pendingContexts = new Map<string, PendingRequestContext>();
-  const verdictCallbacks = new Set<OnUserVerdictNeeded>();
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
   const connections = () => useNip46ConnectionsStore.getState();
@@ -320,18 +315,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
   }): void {
     if (input.method === 'ping') return;
     activity().logActivity(input);
-  }
-
-  function notifyVerdictNeeded(request: Nip46PendingRequest): void {
-    for (const callback of verdictCallbacks) {
-      const invoked = Result.fromThrowable(
-        () => callback(request),
-        (error) => redactError(error)
-      )();
-      if (invoked.isErr()) {
-        nostrLog.warn('nostr.signer.engine_verdict_callback_failed', { error: invoked.error });
-      }
-    }
   }
 
   // ── Expiry sweep (runs only while the queue is non-empty) ─────
@@ -804,7 +787,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       ...(askContentPreview !== undefined && { contentPreview: askContentPreview }),
     });
     ensureSweep();
-    notifyVerdictNeeded(pending);
   }
 
   function contentPreviewFor(
@@ -1002,10 +984,10 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         inheritGrants: match.kind === 'active',
       });
       if (adopted.isErr()) return errAsync({ type: 'adopt-failed', cause: adopted.error });
-      // The replaced client's runtime leftovers: its timed decrypt grants die
-      // with it; its pending requests resolve/expire silently (resolve-time
-      // connection snapshots already treat a vanished record as unpaired).
-      requests().revokeSessionGrant(previousKey);
+      // The replaced client's runtime leftovers: its session ends with it; its
+      // pending requests resolve/expire silently (resolve-time connection
+      // snapshots already treat a vanished record as unpaired).
+      requests().endClientSession(previousKey);
       requests().setAppThrottled(previousKey, null);
     } else {
       // The store drops critical-always entries (its ceiling), caps relays, etc.
@@ -1096,13 +1078,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     return resolveVerdict(resolverSeam, requestId, decision);
   }
 
-  function onUserVerdictNeeded(callback: OnUserVerdictNeeded): () => void {
-    verdictCallbacks.add(callback);
-    return () => {
-      verdictCallbacks.delete(callback);
-    };
-  }
-
   return {
     get isStarted() {
       return state !== null;
@@ -1115,7 +1090,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     completeNostrconnectPairing,
     cancelNostrconnectPairing,
     resolveRequest,
-    onUserVerdictNeeded,
   };
 }
 

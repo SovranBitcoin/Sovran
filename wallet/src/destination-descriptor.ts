@@ -30,7 +30,7 @@ import type {
   WalletContext,
 } from "./types";
 
-export interface DescribeDestinationOptions {
+interface DescribeDestinationOptions {
   /** Locale-bound copy resolver. Defaults to the `en` resolver. */
   copy?: PaymentCopyResolver;
 }

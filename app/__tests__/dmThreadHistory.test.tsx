@@ -4,7 +4,11 @@ import { useDmThread } from '@/features/payments/hooks/useDmThread';
 import { useDmConversations } from '@/features/payments/hooks/useDmConversations';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
-import { dmConversationsCache, dmThreadCache } from '@/features/payments/data/dmSnapshotCaches';
+import {
+  dmConversationsCache,
+  dmConversationsKey,
+  dmThreadCache,
+} from '@/features/payments/data/dmSnapshotCaches';
 
 const mockInbox = jest.fn();
 const mockDirect = jest.fn(async (..._args: unknown[]) => ({ envelopes: [], hasNextPage: false }));
@@ -14,10 +18,16 @@ jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
   fetchDmConversation: (...args: unknown[]) => mockDirect(...args),
   subscribeDmEnvelopesLive: (...args: unknown[]) => mockLive(...args),
 }));
+// What ran, in order: each cache hydration (with its viewer) and each decrypt.
+const mockSteps: string[] = [];
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
-  giftWrapCache: { cache: { hydrate: async () => {} } },
+  giftWrapCache: {
+    cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip17:${viewer}`) },
+  },
 }));
-jest.mock('@/shared/lib/nostr/nip04Cache', () => ({ nip04Cache: { hydrate: async () => {} } }));
+jest.mock('@/shared/lib/nostr/nip04Cache', () => ({
+  nip04Cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip04:${viewer}`) },
+}));
 jest.mock('@/shared/lib/logger', () => {
   const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
   return {
@@ -48,8 +58,11 @@ jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
   isMockContactPubkey: (pubkey: string) => pubkey === mockFictionalPeer,
 }));
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
+  hydrateDmDecryptCaches: jest.requireActual<
+    typeof import('@/features/payments/data/dmDecryptPipeline')
+  >('@/features/payments/data/dmDecryptPipeline').hydrateDmDecryptCaches,
   decryptDmEnvelopes: (envelopes: DmEnvelopePage['envelopes']) =>
-    envelopes.map((e) => ({
+    (mockSteps.push('decrypt'), envelopes).map((e) => ({
       id: e.id,
       counterparty: e.pubkey,
       senderPubkey: e.pubkey,
@@ -76,6 +89,7 @@ function page(peer: string, count: number, newest: number): DmEnvelopePage {
 beforeEach(async () => {
   jest.clearAllMocks();
   mockInbox.mockReset();
+  mockSteps.length = 0;
   mockDirect.mockClear();
   mockLive.mockReset().mockReturnValue(() => {});
   dmThreadCache.clear();
@@ -299,5 +313,149 @@ describe('conversation list seeding', () => {
     expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
     rerender({ live: false });
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a live arrival when an inbox read that began before it lands without it', async () => {
+    let finish!: (p: DmEnvelopePage) => void;
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page('newcomer', 1, 2000)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer']);
+
+    // The first page was read before the arrival and does not hold it.
+    await act(async () => finish(page('peer', 1, 900)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
+
+    // Nor does a refresh answered from an older snapshot.
+    act(() => result.current.refresh());
+    await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
+    await act(async () => finish(page('peer', 1, 900)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
+    expect(
+      dmConversationsCache.getEntry(dmConversationsKey('viewer'))?.data.map((c) => c.counterparty)
+    ).toEqual(['newcomer', 'peer']);
+  });
+
+  it('keeps the seeded rows when a live arrival lands before the first page', async () => {
+    useDmLastMessageStore.getState().recordLastMessage('a'.repeat(64), {
+      protocol: 'nip17',
+      atSeconds: 500,
+      isOwn: false,
+    });
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>(() => {}));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockLive).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page('newcomer', 1, 2000)));
+
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual([
+      'newcomer',
+      'a'.repeat(64),
+    ]);
+  });
+
+  it('fills a seeded row from a live message with the same time', async () => {
+    const peer = 'a'.repeat(64);
+    useDmLastMessageStore.getState().recordLastMessage(peer, {
+      protocol: 'nip17',
+      atSeconds: 500,
+      isOwn: false,
+    });
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>(() => {}));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockLive).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page(peer, 1, 500)));
+
+    const row = result.current.conversations.find((c) => c.counterparty === peer);
+    expect(row?.previewPending).toBeFalsy();
+    expect(row?.newestMessageId).toBeTruthy();
+  });
+});
+
+describe.each([
+  { source: 'conversations', limit: 100 },
+  { source: 'thread', limit: 50 },
+] as const)('$source inbox requests', ({ source, limit }) => {
+  function useFeed() {
+    const thread = useDmThread({
+      counterparty: source === 'thread' ? 'peer' : '',
+      viewerPubkey: source === 'thread' ? 'viewer' : undefined,
+      viewerPrivateKey: key,
+    });
+    const conversations = useDmConversations(
+      source === 'conversations' ? 'viewer' : undefined,
+      key
+    );
+    return source === 'thread' ? thread : conversations;
+  }
+
+  it(`asks the inbox for ${limit} envelopes for the viewer, then pages behind them`, async () => {
+    mockInbox
+      .mockResolvedValueOnce(page('peer', limit, 1000))
+      .mockResolvedValueOnce(page('peer', 1, 500));
+    const { result } = renderHook(() => useFeed());
+    await waitFor(() => expect(result.current.hasMore).toBe(true));
+    expect(mockInbox).toHaveBeenCalledTimes(1);
+    expect(mockInbox.mock.calls[0]).toEqual([
+      { viewer: 'viewer', limit, until: undefined, refresh: false, signal: expect.any(Object) },
+    ]);
+    expect(mockInbox.mock.calls[0][0].signal.aborted).toBe(false);
+    await act(async () => {
+      await result.current.loadMore();
+    });
+    expect(mockInbox.mock.calls[1]).toEqual([
+      {
+        viewer: 'viewer',
+        limit,
+        until: expect.any(Number),
+        refresh: false,
+        signal: expect.any(Object),
+      },
+    ]);
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it(`stops after a first page shorter than ${limit}`, async () => {
+    mockInbox.mockResolvedValueOnce(page('peer', limit - 1, 1000));
+    const { result } = renderHook(() => useFeed());
+    await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.hasMore).toBe(false);
+    expect(mockInbox).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('decryption caches', () => {
+  it.each([
+    ['nip17', ['nip17:viewer']],
+    ['nip04', ['nip04:viewer']],
+  ] as const)(
+    'a %s thread warms only its own cache, before decrypting',
+    async (protocol, warmed) => {
+      mockInbox.mockResolvedValue(page('peer', 1, 1000));
+      const { result } = renderHook(() =>
+        useDmThread({
+          counterparty: 'peer',
+          viewerPubkey: 'viewer',
+          viewerPrivateKey: key,
+          protocol,
+        })
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockSteps).toEqual([...warmed, 'decrypt']);
+    }
+  );
+
+  it('the conversation list warms both caches before decrypting', async () => {
+    mockInbox.mockResolvedValue(page('peer', 1, 1000));
+    const { result } = renderHook(() => useDmConversations('viewer', key));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockSteps).toEqual(['nip17:viewer', 'nip04:viewer', 'decrypt']);
   });
 });

@@ -29,23 +29,19 @@ jest.mock('@/shared/lib/nostr/media/blossomAuth', () => ({
   sha256Hex: () => 'deadbeef',
 }));
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    NDKEvent: class {
-      kind = 0;
-      content = '';
-      created_at = 0;
-      tags: string[][] = [];
-      async sign(): Promise<void> {}
-      rawEvent(): object {
-        return {};
-      }
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  NDKEvent: class {
+    kind = 0;
+    content = '';
+    created_at = 0;
+    tags: string[][] = [];
+    async sign(): Promise<void> {}
+    rawEvent(): object {
+      return {};
+    }
+  },
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,

@@ -42,7 +42,10 @@ export function useModelPicker(): () => void {
     void picker.result.then(async (result) => {
       if (session.current === picker) session.current = null;
       if (result.kind !== 'option') return;
-      const slot = providersForLineup(state.lineup)
+      // The sheet follows the catalog while it is open, so the pick is read
+      // against the lineup as it is now, not as it was when the sheet opened.
+      const { lineup: currentLineup } = modelPickerState(useRoutstrStore.getState(), balanceSats);
+      const slot = providersForLineup(currentLineup)
         .flatMap((provider) => AI_TIERS.map((tier) => ({ provider, tier })))
         .find(({ provider, tier }) => modelOptionId(provider.id, tier.id) === result.id);
       // Picking the current model again only closes the sheet.

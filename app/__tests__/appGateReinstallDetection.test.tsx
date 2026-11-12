@@ -27,7 +27,6 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
 }));
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsHydration: () => 'ready',
   useSettingsStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ hasSeenOnboarding: false }),
     {
@@ -43,9 +42,11 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
   useWalletLifecycleStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ seedCreatedAt: mockLifecycle.seedCreatedAt }),
-    { getState: () => ({ seedCreatedAt: mockLifecycle.seedCreatedAt }) }
+    {
+      getState: () => ({ seedCreatedAt: mockLifecycle.seedCreatedAt }),
+      persist: { hasHydrated: () => true, onFinishHydration: () => () => {} },
+    }
   ),
-  useWalletLifecycleHydrated: () => true,
 }));
 
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
@@ -133,13 +134,19 @@ jest.mock('@/shared/lib/profile/profileSessionOrchestrator', () => ({
   recoverMnemonicSession: jest.fn(),
   deleteAllProfiles: jest.fn(),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: Object.assign(
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = Object.assign(
     (selector: (state: { activeAccountIndex: number; profiles: never[] }) => unknown) =>
       selector({ activeAccountIndex: 0, profiles: [] }),
     { getState: jest.fn() }
-  ),
-}));
+  );
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 
 describe('AppGate locked recovery', () => {
   beforeEach(() => {

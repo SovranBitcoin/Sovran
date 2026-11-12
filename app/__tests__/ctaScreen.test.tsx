@@ -31,7 +31,9 @@ jest.mock('expo-router/react-navigation', () => ({
 jest.mock('react-native', () => ({
   BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
 }));
-jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: 1 }) }), { virtual: true });
+jest.mock('@cashu/coco-react', () => ({
+  useBalanceContext: () => ({ balances: { totalByUnit: { sat: { total: 1, unit: 'sat' } } } }),
+}));
 jest.mock('@/shared/ui/composed/SheetGrabber', () => ({ SheetGrabber: 'Grabber' }));
 jest.mock('heroui-native', () => {
   const React = require('react');

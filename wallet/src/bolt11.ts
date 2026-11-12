@@ -10,7 +10,7 @@ import { decode } from "@gandlaf21/bolt11-decode";
 
 import { logger } from "./logger";
 
-export interface Bolt11Info {
+interface Bolt11Info {
   /**
    * Amount in whole sats, or null when the invoice is amountless. Invoices
    * with sub-sat (msat) precision are rounded UP to the next whole sat — the

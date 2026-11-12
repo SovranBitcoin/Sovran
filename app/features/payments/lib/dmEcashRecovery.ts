@@ -91,7 +91,7 @@ export async function reconcileParkedMessageEcash(
       const spent = await isTokenSpent(manager, entry.token);
       if (!current()) return requeued;
       if (spent) {
-        useNutDropRedeemQueueStore.getState().markStatus(entry.tokenHash, 'spent');
+        useNutDropRedeemQueueStore.getState().markHeldSpent(entry.tokenHash);
       } else if (trusted && entry.reason === 'untrusted-mint') {
         useNutDropRedeemQueueStore.getState().requeue(entry.tokenHash);
         requeued = true;

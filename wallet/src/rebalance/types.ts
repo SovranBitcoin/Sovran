@@ -193,8 +193,19 @@ export interface RebalanceEngineConfig {
   logger?: CocoLogger;
 }
 
-export interface RebalanceRunCallbacks {
+/**
+ * Whether a run is still wanted. `isActive` is asked throughout, also while a
+ * leg is in flight; `beforeLegOpens` only before a new leg opens, before
+ * anything is sent for it. A caller that ends the run there (so `isActive`
+ * reads false from then on) stops it before that leg, without stopping one
+ * already in flight.
+ */
+export interface RebalanceRunActivity {
   isActive(): boolean;
+  beforeLegOpens?(): void;
+}
+
+export interface RebalanceRunCallbacks extends RebalanceRunActivity {
   /** Already done or skipped in an earlier run. */
   isSettled(stepId: string): boolean;
   sinkFor(step: RebalanceTransfer): RebalanceEventSink;

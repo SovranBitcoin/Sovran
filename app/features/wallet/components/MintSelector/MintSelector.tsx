@@ -48,7 +48,7 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         iconBoxSize={24}
         loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}
-        width={shared.dimensions.buttonWidth}
+        width={props.width}
         height={props.height}
         contentHeight={props.contentHeight}
       />

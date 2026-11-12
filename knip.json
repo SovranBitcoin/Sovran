@@ -11,7 +11,8 @@
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
     "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
     "app/shared/lib/routstr/sdk/walletAdapter.ts": ["exports"],
-    "scripts/lib/phone-frame.mjs": ["exports"]
+    "scripts/lib/phone-frame.mjs": ["exports"],
+    "wallet/__tests__/**": ["exports", "types"]
   },
   "workspaces": {
     "harness": {
@@ -46,7 +47,8 @@
       "ignoreBinaries": ["claude", "eas", "gh", "tsx", "python3"]
     },
     "wallet": {
-      "project": ["src/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}", "__tests__/**/*.ts"],
+      "includeEntryExports": true
     },
     "nostr": {
       "project": ["src/**/*.{ts,tsx}"]

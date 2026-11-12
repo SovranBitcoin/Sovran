@@ -15,6 +15,7 @@ import NfcManager, { NfcAdapter, NfcTech } from 'react-native-nfc-manager';
 
 import { nfcLog } from '../logger';
 import { NfcError } from './errors';
+import { nfcTagConnected } from './reader';
 import { isNfcEnabled, isNfcSupported } from './status';
 
 // Android has no system NFC sheet: with the adapter disabled or absent,
@@ -37,15 +38,6 @@ function ensureNfcStarted(): Promise<void> {
     throw new NfcError('NFC is not supported on this device', 'NOT_SUPPORTED');
   });
   return nfcStartPromise;
-}
-
-// Fired the moment requestTechnology resolves (a tag entered the field).
-// The ambient tap-to-pay hook uses it to flip the sheet to 'Reading' and
-// auto-surface the sheet on ambient taps. Plain callback (not a store
-// import) so this lib layer stays UI-free.
-let tagConnectedListener: (() => void) | null = null;
-export function setNfcTagConnectedListener(listener: (() => void) | null): void {
-  tagConnectedListener = listener;
 }
 
 async function cancelStaleSession(): Promise<void> {
@@ -89,7 +81,8 @@ export async function acquireSession(): Promise<void> {
     if (timeout) clearTimeout(timeout);
   }
   nfcLog.info('nfc.session.acquired');
-  tagConnectedListener?.();
+  // A tag entered the field: tell whoever holds the reader (see ./reader).
+  nfcTagConnected();
 }
 
 export async function releaseSession(): Promise<void> {

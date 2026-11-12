@@ -45,18 +45,17 @@
  *      The inspect() method's step must match getStep(). If these diverge,
  *      the machine's internal state is inconsistent.
  *
- *    Invariant 2: Error step has status 'blocked'
- *      When the machine is at the error step, its execution status must
- *      be 'blocked' — the machine can't proceed without user intervention.
+ *    Invariant 2: Error step carries its code and message
+ *      When the machine is at the error step, inspect() details are the
+ *      error step's data: a string `code` and a string `message`.
  *
- *    Invariant 3: Input steps have status 'needsInput'
+ *    Invariant 3: Input steps carry their step data
  *      Steps that require user input (chooseOption, enterAmount, selectMint,
- *      chooseProofs, reviewMint) must have status 'needsInput' (unless an
- *      async operation is currently executing).
+ *      chooseProofs) report their data in inspect() details.
  *
- *    Invariant 4: Idle step has status 'ready'
- *      When the machine is idle (no flow in progress), its status must
- *      be 'ready' — waiting for the first event.
+ *    Invariant 4: Idle step carries no details
+ *      When the machine is idle (no flow in progress), there is nothing to
+ *      show — waiting for the first event.
  *
  * 4. PROPERTY TESTS:
  *    - Invariants hold after every action in random sequences
@@ -102,7 +101,6 @@ const INPUT_STEPS = new Set<FlowStep>([
   'enterAmount',
   'selectMint',
   'chooseProofs',
-  'reviewMint',
 ]);
 
 /**
@@ -116,29 +114,22 @@ function checkInvariants(step: FlowStep, execution: ExecutionState): string | nu
     return `ExecutionState.step (${execution.step}) !== getStep() (${step})`;
   }
 
-  // Invariant 2: Error step must have 'blocked' status.
-  // The machine is stuck and needs the user to take action (reset, re-scan).
+  // Invariant 2: the error step reports its code and message.
   if (step === 'error') {
-    if (execution.status !== 'blocked') {
-      return `Error step should have status 'blocked', got '${execution.status}'`;
+    const details = execution.details;
+    if (typeof details?.code !== 'string' || typeof details?.message !== 'string') {
+      return `Error step should report a code and message, got ${JSON.stringify(details)}`;
     }
   }
 
-  // Invariant 3: Input steps must have 'needsInput' status.
-  // Exception: if an async operation is currently executing (e.g. building
-  // mint list), the status may temporarily be different.
-  if (INPUT_STEPS.has(step) && !execution.isExecuting) {
-    if (execution.status !== 'needsInput') {
-      return `Input step '${step}' should have status 'needsInput', got '${execution.status}'`;
-    }
+  // Invariant 3: input steps report their step data.
+  if (INPUT_STEPS.has(step) && !execution.details) {
+    return `Input step '${step}' should report its step data`;
   }
 
-  // Invariant 4: Idle step must have 'ready' status.
-  // The machine is waiting for the first event (execute, startSendEcash, etc.).
-  if (step === 'idle') {
-    if (execution.status !== 'ready') {
-      return `Idle step should have status 'ready', got '${execution.status}'`;
-    }
+  // Invariant 4: the idle step reports nothing.
+  if (step === 'idle' && execution.details !== undefined) {
+    return `Idle step should report no details, got ${JSON.stringify(execution.details)}`;
   }
 
   return null;

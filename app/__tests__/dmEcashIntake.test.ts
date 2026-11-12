@@ -2,9 +2,6 @@
 import { intakeDmEcash, type DmEcashQueuePort } from '@/features/payments/lib/dmEcashIntake';
 
 const mockClassify = jest.fn();
-jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
-  NUT_DROP_QUEUE_LIMITS: { tokenHash: 64, token: 60_000, mintUrl: 2048, unit: 16 },
-}));
 jest.mock('wallet', () => ({
   classifyMeshToken: (...args: unknown[]) => mockClassify(...args),
   meshTokenDedupeKey: (token: string) => `hash:${token}`,
@@ -21,18 +18,10 @@ function queue() {
   const known = new Map<string, { status: string }>();
   const port: DmEcashQueuePort = {
     has: (hash) => known.has(hash),
-    enqueue: jest.fn((hash) => {
+    enqueue: jest.fn((hash, _entry, status) => {
       if (known.has(hash)) return false;
-      known.set(hash, { status: 'pending' });
+      known.set(hash, { status });
       return true;
-    }),
-    markSpent: jest.fn((hash) => {
-      const entry = known.get(hash);
-      if (entry) entry.status = 'spent';
-    }),
-    park: jest.fn((hash) => {
-      const entry = known.get(hash);
-      if (entry) entry.status = 'untrusted-mint';
     }),
   };
   return { port, known };
@@ -66,14 +55,18 @@ describe('ecash arriving as a Nostr message', () => {
       stillCurrent: () => true,
     });
     expect(outcome).toBe('queued');
-    expect(port.enqueue).toHaveBeenCalledWith(`hash:${TOKEN}`, {
-      token: TOKEN,
-      mintUrl: 'https://mint.example',
-      amount: 21,
-      unit: 'sat',
-      source: 'nostr',
-      senderPubkey: SENDER,
-    });
+    expect(port.enqueue).toHaveBeenCalledWith(
+      `hash:${TOKEN}`,
+      {
+        token: TOKEN,
+        mintUrl: 'https://mint.example',
+        amount: 21,
+        unit: 'sat',
+        source: 'nostr',
+        senderPubkey: SENDER,
+      },
+      'pending'
+    );
   });
 
   it('ignores my own sent token, so sending never redeems back to me', async () => {
@@ -191,7 +184,6 @@ describe('ecash arriving as a Nostr message', () => {
       });
       expect(outcome).toBe('abandoned');
       expect(port.enqueue).not.toHaveBeenCalled();
-      expect(port.markSpent).not.toHaveBeenCalled();
     }
   );
 

@@ -305,14 +305,6 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
-    file: 'shared/stores/global/settingsStore.ts',
-    name: 'useSettingsHydration',
-    scope: 'global',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
     file: 'shared/stores/global/walletLifecycleStore.ts',
     name: 'wallet-lifecycle',
     scope: 'global',
@@ -611,14 +603,6 @@ export const storeRegistryManifest = [
   {
     file: 'shared/stores/runtime/rollbackStore.ts',
     name: 'useRollbackStore',
-    scope: 'session',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
-    file: 'shared/stores/runtime/routstrTopUpStore.ts',
-    name: 'useRoutstrTopUpStore',
     scope: 'session',
     persisted: false,
     queryCache: false,

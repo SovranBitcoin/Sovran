@@ -20,8 +20,8 @@
  *   2. Execute a new input (overriding the current flow)
  *   3. Start a new flow (send/receive)
  *
- * This is possible because RESET and EXECUTE are GLOBAL events — they
- * work from any step. The machine wrapper also supports startSendEcash
+ * This is possible because reset() works from any step and EXECUTE is a
+ * GLOBAL event. The machine wrapper also supports startSendEcash
  * and startReceiveLightning from any step (they internally reset first).
  *
  * Testing strategy:
@@ -183,6 +183,45 @@ describe("interruptions — error recovery", () => {
 
     await tm.machine.startSendEcash();
     tm.assertStep("enterAmount");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// An event the current step does not handle
+// ---------------------------------------------------------------------------
+
+/**
+ * A stray event (a late proof-sheet callback, a confirm tap on a screen the
+ * machine has left) is no transition: the step keeps its data and its
+ * handler is not run again.
+ */
+describe("interruptions — an event the step does not handle", () => {
+  it("leaves the amount screen's data alone and does not re-run its handler", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true });
+    tm.assertStep("enterAmount");
+    const handlerCalls = tm.handlerCalls.length;
+    const snapshot = tm.machine.inspect();
+
+    await tm.machine.chooseProofs(5);
+
+    tm.assertStep("enterAmount");
+    expect(tm.handlerCalls).toHaveLength(handlerCalls);
+    expect(tm.machine.inspect()).toEqual(snapshot);
+  });
+
+  it("leaves the error step's code and message alone", async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.randomString, { reset: true });
+    tm.assertStep("error");
+    const handlerCalls = tm.handlerCalls.length;
+    const snapshot = tm.machine.inspect();
+
+    await tm.machine.submitSendMemo("hello");
+
+    tm.assertStep("error");
+    expect(tm.handlerCalls).toHaveLength(handlerCalls);
+    expect(tm.machine.inspect()).toEqual(snapshot);
   });
 });
 

@@ -36,6 +36,8 @@ const STORAGE_LIBRARIES = [
   '@cashu/coco-core',
   '@cashu/coco-expo-sqlite',
   '@cashu/coco-react',
+  // Writes the Nostr event cache databases `nostr` and `nostr-<i>`.
+  '@nostr-dev-kit/ndk-mobile',
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

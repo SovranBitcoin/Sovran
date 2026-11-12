@@ -77,7 +77,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { alpha, duration, iconSize, spacing, zIndex } from '@/shared/styles/tokens';
-import { useNearPaySessionStore, type NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import {
   buildPeerLayoutTargets,
   getPeerLayoutOverviewTransform,
@@ -1809,12 +1809,10 @@ export function NearPayScreen() {
         }
         return;
       }
-      const delivery: NearPayDelivery = { locked: true };
       paymentLog.info('near_pay.peer.select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
-        locked: delivery.locked,
       });
       setSelectedPeer(peer);
       setSelectedPeerRect(avatarRect);
@@ -1837,7 +1835,6 @@ export function NearPayScreen() {
         creq: peer.creq,
         nostrPubkeyHex: peer.nostrPubkeyHex,
         walletCapabilityExpiresAt: peer.walletCapabilityExpiresAt,
-        delivery,
       });
       // Failure paths must only unwind THIS selection — the radar stays
       // tappable while a send is in flight, so the session-id guard ensures a
@@ -1868,7 +1865,6 @@ export function NearPayScreen() {
         // and recipient lock remain fixed for this selection.
         paymentLog.info('near_pay.start_send', {
           peerID: peer.peerID,
-          locked: delivery.locked,
         });
         await machine.startSendEcash({
           reset: true,

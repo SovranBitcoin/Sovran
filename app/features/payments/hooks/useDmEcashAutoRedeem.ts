@@ -18,24 +18,24 @@
  * home for the person to review (`ParkedMessageEcash`).
  */
 
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { paymentLog, redactError } from '@/shared/lib/logger';
-import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
+import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { isTokenSpent } from '@/shared/lib/routstr/spentProbe';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import { fetchDmEnvelopes, subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
 import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { createDmEnvelopeCursor, type DmEnvelopeCursor } from '../data/dmPagination';
@@ -47,8 +47,6 @@ import {
   nextMessageEcashRetryAt,
 } from '../lib/parkedMessageEcash';
 
-/** NIP-04 and NIP-17 gift wraps: the kinds the conversation list reads. */
-const DM_KINDS = [4, 1059];
 const PAGE_LIMIT = 50;
 /**
  * Upper bound on pages read in one pass, so a pathological inbox is not read
@@ -71,10 +69,8 @@ const BACKDATING_WINDOW_SEC = 2 * 24 * 60 * 60 + 60 * 60;
 
 const queuePort: DmEcashQueuePort = {
   has: (tokenHash) => tokenHash in useNutDropRedeemQueueStore.getState().byTokenHash,
-  enqueue: (tokenHash, entry) => useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry),
-  markSpent: (tokenHash) => useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'spent'),
-  park: (tokenHash) =>
-    useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'untrusted-mint'),
+  enqueue: (tokenHash, entry, status) =>
+    useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry, status),
 };
 
 /** `null` when the wallet cannot be asked yet. */
@@ -87,28 +83,6 @@ async function probeTrusted(mintUrl: string): Promise<boolean | null> {
 async function probeSpent(token: string): Promise<boolean | null> {
   if (!CocoManager.isInitialized()) return null;
   return isTokenSpent(CocoManager.getInstance(), token);
-}
-
-const restoreSettled = (status: string) => status === 'complete' || status === 'not-needed';
-
-/**
- * True once the queue has been read from storage for the active profile.
- * Until then the store holds an empty default: a token queued into it would
- * be written over what is on disk, then dropped when the stored map loads.
- */
-function useQueueHydrated(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const offStart = useNutDropRedeemQueueStore.persist.onHydrate(onChange);
-      const offEnd = useNutDropRedeemQueueStore.persist.onFinishHydration(onChange);
-      return () => {
-        offStart();
-        offEnd();
-      };
-    },
-    () => useNutDropRedeemQueueStore.persist.hasHydrated(),
-    () => false
-  );
 }
 
 const queueEntries = () => useNutDropRedeemQueueStore.getState().byTokenHash;
@@ -124,7 +98,9 @@ function useDmEcashAutoRedeem(): void {
   );
   const pubkey = keys?.pubkey;
   const privateKey = keys?.privateKey;
-  const queueReady = useQueueHydrated();
+  // Until the queue is read for this profile it holds an empty default: a token
+  // queued into it would be written over what is on disk.
+  const queueReady = useStoreLoad(useNutDropRedeemQueueStore.persist) === 'loaded';
   const { isOffline } = useOfflineStatus();
   const wasOffline = useRef(isOffline);
 
@@ -149,7 +125,7 @@ function useDmEcashAutoRedeem(): void {
     // provider can stay mounted with the keys it had, and a write then would
     // land in unscoped storage and bring the wiped tokens back. The queue is
     // only this wallet's while the stores are scoped to this profile.
-    const stillCurrent = () => !disposed && getActiveProfilePubkey() === pubkey;
+    const stillCurrent = () => !disposed && activePubkey() === pubkey;
     // Envelope ids already handed to intake this session. Once one walk has
     // read the whole inbox, a later walk stops at the first page that holds
     // nothing new and lies past the backdating window, instead of rereading
@@ -240,7 +216,6 @@ function useDmEcashAutoRedeem(): void {
     const readPage = async (cursor: DmEnvelopeCursor, pageIndex: number): Promise<boolean> => {
       const page = await fetchDmEnvelopes({
         viewer: pubkey,
-        kinds: DM_KINDS,
         limit: PAGE_LIMIT,
         refresh: pageIndex === 0,
         ...(pageIndex > 0 ? { until: cursor.nextUntil() } : {}),
@@ -277,7 +252,7 @@ function useDmEcashAutoRedeem(): void {
       const page = async () => {
         if (disposed) return false;
         if (pageIndex === 0) {
-          await Promise.all([giftWrapCache.cache.hydrate(pubkey), nip04Cache.hydrate(pubkey)]);
+          await hydrateDmDecryptCaches(pubkey);
         }
         return readPage(cursor, pageIndex);
       };
@@ -318,7 +293,7 @@ function useDmEcashAutoRedeem(): void {
     // The drainer does nothing while a wallet restore is pending, and this
     // hook mounts before the restore gate. Serve the queue when it settles.
     const unsubscribeRestore = useWalletLifecycleStore.subscribe((state, previous) => {
-      if (restoreSettled(state.restoreStatus) && !restoreSettled(previous.restoreStatus)) {
+      if (isSafeToMint(state.restoreStatus) && !isSafeToMint(previous.restoreStatus)) {
         run('restored', () => drainIfNeeded(false));
       }
     });

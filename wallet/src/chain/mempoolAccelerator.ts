@@ -58,7 +58,7 @@ const AccelerationInvoiceSchema = z
   })
   .passthrough();
 
-export interface AccelerationInvoice {
+interface AccelerationInvoice {
   invoiceId: string;
   /** BOLT11 payment request. */
   bolt11: string;
@@ -73,7 +73,7 @@ const AccelerationStatusSchema = z
   })
   .passthrough();
 
-export interface AccelerationStatus {
+interface AccelerationStatus {
   txid: string;
   /** 'accelerating' while queued with pools; 'mined'/'completed' after. */
   status: string;

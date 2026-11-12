@@ -1,8 +1,8 @@
 # Lens: state machines & async state integrity
 
 Scope: the Colada `PaymentMachine` (`wallet/src/machine/` — `transitions.ts`,
-`resolveNext.ts`, `flows/`, `effects.ts`) and its screen-action seam
-(`wallet/src/react/usePaymentMachine.ts`), plus ad-hoc async state in screens
+`resolveNext.ts`, `flows/`, `effects.ts`) and its React seam
+(`wallet/src/react/ColadaProvider.tsx`), plus ad-hoc async state in screens
 and stores that *should* be machines. Authority:
 `wallet/docs/STATE_MACHINE.md` — read it first; §11 lists known gaps (never
 re-report those as new findings).

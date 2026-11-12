@@ -18,6 +18,8 @@ jest.mock('react-native-safe-area-context', () => ({
 let mockDisplayName = '';
 let mockKeys: { pubkey: string; npub: string } | undefined;
 let mockDevMode = false;
+let mockInProcessProfileSwitch = false;
+const mockSetInProcessProfileSwitch = jest.fn();
 let mockPendingCount = 0;
 let mockPolicy = 'RELAXED';
 
@@ -28,7 +30,12 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: mockKeys }),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: (select: (state: object) => unknown) => select({ experimental: mockDevMode }),
+  useSettingsStore: (select: (state: object) => unknown) =>
+    select({
+      experimental: mockDevMode,
+      inProcessProfileSwitch: mockInProcessProfileSwitch,
+      setInProcessProfileSwitch: mockSetInProcessProfileSwitch,
+    }),
 }));
 jest.mock('@/features/feed/stores/notificationPolicyStore', () => ({
   useNotificationPolicyStore: (select: (state: object) => unknown) =>
@@ -111,6 +118,8 @@ beforeEach(() => {
   mockDisplayName = '';
   mockKeys = undefined;
   mockDevMode = false;
+  mockInProcessProfileSwitch = false;
+  mockSetInProcessProfileSwitch.mockClear();
   mockPendingCount = 0;
   mockPolicy = 'RELAXED';
 });
@@ -185,4 +194,26 @@ it('keeps live descriptions mounted and single-line as stores settle and request
   }
   expect(descriptions()[0].props.children).toBe('Sign in to Nostr apps with this device');
   expect(descriptions()[1].props.children).toBe('Follows');
+});
+
+it('exposes profile switching as a checked switch and toggles in both directions', () => {
+  mockDevMode = true;
+  render();
+  const toggle = () => control('settings-in-process-profile-switch-toggle');
+  expect(toggle().props.accessible).toBe(true);
+  expect(toggle().props.accessibilityRole).toBe('switch');
+  expect(toggle().props.accessibilityLabel).toBe('Switch profiles without restart');
+  expect(toggle().props.accessibilityState).toEqual({ checked: false });
+  act(() => {
+    toggle().props.onPress();
+  });
+  expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(true);
+
+  mockInProcessProfileSwitch = true;
+  act(() => tree.update(<SettingsScreen />));
+  expect(toggle().props.accessibilityState).toEqual({ checked: true });
+  act(() => {
+    toggle().props.onPress();
+  });
+  expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
 });

@@ -31,6 +31,7 @@ import type { RoutstrModel } from '@/shared/lib/routstr/api';
 import { ModelChip } from '@/features/ai/components/ModelChip';
 import { E2EE_BADGE_ICON, E2EE_BADGE_LABEL } from '@/features/ai/lib/format';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { emptyLineup, type AiLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
 
 import { openModelPicker } from './helpers/modelPicker';
 
@@ -40,6 +41,7 @@ jest.mock('@/shared/lib/apiClient', () => ({ getAiLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: {
     getState: () => ({ activeAccountIndex: 0, profiles: [{ accountIndex: 0 }] }),
+    subscribe: () => () => undefined,
   },
 }));
 jest.mock('@/shared/lib/routstr/api', () => ({
@@ -335,5 +337,73 @@ describe('the chip badges the model a turn would actually be sent to', () => {
     expect(has(tree, 'ai-model-chip-e2ee')).toBe(false);
     expect(chipLabel(tree)).not.toContain(E2EE_BADGE_LABEL);
     act(() => tree.unmount());
+  });
+});
+
+/**
+ * The chip names the model against the lineup a send reads (this session's,
+ * else the saved one) and the wallet's 10 000 spendable sats.
+ */
+describe('the chip names the model against the lineup a send reads', () => {
+  const lineupEntry = (modelId: string, maxCost: number): LineupEntry => ({
+    modelId,
+    displayName: `${modelId} name`,
+    contextLength: 128_000,
+    created: 1,
+    visionInput: false,
+    satsPricing: { prompt: null, completion: null, request: null, image: null, max_cost: maxCost },
+  });
+  const lineupOf = (...entries: [string, LineupEntry][]): AiLineup => {
+    const lineup = emptyLineup();
+    for (const [provider, value] of entries)
+      lineup[provider] = { ...lineup[provider]!, auto: value };
+    return lineup;
+  };
+
+  function chipLabelWith(lineup: AiLineup | null, saved: AiLineup | null): string {
+    useRoutstrStore.setState({
+      lineup,
+      lastKnownLineup: saved
+        ? { derivedAt: 1, nodeBaseUrl: 'https://ai.example', lineup: saved }
+        : null,
+      modelsCache: null,
+      serverLineupAt: null,
+      nodeBaseUrl: 'https://ai.example',
+      userNodeBaseUrl: 'https://ai.example',
+      selectedProvider: 'openai',
+      selectedTier: 'auto',
+    });
+    let tree!: Renderer;
+    act(() => {
+      tree = TestRenderer.create(<ModelChip />);
+    });
+    const label = String(
+      tree.root.find((node) => node.props.testID === 'ai-model-chip').props.accessibilityLabel
+    );
+    act(() => tree.unmount());
+    return label;
+  }
+
+  it("names the saved lineup's model while this session has none", () => {
+    const saved = lineupOf(['openai', lineupEntry('saved-model', 10)]);
+    expect(chipLabelWith(null, saved)).toBe('Model: Auto · saved-model name');
+  });
+
+  it('keeps an empty session lineup over the saved one', () => {
+    const saved = lineupOf(['openai', lineupEntry('saved-model', 10)]);
+    expect(chipLabelWith(emptyLineup(), saved)).toBe('Model: Auto · Auto');
+  });
+
+  it('names the first model the wallet can afford, else the first at any cost', () => {
+    const affordable = lineupOf(
+      ['openai', lineupEntry('dear-model', 1_000_000)],
+      ['claude', lineupEntry('cheap-model', 10)]
+    );
+    expect(chipLabelWith(affordable, null)).toBe('Model: Auto · cheap-model name');
+    const none = lineupOf(
+      ['openai', lineupEntry('dear-first', 1_000_000)],
+      ['claude', lineupEntry('dear-second', 1_000_000)]
+    );
+    expect(chipLabelWith(none, null)).toBe('Model: Auto · dear-first name');
   });
 });

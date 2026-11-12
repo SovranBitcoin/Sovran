@@ -227,10 +227,8 @@ it('canary resets every registered profile/session store and invokes every reach
   const attachments = require('@/features/ai/lib/attachments');
   const image = { localUri: sentinel, mimeType: 'image/jpeg', width: 1, height: 1 };
   expect(await attachments.encodeChatImage(image)).toContain(sentinel);
-  const errors = require('@/features/ai/lib/turnErrors');
-  const truncations = require('@/features/ai/lib/turnTruncation');
-  errors.recordTurnError(sentinel, { id: 'unknown', text: sentinel });
-  truncations.recordTurnTruncation(sentinel, { budgetTokens: 42 });
+  const turns = require('@/features/ai/lib/turns');
+  turns.dispatchTurn(sentinel, { type: 'failed', error: { id: 'unknown', text: sentinel } });
   const availability = require('@/features/ai/lib/modelAvailability');
   availability.markModelUnavailable('https://example.invalid', sentinel, { status: 404 });
   const zaps = require('@/shared/stores/runtime/pendingZapStore');
@@ -288,7 +286,6 @@ it('canary resets every registered profile/session store and invokes every reach
   const uninspectable: Record<string, string> = {
     'cache.session-epoch':
       'A monotonic generation, not an account-data holder; disposal is observed.',
-    'nostr.for-you-cache': 'Package-private Map; nostr package edits are excluded from this task.',
     'wallet.reusable-quote-flights': 'Package-private flights; wallet package edits are excluded.',
     'wallet.melt-target': 'Wallet closure; manager and wallet edits are excluded.',
     'wallet.cashu-seed': 'Manager-private seed; manager edits are excluded.',
@@ -325,8 +322,7 @@ it('canary resets every registered profile/session store and invokes every reach
   expect(availability.isModelUnavailable('https://example.invalid', sentinel)).toBe(false);
   expect(zaps.peekPendingZap(sentinel)).toBeUndefined();
   expect(nip04Cache.get('a'.repeat(64), sentinel)).toBeUndefined();
-  expect(errors.getTurnError(sentinel)).toBeNull();
-  expect(truncations.getTurnTruncation(sentinel)).toBeNull();
+  expect(turns.getTurn(sentinel)).toBeUndefined();
   expect(giftWrapCache.cache.get('a'.repeat(64), sentinel)).toBeUndefined();
   expect(theme.getState().mode).toBe('light');
   process.stdout.write(
@@ -496,15 +492,21 @@ it('strict Coco cleanup rejects swallowed teardown failures while default cleanu
     dispose,
   };
   // Synthetic manager only: no native database, proofs, wallet or network.
-  Reflect.set(CocoManager, 'instance', instance);
+  const open = () =>
+    Reflect.set(CocoManager, 'life', {
+      phase: 'ready',
+      instance,
+      db: { closeAsync: jest.fn().mockResolvedValue(undefined) },
+    });
+  open();
   await expect(CocoManager.cleanup({ requireSuccess: true })).rejects.toThrow(
     'Coco teardown incomplete'
   );
   expect(dispose).toHaveBeenCalledTimes(1);
-  Reflect.set(CocoManager, 'instance', instance);
+  open();
   await expect(CocoManager.cleanup()).resolves.toBeUndefined();
   expect(dispose).toHaveBeenCalledTimes(2);
-  Reflect.set(CocoManager, 'instance', instance);
+  open();
   const defaultPending = CocoManager.cleanup();
   const joinedAssertion = expect(CocoManager.cleanup({ requireSuccess: true })).rejects.toThrow(
     'Coco teardown incomplete'

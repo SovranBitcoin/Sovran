@@ -79,6 +79,8 @@ function park(
     unit: 'sat',
     source: 'nostr',
   });
+  // A refusal comes from a receive the drain started.
+  if (status === 'failed') store().markStatus(tokenHash, 'redeeming');
   store().markStatus(tokenHash, status, 'parked');
 }
 

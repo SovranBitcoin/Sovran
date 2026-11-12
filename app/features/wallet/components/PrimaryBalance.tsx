@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
@@ -218,7 +219,7 @@ export function PrimaryBalance({
   const balanceSize = glass ? BALANCE_TEXT_SIZE : appStyle.type.balance;
   const balanceLineHeight = glass ? BALANCE_TEXT_LINE_HEIGHT : Math.round(balanceSize * 1.15);
   const sectionGap = glass ? BALANCE_SECTION_GAP : appStyle.space.related;
-  const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
+  const displayBtc = useSettingsStore((state) => state.displayBtc);
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const mockMode = useSettingsStore((state) => state.mockMode);
@@ -290,13 +291,13 @@ export function PrimaryBalance({
     });
     router.navigate({
       pathname: '/transactions',
-      params: {
-        filterCurrency: account.unit,
-        filterPaymentType: 'ecash',
-        filterDirection: 'outgoing',
-        filterStatus: 'Pending',
-        filterMintUrl: 'all',
-      },
+      params: transactionsRouteParams({
+        currency: account.unit,
+        paymentType: 'ecash',
+        direction: 'outgoing',
+        status: 'Pending',
+        mintUrl: 'all',
+      }),
     });
   };
 

@@ -11,7 +11,11 @@
 import { describe, expect, it } from 'vitest';
 import { PaymentRequest, decodePaymentRequest } from '@cashu/cashu-ts';
 
-import { reencodeSingleUsePaymentRequest } from '../../src/payment-request-receive';
+import {
+  paymentRequestEncodingsHandedOut,
+  paymentRequestEncodingsVersion,
+  reencodeSingleUsePaymentRequest,
+} from '../../src/payment-request-receive';
 import { amountToNumber } from '../../src/amount';
 import { MINT1, MINT2 } from '../_harness/fixtures';
 
@@ -77,5 +81,20 @@ describe('reencodeSingleUsePaymentRequest', () => {
     expect(encodedRequest.startsWith('creqA')).toBe(true);
     // creqB is bech32m (case-insensitive); both decode to the same amount.
     expect(amountToNumber(decodePaymentRequest(encodedRequestB.toLowerCase()).amount)).toBe(100);
+  });
+
+  it('records each encoding it hands out against the request it came from', () => {
+    const source = new PaymentRequest(undefined, 'req-recorded', 21, 'sat', [MINT1]).toEncodedRequest();
+    expect(paymentRequestEncodingsHandedOut(source)).toBeUndefined();
+    const before = paymentRequestEncodingsVersion();
+    const shown = reencodeSingleUsePaymentRequest(source, { lockP2pkPubkey: LOCK_KEY });
+    expect([...paymentRequestEncodingsHandedOut(source)!]).toEqual([
+      shown.encodedRequest,
+      shown.encodedRequestB,
+    ]);
+    expect(paymentRequestEncodingsVersion()).toBe(before + 2);
+    // Showing the same thing again hands out nothing new.
+    reencodeSingleUsePaymentRequest(source, { lockP2pkPubkey: LOCK_KEY });
+    expect(paymentRequestEncodingsVersion()).toBe(before + 2);
   });
 });

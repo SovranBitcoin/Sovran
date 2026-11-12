@@ -1,4 +1,4 @@
-import { createPaymentCopyResolver, getPaymentCopy } from "./resolve";
+import { createPaymentCopyResolver } from "./resolve";
 import { logger } from "../logger";
 import type {
   PaymentCopyKey,
@@ -215,12 +215,3 @@ export function createPaymentCopyGroups(
   logger.debug("copy.groups.createResolverGroups");
   return buildPaymentCopyGroups(resolver.text);
 }
-
-const defaultGroups = buildPaymentCopyGroups(getPaymentCopy);
-
-export const MINT_COPY = defaultGroups.MINT_COPY;
-export const MELT_COPY = defaultGroups.MELT_COPY;
-export const SEND_COPY = defaultGroups.SEND_COPY;
-export const PAYMENT_REQUEST_COPY = defaultGroups.PAYMENT_REQUEST_COPY;
-export const RECEIVE_COPY = defaultGroups.RECEIVE_COPY;
-export const TOAST_COPY = defaultGroups.TOAST_COPY;

@@ -44,6 +44,7 @@ import {
   meltMethodForTarget,
   annotationKey,
   decodePaymentRequestInfo,
+  isWellFormedEcashToken,
   rawAnnotationKey,
 } from 'wallet';
 
@@ -56,7 +57,14 @@ import {
   resolvePrimaryReceiveP2PKPublicKey,
 } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC, NfcError, isUserCancelError, isAmbientNfcCycle } from '@/shared/lib/nfc';
+import {
+  writeTokenToNFC,
+  NfcError,
+  isUserCancelError,
+  nfcReader,
+  nfcTagRead,
+  nfcTapProgressed,
+} from '@/shared/lib/nfc';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
@@ -77,10 +85,12 @@ import { chooseFallbackPaymentOption, choosePaymentOption } from './paymentOptio
 import { chooseProofs } from './proofSelectorPicker';
 import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import {
+  useContactSendStore,
+  type ContactSendTarget,
+} from '@/shared/stores/runtime/contactSendStore';
+import { sendRouteOf } from '@/shared/stores/runtime/sendRoute';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
@@ -99,6 +109,12 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 // createSovranNotifications
 // =============================================================================
 
+/** What every payment-flow callback says about its payment. */
+type PaymentNotice = Pick<
+  Parameters<NonNullable<NotificationHandlerMap['onPaymentCancelled']>>[0],
+  'variant' | 'mintUrl' | 'amount' | 'unit'
+>;
+
 interface CreateSovranNotificationsConfig {
   getPubkey?: () => string | undefined;
   getPrivateKey?: () => Uint8Array | undefined;
@@ -110,6 +126,33 @@ export function createSovranNotifications(
   config?: CreateSovranNotificationsConfig
 ): NotificationHandlerMap {
   paymentLog.debug('payment.notifications.created');
+  /**
+   * The processing toast this payment flow opened, under a key only it holds,
+   * and the payment it opened it for. The flow's later callbacks change that
+   * toast only, and only for that payment: another toast on screen, or a late
+   * callback for another payment, is left alone.
+   */
+  let started: {
+    key: string;
+    variant: PaymentNotice['variant'];
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  } | null = null;
+  const startedFor = (data: PaymentNotice) =>
+    started &&
+    started.variant === data.variant &&
+    started.mintUrl === data.mintUrl &&
+    started.amount === data.amount &&
+    started.unit === data.unit
+      ? started
+      : null;
+  /** The toast this flow opened for this payment, while it is the one on screen. */
+  const ownToast = (data: PaymentNotice) => {
+    const own = startedFor(data);
+    const active = usePaymentStatusStore.getState().active;
+    return own && active?.id === own.key ? active : null;
+  };
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
@@ -185,6 +228,7 @@ export function createSovranNotifications(
       // toast; the melt-op:finalized listener's no-active fallback shows the
       // single terminal toast, and onPaymentFailed shows failures.
       if (data.variant === 'melt' && data.method === 'onchain') {
+        started = null;
         paymentLog.info('payment.processing.skipped', {
           variant: data.variant,
           method: data.method,
@@ -194,7 +238,7 @@ export function createSovranNotifications(
       }
       const store = usePaymentStatusStore.getState();
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const id = `${data.variant}-${Date.now()}`;
+      const id = mintLocalId(data.variant);
       paymentLog.info('payment.processing', {
         variant: data.variant,
         statusVariant: variant,
@@ -206,9 +250,23 @@ export function createSovranNotifications(
         activeState: store.active?.state ?? null,
         expectedNext: 'processing_to_terminal_or_delivered',
       });
+      // A melt from a preview already has its quote, which every event of the
+      // melt carries. A payment request's send gets its id while it runs:
+      // until then the toast is held under a key only this flow knows.
+      started = {
+        key: id,
+        variant: data.variant,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      };
       store.setActive({
         variant,
         id,
+        owner:
+          data.variant === 'melt' && data.quoteId
+            ? { kind: 'melt', quoteId: data.quoteId }
+            : { kind: 'pending', key: id },
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
@@ -275,10 +333,28 @@ export function createSovranNotifications(
         }
       }
 
-      if (!store.active) {
+      // The payment's ids are in its history entry: bind this flow's toast to
+      // them, so the wallet events of this payment (and no other) reach it.
+      const entryOperationId =
+        typeof confirmedEntry?.operationId === 'string'
+          ? confirmedEntry.operationId
+          : typeof confirmedEntry?.id === 'string' && data.variant === 'melt'
+            ? confirmedEntry.id
+            : undefined;
+      const own = startedFor(data);
+      if (own) {
+        if (data.variant === 'paymentRequest' && entryOperationId) {
+          store.bindOwner(own.key, { kind: 'send', operationId: entryOperationId });
+        } else if (data.variant === 'melt' && typeof confirmedEntry?.quoteId === 'string') {
+          store.bindOwner(own.key, { kind: 'melt', quoteId: confirmedEntry.quoteId });
+        }
+      }
+
+      const active = ownToast(data);
+      if (!active) {
         paymentLog.warn('payment.confirmed.skipped', {
           variant: data.variant,
-          reason: 'no_active_status_toast',
+          reason: store.active ? 'active_status_not_this_payment' : 'no_active_status_toast',
         });
         return;
       }
@@ -287,36 +363,41 @@ export function createSovranNotifications(
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_delivered',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
           expectedNext: 'delivered_then_later_confirmed',
         });
-        store.setDelivered(store.active.id);
+        store.setDelivered(active.id);
       } else if (data.variant === 'melt' && data.historyEntry) {
         if (confirmedEntry?.state === 'PENDING') {
           paymentLog.info('payment.confirmed.skipped', {
             variant: data.variant,
             reason: 'melt_history_pending',
-            activeId: store.active.id,
-            activeState: store.active.state,
+            activeId: active.id,
+            activeState: active.state,
           });
           return;
         }
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_confirmed',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
         });
-        store.setConfirmed(store.active.id);
+        // The melt for View: its own event may have come while the toast was
+        // still waiting for its quote, and was left to this.
+        store.setConfirmed(
+          active.id,
+          entryOperationId ? { operationId: entryOperationId } : undefined
+        );
       } else {
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_confirmed',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
         });
-        store.setConfirmed(store.active.id);
+        store.setConfirmed(active.id);
       }
     },
     onPaymentCancelled: (data) => {
@@ -330,7 +411,8 @@ export function createSovranNotifications(
         unit: data.unit,
         activeId: store.active?.id ?? null,
       });
-      store.clearActive();
+      const own = startedFor(data);
+      if (own) store.clearActive(own.key);
     },
     onPaymentFailed: (data) => {
       const store = usePaymentStatusStore.getState();
@@ -350,29 +432,25 @@ export function createSovranNotifications(
       const reason = describeWalletFailure(data);
       const msg = data.rolledBack ? `${reason}\nYour funds have been returned.` : reason;
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const active = store.active;
-      if (
-        !active ||
-        active.variant !== variant ||
-        active.mintUrl !== data.mintUrl ||
-        active.amount !== data.amount ||
-        active.unit !== data.unit
-      ) {
-        // No matching processing toast to flip (onchain melts suppress it,
-        // and another payment may currently own the surface). A failure must
-        // still surface as its own terminal toast rather than mutating an
-        // unrelated payment.
-        const id = `${data.variant}-${Date.now()}`;
+      const active = ownToast(data);
+      if (!active) {
+        // No processing toast of this flow's to flip (onchain melts suppress
+        // it, and another payment may currently own the surface). A failure
+        // must still surface as its own terminal toast rather than mutating
+        // an unrelated payment.
+        const id = mintLocalId(data.variant);
         paymentLog.info('payment.failed.route', {
           variant: data.variant,
           action: 'new_failed_toast',
           id,
-          reason: active ? 'active_status_mismatch' : 'no_active_status_toast',
+          reason: store.active ? 'active_status_mismatch' : 'no_active_status_toast',
           rolledBack: data.rolledBack,
         });
         store.setActive({
           variant,
           id,
+          // Final when shown: nothing is ever matched to it.
+          owner: { kind: 'pending', key: id },
           mintUrl: data.mintUrl,
           amount: data.amount,
           unit: data.unit,
@@ -402,6 +480,9 @@ export function createSovranNotifications(
       else if (source === 'gallery') staticPopup('no-qr-code-found');
     },
     onScanError: (source, err) => {
+      // An ambient cycle re-arms on its own and stays quiet, as its scan
+      // source keeps its failed reads quiet.
+      if (source === 'nfc' && nfcReader().holder === 'ambient') return;
       if (source === 'gallery') staticPopup('qr-scan-failed');
       else staticPopup('general-error', { failure: { service: 'app', error: err } });
     },
@@ -469,6 +550,7 @@ export function createSovranNotifications(
     // etc.). 'creating'/'writing' only fire once executeNfcSend write-back
     // is wired; harmless to map them now.
     onNfcPaymentProgress: ({ phase }) => {
+      nfcTapProgressed(phase);
       useNfcTapStore.getState().setPhase(phase);
     },
 
@@ -701,7 +783,7 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
     clipboard: async () => {
       paymentLog.debug('payment.scan.clipboard.start');
       const rawText = (await Clipboard.getStringAsync()).trim();
-      const decodedText = isEncoded(rawText) ? decode(rawText) : rawText;
+      const decodedText = isEncoded(rawText) ? decode(rawText, isWellFormedEcashToken) : rawText;
       if (!decodedText) {
         paymentLog.debug('payment.scan.clipboard.empty');
         return { empty: true };
@@ -744,7 +826,7 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           // Ambient cycles (wallet-screen listening loop) re-arm every ~30s,
           // so their per-cycle failures must stay quiet; explicit presses
           // keep the popups.
-          const ambient = isAmbientNfcCycle();
+          const ambient = nfcReader().holder === 'ambient';
           const closeTapSheet = () => {
             const popup = usePopupStore.getState();
             if (
@@ -757,6 +839,9 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           };
           try {
             const data = await nfcAdapter.readPaymentRequest();
+            // The payment machine has the session now; closing the sheet
+            // below must not cancel it.
+            nfcTagRead();
             // The flow navigates to the payment screen now — don't leave the
             // tap sheet floating over it.
             closeTapSheet();
@@ -867,8 +952,8 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 }
 
 /**
- * Deliver a just-created bearer ecash token to a remote Nostr contact when a
- * destination-first Send was addressed to one (`contactSendStore`). The token
+ * Deliver a just-created bearer ecash token to the remote Nostr contact a
+ * destination-first Send was addressed to (`contactSendStore`). The token
  * rides an encrypted NIP-17 gift-wrapped DM to the contact's npub — bearer is
  * safe here because only that npub can decrypt it (unlike the public mesh).
  *
@@ -877,12 +962,11 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
  * bearer hand-off screen and the funds stay recoverable. Always clears the
  * target on success so a later ordinary send never re-DMs to a stale contact.
  */
-async function deliverContactDmIfActive(
+async function deliverContactDm(
+  target: ContactSendTarget,
   historyEntry: string,
   deliverContactEcashDm?: CreateSovranHandlersConfig['deliverContactEcashDm']
 ): Promise<boolean> {
-  const target = useContactSendStore.getState().active;
-  if (!target) return false;
   if (!deliverContactEcashDm) {
     paymentLog.warn('contact_send.delivery.no_adapter');
     return false;
@@ -982,41 +1066,6 @@ export function createSovranHandlers({
         refundKeyCount: p2pkLock?.refundKeys?.length ?? 0,
       });
 
-      // Routstr top-up: intercept the token and send it to the Routstr API
-      const topUpState = useRoutstrTopUpStore.getState();
-      if (topUpState.phase === 'active') {
-        try {
-          const entry = parseHistoryEntryOnce(historyEntry);
-          const token = entry ? sendEntryToken(entry) : null;
-          if (!token) throw new Error('Send history entry carries no token');
-          const encodedToken = getEncodedToken(token);
-          const result = await executeRoutstrTopUp(encodedToken);
-
-          if (result.success) {
-            const balanceStr = formatRoutstrBalance(result.balance);
-            if (result.isNewWallet) {
-              paramPopup('routstr-wallet-created', { balance: balanceStr });
-            } else {
-              paramPopup('routstr-top-up-success', { balance: balanceStr });
-            }
-            useRoutstrTopUpStore.getState().complete('success');
-          } else {
-            staticPopup('routstr-transaction-failed', {
-              failure: { service: 'routstr', error: result.error },
-            });
-            useRoutstrTopUpStore.getState().complete('failed');
-          }
-        } catch (e) {
-          paymentLog.error('payment.routstr_topup.error', {
-            error: e instanceof Error ? e.message : String(e),
-          });
-          staticPopup('routstr-transaction-failed', { failure: { service: 'routstr', error: e } });
-          useRoutstrTopUpStore.getState().complete('failed');
-        }
-        router.dismiss();
-        return;
-      }
-
       // Attach recipient identity and P2PK-lock presence to the executed
       // history entry so SendTokenScreen can render both indicators.
       // Operations build the entry; this seam adds transient screen metadata.
@@ -1092,36 +1141,50 @@ export function createSovranHandlers({
       // may be P2PK-locked to them; the DM is the envelope, the lock is what
       // is inside it.
       //
-      // Nearby delivery is bound to its operation before execution and never
-      // populates the contact-send session.
-      const contactTarget = useContactSendStore.getState().active;
-      if (contactTarget) {
-        const recipientPubkey = contactTarget.pubkey;
-        const delivered = await deliverContactDmIfActive(
-          enrichedHistoryEntry,
-          deliverContactEcashDm
-        );
-        if (delivered) {
-          if (hasFeature('directMessages')) {
-            router.dismissAll();
-            // Let the modal dismissal settle before pushing the DM thread —
-            // navigating mid-dismissal triggers react-native-screens' modal
-            // header-visibility remount loop (blank DM thread).
-            runAfterInteractions(() => {
-              router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
-            });
-          } else {
-            // Without DM pages the send ends on the wallet: the token is
-            // already with the contact, so there is no hand-off to show.
-            // `dismissAll` alone only pops this flow's stack to its first
-            // screen, the send chooser.
-            router.dismissTo('/');
+      // Nearby delivery is bound to its operation before execution, so a
+      // nearby send ends on the hand-off screen like an ordinary one.
+      const route = sendRouteOf({
+        nearby: useNearPaySessionStore.getState().active?.recipient ?? null,
+        contact: useContactSendStore.getState().active,
+      });
+      switch (route.kind) {
+        case 'contact': {
+          const recipientPubkey = route.target.pubkey;
+          const delivered = await deliverContactDm(
+            route.target,
+            enrichedHistoryEntry,
+            deliverContactEcashDm
+          );
+          if (delivered) {
+            if (hasFeature('directMessages')) {
+              router.dismissAll();
+              // Let the modal dismissal settle before pushing the DM thread —
+              // navigating mid-dismissal triggers react-native-screens' modal
+              // header-visibility remount loop (blank DM thread).
+              runAfterInteractions(() => {
+                router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+              });
+            } else {
+              // Without DM pages the send ends on the wallet: the token is
+              // already with the contact, so there is no hand-off to show.
+              // `dismissAll` alone only pops this flow's stack to its first
+              // screen, the send chooser.
+              router.dismissTo('/');
+            }
+            return;
           }
-          return;
+          // Delivery failed — fall through to the bearer hand-off screen so the
+          // user can still copy/share the token (funds are not lost).
+          paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
+          break;
         }
-        // Delivery failed — fall through to the bearer hand-off screen so the
-        // user can still copy/share the token (funds are not lost).
-        paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
+        case 'nearby':
+        case 'handOff':
+          break;
+        default: {
+          const unreachable: never = route;
+          return unreachable;
+        }
       }
 
       leaveMintPicker('(send-flow)', () =>

@@ -341,7 +341,7 @@ export function pickMintForUnit(
   return best.mintUrl;
 }
 
-export interface ReceiveMethodMintResolution {
+interface ReceiveMethodMintResolution {
   mintUrl: string | null;
   source: "explicit" | "auto" | "none";
 }
@@ -639,18 +639,6 @@ export function getCapabilityUnavailableReason(
   return null;
 }
 
-export function isMintMethodCompatible(
-  ctx: Pick<WalletContext, "mintMethodCapabilities">,
-  mintUrl: string,
-  requirement: MintMethodRequirement,
-  amount?: number,
-): boolean {
-  const capability = getMintMethodCapability(ctx, mintUrl, requirement);
-  return (
-    getCapabilityUnavailableReason(capability, requirement, amount) == null
-  );
-}
-
 export function hasMintSupportingMethod(
   ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
   requirement: MintMethodRequirement,
@@ -667,23 +655,6 @@ export function hasMintSupportingMethod(
     result,
   });
   return result;
-}
-
-export function hasCompatibleMintForMethod(
-  ctx: Pick<
-    WalletContext,
-    "trustedMintUrls" | "mintBalances" | "mintMethodCapabilities"
-  >,
-  requirement: MintMethodRequirement,
-  options: {
-    amount?: number;
-    allowedMints?: string[];
-    requireBalance?: boolean;
-  } = {},
-): boolean {
-  return buildMethodAwareMintCandidates(ctx, requirement, options).some(
-    (candidate) => candidate.status !== "disabled",
-  );
 }
 
 export function buildMethodAwareMintCandidates(
@@ -1037,36 +1008,6 @@ export function createAmountEntryMethodContext(
       ? { mintMethodCapabilities: ctx.mintMethodCapabilities }
       : {}),
   };
-}
-
-export function methodContextHasCompatibleMint(
-  ctx: AmountEntryMethodContext | undefined,
-  requirement: MintMethodRequirement,
-  amount?: number,
-  options: { requireBalance?: boolean } = {},
-): boolean {
-  if (!ctx) {
-    const result = requirement.method === "bolt11";
-    logger.debug("mintCapabilities.methodContext.compatible.default", {
-      operation: requirement.operation,
-      method: requirement.method,
-      result,
-    });
-    return result;
-  }
-  const result = hasCompatibleMintForMethod(ctx, requirement, {
-    amount,
-    requireBalance: options.requireBalance,
-  });
-  logger.debug("mintCapabilities.methodContext.compatible", {
-    trustedMintCount: ctx.trustedMintUrls.length,
-    operation: requirement.operation,
-    method: requirement.method,
-    hasAmount: amount != null && amount > 0,
-    requireBalance: !!options.requireBalance,
-    result,
-  });
-  return result;
 }
 
 export function methodContextHasSupportingMint(

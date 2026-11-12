@@ -7,7 +7,11 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { acquireTransition, isTransitionInFlight } from '@/shared/lib/profile/profileTransition';
+import {
+  acquireTransition,
+  isTransitionInFlight,
+  registerTransitionControls,
+} from '@/shared/lib/profile/profileTransition';
 
 jest.mock('@react-native-async-storage/async-storage', () => {
   const data = new Map<string, string>();
@@ -62,12 +66,11 @@ it('writes the on-disk guard only when asked, and removes it on release', async 
   expect(await AsyncStorage.getItem(GUARD)).toBeNull();
 });
 
-it('refuses the on-disk guard while another runtime’s transition is recent, and leaves it alone', async () => {
+it('refuses the on-disk guard while another runtime’s transition is recent, releases itself, and leaves that guard alone', async () => {
   await AsyncStorage.setItem(GUARD, JSON.stringify({ startedAt: Date.now() }));
 
   const lock = acquireTransition()!;
   expect(await lock.takeDiskGuard()).toBe(false);
-  await lock.release();
 
   // The guard belongs to the other transition; this lock never took it.
   expect(await AsyncStorage.getItem(GUARD)).not.toBeNull();
@@ -75,17 +78,25 @@ it('refuses the on-disk guard while another runtime’s transition is recent, an
   await AsyncStorage.removeItem(GUARD);
 });
 
+it('holds and releases quietly when the layout has registered no splash controls', async () => {
+  const lock = acquireTransition()!;
+  expect(() => lock.holdSplash({ keepStagesThatOutliveAccount: true })).not.toThrow();
+  await lock.release();
+  expect(isTransitionInFlight()).toBe(false);
+});
+
 it('drops the splash on release only when this flow was holding it', async () => {
   const resetStages = jest.fn();
   const cancelResetStages = jest.fn();
+  registerTransitionControls({ resetStages, cancelResetStages });
 
   const quiet = acquireTransition()!;
   await quiet.release();
   expect(cancelResetStages).not.toHaveBeenCalled();
 
   const lock = acquireTransition()!;
-  lock.holdSplash({ resetStages, cancelResetStages });
-  expect(resetStages).toHaveBeenCalledTimes(1);
+  lock.holdSplash({ keepStagesThatOutliveAccount: true });
+  expect(resetStages.mock.calls).toEqual([[{ keepStagesThatOutliveAccount: true }]]);
   await lock.release();
   expect(cancelResetStages).toHaveBeenCalledTimes(1);
 });

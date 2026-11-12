@@ -6,7 +6,7 @@ import { isValidSatAmount } from "../guards";
 import { normalizeNostrPubkey } from "../recipient";
 import { normalizeP2pkLock, type P2pkLockSpec } from "../p2pk";
 import type { Detectors, WalletContext } from "../types";
-import { resolveNext, type StepResult } from "./resolveNext";
+import { previewStep, resolveNext, type StepResult } from "./resolveNext";
 import { buildProofSuggestions } from "./amountFallback";
 import type { FlowContext, FlowEvent, FlowStep } from "./types";
 import { startSendFlow, startSendEcashFlow } from "./flows/send";
@@ -26,6 +26,17 @@ export interface TransitionResult {
   context: FlowContext;
   data: StepResult["data"];
 }
+
+/**
+ * No transition: the event means nothing on the current step. The machine
+ * leaves step, data and context as they are and dispatches nothing, as it
+ * does for an effect's `{ kind: 'stale' }`.
+ */
+export interface Unchanged {
+  kind: "unchanged";
+}
+
+const UNCHANGED: Unchanged = { kind: "unchanged" };
 
 function apply(result: StepResult, ctx: FlowContext): TransitionResult {
   const merged = result.contextPatch ? { ...ctx, ...result.contextPatch } : ctx;
@@ -262,7 +273,7 @@ function handleOptionChosen(
       // Same cross-unit hard-stop as the EXECUTE arm (BTC-04) — a BIP-321
       // creq option carries its unit just like a standalone scan.
       const requestUnit = (intent.info.unit ?? "sat").trim().toLowerCase();
-      const activeUnit = (currentCtx.unit ?? "sat").trim().toLowerCase();
+      const activeUnit = currentCtx.unit.trim().toLowerCase();
       if (requestUnit !== activeUnit) {
         logger.warn("transitions.optionChosen.paymentRequestUnitMismatch", {
           requestUnit,
@@ -608,34 +619,12 @@ function handleProofsChosen(
   // re-check proof composition and loop back to chooseProofs when offline).
   const mintUrl = ctx.mintUrl!;
 
-  if (destination === "paymentRequest" && ctx.paymentRequest) {
-    return {
-      step: "navigateToPaymentRequest",
-      context: ctx,
-      data: {
-        mintUrl,
-        paymentRequest: ctx.paymentRequest,
-        unit: ctx.unit,
-        amount: event.amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-      },
-    };
-  }
-
-  if (destination === "meltQuote" && ctx.meltTarget) {
-    return {
-      step: "navigateToMeltPreview",
-      context: ctx,
-      data: {
-        mintUrl,
-        meltTarget: ctx.meltTarget,
-        unit: ctx.unit,
-        amount: event.amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-      },
-    };
+  if (
+    (destination === "paymentRequest" && ctx.paymentRequest) ||
+    (destination === "meltQuote" && ctx.meltTarget)
+  ) {
+    const at = { mintUrl, amount: event.amount, unit: ctx.unit };
+    return { ...previewStep(destination, ctx, at), context: ctx };
   }
 
   if (
@@ -711,7 +700,7 @@ export function transition(
   /** See `CreateMachineConfig.getSatsPerUnitMinor` — re-denominates scanned
    *  fixed sat amounts into the active unit at seeding time. */
   getSatsPerUnitMinor?: (unit: string) => number | null,
-): TransitionResult {
+): TransitionResult | Unchanged {
   function stamp(result: TransitionResult): TransitionResult {
     if (offline != null) result.context.offline = offline;
     return result;
@@ -730,8 +719,6 @@ export function transition(
           getSatsPerUnitMinor,
         ),
       );
-    case "RESET":
-      return stamp({ step: "idle", context: { unit }, data: {} as any });
     case "REQUEST_MINT_SELECTOR":
       return stamp(requestMintSelector(event, currentCtx, walletCtx));
     case "START_SEND_ECASH":
@@ -775,22 +762,16 @@ export function transition(
     case "SHOW_RECEIVE_QR":
       return stamp(startReceiveQrFlow(walletCtx, unit));
     case "REVIEW_MINT":
+      // Reviewing a mint is part of receiving a token. It carries on the
+      // token receive the machine shows (whose scanned input the scan history
+      // needs); from anywhere else it starts afresh, so nothing of a payment
+      // the machine still holds (its request, amount, mint) can rebuild that
+      // payment's preview for Pay to send again.
       return stamp({
         step: "reviewMint",
-        context: { ...currentCtx, reviewToken: event.token },
+        context: currentStep === "receiveToken" ? { ...currentCtx } : { unit },
         data: { mintUrl: event.mintUrl, token: event.token },
       });
-    case "MINT_TRUSTED": {
-      const token = currentCtx.reviewToken;
-      if (token) {
-        return stamp({
-          step: "receiveToken",
-          context: { ...currentCtx, reviewToken: undefined },
-          data: { token },
-        });
-      }
-      return stamp({ step: currentStep, context: currentCtx, data: {} as any });
-    }
   }
 
   // State-specific events
@@ -822,7 +803,7 @@ export function transition(
           currentStep,
           amount: event.amount,
         });
-        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+        return UNCHANGED;
       }
       return stamp(
         handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo),
@@ -831,12 +812,12 @@ export function transition(
       // Same gating: only the memo prompt's own step may consume it (BTC-12).
       if (currentStep !== "enterSendMemo") {
         logger.warn("transitions.sendMemoSubmitted.wrongStep", { currentStep });
-        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+        return UNCHANGED;
       }
       return stamp(handleSendMemoSubmitted(event, currentCtx));
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that
-  // bypassed their guard in createMachine.ts) — return current state.
-  return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+  // bypassed their guard in createMachine.ts).
+  return UNCHANGED;
 }

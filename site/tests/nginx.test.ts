@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { existsSync } from 'node:fs';
+import { closeSync, existsSync, openSync } from 'node:fs';
 
 const site = new URL('../', import.meta.url);
 const template = await readFile(new URL('nginx/default.conf.template', site), 'utf8');
@@ -53,9 +53,15 @@ test('real nginx serves pages, retires sensitive paths, redirects 11 locales, an
   if (!certificates) throw new Error('System CA certificates are required for nginx tests');
   const config = template.replaceAll('${PORT}', `${port}`).replaceAll('${ARTIFACT_ORIGIN}', '').replaceAll('${ARTIFACT_RESOLVER}', '1.1.1.1').replace('/usr/share/nginx/html', new URL('dist', site).pathname).replace('/etc/ssl/cert.pem', certificates);
   await writeFile(join(dir, 'nginx.conf'), `daemon off; pid ${dir}/pid; error_log ${dir}/error.log; events {} http { client_body_temp_path ${dir}/body; proxy_temp_path ${dir}/proxy; fastcgi_temp_path ${dir}/fastcgi; uwsgi_temp_path ${dir}/uwsgi; scgi_temp_path ${dir}/scgi; types { text/html html; text/css css; application/javascript js; application/json json; image/webp webp; } ${config} }`);
-  const process = spawn('nginx', ['-p', dir, '-c', join(dir, 'nginx.conf')], { stdio: ['ignore', 'ignore', 'pipe'] });
-  let errors = '';
-  process.stderr.on('data', (chunk) => { errors += chunk; });
+  const errorPath = join(dir, 'stderr.log');
+  // On Linux, Node/Bun child-process pipes can be sockets that nginx cannot
+  // reopen through /dev/stderr. Keep the production config and give it a file.
+  const process = (() => {
+    const stderr = openSync(errorPath, 'w', 0o600);
+    try {
+      return spawn('nginx', ['-p', dir, '-c', join(dir, 'nginx.conf')], { stdio: ['ignore', 'ignore', stderr] });
+    } finally { closeSync(stderr); }
+  })();
   const request = (path: string) => fetch(`http://127.0.0.1:${port}${path}`, { redirect: 'manual' });
   try {
     let ready = false;
@@ -63,7 +69,7 @@ test('real nginx serves pages, retires sensitive paths, redirects 11 locales, an
       try { if ((await request('/health')).status === 200) { ready = true; break; } } catch { /* Process is starting. */ }
       await Bun.sleep(40);
     }
-    if (!ready) throw new Error(`nginx did not start: ${errors}`);
+    if (!ready) throw new Error(`nginx did not start: ${await readFile(errorPath, 'utf8')}`);
     for (const path of ['/', '/download', '/releases', '/releases/', '/roadmap', '/terms', '/privacy']) {
       const response = await request(path);
       expect(response.status).toBe(200);

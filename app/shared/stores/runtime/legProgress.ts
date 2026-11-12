@@ -3,7 +3,8 @@
  *
  * A long-running action is modelled as a sequence of N legs, each flipping
  * pending → active → done | failed | skipped, with a terminal action state of
- * running → done | failed | cancelled | unsettled. `unsettled` means the run
+ * running → done | failed | cancelled | unsettled (`LEG_MOVES` and `end`
+ * below refuse every other move). `unsettled` means the run
  * stopped with an outcome that is not yet known (a payment still in flight):
  * it is never reported as a failure. The unified Swap toast and the post
  * Delete toast both drive their progress through a store built from this
@@ -28,25 +29,45 @@ export type LegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
 export type ProgressState = 'running' | 'done' | 'failed' | 'cancelled' | 'unsettled';
 
-export interface ProgressLeg {
+/** A leg's error belongs to its failure: no other status carries one. */
+export type ProgressLeg = {
   id: string;
   /** Optional human label, e.g. "Mint A → Mint B" or "relay.example.com". */
   label?: string;
-  status: LegStatus;
-  errorMessage?: string;
-}
+} & (
+  | { status: Exclude<LegStatus, 'failed'>; errorMessage?: undefined }
+  | { status: 'failed'; errorMessage?: string }
+);
 
-interface ActiveProgress<Meta> {
+/**
+ * What a leg can become next. Done and skipped are final; a failed leg can be
+ * tried again (active), succeed on a retry, fail again or be skipped.
+ */
+const LEG_MOVES: Record<LegStatus, readonly LegStatus[]> = {
+  pending: ['active', 'done', 'failed', 'skipped'],
+  active: ['done', 'failed', 'skipped'],
+  failed: ['active', 'done', 'failed', 'skipped'],
+  done: [],
+  skipped: [],
+};
+
+/**
+ * The run's own state. It ends once: a final state is never replaced by
+ * another, only reopened by `resume` for a retry. The message is the failure
+ * text, the cancel reason or what is still pending.
+ */
+type RunState =
+  | { state: 'running' | 'done'; errorMessage?: undefined }
+  | { state: 'failed' | 'cancelled' | 'unsettled'; errorMessage?: string };
+
+type ActiveProgress<Meta> = RunState & {
   /** Stable id used to correlate updates with the toast. */
   id: string;
   startedAt: number;
-  state: ProgressState;
   legs: ProgressLeg[];
-  /** Last failure text when state flips to 'failed', or the pending detail for 'unsettled'. */
-  errorMessage?: string;
   /** Domain payload (swap: unit/totalAmount/groupId; delete: noteId). */
   meta: Meta;
-}
+};
 
 interface LegProgressStore<Meta> {
   active: ActiveProgress<Meta> | null;
@@ -61,6 +82,8 @@ interface LegProgressStore<Meta> {
   /** End the run with an outcome that is still unknown (e.g. a melt that has
    *  not settled); `detail` says what is still pending. */
   settleUnknown: (detail?: string) => void;
+  /** Reopen a run that ended, for a retry of its legs; no-op while running. */
+  resume: () => void;
   /** Clear without firing terminal logs — used when the toast auto-dismisses. */
   clear: () => void;
 }
@@ -76,16 +99,40 @@ export function createLegProgressStore<Meta extends object>(opts: {
   const { name, log } = opts;
 
   return create<LegProgressStore<Meta>>({ name: 'legProgress', scope: 'session' })((set, get) => {
-    const setLeg = (legId: string, status: LegStatus, errorMessage?: string) =>
+    const setLeg = (legId: string, next: Pick<ProgressLeg, 'status' | 'errorMessage'>) =>
       set((s) => {
         if (!s.active) return s;
-        const legs = s.active.legs.map((l) =>
-          l.id === legId
-            ? { ...l, status, ...(errorMessage !== undefined ? { errorMessage } : {}) }
-            : l
-        );
-        return { active: { ...s.active, legs } };
+        let moved = false;
+        const legs = s.active.legs.map((leg): ProgressLeg => {
+          if (leg.id !== legId) return leg;
+          if (!LEG_MOVES[leg.status].includes(next.status)) {
+            log.debug(`${name}.status.leg_move_refused`, {
+              legId,
+              from: leg.status,
+              to: next.status,
+            });
+            return leg;
+          }
+          moved = true;
+          const base = { id: leg.id, ...(leg.label !== undefined ? { label: leg.label } : {}) };
+          return next.status === 'failed'
+            ? { ...base, status: 'failed', errorMessage: next.errorMessage }
+            : { ...base, status: next.status };
+        });
+        return moved ? { active: { ...s.active, legs } } : s;
       });
+
+    /** End a running run; a run that already ended keeps its end. */
+    const end = (next: RunState, logEnd: (active: ActiveProgress<Meta>) => void) => {
+      const cur = get().active;
+      if (!cur) return;
+      if (cur.state !== 'running') {
+        log.warn(`${name}.status.end_refused`, { id: cur.id, state: cur.state, next: next.state });
+        return;
+      }
+      logEnd(cur);
+      set({ active: { ...cur, ...next } });
+    };
 
     // complete and cancel report the same thing — how long the run took and how
     // far the legs actually got — and differ only in the state they land on.
@@ -117,42 +164,35 @@ export function createLegProgressStore<Meta extends object>(opts: {
           },
         });
       },
-      setActiveLeg: (legId) => setLeg(legId, 'active'),
-      setLegDone: (legId) => setLeg(legId, 'done'),
-      setLegSkipped: (legId) => setLeg(legId, 'skipped'),
-      setLegFailed: (legId, errorMessage) => setLeg(legId, 'failed', errorMessage),
-      complete: () => {
+      setActiveLeg: (legId) => setLeg(legId, { status: 'active' }),
+      setLegDone: (legId) => setLeg(legId, { status: 'done' }),
+      setLegSkipped: (legId) => setLeg(legId, { status: 'skipped' }),
+      setLegFailed: (legId, errorMessage) => setLeg(legId, { status: 'failed', errorMessage }),
+      complete: () => end({ state: 'done' }, (cur) => logSettled('complete', cur)),
+      fail: (errorMessage) =>
+        end({ state: 'failed', errorMessage }, (cur) =>
+          log.warn(`${name}.status.fail`, {
+            id: cur.id,
+            durationMs: Date.now() - cur.startedAt,
+            errorMessage,
+          })
+        ),
+      cancel: (errorMessage) =>
+        end({ state: 'cancelled', errorMessage }, (cur) => logSettled('cancel', cur)),
+      settleUnknown: (detail) =>
+        end({ state: 'unsettled', errorMessage: detail }, (cur) =>
+          log.info(`${name}.status.unsettled`, {
+            id: cur.id,
+            durationMs: Date.now() - cur.startedAt,
+            doneLegs: cur.legs.filter((l) => l.status === 'done').length,
+            totalLegs: cur.legs.length,
+          })
+        ),
+      resume: () => {
         const cur = get().active;
-        if (!cur) return;
-        logSettled('complete', cur);
-        set({ active: { ...cur, state: 'done' } });
-      },
-      fail: (errorMessage) => {
-        const cur = get().active;
-        if (!cur) return;
-        log.warn(`${name}.status.fail`, {
-          id: cur.id,
-          durationMs: Date.now() - cur.startedAt,
-          errorMessage,
-        });
-        set({ active: { ...cur, state: 'failed', errorMessage } });
-      },
-      cancel: (errorMessage) => {
-        const cur = get().active;
-        if (!cur) return;
-        logSettled('cancel', cur);
-        set({ active: { ...cur, state: 'cancelled', errorMessage } });
-      },
-      settleUnknown: (detail) => {
-        const cur = get().active;
-        if (!cur) return;
-        log.info(`${name}.status.unsettled`, {
-          id: cur.id,
-          durationMs: Date.now() - cur.startedAt,
-          doneLegs: cur.legs.filter((l) => l.status === 'done').length,
-          totalLegs: cur.legs.length,
-        });
-        set({ active: { ...cur, state: 'unsettled', errorMessage: detail } });
+        if (!cur || cur.state === 'running') return;
+        log.info(`${name}.status.resume`, { id: cur.id, from: cur.state });
+        set({ active: { ...cur, state: 'running', errorMessage: undefined } });
       },
       clear: () => {
         if (get().active) log.debug(`${name}.status.clear`);

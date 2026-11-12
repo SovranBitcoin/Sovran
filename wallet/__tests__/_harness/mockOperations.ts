@@ -228,7 +228,7 @@ export function createMockOperations(
     })),
 
     // rollbackSend: cancels a prepared send (no-op in tests)
-    rollbackSend: wrap('rollbackSend', async () => {}),
+    rollbackSend: wrap('rollbackSend', async () => ({ kind: 'reclaimed' as const })),
 
     // paymentRequestPayabilityFrom: every mint can pay unless a test says
     // otherwise (fee-charging keysets are simulated via the override).

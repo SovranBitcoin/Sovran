@@ -7,6 +7,8 @@
 // primitives.
 //
 // App-side operations (NOT included here, injected via enrichment callbacks):
+//   executeReceive,
+//   executeMintQuote      — built by the host from `receiveOperations.ts`
 //   linkTransaction       — needs app-specific scan history store
 //   Mint catalog data     — bulk fetch (audit / KYM / operator profile),
 //                           injected via fetchMintCatalog
@@ -25,13 +27,16 @@ import type {
   BoltMeltQuote,
   Manager,
   Mint,
-  ReceiveHistoryEntry,
   SendHistoryEntry,
 } from "@cashu/coco-core";
 import { getEncodedToken, operationHistoryId } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
-import { normalizeP2pkLock, proofsHaveP2PK } from "../p2pk";
-import type { MachineOperations, StepDataMap } from "../machine/types";
+import { normalizeP2pkLock } from "../p2pk";
+import type {
+  MachineOperations,
+  SendRollbackResult,
+  StepDataMap,
+} from "../machine/types";
 import type {
   MintCatalogEntry,
   MintContactProfileResolver,
@@ -51,6 +56,8 @@ import { parsePaymentInput } from "../parse";
 import {
   AuthoredError,
   MeltUserCancelledError,
+  MeltOutcomeUnknownError,
+  PaymentRequestUndeliveredError,
   UnitRateUnavailableError,
 } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
@@ -65,6 +72,7 @@ import { getKeysetUnits } from "../core/keysetUnits";
 import { normalizeMintUrl } from "../transport/plan";
 import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
+import { outcomeOfFailedMeltExecute } from "../melt-outcome";
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
 // not export it as a named type, so we infer it from the manager API to
@@ -130,11 +138,9 @@ function mapMeltOperationState(state: string): string {
 }
 
 /**
- * Execute a prepared melt with the reservation rescue shared by every melt
- * rail: prepare() reserved proofs at the mint, so if execute() throws — mint
- * unreachable mid-flight, network drop, mint 5xx, or the QA mock-fail gate —
- * the operation is cancelled so the proofs don't stay locked until the next
- * manager restart. Safety-critical: keep ONE copy.
+ * After execute returns or throws, only Coco's finalized state proves payment.
+ * On failure, release a reservation only when this call left it unsent;
+ * unresolved operations stay with Coco's recovery and must not be paid again.
  */
 async function executeMeltWithRescue(
   mgr: Manager,
@@ -158,14 +164,26 @@ async function executeMeltWithRescue(
       operationId: operation.id,
       error: errField(e),
     });
-    await mgr.ops.melt
-      .cancel(operation.id, "Execute failed")
-      .catch((cancelErr) => {
+    const saved = await mgr.ops.melt.get(operation.id).catch((lookupError) => {
+      logger.warn(`operations.${logPrefix}.lookupAfterFailureFailed`, {
+        operationId: operation.id,
+        error: errField(lookupError),
+      });
+      return null;
+    });
+    const outcome = outcomeOfFailedMeltExecute(e, saved?.state ?? null);
+    if (outcome === "paid" && saved?.state === "finalized") return saved;
+    if (outcome === "unknown") {
+      throw new MeltOutcomeUnknownError(operation.id, e);
+    }
+    if (saved?.state === "prepared") {
+      await mgr.ops.melt.cancel(operation.id, "Execute failed").catch((cancelErr) => {
         logger.warn(`operations.${logPrefix}.cancelAfterFailureFailed`, {
           operationId: operation.id,
           error: errField(cancelErr),
         });
       });
+    }
     throw e;
   }
   logger.info(`operations.${logPrefix}.complete`, {
@@ -196,9 +214,8 @@ function buildMeltEntry(
 }
 
 /**
- * Execute a prepared send with the same reservation rescue melts get
- * (executeMeltWithRescue): prepare() reserved proofs at the mint, so if
- * execute() throws — network drop mid-flight, app backgrounded, mint 5xx —
+ * Execute a prepared send with reservation rescue: prepare() reserved proofs,
+ * so if execute() throws — network drop mid-flight, app backgrounded, mint 5xx —
  * the operation is cancelled instead of abandoning the reservation (locked
  * proofs + a phantom pending history row until the next recovery run).
  * Safety-critical: keep ONE copy (BTC-07).
@@ -207,7 +224,11 @@ async function executeSendWithRescue(
   mgr: Manager,
   operation: { id: string },
   input: {
-    logPrefix: "executeSend" | "executeOfflineSend" | "executeNfcSend";
+    logPrefix:
+      | "executeSend"
+      | "executeOfflineSend"
+      | "executeNfcSend"
+      | "executePaymentRequest.nostr";
     /** Passed through to ops.send.execute verbatim (undefined = no options). */
     executeOptions?: { memo?: string };
     /** Dev mock-fail gate — inside the try so the rescue path is exercised. */
@@ -450,6 +471,36 @@ function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   return JSON.stringify({ ...parsed, token });
 }
 
+/**
+ * What a send hands back: its history row (there after execute), or an entry
+ * built from the operation when the row is not there yet. Either carries the
+ * token.
+ */
+async function sendEntryWithToken(
+  mgr: Manager,
+  operation: SendOperationLike,
+  token: CoreToken,
+  logPrefix: "executeSend" | "executeOfflineSend",
+): Promise<{ historyEntry: string }> {
+  const historyEntry = await findSendHistoryEntryByOperationId(
+    mgr,
+    operation.id,
+  );
+  if (historyEntry) {
+    logger.info(`operations.${logPrefix}.historyFound`, {
+      operationId: operation.id,
+    });
+    return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+  }
+
+  logger.warn(`operations.${logPrefix}.historyMissing`, {
+    operationId: operation.id,
+  });
+  return {
+    historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Payment request rollback helpers
 // ---------------------------------------------------------------------------
@@ -606,7 +657,7 @@ export interface DefaultOperationsConfig {
   shouldMockFailPaymentRequest?: () => boolean;
   /** Dev-only: when true, executeMelt throws after prepare so the cancel-rescue path runs. */
   shouldMockFailMelt?: () => boolean;
-  /** Dev-only: when true, executeSend throws before prepare. */
+  /** Dev-only: when true, executeSend throws after prepare so the cancel-rescue path runs. */
   shouldMockFailSend?: () => boolean;
   /**
    * Per-request timeout for external lightning calls (LNURL pay-params,
@@ -748,7 +799,16 @@ export function createDefaultOperations(
         try {
           await bindDelivery(prepared.id);
         } catch (error) {
-          await mgr.ops.send.cancel(prepared.id);
+          // As in the rescue: a cancel that fails must not replace the error
+          // that caused it.
+          try {
+            await mgr.ops.send.cancel(prepared.id);
+          } catch (cancelErr) {
+            logger.warn("operations.executeSend.cancelAfterBindingFailed", {
+              operationId: prepared.id,
+              error: errField(cancelErr),
+            });
+          }
           throw error;
         }
       }
@@ -778,29 +838,7 @@ export function createDefaultOperations(
         hadMemo: !!normalizeMemo(memo),
       });
 
-      // Try history first (should be there after execute), fall back to
-      // constructing from the operation result to avoid a race.
-      const historyEntry = await findSendHistoryEntryByOperationId(
-        mgr,
-        operation.id,
-      );
-      if (historyEntry) {
-        logger.info("operations.executeSend.historyFound", {
-          operationId: operation.id,
-        });
-        return {
-          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
-        };
-      }
-
-      logger.warn("operations.executeSend.historyMissing", {
-        operationId: operation.id,
-      });
-      return {
-        historyEntry: JSON.stringify(
-          buildSyntheticSendEntry(operation, tokenWithMemo),
-        ),
-      };
+      return sendEntryWithToken(mgr, operation, tokenWithMemo, "executeSend");
     },
 
     executeOfflineSend: async ({ mintUrl, amount, memo }) => {
@@ -834,89 +872,12 @@ export function createDefaultOperations(
         proofCount: token.proofs.length,
       });
 
-      const historyEntry = await findSendHistoryEntryByOperationId(
+      return sendEntryWithToken(
         mgr,
-        operation.id,
+        operation,
+        tokenWithMemo,
+        "executeOfflineSend",
       );
-      if (historyEntry) {
-        logger.info("operations.executeOfflineSend.historyFound", {
-          operationId: operation.id,
-        });
-        return {
-          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
-        };
-      }
-
-      logger.warn("operations.executeOfflineSend.historyMissing", {
-        operationId: operation.id,
-      });
-      return {
-        historyEntry: JSON.stringify(
-          buildSyntheticSendEntry(operation, tokenWithMemo),
-        ),
-      };
-    },
-
-    executeMintQuote: async ({ mintUrl, amount, unit: _unit, method = "bolt11" }) => {
-      const mgr = requireManager();
-      const unit = _unit || "sat";
-      logger.info("operations.executeMintQuote.prepare", {
-        ...mintUrlFields(mintUrl),
-        amount,
-        method,
-        unit,
-      });
-
-      // v2 quote-first: create the canonical quote row (remote quote happens
-      // here), then prepare the durable mint operation against it. Onchain
-      // quotes are reusable and get a FRESH address per create() — the
-      // fixed-amount receive path relies on that for payment attribution.
-      const quote =
-        method === "onchain"
-          ? await mgr.quotes.mint.create({ mintUrl, method: "onchain", unit })
-          : await mgr.quotes.mint.create({
-              mintUrl,
-              method: "bolt11",
-              amount: { amount, unit },
-            });
-      logger.info("operations.executeMintQuote.quoteCreated", {
-        ...mintUrlFields(mintUrl),
-        quoteId: quote.quoteId,
-        method,
-        unit: quote.unit,
-        reusable: quote.reusable,
-        requestLength: quote.request.length,
-      });
-
-      // Reusable (onchain) quotes derive nothing from the quote amount —
-      // the operation amount must be explicit in v2.
-      const mintOp = await mgr.ops.mint.prepare({ quote, amount });
-      logger.info("operations.executeMintQuote.created", {
-        operationId: mintOp.id,
-        quoteId: mintOp.quoteId,
-        method,
-        state: quote.state ?? "UNPAID",
-        unit: mintOp.unit,
-      });
-
-      // Build entry directly from the operation result to avoid a race
-      // where getPaginatedHistory runs before HistoryService persists the
-      // row. State uses the legacy quote-state family; the read-model
-      // normalizer treats it interchangeably with v2 operation states.
-      const entry = {
-        id: mintOp.id,
-        type: "mint" as const,
-        operationId: mintOp.id,
-        createdAt: mintOp.createdAt,
-        mintUrl: mintOp.mintUrl,
-        unit: mintOp.unit,
-        quoteId: mintOp.quoteId,
-        state: quote.state ?? ("UNPAID" as const),
-        amount: amountToNumber(mintOp.amount),
-        paymentRequest: quote.request,
-        metadata: { operationId: mintOp.id },
-      };
-      return { historyEntry: JSON.stringify(entry) };
     },
 
     buildMintListItems: async (
@@ -1048,7 +1009,6 @@ export function createDefaultOperations(
       // because picking there moves the wallet to that mint's account.
       const crossesAccounts = (mintUrl: string) =>
         isTestnut(mintUrl) !== testnutAccount;
-      const listedMints = allTrustedMints;
       const rowVerdict = createMintRowRules({
         data,
         capabilityCtx: {
@@ -1070,7 +1030,7 @@ export function createDefaultOperations(
           (mintInfoMap.get(mintUrl)?.nuts?.["17"]?.supported?.length ?? 0) > 0,
       });
 
-      const items = listedMints.map((mint: Mint): MintListItem => {
+      const items = allTrustedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
         const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
@@ -1127,7 +1087,6 @@ export function createDefaultOperations(
           : null,
         testnutAccount,
         trustedCount: allTrustedMints.length,
-        listedCount: listedMints.length,
         // Listed under their own unit tab; pickable only when scope is "selected".
         otherAccount: Object.fromEntries(
           allTrustedMints
@@ -1271,51 +1230,73 @@ export function createDefaultOperations(
       };
     },
 
-    rollbackSend: async (operationId) => {
+    rollbackSend: async (operationId): Promise<SendRollbackResult> => {
       const mgr = getManager();
       if (!mgr) {
         logger.warn("operations.rollbackSend.noManager", { operationId });
-        return;
+        return { kind: "unknown", reason: "noManager" };
       }
       logger.info("operations.rollbackSend.start", { operationId });
-      const operation = await mgr.ops.send.get(operationId).catch((e) => {
-        logger.warn("operations.rollbackSend.lookupFailed", {
-          operationId,
-          error: errField(e),
-        });
-        return null;
-      });
+      const lookup = await mgr.ops.send.get(operationId).then(
+        (operation) => ({ ok: true as const, operation }),
+        (e: unknown) => {
+          logger.warn("operations.rollbackSend.lookupFailed", {
+            operationId,
+            error: errField(e),
+          });
+          return { ok: false as const };
+        },
+      );
+      if (!lookup.ok) return { kind: "unknown", reason: "lookupFailed" };
+      const operation = lookup.operation;
       if (!operation) {
         logger.info("operations.rollbackSend.notFound", { operationId });
-        return;
+        return { kind: "unknown", reason: "notFound" };
       }
-      // Only swallow "already gone" — surface every other reclaim/cancel
-      // failure so the caller can warn the user that the mint may still
-      // hold the spent proofs in pending state. Silently telling the user
-      // a send was cancelled when reclaim failed leaves wallet state and
-      // mint state divergent.
-      if (operation.state === "prepared") {
-        logger.info("operations.rollbackSend.cancelPrepared", { operationId });
-        await mgr.ops.send.cancel(operationId);
-        logger.info("operations.rollbackSend.done", {
-          operationId,
-          action: "cancel",
-        });
-      } else if (["executing", "pending"].includes(operation.state)) {
-        logger.info("operations.rollbackSend.reclaim", {
-          state: operation.state,
-          operationId,
-        });
-        await mgr.ops.send.reclaim(operationId);
-        logger.info("operations.rollbackSend.done", {
-          operationId,
-          action: "reclaim",
-        });
-      } else {
-        logger.info("operations.rollbackSend.noop", {
-          operationId,
-          state: operation.state,
-        });
+      // A cancel or reclaim that fails throws, so the caller can warn that
+      // the mint may still hold the proofs as pending. Telling the user a
+      // send was cancelled when it was not leaves wallet and mint divergent.
+      switch (operation.state) {
+        case "init":
+          logger.info("operations.rollbackSend.neverPrepared", { operationId });
+          return { kind: "neverExecuted" };
+        case "prepared":
+          logger.info("operations.rollbackSend.cancelPrepared", { operationId });
+          await mgr.ops.send.cancel(operationId);
+          logger.info("operations.rollbackSend.done", {
+            operationId,
+            action: "cancel",
+          });
+          return { kind: "neverExecuted" };
+        case "executing":
+        case "pending":
+          logger.info("operations.rollbackSend.reclaim", {
+            state: operation.state,
+            operationId,
+          });
+          await mgr.ops.send.reclaim(operationId);
+          logger.info("operations.rollbackSend.done", {
+            operationId,
+            action: "reclaim",
+          });
+          return { kind: "reclaimed" };
+        case "rolled_back":
+          logger.info("operations.rollbackSend.alreadyRolledBack", { operationId });
+          return { kind: "reclaimed" };
+        case "finalized":
+        case "rolling_back":
+          logger.info("operations.rollbackSend.notReclaimable", {
+            operationId,
+            state: operation.state,
+          });
+          return {
+            kind: "unknown",
+            reason: operation.state === "finalized" ? "redeemed" : "rollingBack",
+          };
+        default: {
+          const unreachable: never = operation;
+          return unreachable;
+        }
       }
     },
 
@@ -1345,69 +1326,6 @@ export function createDefaultOperations(
         state: operation.state,
       });
       return { state: operation.state };
-    },
-
-    executeReceive: async ({ tokenString, mintUrl }) => {
-      const mgr = requireManager();
-      logger.info("operations.executeReceive.start", {
-        ...mintUrlFields(mintUrl),
-        tokenLength: tokenString.length,
-      });
-      await mgr.wallet.receive(tokenString);
-      logger.info("operations.executeReceive.received", {
-        ...mintUrlFields(mintUrl),
-      });
-
-      let hadP2PK = false;
-      let tokenAmount = 0;
-      try {
-        const metadata = getTokenMetadata(tokenString);
-        hadP2PK = proofsHaveP2PK(metadata.incompleteProofs);
-        tokenAmount = amountToNumber(metadata.amount);
-        logger.info("operations.executeReceive.tokenDecoded", {
-          ...mintUrlFields(mintUrl),
-          amount: tokenAmount,
-          unit: metadata.unit ?? "sat",
-          proofCount: metadata.incompleteProofs.length,
-          hadP2PKProofs: hadP2PK,
-        });
-      } catch (e) {
-        logger.warn("operations.executeReceive.p2pkDetectionFailed", {
-          error: errField(e),
-        });
-      }
-
-      // Try history first, fall back to constructing from known data
-      // to avoid race where history write hasn't flushed yet.
-      const historyEntry = await findReceiveHistoryEntry(
-        mgr,
-        tokenString,
-        mintUrl,
-      );
-      if (historyEntry) {
-        logger.info("operations.executeReceive.historyFound", {
-          ...mintUrlFields(mintUrl),
-          hadP2PKProofs: hadP2PK,
-        });
-        return { historyEntry, hadP2PKProofs: hadP2PK };
-      }
-
-      logger.warn("operations.executeReceive.historyMissing", {
-        ...mintUrlFields(mintUrl),
-      });
-      // Synthetic fallback only — coco-core's history row is the canonical
-      // store of the encoded token. Echoing it here would put a bearer
-      // instrument into notifications.onTransactionCreated subscribers and
-      // every entry-update listener that doesn't read from the DB.
-      const entry = {
-        id: `redeemed-${Date.now()}`,
-        type: "receive" as const,
-        createdAt: Date.now(),
-        mintUrl,
-        unit: "sat",
-        amount: tokenAmount,
-      };
-      return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
     },
 
     isMintTrusted: async (mintUrl) => {
@@ -1927,7 +1845,12 @@ export function createDefaultOperations(
           amount,
           needsSwap: !!prepared.needsSwap,
         });
-        const { operation, token } = await mgr.ops.send.execute(prepared.id);
+        // Nothing has been delivered yet, so a send that cannot be executed
+        // is cancelled like every other send; delivery has its own rollback
+        // below.
+        const { operation, token } = await executeSendWithRescue(mgr, prepared, {
+          logPrefix: "executePaymentRequest.nostr",
+        });
         operationId = operation.id;
         logger.info("operations.executePaymentRequest.nostr.tokenCreated", {
           operationId,
@@ -1984,7 +1907,7 @@ export function createDefaultOperations(
               errorMessage,
             );
           }
-          throw deliveryErr;
+          throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
       } else {
         logger.info("operations.executePaymentRequest.transport", {
@@ -1992,7 +1915,7 @@ export function createDefaultOperations(
         });
         // HTTP / transport-less payment request: use the paymentRequests API
         let requestForCoco = paymentRequest;
-        if (info?.mintsPreferred) {
+        if (info.mintsPreferred) {
           // Coco 2.0.0 treats every m list as strict. Remove only the advisory
           // list in its input copy; the original request remains the flow identity.
           const sdkRequest = decodePaymentRequest(paymentRequest);
@@ -2044,14 +1967,23 @@ export function createDefaultOperations(
               errorMessage,
             );
           }
-          throw deliveryErr;
+          throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
       }
 
+      // The payment is delivered by now. A history read that fails must not
+      // turn it into a failure the person can retry; the fallback entry below
+      // stands in for the row.
       const historyEntry = await findSendHistoryEntryByOperationId(
         mgr,
         operationId,
-      );
+      ).catch((err: unknown) => {
+        logger.warn("operations.executePaymentRequest.historyLookupFailed", {
+          operationId,
+          error: errField(err),
+        });
+        return null;
+      });
       logger.info("operations.executePaymentRequest.historyLookup", {
         operationId,
         found: !!historyEntry,
@@ -2061,8 +1993,8 @@ export function createDefaultOperations(
           // narrow is safe; the cast is a pragmatic alternative to re-running
           // the type guard inside parseHistoryEntryOnce's loose return.
           ((parseHistoryEntryOnce(historyEntry) as ParsedSendEntry | null) ??
-          buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount))
-        : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount);
+          buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount, unit))
+        : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount, unit);
       // Enrich with transport metadata so the screen can show progress
       const enriched: ParsedSendEntry = {
         ...baseEntry,
@@ -2118,13 +2050,14 @@ export function createDefaultOperations(
 }
 
 // ---------------------------------------------------------------------------
-// Receive history lookup helper
+// Payment-request fallback entry and receive history lookup
 // ---------------------------------------------------------------------------
 
 function buildSyntheticPaymentRequestEntry(
   operationId: string,
   mintUrl: string,
   amount: number,
+  unit: string,
 ): Omit<SyntheticSendEntry, "token" | "metadata"> {
   const now = Date.now();
   return {
@@ -2132,35 +2065,9 @@ function buildSyntheticPaymentRequestEntry(
     type: "send",
     createdAt: now,
     mintUrl,
-    unit: "sat",
+    unit,
     amount,
     operationId,
     state: "pending",
   };
-}
-
-async function findReceiveHistoryEntry(
-  mgr: Manager,
-  tokenString: string,
-  mintUrl: string,
-): Promise<string | null> {
-  logger.debug("operations.history.receive.lookup.start", {
-    ...mintUrlFields(mintUrl),
-    tokenLength: tokenString.length,
-    limit: 50,
-  });
-  const history = await mgr.history.getPaginatedHistory(0, 50);
-  const entry = history.find(
-    (h): h is ReceiveHistoryEntry =>
-      h.type === "receive" &&
-      h.mintUrl === mintUrl &&
-      h.metadata?.rawToken === tokenString,
-  );
-  logger.debug("operations.history.receive.lookup.done", {
-    ...mintUrlFields(mintUrl),
-    found: !!entry,
-    historyCount: history.length,
-    entryState: entry?.state ?? null,
-  });
-  return entry ? JSON.stringify(entry) : null;
 }

@@ -12,17 +12,9 @@ export { normalizeMintUrl } from './plan';
 export {
   classifyMeshToken,
   meshTokenDedupeKey,
-  type ClassifiedMeshToken,
-  type MeshTokenClass,
 } from './classify';
 
 export {
-  classifyMeshRedeemError,
   createMeshRedeemOrchestrator,
-  type MeshRedeemEntry,
-  type MeshRedeemErrorKind,
   type MeshRedeemOrchestrator,
-  type MeshRedeemOrchestratorConfig,
-  type MeshRedeemQueuePort,
-  type MeshRedeemStatus,
 } from './redeemOrchestrator';

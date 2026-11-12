@@ -30,7 +30,6 @@ jest.mock('wallet/react', () => ({
   useColadaManager: () => mockManager,
 }));
 jest.mock('wallet', () => ({
-  getMintMethodCapability: () => ({ supported: true }),
   buildBip321OnchainUri: (value: string) => value,
   standingPaymentRequestKey: (unit: string) => unit,
   isTestnutUnit: (unit: string) => unit.startsWith('t'),
@@ -40,12 +39,33 @@ jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
   isTestnutMint: (mintUrl: string) => mintUrl.includes('testnut'),
 }));
 jest.mock('@/features/receive/hooks/useReceiveMethodMint', () => ({
-  useReceiveMethodMint: () => ({ mintUrl: 'https://mint.example', anyMintSupports: mockSupports }),
+  useReceiveMethodMint: () => ({
+    mintUrl: 'https://mint.example',
+    anyMintSupports: mockSupports,
+    supported: true,
+  }),
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
-jest.mock('@/shared/hooks/useMempoolAddressSummary', () => ({
-  useMempoolAddressSummary: () => ({ summary: null }),
-}));
+// Each poll of the standing address hands the tab a fresh summary object; a
+// test publishes one with `mockReportMempool` and the tab re-renders on it.
+let mockMempoolSummary: { totalReceivedSats: number } | null = null;
+const mockMempoolListeners = new Set<() => void>();
+const mockReportMempool = (summary: { totalReceivedSats: number } | null) => {
+  mockMempoolSummary = summary;
+  mockMempoolListeners.forEach((listener) => listener());
+};
+jest.mock('@/shared/hooks/useMempoolAddressSummary', () => {
+  const { useSyncExternalStore } = jest.requireActual<typeof import('react')>('react');
+  const subscribe = (listener: () => void) => {
+    mockMempoolListeners.add(listener);
+    return () => mockMempoolListeners.delete(listener);
+  };
+  return {
+    useMempoolAddressSummary: () => ({
+      summary: useSyncExternalStore(subscribe, () => mockMempoolSummary),
+    }),
+  };
+});
 jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
   standingQuoteIdentityStore: {},
 }));
@@ -166,7 +186,6 @@ const actions = {
 const props = {
   method: 'bolt12' as const,
   unit: 'sat',
-  walletContext: { trustedMintUrls: ['https://mint.example'], mintBalances: {} },
   actions,
   muted: 'white',
 };
@@ -208,6 +227,51 @@ describe('receive rail presentation', () => {
       {}
     );
     act(() => renderer.unmount());
+  });
+  it('tries the automatic address rotation again on the next report after one fails', async () => {
+    let finishFirst!: (rotated: boolean) => void;
+    const rotate = jest
+      .fn<Promise<boolean>, unknown[]>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            finishFirst = done;
+          })
+      )
+      .mockResolvedValue(true);
+    mockQuote.mockImplementation(() => ({
+      quote: { request: 'bc1qpaid', expiry: 10_000_000_000 },
+      error: null,
+      rotate,
+    }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    try {
+      await act(async () => {
+        renderer = TestRenderer.create(<ReceiveReusableQuoteTab {...props} method="onchain" />);
+      });
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(1);
+      expect(rotate).toHaveBeenLastCalledWith('deposit_received');
+
+      // A report while the first rotation is still running does not start a second.
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(1);
+
+      // The mint refused the replacement: the paid address is still on screen.
+      await act(async () => finishFirst(false));
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(2);
+      expect(rotate).toHaveBeenLastCalledWith('deposit_received');
+    } finally {
+      act(() => renderer?.unmount());
+      mockReportMempool(null);
+      mockQuote.mockReset();
+      mockQuote.mockImplementation(() => ({
+        quote: { request: 'lno-fixture', expiry: 10_000_000_000 },
+        error: null,
+        rotate: jest.fn(),
+      }));
+    }
   });
   it('opens Discover only once on a rapid double tap', () => {
     mockSupports = false;
@@ -325,6 +389,51 @@ describe('receive rail presentation', () => {
       `receive-rail-item-${shown}`,
     ]);
     mockActiveUnit = 'sat';
+    act(() => renderer.unmount());
+  });
+  it('says a row was copied only once the clipboard took it, and says so when it did not', async () => {
+    const { setStringAsync } = jest.requireMock<{ setStringAsync: jest.Mock }>('expo-clipboard');
+    const popup = jest.requireMock<{ copyPopup: jest.Mock; staticPopup: jest.Mock }>(
+      '@/shared/lib/popup'
+    );
+    popup.copyPopup.mockClear();
+    popup.staticPopup.mockClear();
+    mockRail = 'bolt12';
+    mockLoadItems.mockResolvedValue([
+      {
+        key: 'offer',
+        rail: 'bolt12',
+        request: 'lno-offer',
+        status: 'reusable',
+        createdAt: 1,
+        copyTarget: 'bolt12Offer',
+      },
+    ]);
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<ReceiveRailListScreen />);
+    });
+    const press = () =>
+      renderer.root.findAllByProps({ testID: 'receive-rail-item-offer' })[0].props.onPress();
+
+    let write!: { resolve: () => void; reject: (error: Error) => void };
+    setStringAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          write = { resolve, reject };
+        })
+    );
+    await act(async () => press());
+    expect(setStringAsync).toHaveBeenLastCalledWith('lno-offer');
+    expect(popup.copyPopup).not.toHaveBeenCalled();
+    await act(async () => write.resolve());
+    expect(popup.copyPopup).toHaveBeenCalledWith('bolt12Offer');
+
+    popup.copyPopup.mockClear();
+    setStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
+    await act(async () => press());
+    expect(popup.copyPopup).not.toHaveBeenCalled();
+    expect(popup.staticPopup).toHaveBeenCalledWith('copy-failed');
     act(() => renderer.unmount());
   });
 });

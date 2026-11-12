@@ -20,11 +20,6 @@ export function buildImetaTag(media: MediaDescriptor): string[] {
   return ['imeta', ...parts];
 }
 
-/** Builds one imeta tag per media descriptor (the post's full set). */
-export function buildImetaTags(media: readonly MediaDescriptor[]): string[][] {
-  return media.map(buildImetaTag);
-}
-
 /** NIP-92 imeta metadata for a media url. */
 interface ImetaInfo {
   url: string;

@@ -34,7 +34,6 @@ import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -42,7 +41,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
-import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
 import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
@@ -66,8 +64,6 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { hasFeature } from '@/shared/config/features';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
-import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { Contacts } from 'nostr-tools/kinds';
 import * as nip19 from 'nostr-tools/nip19';
 import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
@@ -172,31 +168,6 @@ const UserProfileParamsSchema = z
     message: 'either npub or pubkey is required',
     path: ['pubkey'],
   });
-
-function buildUpdatedContactTags(
-  existingTags: string[][],
-  targetPubkey: string,
-  shouldFollow: boolean
-): string[][] {
-  const nextTags = existingTags.filter((tag) => !(tag[0] === 'p' && tag[1] === targetPubkey));
-  if (shouldFollow) {
-    nextTags.push(['p', targetPubkey]);
-  }
-  // Keep one p-tag per pubkey while preserving order for NIP-02 contact lists.
-  const seenP = new Set<string>();
-  const deduped: string[][] = [];
-  for (const tag of nextTags) {
-    if (tag[0] !== 'p') {
-      deduped.push(tag);
-      continue;
-    }
-    const pk = tag[1];
-    if (!pk || seenP.has(pk)) continue;
-    seenP.add(pk);
-    deduped.push(tag);
-  }
-  return deduped;
-}
 
 function safeNpubEncode(pubkey: string): string {
   if (!pubkey) return '';
@@ -580,6 +551,33 @@ function TopFollowers({
   );
 }
 
+/**
+ * What the Follow button shows for the follow state the store holds. A tap no
+ * published list holds yet (`syncing`) says so, with a clock for the check,
+ * so it never looks like a follow other people can see.
+ */
+export function followButtonFace(isFollowing: boolean, syncing = false) {
+  if (syncing)
+    return {
+      label: isFollowing ? 'Following · syncing' : 'Unfollowed · syncing',
+      accessibilityLabel: isFollowing
+        ? 'Following, waiting to sync'
+        : 'Unfollowed, waiting to sync',
+      icon: 'mdi:clock-outline',
+      systemIcon: 'clock',
+      isActive: isFollowing,
+      filled: !isFollowing,
+    };
+  return {
+    label: isFollowing ? 'Following' : 'Follow',
+    accessibilityLabel: isFollowing ? 'Following' : 'Follow',
+    icon: isFollowing ? 'mdi:check' : 'la:user-plus',
+    systemIcon: isFollowing ? 'checkmark' : 'person.badge.plus',
+    isActive: isFollowing,
+    filled: !isFollowing,
+  };
+}
+
 // ============================================================================
 // Banner with Overlapping Avatar
 // ============================================================================
@@ -594,7 +592,7 @@ function BannerWithAvatar({
   isResolving,
   showFollowButton,
   isFollowing,
-  isFollowLoading,
+  followSyncing,
   onToggleFollow,
   onSendMoney,
   onShareQr,
@@ -621,7 +619,8 @@ function BannerWithAvatar({
   isResolving: boolean;
   showFollowButton: boolean;
   isFollowing: boolean;
-  isFollowLoading: boolean;
+  /** The last tap is not in a published follow list yet. */
+  followSyncing: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
   /** Opens the share page holding this profile's npub QR, and its Lightning
@@ -753,7 +752,6 @@ function BannerWithAvatar({
         isLoading,
         bannerState,
         showFollowButton,
-        isFollowLoading,
         hasStories: !!hasStories,
       }}>
       {/* Banner */}
@@ -912,18 +910,13 @@ function BannerWithAvatar({
               // following → `isActive` tinted pill. Both honored across
               // liquid-glass, blur and flat.
               <CapsuleButton
-                label={isFollowing ? 'Following' : 'Follow'}
-                icon={isFollowing ? 'mdi:check' : 'la:user-plus'}
-                systemIcon={isFollowing ? 'checkmark' : 'person.badge.plus'}
-                isActive={isFollowing}
-                filled={!isFollowing}
+                {...followButtonFace(isFollowing, followSyncing)}
                 onPress={onToggleFollow}
-                busy={isFollowLoading}
                 fitContent
                 height={34}
                 iconSize={15}
                 textSize={13}
-                style={[styles.followCapsule, isFollowLoading && styles.followButtonDisabled]}
+                style={styles.followCapsule}
                 testID="profile-follow-button"
               />
             ))}
@@ -998,13 +991,8 @@ function BannerWithAvatar({
 // Main Component
 // ============================================================================
 
-type NostrSocialState = ReturnType<typeof useNostrSocialStore.getState>;
-
-// Module-scope because the publish path throws inside try/catch, which the
-// React Compiler can't lower — keeping it in render would bail the whole
-// component. Body is the verbatim former handleToggleFollowInner.
-// Module-scope for the same compiler reason as toggleFollowContacts (the
-// try/catch around startSendEcash bails the component). Verbatim former
+// Module-scope because the try/catch around startSendEcash bails the React
+// Compiler for the whole component. Verbatim former
 // handleSendMoney IIFE body; the optional-chaining reads moved to the caller.
 async function startSendMoneyToProfile(ctx: {
   machine: ReturnType<typeof usePaymentFlowMachine>;
@@ -1039,73 +1027,28 @@ async function startSendMoneyToProfile(ctx: {
   }
 }
 
-async function toggleFollowContacts(ctx: {
-  pubkey: string;
-  ownPubkey: string | undefined;
-  ndk: ReturnType<typeof useNDK>['ndk'];
-  followInFlight: boolean;
-  isFollowingProfile: boolean;
-  contactsTags: NostrSocialState['contactsTags'];
-  contactsContent: NostrSocialState['contactsContent'];
-  setContactsFromRelay: NostrSocialState['setContactsFromRelay'];
-  setFollowOptimistic: NostrSocialState['setFollowOptimistic'];
-  clearFollowOptimistic: NostrSocialState['clearFollowOptimistic'];
-}) {
-  const {
-    pubkey,
-    ownPubkey,
-    ndk,
-    followInFlight,
-    isFollowingProfile,
-    contactsTags,
-    contactsContent,
-    setContactsFromRelay,
-    setFollowOptimistic,
-    clearFollowOptimistic,
-  } = ctx;
-  if (!pubkey || !ownPubkey || !ndk) {
-    nostrLog.warn('user.profile.follow.precondition_failed', {
-      hasPubkey: !!pubkey,
-      hasNostrKeys: !!ownPubkey,
-      hasNdk: !!ndk,
-    });
-    paramPopup('engagement-update-failed', 'follow');
-    return;
-  }
-  if (ownPubkey === pubkey || followInFlight) return;
-
-  const shouldFollow = !isFollowingProfile;
-  nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
-  setFollowOptimistic(pubkey, shouldFollow, true);
-
-  const nextTags = buildUpdatedContactTags(
-    contactsTags.map((tag) => [...tag]),
-    pubkey,
-    shouldFollow
-  );
-  const createdAtSec = Math.floor(Date.now() / 1000);
-
-  try {
-    const contactEvent = new NDKEvent(ndk);
-    contactEvent.kind = Contacts;
-    contactEvent.tags = nextTags;
-    contactEvent.content = contactsContent;
-    contactEvent.created_at = createdAtSec;
-    // Contact list is replaceable + important: land it on as many write relays
-    // as possible via the central seam (outbox-aware, with retry).
-    const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
-    if (published.isErr()) throw new Error('contacts publish failed');
-    nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
-    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAtSec });
-    clearFollowOptimistic(pubkey);
-  } catch (e) {
-    nostrLog.error('user.profile.follow.failed', {
-      pubkey,
-      error: e instanceof Error ? e : new Error(String(e)),
-    });
-    clearFollowOptimistic(pubkey);
-    paramPopup('engagement-update-failed', 'follow');
-  }
+/**
+ * The Follow button's tap. It only records what the person wants;
+ * `followSync` publishes it, so the button answers at once and every tap
+ * counts, also while one publishes. Each tap toggles what the store holds at
+ * that moment, so two taps before the screen redraws follow and unfollow.
+ */
+export function useFollowToggle(pubkey: string | undefined, ownPubkey: string | undefined) {
+  const setFollowIntent = useNostrSocialStore((state) => state.setFollowIntent);
+  return () => {
+    if (!pubkey || !ownPubkey) {
+      nostrLog.warn('user.profile.follow.precondition_failed', {
+        hasPubkey: !!pubkey,
+        hasNostrKeys: !!ownPubkey,
+      });
+      paramPopup('engagement-update-failed', 'follow');
+      return;
+    }
+    if (ownPubkey === pubkey) return;
+    const shouldFollow = !selectIsFollowingPubkey(pubkey)(useNostrSocialStore.getState());
+    nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
+    setFollowIntent(pubkey, shouldFollow);
+  };
 }
 
 export function UserProfileScreen() {
@@ -1114,7 +1057,6 @@ export function UserProfileScreen() {
 
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const profileFlowGroup = useActiveProfileFlowGroup();
-  const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const params = useRouteParams(UserProfileParamsSchema, {
     where: 'user-flow.profile',
@@ -1152,13 +1094,9 @@ export function UserProfileScreen() {
     isResolving: isMetadataResolving,
   } = useNostrProfileMetadata(pubkey);
 
-  const contactsTags = useNostrSocialStore((state) => state.contactsTags);
-  const contactsContent = useNostrSocialStore((state) => state.contactsContent);
-  const setContactsFromRelay = useNostrSocialStore((state) => state.setContactsFromRelay);
-  const setFollowOptimistic = useNostrSocialStore((state) => state.setFollowOptimistic);
-  const clearFollowOptimistic = useNostrSocialStore((state) => state.clearFollowOptimistic);
-  const followOptimisticEntry = useNostrSocialStore((state) =>
-    pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
+  // A tap not yet in a published follow list: the button says it is waiting to sync.
+  const followPending = useNostrSocialStore(
+    (state) => !!(pubkey && state.optimisticFollowsByPubkey[pubkey]?.pending)
   );
   const isFocused = useIsFocused();
   const {
@@ -1286,7 +1224,6 @@ export function UserProfileScreen() {
   const followingCount = profileData?.follows;
   // Selector returns a primitive, so a per-render selector identity is safe.
   const isFollowingProfile = useNostrSocialStore(selectIsFollowingPubkey(pubkey || ''));
-  const followInFlight = !!followOptimisticEntry?.pending;
 
   // ===========================
   // VIDEO STORIES STATE
@@ -1345,23 +1282,7 @@ export function UserProfileScreen() {
     }
   };
 
-  // `followInFlight` is store-derived state and lands a render too late;
-  // a rapid double-tap on Follow runs `setFollowOptimistic` twice and races
-  // a second kind-3 publish with the first's `clearFollowOptimistic`.
-  const handleToggleFollow = useSingleFlight(() =>
-    toggleFollowContacts({
-      pubkey,
-      ownPubkey: nostrKeys?.pubkey,
-      ndk,
-      followInFlight,
-      isFollowingProfile,
-      contactsTags,
-      contactsContent,
-      setContactsFromRelay,
-      setFollowOptimistic,
-      clearFollowOptimistic,
-    })
-  );
+  const handleToggleFollow = useFollowToggle(pubkey, nostrKeys?.pubkey);
 
   const handleMintInfoPress = () => {
     if (!profileMintUrl) return;
@@ -1425,12 +1346,12 @@ export function UserProfileScreen() {
         videos: userVideoPosts.length,
         hasStories,
         mintKnown: !!profileMintUrl,
-        followInFlight,
+        followPending,
       },
     },
     nostrLog
   );
-  useStateChangeLogger('UserProfileScreen', { followInFlight, isFollowingProfile }, nostrLog);
+  useStateChangeLogger('UserProfileScreen', { followPending, isFollowingProfile }, nostrLog);
   useWhyDidRender(
     'UserProfileScreen',
     {
@@ -1445,7 +1366,7 @@ export function UserProfileScreen() {
       isMetadataLoading,
       isProfileApiLoading,
       isFollowingProfile,
-      followInFlight,
+      followPending,
       profileMintUrl,
     },
     nostrLog
@@ -1460,16 +1381,14 @@ export function UserProfileScreen() {
       ? 'metadata-loading'
       : isProfileApiLoading
         ? 'profile-api-loading'
-        : followInFlight
-          ? 'follow-updating'
-          : 'ready',
+        : 'ready',
     state: {
       aboutVisible: Boolean(cachedProfile?.about),
       bannerKnown: Boolean(cachedProfile?.banner),
       displayNameKnown: displayName.length > 0,
       followerCountKnown: followerCount !== undefined,
       followingCountKnown: followingCount !== undefined,
-      followInFlight,
+      followPending,
       hasMintUrl: Boolean(profileMintUrl),
       hasStories,
       isFollowingProfile,
@@ -1588,7 +1507,7 @@ export function UserProfileScreen() {
                 // every time you open your own profile.
                 showFollowButton={!!nostrKeys?.pubkey && !isOwnProfile && !!pubkey}
                 isFollowing={isFollowingProfile}
-                isFollowLoading={followInFlight}
+                followSyncing={followPending}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
                 onShareQr={handleShareQr}
@@ -1762,8 +1681,5 @@ const styles = StyleSheet.create({
   followCapsule: {
     marginTop: 10,
     minWidth: 108,
-  },
-  followButtonDisabled: {
-    opacity: 0.6,
   },
 });

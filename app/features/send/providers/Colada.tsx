@@ -26,7 +26,7 @@ import { getPublicKey } from 'nostr-tools/pure';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
 import { createExecuteMintQuote, createExecuteReceive } from 'wallet/operations';
-import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import { mintLocalId } from '@/shared/lib/id';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
@@ -558,13 +558,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           pendingMessage: RECEIVE_PENDING_TOAST_COPY.subtitle,
           newLocalId: mintLocalId,
         }),
-        executeMintQuote: createExecuteMintQuote({
-          getManager,
-          prepareMintQuote: (manager, method, mintUrl, amount, unit) =>
-            method === 'onchain'
-              ? prepareOnchainMintQuote(manager, mintUrl, amount, unit)
-              : prepareBolt11MintQuote(manager, mintUrl, amount, unit),
-        }),
+        executeMintQuote: createExecuteMintQuote({ getManager, prepareMintQuote }),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
         // operation set; this one has no default because NDK / cache wiring
@@ -714,7 +708,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       handlers={handlers}
       detectors={buildDetectors}
       instance={instance}
-      getManager={getManager}
       annotationStore={transactionAnnotationAdapter}
       operations={operationsOverride}
       notifications={notifications}

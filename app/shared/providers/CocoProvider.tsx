@@ -143,57 +143,61 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     bgStage.log('Starting NPC sync...');
     await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
 
-    try {
-      if (!isLive()) return;
-      bgStage.log('Recovering pending operations...');
-      log.info('coco.recovery.send.start');
-      await initPhase('Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
-      if (!isLive()) return;
-      log.info('coco.recovery.send.done');
-      log.info('coco.recovery.melt.start');
-      await initPhase('Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
-      if (!isLive()) return;
-      log.info('coco.recovery.melt.done');
-      log.info('coco.recovery.receive.start');
-      await initPhase('Coco-bg.receiveRecovery', () => chainManager.ops.receive.recovery.run());
-      if (!isLive()) return;
-      log.info('coco.recovery.receive.done');
-      // Safe no-op sweep while the NUT-18 incoming saga is unused.
-      log.info('coco.recovery.payment_request_receive.start');
-      await initPhase('Coco-bg.paymentRequestReceiveRecovery', () =>
-        chainManager.recoverPendingPaymentRequestReceiveAttempts()
-      );
-      log.info('coco.recovery.payment_request_receive.done');
-      if (!isLive()) return;
-      // Sats parked on a Routstr node the app has since been repointed away
-      // from. It belongs beside the other recovery sweeps for the same reason
-      // they are here: money that is ours but not yet in the wallet, swept
-      // once the wallet is ready. Non-fatal — the catch below covers it, and
-      // the sweep is idempotent, so a failed pass simply retries next launch.
-      // Change for a request that ended between paying and being paid back —
-      // the window a force quit or a crash opens. Runs first: it is the only
-      // one with a deadline (a node sweeps unclaimed refunds eventually).
-      log.info('coco.recovery.routstr_payments.start');
-      await initPhase('Coco-bg.routstrPaymentRecovery', () => recoverPendingPayments());
-      if (!isLive()) return;
-      // The same window, for payments `@routstr/sdk` now owns: it records each
-      // request token before it leaves and clears it when the change is home,
-      // so anything still recorded is money the node has to be asked about.
-      // The sweep above drains rows written before the SDK took over; this one
-      // drains everything since.
-      await initPhase('Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
-      if (!isLive()) return;
-      log.info('coco.recovery.routstr_payments.done');
-      log.info('coco.recovery.routstr_reclaim.start');
-      await initPhase('Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
-      log.info('coco.recovery.routstr_reclaim.done');
-    } catch (recoveryErr) {
-      initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
-      log.warn('coco.recovery.failed', {
-        error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
-      });
-      reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
-    }
+    // Each recovery stands alone: one that fails is reported and the rest still
+    // run, so a stuck send cannot hold back a melt, a receive or a refund.
+    const recover = async (
+      name: string,
+      phase: string,
+      run: () => Promise<unknown>
+    ): Promise<void> => {
+      log.info(`coco.recovery.${name}.start`);
+      try {
+        await initPhase(phase, run);
+        log.info(`coco.recovery.${name}.done`);
+      } catch (recoveryErr) {
+        initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
+        log.warn('coco.recovery.failed', {
+          phase,
+          error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
+        });
+        reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
+      }
+    };
+
+    if (!isLive()) return;
+    bgStage.log('Recovering pending operations...');
+    await recover('send', 'Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
+    if (!isLive()) return;
+    await recover('melt', 'Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
+    if (!isLive()) return;
+    await recover('receive', 'Coco-bg.receiveRecovery', () =>
+      chainManager.ops.receive.recovery.run()
+    );
+    if (!isLive()) return;
+    // Safe no-op sweep while the NUT-18 incoming saga is unused.
+    await recover('payment_request_receive', 'Coco-bg.paymentRequestReceiveRecovery', () =>
+      chainManager.recoverPendingPaymentRequestReceiveAttempts()
+    );
+    if (!isLive()) return;
+    // Change for a request that ended between paying and being paid back —
+    // the window a force quit or a crash opens. It has a deadline (a node
+    // sweeps unclaimed refunds eventually). The sweep is idempotent, so a
+    // failed pass simply retries next launch.
+    await recover('routstr_payments', 'Coco-bg.routstrPaymentRecovery', () =>
+      recoverPendingPayments()
+    );
+    if (!isLive()) return;
+    // The same window, for payments `@routstr/sdk` now owns: it records each
+    // request token before it leaves and clears it when the change is home,
+    // so anything still recorded is money the node has to be asked about.
+    // The sweep above drains rows written before the SDK took over; this one
+    // drains everything since.
+    await recover('routstr_sdk_sweep', 'Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
+    if (!isLive()) return;
+    // Sats parked on a Routstr node the app has since been repointed away
+    // from: money that is ours but not yet in the wallet, swept once the
+    // wallet is ready.
+    await recover('routstr_reclaim', 'Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
 
     if (!isLive()) return;
     // Ecash that releases before 0.0.45 stored themselves. Not awaited: it
@@ -226,16 +230,8 @@ function restageWalletCredentials(cashuMnemonic: string | null): void {
 
 export function CocoProvider({ children }: CocoProviderProps) {
   useInitMount('CocoProvider');
-  const stage = useInitializationStage('coco', {
-    message: 'Initializing Coco...',
-    dependsOn: ['nostr'],
-    blocking: true,
-  });
-  const bgStage = useInitializationStage('coco-background', {
-    message: 'Background tasks...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
+  const stage = useInitializationStage('coco');
+  const bgStage = useInitializationStage('coco-background');
   const { keys, cashuMnemonic } = useNostrKeysContext();
   // Mirrored, not depended on: `privateKey` is a fresh `Uint8Array` on every
   // derivation, so making it a trigger would tear down and re-initialise

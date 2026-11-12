@@ -66,4 +66,29 @@ describe('mintNuts readers', () => {
     expect(mintMethodsFromNuts(methodEntriesMalformed as never)).toEqual([]);
     expect(nutSupported(supportedIsString as never, '7')).toBe(false);
   });
+
+  it('drops entries whose method or unit is not a string, without throwing', () => {
+    const malformedFields: unknown = {
+      '4': {
+        methods: [
+          { method: 7, unit: 'sat' },
+          { method: { name: 'bolt11' }, unit: 'sat' },
+          { method: 'bolt11', unit: 7 },
+          { method: 'bolt12', unit: ['sat'] },
+          { method: 'onchain', unit: 'sat' },
+        ],
+      },
+      '5': {
+        methods: [
+          { method: 5, unit: 'sat' },
+          { method: 'bolt11', unit: 'sat' },
+        ],
+      },
+    };
+    expect(mintMethodsFromNuts(malformedFields as never)).toEqual(['bolt11', 'bolt12', 'onchain']);
+    expect(meltMethodsFromNuts(malformedFields as never)).toEqual(['bolt11']);
+    expect(mintMethodUnitPairsFromNuts(malformedFields as never)).toEqual([
+      { method: 'onchain', unit: 'sat' },
+    ]);
+  });
 });

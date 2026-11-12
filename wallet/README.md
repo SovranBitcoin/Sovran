@@ -5,12 +5,15 @@ sequencing, payment-state copy, screen-action availability, subscription events,
 chain helpers, and adapter-shaped side effects. Wallet apps own presentation,
 routing, storage, native modules, and product-specific enrichment.
 
-The package has two public entry points:
+The package is private to this workspace and has one consumer, the app. Its
+entry files export only what the app or the package's own tests import, and
+`bun run knip` fails on an entry export nothing imports. It has two main entry
+points:
 
-- `colada` for framework-agnostic machine, adapters, copy, history, chain,
+- `wallet` for framework-agnostic machine, adapters, copy, history, chain,
   subscription, screen-action session, and capability helpers.
-- `colada/react` for `ColadaProvider`, `usePaymentFlowMachine`,
-  `useScreenActions`, `useExecutionState`, and `useColadaSubscriptions`.
+- `wallet/react` for `ColadaProvider`, `usePaymentFlowMachine`,
+  `useScreenActions`, and `useExecutionState`.
 
 ## What Colada Owns
 
@@ -48,8 +51,8 @@ notifications, screen actions, adapters, deep links, and a
 
 ```tsx
 import React from 'react';
-import { ColadaProvider, usePaymentFlowMachine } from 'colada/react';
-import type { StepHandlerMap, WalletContext } from 'colada';
+import { ColadaProvider, usePaymentFlowMachine } from 'wallet/react';
+import type { StepHandlerMap, WalletContext } from 'wallet';
 
 function createHandlers(): StepHandlerMap {
   return {
@@ -74,13 +77,13 @@ function createHandlers(): StepHandlerMap {
 export function AppRoot() {
   return (
     <ColadaProvider
+      instance={instance}
       handlers={() => createHandlers()}
       operations={walletOperations}
       notifications={walletNotifications}
       actions={walletScreenActions}
       clipboardAdapter={clipboardAdapter}
       shareAdapter={shareAdapter}
-      imagePickerAdapter={imagePickerAdapter}
       chainAdapter={chainAdapter}
       navigation={{ goBack: () => router.back(), scanQr: openScanner }}
     >
@@ -92,7 +95,7 @@ export function AppRoot() {
 export function SendEntryScreen({ walletContext }: { walletContext: WalletContext }) {
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
 
-  return <Button title="Paste or scan" onPress={() => machine.scan(undefined, { source: 'paste' })} />;
+  return <Button title="Paste or scan" onPress={() => machine.scan(undefined, { source: 'clipboard' })} />;
 }
 ```
 
@@ -106,19 +109,19 @@ Important props:
 | Prop | Purpose |
 | --- | --- |
 | `handlers` | Factory called with the `PaymentMachine`; returns `StepHandlerMap` navigation handlers. |
-| `instance` | Optional `createColada()` instance for framework-agnostic operation/context reuse. |
+| `instance` | Required `createColada()` instance: the wallet context, the Coco manager, the default operations, and the locale, offline, BTC price, display currency, fiat-rate and send-memo settings. |
 | `operations` | Wallet I/O the machine can run internally, such as send, receive, melt, mint quote, mint review, status checks, rollback, Nostr DM, and recipient profile lookup. |
 | `notifications` | Optional named callbacks for UX and lifecycle events. Missing handlers are no-ops. |
 | `actions` | Wallet overrides for predefined `useScreenActions` actions. Defaults cover navigation, operations, copy, and share where possible. |
 | `screenActionsBridge` | App-owned bridge for extra action context, subscription binding, entry merge rules, decoration, locale, and source labels. |
-| `getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale` | Runtime getters read through refs so long-lived handlers see fresh values. |
-| `translations`, `paymentCopyOverrides` | Copy/i18n extensions for payment-state text. |
-| `clipboardAdapter`, `shareAdapter`, `imagePickerAdapter`, `nostrAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
-| `scanSources` | Optional explicit scan-source map. When omitted, clipboard and image-picker adapters derive default sources. |
+| `annotationStore` | Persistence for per-transaction annotations. In memory when omitted. |
+| `getUnit` | The wallet's active unit, read on every flow reset. |
+| `clipboardAdapter`, `shareAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter` | JSON-shaped native/platform seams. |
+| `scanSources` | Where `machine.scan()` reads clipboard, gallery and NFC input from. |
 | `deepLinks` | Reactive deep-link input and scheme filtering. Accepted Cashu links are scanned by the machine. |
 | `navigation` | Default screen-action navigation callbacks such as `goBack`, `scanQr`, `mintInfo`, and `addMint`. |
 
-Flat provider props win over values carried by `instance`.
+Settings live on `instance` only; the provider has no prop that repeats one.
 
 ## Nostr GraphQL Enrichment
 
@@ -142,7 +145,6 @@ profiles and mint review events through `events(input:)` and
 
 Colada exports wallet seed helpers for Coco `seedGetter` setup:
 
-- `generateCashuMnemonic()` creates a standard 12-word BIP-39 mnemonic.
 - `deriveStandardCashuSeed(mnemonic)` returns the standard 64-byte BIP-39 seed.
 - `createCashuSeedGetter({ getMnemonic })` returns a lazy Coco-compatible
   `() => Promise<Uint8Array>`.
@@ -235,8 +237,8 @@ distinct operation or flow meaning.
 Emoji token copy is a `sendToken.copy` variant with `variantId: 'emoji'`.
 There is no sibling emoji-copy runtime action.
 
-Frameworks that are not React should use `createScreenActionSession()`. A
-session owns entry parsing, subscription-driven entry updates, merge/decorate
+Under the hook is a framework-agnostic session (`createScreenActionSession`,
+internal to the package). A session owns entry parsing, subscription-driven entry updates, merge/decorate
 rules, source refreshes, action inspection, action execution, and disposal. It
 exposes `inspect()`, `subscribe()`, `execute(action, params?)`, `setEntry()`,
 `setEntrySeed()`, and `dispose()`. React's `useScreenActions()` is only an
@@ -249,8 +251,8 @@ React.
 
 ## Copy And Localization
 
-Use `createPaymentCopyResolver`, `resolvePaymentCopy`, `getPaymentCopy`,
-`registerPaymentCopyLocale`, and `paymentCopyOverrides` for payment-state text.
+Use `createPaymentCopyResolver` (with per-key `overrides`) and
+`createPaymentCopyGroups` for payment-state text.
 
 Apps may override individual copy keys, but default payment copy belongs in
 Colada. New payment states should declare copy keys beside the state/action
@@ -258,13 +260,11 @@ logic instead of adding app-screen strings.
 
 ## Subscription Bus
 
-`createSubscriptionBus()` exposes:
+The provider makes one bus (`createSubscriptionBus`, internal), which exposes:
 
 - `subscribe(filter, listener)`
 - `subscribeAll(listener)`
 - `publish(event)`
-
-React consumers can use `useColadaSubscriptions()`.
 
 Events are JSON-shaped and typed by `ColadaSubscriptionEvent`, including
 `history.updated`, `melt.updated`, `mint.updated`, receive mint/key changes,
@@ -284,7 +284,6 @@ Framework-agnostic helpers include:
 - `fetchMempoolAddressStats`
 - `summarizeMempoolAddress`
 - `getOnchainConfirmationProgress`
-- `getOnchainConfirmationInfo`
 - `MempoolAddressStatsSchema`
 
 The `ChainAdapter` contract covers fees, address transactions, address summary,
@@ -297,7 +296,6 @@ the same adapter shape.
 Mint payment-method support is explicit. Colada derives support from NUT-04
 and NUT-05 method-unit metadata via:
 
-- `deriveMintMethodSupportFromInfo`
 - `deriveMintMethodCapabilityMapFromTrustedMints`
 - `getMintMethodCapability`
 - `evaluateMintMethodAmountAvailability`
@@ -313,7 +311,7 @@ with a concrete reason instead of pretending the path can execute.
 
 - `src/adapters/`: JSON-shaped native/platform contracts.
 - `src/react/ColadaProvider.tsx`: provider, context, flat prop API, deep-link
-  processing, scan-source derivation, and React hooks.
+  processing, and React hooks.
 - `src/machine/`: framework-agnostic payment machine, flow modules, transition
   helpers, and operation/notification types.
 - `src/screen-actions/`: action contracts, availability rules, default
@@ -328,8 +326,8 @@ with a concrete reason instead of pretending the path can execute.
 
 ## Working Rules
 
-- Prefer root imports from `colada` for framework-agnostic helpers and
-  `colada/react` for React hooks.
+- Prefer root imports from `wallet` for framework-agnostic helpers and
+  `wallet/react` for React hooks.
 - Keep app screens declarative: render the step or entry Colada hands back.
 - Put native/platform dependencies behind adapters.
 - Put app-specific entry enrichment in `screenActionsBridge`.

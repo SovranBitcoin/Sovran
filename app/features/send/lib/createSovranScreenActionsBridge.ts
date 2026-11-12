@@ -12,8 +12,11 @@ import type {
   ScreenType,
 } from 'wallet';
 import {
+  candidateKeys,
+  decodeAnnotation,
   isMintQuotePaymentObserved,
   meltOperationToScreenActionEntry,
+  mergeAnnotationRecords,
   mergeEntryUpdate as defaultMerge,
   normalizeContractState,
   normalizeHistoryEntry,
@@ -31,7 +34,10 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
-import { setDistributionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+import {
+  setDistributionAnnotation,
+  transactionAnnotationAdapter,
+} from '@/shared/stores/profile/transactionAnnotationStore';
 
 type EntryRecord = Record<string, unknown>;
 
@@ -47,6 +53,7 @@ const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
 const SOURCE_LABELS: Record<string, string> = {
   qr: 'QR Code',
   nfc: 'NFC',
+  ble: 'Bluetooth',
   paste: 'Clipboard',
   deeplink: 'Deep Link',
   copy: 'Copied',
@@ -275,9 +282,29 @@ export function buildAddedMintItem(
   };
 }
 
+/**
+ * Where the transaction came from, read as its row reads it: the
+ * transaction's annotations over every key it could have been written under.
+ * Scan history and the distribution store are the fallback; scan history
+ * keeps only the newest scans and skips very long inputs.
+ */
 function getSourceLabel(entry: EntryRecord | null): string | null {
   const entryId = entry && typeof entry.id === 'string' ? entry.id : undefined;
   if (!entryId) return null;
+
+  const record = mergeAnnotationRecords(
+    transactionAnnotationAdapter.getMany(
+      candidateKeys({
+        id: entryId,
+        type: getStringField(entry, 'type'),
+        quoteId: getStringField(entry, 'quoteId'),
+        operationId:
+          getStringField(entry, 'operationId') ??
+          getStringField(asEntryRecord(entry?.metadata), 'operationId'),
+      })
+    )
+  );
+  const annotation = record ? decodeAnnotation(record) : null;
 
   const scan = useScanHistoryStore
     .getState()
@@ -287,7 +314,12 @@ function getSourceLabel(entry: EntryRecord | null): string | null {
       ? (entry.quoteId as string)
       : entryId;
   const distribution = useTransactionDistributionStore.getState().distributions[distributionKey];
-  const source = scan?.source ?? distribution?.source ?? null;
+  const source =
+    annotation?.scan?.method ??
+    annotation?.distribution?.source ??
+    scan?.source ??
+    distribution?.source ??
+    null;
   return source ? (SOURCE_LABELS[source] ?? null) : null;
 }
 
@@ -484,6 +516,11 @@ export function createSovranScreenActionsBridge({
         useTransactionDistributionStore.subscribe(
           (state) => state.distributions,
           () => bus.publish({ type: 'screenActions.changed', reason: 'transactionDistribution' })
+        )
+      );
+      unsubscribes.push(
+        transactionAnnotationAdapter.subscribe(() =>
+          bus.publish({ type: 'screenActions.changed', reason: 'transactionAnnotation' })
         )
       );
       unsubscribes.push(

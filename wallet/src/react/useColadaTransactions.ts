@@ -19,13 +19,11 @@ import type { AnnotationStoreAdapter } from "../annotations";
 import { useAnnotationStore, useColadaManager } from "./ColadaProvider";
 import { createSharedReadStore, type SharedReadStore } from "./sharedReadStore";
 
-export interface UseColadaTransactionsResult {
+interface UseColadaTransactionsResult {
   /** Merged, deduped, newest-first transaction history. */
   history: HistoryEntry[];
   /** Load the next page of coco history (infinite scroll). */
   loadMore: () => Promise<void>;
-  /** Jump to a specific page of coco history. */
-  goToPage: (page: number) => Promise<void>;
   /** Re-fetch the first page + supplements. */
   refresh: () => Promise<void>;
   /** Whether more coco history pages exist. */
@@ -239,7 +237,7 @@ function transactionStore(
 function emptyTransactions(): UseColadaTransactionsResult {
   return {
     history: [], hasMore: true, isFetching: false,
-    loadMore: async () => {}, goToPage: async () => {}, refresh: async () => {},
+    loadMore: async () => {}, refresh: async () => {},
   };
 }
 
@@ -258,7 +256,6 @@ function createTransactionStore(
     let isFetching = false;
     let hasMore = true;
     let offset = -pageSize;
-    let mode: "infinite" | "page" = "infinite";
     let refreshPending = false;
     let supplementRead: { requested: boolean; promise: Promise<void> } | null = null;
 
@@ -267,14 +264,14 @@ function createTransactionStore(
       history = keepIfSame(history, mergeTransactionSources({
         cocoHistory, receiveEntries, pendingRequestEntries,
       }));
-      publish({ history, loadMore, goToPage, refresh, hasMore, isFetching });
+      publish({ history, loadMore, refresh, hasMore, isFetching });
     };
     const applyHistory = (next: HistoryEntry[], reason: string) => {
       const previous = cocoHistory;
       cocoHistory = keepIfSame(previous, next);
       if (cocoHistory !== previous) {
         logger.info("history.state.applied", {
-          reason, mode, offset, ...summarizeEntries(cocoHistory),
+          reason, offset, ...summarizeEntries(cocoHistory),
         });
       }
       emit();
@@ -320,22 +317,14 @@ function createTransactionStore(
       setFetching(true);
       const run = async () => {
         const supplements = fetchSupplements();
-        if (mode === "infinite") {
-          // Refresh the head at any scroll depth without dropping older pages.
-          const page = await fetchPage(0);
-          if (page && !cancelled) {
-            if (offset <= 0) hasMore = page.length === pageSize;
-            offset = Math.max(0, offset);
-            const pageIds = new Set(page.map((n) => n.id));
-            const fresh = cocoHistory.filter((p) => !pageIds.has(p.id));
-            applyHistory([...page, ...fresh], "refresh-head");
-          }
-        } else {
-          const page = await fetchPage(offset);
-          if (page && !cancelled) {
-            hasMore = page.length === pageSize;
-            applyHistory(page, "refresh-window");
-          }
+        // Refresh the head at any scroll depth without dropping older pages.
+        const page = await fetchPage(0);
+        if (page && !cancelled) {
+          if (offset <= 0) hasMore = page.length === pageSize;
+          offset = Math.max(0, offset);
+          const pageIds = new Set(page.map((n) => n.id));
+          const fresh = cocoHistory.filter((p) => !pageIds.has(p.id));
+          applyHistory([...page, ...fresh], "refresh-head");
         }
         await supplements;
       };
@@ -349,7 +338,6 @@ function createTransactionStore(
         const page = await fetchPage(nextOffset);
         if (page && !cancelled) {
           hasMore = page.length === pageSize;
-          mode = "infinite";
           const seen = new Set<string>();
           const out: HistoryEntry[] = [];
           for (const entry of [...cocoHistory, ...page]) {
@@ -363,22 +351,6 @@ function createTransactionStore(
       };
       await run().finally(() => { if (!cancelled) setFetching(false); });
     };
-    const goToPage = async (page: number) => {
-      if (cancelled || isFetching) return;
-      setFetching(true);
-      const run = async () => {
-        const nextOffset = page * pageSize;
-        const result = await fetchPage(nextOffset);
-        if (result && !cancelled) {
-          hasMore = result.length === pageSize;
-          mode = "page";
-          offset = nextOffset;
-          applyHistory(result, "goToPage");
-        }
-      };
-      await run().finally(() => { if (!cancelled) setFetching(false); });
-    };
-
     const onHistory = () => void refresh();
     const onReceive = () => void fetchSupplements();
     manager.on("history:updated", onHistory);

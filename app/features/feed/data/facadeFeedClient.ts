@@ -2,7 +2,6 @@ import type { NostrCursor } from '@sovranbitcoin/schemas';
 import { feedPageKey } from './feedCache';
 import { facade } from 'nostr';
 
-import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedTypes';
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
@@ -12,7 +11,6 @@ import {
   resolvedFeedPageToParseResult,
   skimmableFeedFilters,
 } from './facadeFeedAdapter';
-import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { emptyNotificationsResult } from '@/features/feed/lib/notificationResults';
 import {
   createNotificationsResultMapper,
@@ -34,61 +32,14 @@ import {
 import { READ_DISABLED, readUnavailable } from './feedClient';
 
 // ---------------------------------------------------------------------------
-// Cache bridge: the nagg GraphQL fast-paths (thread, user feeds, posts-by-pubkey)
-// return app-shaped results WITHOUT writing to the shared entity cache the way
-// the facade reads do. These helpers write those results back into the singleton
-// cache, tagged 'nagg' (the source that served them), so a later read — opening a
-// reply as its own thread, revisiting a profile — serves them instantly. The
-// for-you/notifications facade paths already ingest; this closes the gap.
-// ---------------------------------------------------------------------------
-
-function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
-  const out: FeedEvent[] = [];
-  if (item.type === 'note') {
-    out.push(item.event);
-    if (item.rootEvent) out.push(item.rootEvent);
-    if (item.replyPreviewEvents) out.push(...item.replyPreviewEvents);
-  } else {
-    out.push(item.repostEvent);
-    if (item.originalEvent) out.push(item.originalEvent);
-    if (item.rootEvent) out.push(item.rootEvent);
-    if (item.reposters) for (const reposter of item.reposters) out.push(reposter.event);
-  }
-  return out;
-}
-
-/** Write a parsed feed/user-feed page's notes/profiles/metrics into the shared cache. */
-function ingestFeedPageIntoCache(result: FeedParseResult): void {
-  // Dev-only: the nagg GraphQL feed paths (home fallback, profile feed, search)
-  // funnel through here, so badge every rendered note as 'nagg'. No-op in prod.
-  if (__DEV__) {
-    const ids: string[] = [];
-    for (const item of result.orderedFeedItems) {
-      for (const event of eventsFromAppFeedItem(item)) ids.push(event.id);
-    }
-    recordDebugTiers(ids, 'nagg');
-  }
-  const cache = buildNostrDataLayer()?.cache;
-  if (!cache) return;
-  const events: FeedEvent[] = [];
-  for (const item of result.orderedFeedItems) events.push(...eventsFromAppFeedItem(item));
-  events.push(...result.quotedEventsMap.values());
-  cache.ingestNotes(events);
-  cache.ingestProfileInfos(Object.fromEntries(result.profilesMap), 'nagg');
-  cache.ingestNoteStats(facade.statsFromMetrics(Object.fromEntries(result.metricsMap)), 'nagg');
-}
-
-// ---------------------------------------------------------------------------
 // Facade-backed feed client.
 //
-// Routes the home feeds (for-you / following-popular), user/profile feeds,
-// posts-by-pubkeys, and notifications through the tier-selecting nagg-ts
-// facade so the Settings → Network toggles actually change which source
-// (nagg → Primal → relays) serves each read — visible in the bridged nostr.*
-// logs — and so a down nagg degrades to Primal/relay instead of blanking the
-// surface. Threads keep nagg's viewer-ranked GraphQL gold path while nagg is
-// enabled (the app-view can't reproduce that ranking); enrichment and
-// following-replies still delegate to the legacy client.
+// Routes the home feeds, user/profile feeds, posts-by-pubkeys, notifications
+// and threads through the Nostr package's tier-selecting facade so the
+// Settings → Network toggles actually change which source (nagg → Primal →
+// relays) serves each read — visible in the bridged nostr.* logs — and so a
+// down nagg degrades to Primal/relay instead of blanking the surface. Only
+// enrichment still delegates to the nagg REST client.
 //
 // The pure shape bridge lives in facadeFeedAdapter.
 // ---------------------------------------------------------------------------
@@ -108,7 +59,6 @@ function feedPageTransport(request: {
   signal?: AbortSignal;
   timeoutMs?: number;
   readId?: string;
-  until?: number;
   cursor?: NostrCursor;
 }) {
   return {
@@ -121,23 +71,20 @@ function feedPageTransport(request: {
   };
 }
 
-export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>): FeedClient {
+export function createFacadeFeedClient(enrichment: Pick<FeedClient, 'enrich'>): FeedClient {
   const pagers = new Map<string, facade.FeedPager>();
   let pagerLayer: ReturnType<typeof buildNostrDataLayer>;
   return {
-    ...fallback,
+    ...enrichment,
     dispose() {
       for (const pager of pagers.values()) pager.dispose();
       pagers.clear();
-      fallback.dispose?.();
     },
     async getFeed(request): Promise<FeedParseResult> {
       const spec = mapAppSpecToFeedSpec(request.spec, request.userPubkey);
-      if (!spec) {
-        const result = await fallback.getFeed(request);
-        ingestFeedPageIntoCache(result);
-        return result;
-      }
+      // A Following feed asked for before the account's key is known has
+      // nobody to follow yet: an empty page, and no request.
+      if (!spec) return emptyFeedParseResult();
 
       const layer = buildNostrDataLayer();
       if (!layer) {
@@ -288,7 +235,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
           feedLog.info('feed.user.page.done', {
             tier: page.tier,
             items: parsed.orderedFeedItems.length,
-            paged: !!request.until,
+            paged: !!request.cursor,
             paginationUntil: parsed.paginationUntil,
           });
           return parsed;
@@ -334,7 +281,6 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
 
     openNotificationsSession(request) {
       const facadeRequest = toFacadeNotificationsRequest(request);
-      if (!facadeRequest) return null;
       const layer = buildNostrDataLayer();
       if (!layer) {
         feedLog.warn('feed.notifications.facade.no_layer', {
@@ -376,7 +322,6 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
 
     async getNotifications(request): Promise<FeedNotificationsResult> {
       const facadeRequest = toFacadeNotificationsRequest(request);
-      if (!facadeRequest) return fallback.getNotifications(request);
 
       const layer = buildNostrDataLayer();
       if (!layer) {
@@ -392,9 +337,8 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       return result.match(
         (page) => {
           const mapped = resolvedNotificationsToResult(page);
-          // Mirrors the nagg client's fetch.done, plus the tier that actually
-          // answered — the waterfall means the same filters can be served by
-          // different tiers with different result shapes.
+          // Names the tier that actually answered — the waterfall means the same
+          // filters can be served by different tiers with different result shapes.
           feedLog.info('feed.notifications.fetch.done', {
             transport: 'facade',
             tier: page.tier,

@@ -12,13 +12,7 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { describeWalletFailure } from '@/shared/lib/errors';
 
-import {
-  buildBip321OnchainUri,
-  getMintMethodCapability,
-  isTestnutUnit,
-  toAccountUnit,
-  type WalletContext,
-} from 'wallet';
+import { buildBip321OnchainUri, isTestnutUnit, toAccountUnit } from 'wallet';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
@@ -54,7 +48,6 @@ interface ReceiveReusableQuoteTabProps {
   active?: boolean;
   /** Hidden tabs must not create a quote for a method excluded from Unified. */
   enabled?: boolean;
-  walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   actions: UseScreenActionsResult<'receive'>['actions'];
   muted: string;
   /** Reports the rail's copyable payload (bare offer/address) upward for the
@@ -85,7 +78,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   unit,
   active = true,
   enabled = true,
-  walletContext,
   actions,
   muted,
   onQrPayload,
@@ -95,12 +87,12 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // four independent selections (preferred / npub.cash / bolt12 / onchain).
   // Explicit picks persist; otherwise colada auto-derives the first trusted
   // mint supporting the method. Never the hub/NPC mint.
-  const { mintUrl: methodMint, anyMintSupports } = useReceiveMethodMint(method, unit);
+  const {
+    mintUrl: methodMint,
+    anyMintSupports,
+    supported: mintSupports,
+  } = useReceiveMethodMint(method, unit);
   const methodMintInfo = useMintInfo(methodMint);
-  const capability = methodMint
-    ? getMintMethodCapability(walletContext, methodMint, { operation: 'mint', method, unit })
-    : null;
-  const mintSupports = !!capability?.supported && !capability.disabled;
 
   // The pick runs through the payment machine's mint-select page (scope =
   // method): colada builds the capability-filtered list, the selection comes
@@ -203,21 +195,26 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // deposit still auto-mints. Bolt12 offers never watch/rotate.
   const onchainStandingAddress = method === 'onchain' ? request : null;
   const standingMempool = useMempoolAddressSummary(onchainStandingAddress);
-  const depositObserved =
-    !!standingMempool.summary && standingMempool.summary.totalReceivedSats > 0;
+  const mempoolReport = standingMempool.summary;
+  const depositObserved = !!mempoolReport && mempoolReport.totalReceivedSats > 0;
   const rotatedForAddressRef = useRef<string | null>(null);
   React.useEffect(() => {
     if (!onchainStandingAddress || !depositObserved) return;
     // One rotation per observed address — the poll keeps reporting the payment
-    // until `request` swaps to the fresh (unpaid) address.
+    // until `request` swaps to the fresh (unpaid) address. A rotation that did
+    // not go through releases the address, so the next report tries again.
     if (rotatedForAddressRef.current === onchainStandingAddress) return;
     rotatedForAddressRef.current = onchainStandingAddress;
     paymentLog.info('receive.onchain.rotate_requested', {
       source: 'deposit_detected',
       addressLength: onchainStandingAddress.length,
     });
-    void rotate('deposit_received');
-  }, [onchainStandingAddress, depositObserved, rotate]);
+    void rotate('deposit_received').then((rotated) => {
+      if (!rotated && rotatedForAddressRef.current === onchainStandingAddress) {
+        rotatedForAddressRef.current = null;
+      }
+    });
+  }, [onchainStandingAddress, depositObserved, mempoolReport, rotate]);
 
   // "View all": push the rail's list into this same (receive-flow) stack so a
   // paid onchain address can open its deposit transaction to the side. The list

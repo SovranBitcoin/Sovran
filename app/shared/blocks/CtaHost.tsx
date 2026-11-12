@@ -3,14 +3,16 @@ import { AppState } from 'react-native';
 import { useRootNavigationState } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as Application from 'expo-application';
-import { useColadaBalance } from 'wallet/react';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
+import { useHoldsMoney } from '@/shared/lib/cta/useHoldsMoney';
+import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 
 export function CtaHost() {
   const navigation = useRootNavigationState();
@@ -22,7 +24,7 @@ export function CtaHost() {
     (s) => s.recoveryPhraseVerifiedRevision
   );
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
-  const balance = useColadaBalance('sat');
+  const holdsMoney = useHoldsMoney();
   const legacyGroups = useLegacyEcashStore((s) => s.groups);
   const accountIndex = useProfileStore((s) => s.activeAccountIndex);
   const dismissed = useCtaStore((s) => s.dismissed);
@@ -31,26 +33,22 @@ export function CtaHost() {
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const previewSeq = useCtaStore((s) => s.previewSeq);
   useLatestVersionFetch(activeId === 'update-required' && previewOverride === null);
-  const [hydrated, setHydrated] = useState(useCtaStore.persist.hasHydrated);
+  const hydrated = useStoreLoadLatched(useCtaStore.persist);
   const [nowMs, setNowMs] = useState(Date.now);
   const observedRoute = useRef(false);
   const automation = __DEV__ && !!process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 
   useEffect(() => {
-    const unsub = useCtaStore.persist.onFinishHydration(() => setHydrated(true));
-    setHydrated(useCtaStore.persist.hasHydrated());
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') setNowMs(Date.now());
     });
-    return () => {
-      unsub();
-      appState.remove();
-    };
+    return () => appState.remove();
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !navigation?.key || restoreStatus === 'pending' || restoreStatus === 'failed')
-      return;
+    // Held while the restore gate shows recovery; the prompts' own rules hold
+    // them only for a pending restore.
+    if (!hydrated || !navigation?.key || isRestoreAsked(restoreStatus)) return;
     const next =
       previewOverride ??
       selectNextCta({
@@ -63,7 +61,7 @@ export function CtaHost() {
           recoveryPhraseVerifiedRevision,
           restoreStatus,
         },
-        balanceTotalSat: balance.total,
+        holdsMoney,
         backupStartedAt,
         oldEcash: legacyClaimPrompt(legacyGroups, accountIndex),
         dismissed,
@@ -108,7 +106,7 @@ export function CtaHost() {
     recoveryPhraseVerifiedAt,
     recoveryPhraseVerifiedRevision,
     restoreStatus,
-    balance.total,
+    holdsMoney,
     backupStartedAt,
     legacyGroups,
     accountIndex,

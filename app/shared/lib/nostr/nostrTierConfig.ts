@@ -5,15 +5,13 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 /**
  * Resolved configuration for the resilient Nostr data layer's three tiers
- * (nagg → Primal cache → raw relays), combining the dev enable/disable toggles
- * (Settings → Developer) with the endpoint config. This is the single seam the
- * facade wiring reads when the read paths are routed through `@sovranbitcoin/
- * nagg-ts` — a disabled tier is simply omitted from the fallback chain, so a
- * developer can simulate "nagg down" / "Primal down" / "relays down".
+ * (nagg → Primal cache → raw relays), combining the enable/disable toggles
+ * (Settings → Network) with the endpoint config. This is the single seam the
+ * facade wiring reads when the read paths are routed through the `nostr`
+ * workspace package — a disabled tier is simply omitted from the fallback
+ * chain, so "nagg down" / "Primal down" / "relays down" can be simulated.
  *
- * It deliberately holds NO reference to the facade itself (only plain config),
- * so it ships safely while the app still resolves nagg-ts to the published
- * registry version that predates the facade.
+ * It deliberately holds NO reference to the facade itself, only plain config.
  */
 export type NostrTierConfig = {
   nagg: { enabled: boolean; appViewBaseUrl: string };

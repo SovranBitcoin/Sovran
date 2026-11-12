@@ -12,7 +12,10 @@ import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { paymentLog, mintUrlLogFields, redactError } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import {
+  fitsNutDropQueue,
+  useNutDropRedeemQueueStore,
+} from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
 /**
@@ -110,13 +113,27 @@ export function useNutDropAutoRedeem(): void {
       }
 
       const tokenHash = meshTokenDedupeKey(token);
-      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenHash, {
+      const entry = {
         token,
         mintUrl: classified.mintUrl,
         amount: classified.amount,
         unit: classified.unit ?? 'sat',
         senderPeerID: event.peerID,
-      });
+      };
+      if (!fitsNutDropQueue(tokenHash, entry)) {
+        // Left for the person to paste by hand, as the message path does: a
+        // nearby peer must not be able to queue an entry an older release's
+        // reader would fail the whole queue on.
+        paymentLog.warn('near_pay.redeem.ignored_over_limit', {
+          tokenHash: tokenHash.slice(0, 12),
+          tokenLength: token.length,
+          mintUrlLength: entry.mintUrl.length,
+          unitLength: entry.unit.length,
+          senderPeerID: event.peerID,
+        });
+        return;
+      }
+      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry);
       paymentLog.info('near_pay.redeem.token_received', {
         tokenHash: tokenHash.slice(0, 12),
         classification: classified.classification,

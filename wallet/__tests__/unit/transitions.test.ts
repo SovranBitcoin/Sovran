@@ -25,14 +25,12 @@
  * Event types tested:
  *
  *   GLOBAL EVENTS (handled from any step):
- *     RESET            → idle (clears all context)
  *     EXECUTE          → varies (parse input → resolve intent → route)
  *     START_SEND_ECASH → enterAmount or selectMint or error
  *     START_RECEIVE_LIGHTNING → enterAmount (destination: mintQuote)
  *     START_RECEIVE    → receiveHub
  *     REQUEST_MINT_SELECTOR → selectMint
  *     REVIEW_MINT      → reviewMint
- *     MINT_TRUSTED     → receiveToken (when reviewToken exists)
  *
  *   STATE-SPECIFIC EVENTS (only handled in their respective step):
  *     AMOUNT_ENTERED   → advances past enterAmount
@@ -47,7 +45,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { PaymentRequest } from '@cashu/cashu-ts';
-import { transition, type TransitionResult } from '../../src/machine/transitions';
+import {
+  transition,
+  type TransitionResult,
+  type Unchanged,
+} from '../../src/machine/transitions';
 import { defaultDetectors } from '../../src/detectors';
 import { parsePaymentInput } from '../../src/parse';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
@@ -72,6 +74,22 @@ function tx(
     getSatsPerUnitMinor?: (unit: string) => number | null;
   }
 ): TransitionResult {
+  const result = txOutcome(step, ctx, event, wallet, opts);
+  if ('kind' in result) throw new Error(`no transition for ${event.type} on ${step}`);
+  return result;
+}
+
+/** Like `tx`, for events that may leave the step unchanged. */
+function txOutcome(
+  step: FlowStep,
+  ctx: FlowContext,
+  event: FlowEvent,
+  wallet: WalletContext = WALLETS.default,
+  opts?: {
+    unit?: string;
+    getSatsPerUnitMinor?: (unit: string) => number | null;
+  }
+): TransitionResult | Unchanged {
   return transition(
     step,
     ctx,
@@ -87,39 +105,6 @@ function tx(
 
 /** The minimal idle context — just the unit. */
 const idle: FlowContext = { unit: UNIT };
-
-// ---------------------------------------------------------------------------
-// RESET — global event
-// ---------------------------------------------------------------------------
-
-/**
- * RESET is the machine's "escape hatch". From ANY step, at ANY time,
- * RESET returns to idle with a clean context. This is critical for:
- *   - User tapping "Cancel" or "Back" during a flow
- *   - The app clearing state when the payment sheet dismisses
- *   - Recovery from stuck states
- *
- * The ONLY context field preserved is `unit` — the currency unit is
- * a session-level setting, not a flow-level one.
- */
-describe('transition — RESET', () => {
-  it('returns to idle from any step', () => {
-    // Start in enterAmount with accumulated context (amount, mintUrl).
-    // RESET should wipe everything and return to idle.
-    const result = tx('enterAmount', { ...idle, amount: 100, mintUrl: MINT1 }, { type: 'RESET' });
-    expect(result.step).toBe('idle');
-    // Amount from the previous flow should be gone
-    expect(result.context.amount).toBeUndefined();
-  });
-
-  it('clears the context', () => {
-    // Even complex context fields like `parsed` (the parsed input) should
-    // be wiped. Only `unit` survives a RESET.
-    const result = tx('error', { ...idle, parsed: {} as any }, { type: 'RESET' });
-    expect(result.context.parsed).toBeUndefined();
-    expect(result.context.unit).toBe(UNIT);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // EXECUTE — global event
@@ -536,22 +521,23 @@ describe('transition — event gating', () => {
     // A stray/double-fired proofs callback mid-flow must not supersede the
     // current step (previously it dereferenced ctx.mintUrl! and forced a
     // bogus confirmSend/error state).
-    const result = tx(
+    const result = txOutcome(
       'enterAmount',
       { ...idle },
       { type: 'PROOFS_CHOSEN', amount: 100 }
     );
-    expect(result.step).toBe('enterAmount');
+    expect(result).toEqual({ kind: 'unchanged' });
   });
 
   it('ignores SEND_MEMO_SUBMITTED outside the enterSendMemo step', () => {
-    const result = tx(
+    const ctx: FlowContext = { ...idle, amount: 100, mintUrl: MINT1 };
+    const result = txOutcome(
       'enterAmount',
-      { ...idle, amount: 100, mintUrl: MINT1 },
+      ctx,
       { type: 'SEND_MEMO_SUBMITTED', memo: 'hello' }
     );
-    expect(result.step).toBe('enterAmount');
-    expect(result.context.memo).toBeUndefined();
+    expect(result).toEqual({ kind: 'unchanged' });
+    expect(ctx.memo).toBeUndefined();
   });
 
   it('keeps the full constraint set on the AMOUNT_ENTERED unit-mismatch recovery', () => {
@@ -886,10 +872,8 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
 /**
  * REVIEW_MINT is triggered when the user receives a cashu token from an
  * untrusted mint. Before redeeming, the user must review and trust the
- * mint. The machine parks at reviewMint until the user decides.
- *
- * The reviewToken is stored in context so that after trusting, the machine
- * can continue to receiveToken with the original token.
+ * mint (on the mint page). The machine parks at reviewMint with the mint and
+ * the token as step data.
  */
 describe('transition — REVIEW_MINT', () => {
   it('routes to reviewMint step', () => {
@@ -899,35 +883,7 @@ describe('transition — REVIEW_MINT', () => {
       token: 'cashuAtest',
     });
     expect(result.step).toBe('reviewMint');
-    // The token is saved so we can resume after trusting
-    expect(result.context.reviewToken).toBe('cashuAtest');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// MINT_TRUSTED — global event
-// ---------------------------------------------------------------------------
-
-/**
- * MINT_TRUSTED fires after the user approves the untrusted mint in the
- * review screen. If a reviewToken exists in context, the machine continues
- * to receiveToken to redeem it. If no reviewToken (shouldn't happen in
- * normal flow), the machine stays on reviewMint.
- */
-describe('transition — MINT_TRUSTED', () => {
-  it('routes to receiveToken when reviewToken exists', () => {
-    const ctx: FlowContext = { ...idle, reviewToken: 'cashuAtest' };
-    const result = tx('reviewMint', ctx, { type: 'MINT_TRUSTED' });
-    expect(result.step).toBe('receiveToken');
-    // reviewToken is consumed — cleared from context
-    expect(result.context.reviewToken).toBeUndefined();
-  });
-
-  it('stays on current step when no reviewToken', () => {
-    // Edge case: MINT_TRUSTED without a reviewToken. The machine has
-    // nothing to continue with, so it stays on reviewMint.
-    const result = tx('reviewMint', idle, { type: 'MINT_TRUSTED' });
-    expect(result.step).toBe('reviewMint');
+    expect(result.data).toEqual({ mintUrl: MINT1, token: 'cashuAtest' });
   });
 });
 
@@ -1688,10 +1644,9 @@ describe('transition — OPTION_CHOSEN', () => {
 describe('transition — unhandled events', () => {
   it('returns current state for CONFIRM_MELT in transition (handled by createMachine)', () => {
     const ctx: FlowContext = { ...idle, mintUrl: MINT1 };
-    const result = tx('navigateToMeltPreview', ctx, { type: 'CONFIRM_MELT' });
-    // Same step, same context — event was not handled at this level
-    expect(result.step).toBe('navigateToMeltPreview');
-    expect(result.context).toBe(ctx);
+    const result = txOutcome('navigateToMeltPreview', ctx, { type: 'CONFIRM_MELT' });
+    // Not handled at this level: step, data and context stay as they are
+    expect(result).toEqual({ kind: 'unchanged' });
   });
 });
 
@@ -1720,13 +1675,12 @@ describe('payment-request mint preference transitions', () => {
     expect(result.step).toBe('selectMint');
     expect(result.context.supportedMintUrls).toBeUndefined();
   });
-  it('clears preferred ranking on option change and RESET', () => {
+  it('clears preferred ranking on option change', () => {
     const current = tx('idle', idle, { type: 'EXECUTE', input: request(true) }, wallet);
     const strictOption = parsePaymentInput(request(false), defaultDetectors).options[0];
     const changed = tx('chooseOption', current.context, { type: 'OPTION_CHOSEN', option: strictOption }, wallet);
     expect(changed.context.preferredMintUrls).toBeUndefined();
     expect(changed.context.supportedMintUrls).toEqual([MINT1]);
-    expect(tx(current.step, current.context, { type: 'RESET' }, wallet).context.preferredMintUrls).toBeUndefined();
   });
 });
 

@@ -1,12 +1,12 @@
 {
   "version": 1,
   "renderer": "composition-v1",
-  "appSourceFingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+  "appSourceFingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
   "outputs": {
     "social/og.png": {
       "recipeSha256": "d302ec8ca6f7ae072338314bf11df98244728feed738cec1b0ef241ec7dacaa6",
-      "sourceSha256": "7f3a332b43053741d4f096169f7299fc3cf3616d6da2bb6a3d1bf2ae30efe7b4",
-      "sha256": "b3caa84864220930e9f03458a1f97c180d83c61f05077e0ffe8f8076f1a6e6e6",
+      "sourceSha256": "d250ae496616088c123590cfd27c2ee753502e17ec3331434d79c0cb95ce794d",
+      "sha256": "5f26d8077feab50143832ee8832e9c50fcd8758916a018d027a0e1b191ea6d4b",
       "provenance": {
         "version": 1,
         "recipe": {
@@ -37,72 +37,72 @@
           "lockup": "wordmark",
           "scale": 1
         },
-        "appSourceFingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+        "appSourceFingerprint": "ee6f95d53c7427bb76f8bfd470d0b6b32f7424cf8e8cfe53755708bfc64aa96e",
         "captures": [
           {
             "captureId": "ios/feed",
             "canonicalId": "ios/feed",
             "source": "library",
-            "sha256": "daa675594625e774d094b79a6ee6f8c78ef054e84080234a2880d77ec18b8dcc",
+            "sha256": "868c6af788011549dd009d59f52965d86f4ea8890fd3da5d4a604a77d52b18ca",
             "freshness": "current",
             "evidenceClass": "native-fixture",
             "captureEvidence": {
               "scenario": "marketing.screenshots",
               "occurrence": 1,
               "stepId": "T32",
-              "sourceFingerprint": "9c19f9a18651a923bfead69156d136d0004dc9679ab013aaa2755fed842852f0",
-              "recipeSha256": "838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2",
-              "manifestSha256": "3e027e65134320fb4c5345b27edf785bc69ca60e4e8c3675129a29614fcca29c",
-              "eventsSha256": "932a015a29b9e48dacb69d185d85b6e8753ccc83575e160d5dbf65a6dcb677a0",
-              "originalSha256": "6ba6a8b8d39740bd1a71bc103e5d69795df972384ba0594277a795b9f7ed9697",
-              "sessionSha256": "f9773db15782f6f46db07efc4e324206d5e0eace8dac69433cb665e4313ffee5"
+              "sourceFingerprint": "8a3f1fa1cc9d0ce7fdac6b6f99c582a2e3ee86ff27338274a1522588c68fd3ea",
+              "recipeSha256": "56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6",
+              "manifestSha256": "3c7e49c22c9f5a6ea7fcb08b666733dc08976f71858efba1208fbd108f1e0286",
+              "eventsSha256": "11b079aa089bdea4e33499660af70d0f441431c9df8563453036b45788cfbf68",
+              "originalSha256": "7db86b21fdd4e828c6306b1bd06072efd21ade6dbfc1066052accd78db5a4e78",
+              "sessionSha256": "1c3409882a0898b94dcacf96d3ebeb22ac85be91bbb89b40d5dabc44a8bbf683"
             },
             "functionalResult": "not-established",
             "publicationEligibility": "eligible",
             "publicationReview": "not-established",
             "frameId": "iphone-17-pro-max",
-            "capturedAt": "2026-09-25T22:46:38.848Z",
-            "run": "2026-09-25T22-41-50-980Z-50222993",
+            "capturedAt": "2026-11-12T02:16:49.412Z",
+            "run": "2026-11-12T02-11-40-025Z-902ef0bc",
             "nativeBuild": {
-              "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+              "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
               "appVersion": "0.1.3",
               "buildNumber": "1",
-              "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-              "builtAt": "2026-09-25T15:26:45.855Z",
-              "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+              "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+              "builtAt": "2026-11-12T01:57:25.941Z",
+              "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
             }
           },
           {
             "captureId": "ios/wallet",
             "canonicalId": "ios/wallet",
             "source": "library",
-            "sha256": "67c771028ef659e6b00e13cfc300b0c2063ee6fb392b3d10851fa770344efbea",
+            "sha256": "1fa9abca0b6a8e78dc6a41c3de333badcf32ee70218c1a54341ba9dcb2ba5731",
             "freshness": "current",
             "evidenceClass": "native-fixture",
             "captureEvidence": {
               "scenario": "store.screenshots",
               "occurrence": 1,
               "stepId": "T01",
-              "sourceFingerprint": "b76feb3a5f2c724f53735b2c5e83e6ca8338fb4e5c438281034a2ec2c8e20a7a",
-              "recipeSha256": "d2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85",
-              "manifestSha256": "0a26baac554d69c6374b484cdc1978efbb8b0b53bc8e28c916291167c0c4e307",
-              "eventsSha256": "0a79e511644845146342d216cc58d1be3b8d28a2b5fdb1504a8920b5b0861776",
-              "originalSha256": "e1a455602b35d1334787472e340c72840fc9d26925dc7dec3055c297b3d5d3cd",
-              "sessionSha256": "a5204134410791edab8fe64525bb9df50463489bf4a0c86d34fff22b90a2698d"
+              "sourceFingerprint": "f478d6df5d9ba168f6adfd7f80c7698603fd985aab598a5cad9c472e3a603133",
+              "recipeSha256": "a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880",
+              "manifestSha256": "a29172ef00eb400c9d682fc620963481e35247dec0bddadbff1a0484c13f35ff",
+              "eventsSha256": "60a87b9d6c8c1c3bb208aa9b18e0d561448f00d2cdd1a6fd68d0c08b997c981b",
+              "originalSha256": "2f3ccbb50c72379ecca06bb2744f85df47fa18042529c63a3482a243eb2feee8",
+              "sessionSha256": "1bc42a95cf4898c1c8678739c67f37dfb54306aa5f801fa014dcac0602d4bce3"
             },
             "functionalResult": "not-established",
             "publicationEligibility": "eligible",
             "publicationReview": "not-established",
             "frameId": "iphone-17-pro-max",
-            "capturedAt": "2026-09-25T15:29:51.532Z",
-            "run": "2026-09-25T15-27-08-329Z-971c09a2",
+            "capturedAt": "2026-11-12T02:29:26.636Z",
+            "run": "2026-11-12T02-26-40-784Z-41a69cc9",
             "nativeBuild": {
-              "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
+              "fingerprint": "d51602077f110915e1aec6936856ed12d907da93",
               "appVersion": "0.1.3",
               "buildNumber": "1",
-              "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
-              "builtAt": "2026-09-25T15:26:45.855Z",
-              "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
+              "gitSha": "27c4c586e9aee26aab2ade4b5ad11a3539a06d8b",
+              "builtAt": "2026-11-12T01:57:25.941Z",
+              "artifactSha256": "4704571dbf1184d0629768a085b1fd7097af00f174fd67446bab5c4a7f79b683"
             }
           }
         ]
@@ -110,6 +110,6 @@
     }
   },
   "images": {
-    "og.png": "b3caa84864220930e9f03458a1f97c180d83c61f05077e0ffe8f8076f1a6e6e6"
+    "og.png": "5f26d8077feab50143832ee8832e9c50fcd8758916a018d027a0e1b191ea6d4b"
   }
 }

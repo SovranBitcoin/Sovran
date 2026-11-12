@@ -27,16 +27,26 @@ interface RelayListState {
   /** True once a `kind:10002` has been published for this profile. */
   hasPublished: boolean;
   source: RelayListSource;
+  /**
+   * In memory only, never saved: the account whose relay list this session's
+   * sync has discovered, by finding it or by the relays answering there is
+   * none (the defaults are then its real list). A saved list may be stale.
+   */
+  discoveredFor: string | null;
 }
 
 interface RelayListActions {
   /** Ingest a relay list parsed from a relay event (last-writer-wins). */
   setFromRelay: (entries: RelayListEntry[], createdAtSec: number) => void;
-  addRelay: (url: string, marker: { read: boolean; write: boolean }) => void;
+  /** Add or update a relay. False, and nothing changed, when it is a new one and the list is full. */
+  addRelay: (url: string, marker: { read: boolean; write: boolean }) => boolean;
   removeRelay: (url: string) => void;
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
-  markPublished: (createdAtSec: number) => void;
+  /** A list dated `createdAtSec` holding `entries` was accepted by a relay: it is the saved list. */
+  markPublished: (createdAtSec: number, entries: RelayListEntry[]) => void;
+  /** This session's sync has the relays' answer about `pubkey`'s relay list. */
+  markDiscovered: (pubkey: string) => void;
 }
 
 type RelayListStore = RelayListState & RelayListActions;
@@ -47,8 +57,16 @@ const entrySchema = z.object({
   write: z.boolean(),
 });
 
+/**
+ * A new relay is refused once the list holds this many. Held by `addRelay`
+ * and `setMarker` only: 0.1.3 appended with no cap, so a saved list may be
+ * longer, and the reader takes it whole (a limit there would discard the
+ * whole configuration). A list from a relay is taken whole too.
+ */
+export const MAX_RELAYS = 64;
+
 const PersistedRelayListStore = z.object({
-  entries: z.array(entrySchema).max(64).default([]),
+  entries: z.array(entrySchema).default([]),
   updatedAt: z.number().default(0),
   hasPublished: z.boolean().default(false),
   // `.catch('default')`: unknown provenance degrades to "unpinned" — the
@@ -58,8 +76,24 @@ const PersistedRelayListStore = z.object({
   source: z.enum(['default', 'relay', 'local']).default('default').catch('default'),
 });
 
-function defaultEntries(): RelayListEntry[] {
+export function defaultEntries(): RelayListEntry[] {
   return DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true }));
+}
+
+/**
+ * The list an edit starts from. An empty list the person did not empty
+ * themselves is the defaults, which is what this app writes to
+ * (`getOwnWriteRelays`): adding one relay to it keeps them.
+ */
+function editable(state: RelayListState): RelayListEntry[] {
+  return state.entries.length === 0 && state.source !== 'local' ? defaultEntries() : state.entries;
+}
+
+/** Whether writing `url` would add a new relay to a list already holding `MAX_RELAYS`. */
+function wouldOverfill(entries: readonly RelayListEntry[], url: string): boolean {
+  if (entries.length < MAX_RELAYS) return false;
+  const normalized = safeNormalizeRelay(url);
+  return normalized !== null && !entries.some((e) => e.url === normalized);
 }
 
 function upsert(
@@ -86,6 +120,7 @@ export const useRelayListStore = create<RelayListStore>({
       updatedAt: 0,
       hasPublished: false,
       source: 'default',
+      discoveredFor: null,
 
       setFromRelay: (entries, createdAtSec) => {
         // Last-writer-wins: ignore an older or equal list than what we hold.
@@ -95,16 +130,22 @@ export const useRelayListStore = create<RelayListStore>({
       },
 
       addRelay: (url, marker) => {
-        set({ entries: upsert(get().entries, url, marker), source: 'local' });
+        if (wouldOverfill(editable(get()), url)) {
+          storeLog.warn('nostr.relays.add_at_capacity', { max: MAX_RELAYS });
+          return false;
+        }
+        set({ entries: upsert(editable(get()), url, marker), source: 'local' });
+        return true;
       },
 
       removeRelay: (url) => {
         const normalized = safeNormalizeRelay(url) ?? url;
-        set({ entries: get().entries.filter((e) => e.url !== normalized), source: 'local' });
+        set({ entries: editable(get()).filter((e) => e.url !== normalized), source: 'local' });
       },
 
       setMarker: (url, marker) => {
-        set({ entries: upsert(get().entries, url, marker), source: 'local' });
+        if (wouldOverfill(editable(get()), url)) return;
+        set({ entries: upsert(editable(get()), url, marker), source: 'local' });
       },
 
       restoreDefaults: () => {
@@ -112,8 +153,12 @@ export const useRelayListStore = create<RelayListStore>({
         set({ entries: defaultEntries(), source: 'local' });
       },
 
-      markPublished: (createdAtSec) => {
-        set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
+      markPublished: (createdAtSec, entries) => {
+        set({ entries, updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
+      },
+
+      markDiscovered: (pubkey) => {
+        set({ discoveredFor: pubkey });
       },
     }),
     persistConfig({
@@ -139,4 +184,15 @@ export function getOwnWriteRelays(): string[] {
   const { entries } = useRelayListStore.getState();
   const write = entries.filter((e) => e.write).map((e) => e.url);
   return write.length > 0 ? write : [...DEFAULT_RELAYS];
+}
+
+/**
+ * `getOwnWriteRelays` once this session's sync has discovered the account's
+ * relay list, otherwise `null`. A list saved by an earlier session is not
+ * enough: the account may have moved to other relays since, and a store that
+ * has not loaded reads as the defaults; either may not be where its lists are.
+ */
+export function getKnownOwnWriteRelays(pubkey: string): string[] | null {
+  if (!useRelayListStore.persist.hasHydrated()) return null;
+  return useRelayListStore.getState().discoveredFor === pubkey ? getOwnWriteRelays() : null;
 }

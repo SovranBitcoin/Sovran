@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager } from 'react-native';
 import { facade } from 'nostr';
-import type { NostrTier } from '@sovranbitcoin/schemas';
 
 import type {
   FeedEvent,
@@ -16,6 +15,7 @@ import type {
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { consumeThreadSeed, peekThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
 import {
   bucketsFromThreadResult,
   buildThreadItemsFromResult,
@@ -51,7 +51,7 @@ function ownContentSeed(
 }
 
 /**
- * First-frame seed projected from the shared nagg-ts entity cache (populated by
+ * First-frame seed projected from the shared `nostr` entity cache (populated by
  * every feed/notifications read). When the tapped note was already seen, this
  * paints the post + its cached ancestor chain + author profiles/metrics with NO
  * network. It carries the post + its cached ancestor chain + cached direct reply
@@ -71,12 +71,7 @@ function cachedThreadSeed(eventId: string): ThreadSeedBuckets | undefined {
 
   const metrics = new Map<string, NoteMetrics>();
   for (const [id, stats] of Object.entries(view.stats)) {
-    metrics.set(id, {
-      likeCount: stats.likes,
-      repostCount: stats.reposts,
-      replyCount: stats.replies,
-      satsZapped: stats.satsZapped,
-    });
+    metrics.set(id, noteMetricsFromStats(stats));
   }
 
   return {
@@ -158,7 +153,6 @@ export function useThread(eventId: string): UseThreadResult {
   const replyOffsetRef = useRef(0);
   const hasMoreRepliesRef = useRef(false);
   const knownReplyIdsRef = useRef<Set<string>>(new Set());
-  const primaryTierRef = useRef<NostrTier | null>(null);
   const spamAuditStartedRef = useRef(false);
   /** The full ordered reply STACK from the source (nagg manifest or local
    *  sort) — load-more pages this from memory, never the network. */
@@ -190,7 +184,6 @@ export function useThread(eventId: string): UseThreadResult {
       mergeIntoRef(quotedEventsRef, result.quotedEvents);
 
       if (source === 'initial') {
-        primaryTierRef.current = result.tier;
         allSortedReplyIdsRef.current = result.allSortedReplyIds ?? null;
       } else if (result.allSortedReplyIds) {
         // A network continuation (stack exhausted, server had more): extend
@@ -303,7 +296,6 @@ export function useThread(eventId: string): UseThreadResult {
     threadSeedRef.current = null;
     hasMoreRepliesRef.current = false;
     knownReplyIdsRef.current = new Set();
-    primaryTierRef.current = null;
     spamAuditStartedRef.current = false;
     allSortedReplyIdsRef.current = null;
     setSpamReplies([]);
@@ -519,12 +511,7 @@ async function runSpamAuditImpl(
     );
     const metrics = new Map<string, NoteMetrics>();
     for (const [id, s] of Object.entries(audit.stats)) {
-      metrics.set(id, {
-        likeCount: s.likes,
-        repostCount: s.reposts,
-        replyCount: s.replies,
-        satsZapped: s.satsZapped,
-      });
+      metrics.set(id, noteMetricsFromStats(s));
     }
     mergeIntoRef(profilesRef, profiles);
     mergeIntoRef(metricsRef, metrics);

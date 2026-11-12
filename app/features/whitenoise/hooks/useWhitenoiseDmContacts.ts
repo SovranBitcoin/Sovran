@@ -12,10 +12,7 @@ import { wnLog } from '@/shared/lib/logger';
  * Refreshes when the InviteReader signals an `inviteRead` event (i.e.
  * accept/decline finished), which is when the index could have changed.
  */
-export function useWhitenoiseDmContacts(): {
-  entries: WhitenoiseDmIndexEntry[];
-  refresh: () => Promise<void>;
-} {
+export function useWhitenoiseDmContacts(): { entries: WhitenoiseDmIndexEntry[] } {
   const { inviteReader, accountIndex } = useWhitenoise();
   const [entries, setEntries] = useState<WhitenoiseDmIndexEntry[]>([]);
   const index = useMemo(() => new WhitenoiseDmIndex(accountIndex), [accountIndex]);
@@ -41,5 +38,5 @@ export function useWhitenoiseDmContacts(): {
     };
   }, [inviteReader, refresh]);
 
-  return { entries, refresh };
+  return { entries };
 }

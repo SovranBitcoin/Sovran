@@ -285,11 +285,6 @@ const STATIC_POPUPS = {
     icon: 'icon:fluent:wallet-20-filled',
     type: 'info',
   },
-  'routstr-transaction-failed': {
-    message: 'AI transaction failed',
-    icon: 'icon:mdi:alert-circle',
-    type: 'error',
-  },
 
   // qr
   'no-qr-code-found': {
@@ -374,18 +369,6 @@ const PARAM_POPUPS = {
   'ai-provider-switched': (p: { providerName: string }): PopupSpec => ({
     message: `Now using ${p.providerName}`,
     icon: 'icon:humbleicons:url',
-    type: 'success',
-  }),
-
-  'routstr-top-up-success': (p: { balance: string }): PopupSpec => ({
-    message: `Balance topped up! New balance: ${p.balance}`,
-    icon: WALLET_ICON,
-    type: 'success',
-  }),
-
-  'routstr-wallet-created': (p: { balance: string }): PopupSpec => ({
-    message: `Wallet created! Balance: ${p.balance}`,
-    icon: WALLET_ICON,
     type: 'success',
   }),
 

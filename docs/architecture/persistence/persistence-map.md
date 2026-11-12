@@ -2,7 +2,7 @@
 
 Every durable thing a Sovran build has written, by epoch, and what the 0.1.4 candidate
 (`5651d4720`) does with it on the first launch after an upgrade. Second artifact of the
-[persistence release safety](../../../.agents/skills/persistence-release-safety/SKILL.md)
+[persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
 procedure.
 
 Built 2026-10-10 from `surface.sh` run on every store build's commit
@@ -179,3 +179,49 @@ candidate's Coco. `cocoVersionsDocumented.test.ts` fails when a database is adde
 **Manifest/lock discrepancy:** the early 0.0.51 manifest and committed lock disagree. The table reports the lock resolution, not proof of the library bundled in a released binary.
 
 **Nostr cache:** 0.0.58–0.0.61 still used one database, **`nostr`**, rather than `nostr-i`. Account-indexed names appear by 0.0.62 and persist at HEAD. `providers/NostrNDKProvider.tsx:8@59a27ff7a`; `:9@a838d5bc3`; `shared/providers/NostrNDKProvider.tsx:32@19388f0e3`; `app/shared/providers/NostrNDKProvider.tsx:156–165@HEAD`.
+
+## Corrections and additions, 2026-11-10
+
+Found by a survey of `main` at `e5d70b590` (latest release still 0.1.3). The tables above are left as written on
+2026-10-10; where they disagree with this section, this section is right. The surveys are in
+`.surgery/pass-1/surveys/`.
+
+**Cells that say "NO TEST".** The release fixtures were built after this map. Every persisted store a release wrote is
+now held by a fixture from its first epoch with a fact read back after the upgrade (`T/releaseFixtures.test.ts`), so
+those cells are stale for the store rows. What still has no test is listed in the rows below and in F198.
+
+**Cells that are wrong now.**
+
+| Row | What is true now |
+| --- | --- |
+| `nip46-pending-pairing` | Not read. Since `67e38b085` the pairing intent is in SecureStore under `nip46_pending_pairing` (`{uri,targetPubkey,targetAccountIndex,createdAt,expiresAt}`, ten-minute life, no version). A plaintext row left by 0.1.1 to 0.1.3 is removed and never handed out, on purpose: `T/nip46PairingIntentStorage.test.ts`, "is removed on the next take and never handed out" |
+| Redux rows (E1–E14), "No reader", "Ignored, left on disk" | The phrase in the row is adopted (`L/nostr/reduxEraRoot.ts`), its ecash is claimed and the row is then removed (`L/cashu/legacyEcashClaim.ts`, ADR 32) |
+| `legacy-ecash-store`, "E21" | There is no E21. The store is unreleased and is held by the E20 fixture |
+| Query caches, "E20" | `own-profile-stats-cache` was written from 0.1.1 and `mint-changes-cache` from 0.1.2; only `mint-discover-cache` is new |
+| `send-reachability-store` "E17+" with evidence at 0.1.1; `npc_since` "E18+" | Both are in 0.1.0 (E17) |
+| `migrations_complete` (bare) | No writer was found in any epoch; the constant remains for deletion only |
+
+**Rows that were missing.**
+
+| Epoch | Item | Released shape evidence | Reader at `e5d70b590` | Outcome | Test |
+| --- | --- | --- | --- | --- | --- |
+| E19+ | `SQLite/coco*.db.pre-v2`, `-wal`, `-shm`: a copy of the wallet database made once before Coco 2 migrates it; holds spendable proofs | `app/shared/lib/cashu/manager.ts:146@d9ad12c4b` | `L/cashu/manager.ts:489` | Written once; an existing copy is skipped; nothing restores from it automatically | `T/cocoBackupLifecycle.test.ts`; `T/cocoDatabaseUpgrade.test.ts`, "keeps a copy of a pre-v2 database" |
+| E17+ | iOS keychain `sovran_<sha256(scope)>_noiseStaticKey`, `…_ed25519SigningKey`, service `<service>.sovran.<hash>`: BitChat identity, derived from the account key | `app/modules/bitchat-module/ios/ProfileScopedBitchatKeychain.swift:21@d9ad12c4b` | Same file, unchanged | Matching bytes kept; otherwise written again from the account key | **NO TEST** on a device (F198) |
+| E17+ | Android encrypted preferences `sovran_<hash>_bitchat_identity`, `sovran_<hash>_bitchat_crypto_secure` | `app/modules/bitchat-module/android/…/BitchatIdentityInstaller.kt:90@d9ad12c4b` | Same file, unchanged | A file the system reports corrupt is deleted and made again | **NO TEST** on a device (F198) |
+| E17+ | BitChat peer summaries: iOS UserDefaults `bitchat.dmPeerSummaries.<scope>`; Android preferences `sovran_<hash>_bitchat_dm_summaries`. `{peerID,nickname,lastTimestamp}`, no version | `BitChatBLEBridge.swift:178@d9ad12c4b` | `BitChatBLEBridge.swift:190`; `BitChatBLEBridge.kt:579` | Read as written; unreadable means empty | **NO TEST** (F198) |
+| E17+ | BitChat vendor storage (favorites, fingerprints, seen-message caches) | Vendor submodules are not in this checkout | Unknown | **Not inventoried** | **NO TEST** (F198) |
+| unreleased | `profile-store` rows gain `walletDatabaseCreated`, `walletPhraseFingerprint`; `swap-transactions-store` groups gain `mintOperationId` | none | `G/profileStore.ts:131`, `:134`; `P/swapTransactionsStore.ts:162` | Optional; absent on every released row | E20 fixture facts; `T/walletDatabaseLost.test.ts`, `T/profileWalletPhraseFingerprint.test.ts` |
+| unreleased | `<name>:unreadable[:profile:<pubkey>]`: the bytes of a store its reader rejected | none | `L/persist/preserveUnreadable.ts:63` | Written before defaults are saved; nothing reads it back (F72) | `T/persistUnreadableGuard.test.ts`; `T/releasedWriterBounds.test.ts` |
+| unreleased | `document/e2e/runner.json`: test-runner connection note | none | `L/loggerRunnerLink.ts:23` | Harness only | none needed |
+
+**The Nostr cache.** `SQLite/nostr`, `nostr-<i>` is owned by `@nostr-dev-kit/ndk-mobile` (0.2.2 since 0.0.58), which
+keeps its own `PRAGMA user_version`. `T/persistenceSurface.test.ts` now pins that library's version. No test opens an
+old cache file.
+
+**Limits that a release's own writer could exceed.** Nine stores load as defaults when one saved value is over the
+reader's limit, in 0.1.0 to 0.1.3 and today: `T/releasedWriterBounds.test.ts`, F191, F192. The redeem queue now reads
+every token a release saved, and merges back a queue an earlier build set aside (`T/nutDropRedeemQueueRecovery.test.ts`).
+
+**What 0.1.3 and this build do not read of each other's messages** is in `.surgery/pass-1/surveys/wire-formats.md`:
+F193 (a 0.1.3 payment to a re-encoded Nostr payment request after a restart), F199 (Nut Drop).
+Tokens 0.1.3 copied as an emoji now paste.

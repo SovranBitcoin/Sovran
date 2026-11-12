@@ -110,6 +110,43 @@ function narrowDisplayMints(
   return mints;
 }
 
+// Every display encoding this wallet produced, by the Coco operation's own
+// encodedRequest it was derived from. A payer on 0.1.3 sends the whole encoded
+// request it scanned as the payload id, so the receive transport needs to know,
+// byte for byte, which strings this wallet handed out for which operation.
+// Kept for the app session; a screen showing a request again re-records it.
+const handedOut = new Map<string, Set<string>>();
+let handedOutVersion = 0;
+
+function recordHandedOut(
+  source: string,
+  encodings: { encodedRequest: string; encodedRequestB: string },
+): void {
+  let known = handedOut.get(source);
+  if (!known) {
+    known = new Set();
+    handedOut.set(source, known);
+  }
+  for (const encoding of [encodings.encodedRequest, encodings.encodedRequestB]) {
+    if (known.has(encoding)) continue;
+    known.add(encoding);
+    handedOutVersion += 1;
+  }
+}
+
+/** The display encodings this wallet produced from a Coco operation's
+ *  `encodedRequest` in this app session (not including that string itself). */
+export function paymentRequestEncodingsHandedOut(
+  encodedRequest: string,
+): ReadonlySet<string> | undefined {
+  return handedOut.get(encodedRequest);
+}
+
+/** Grows whenever a display encoding not seen before is handed out. */
+export function paymentRequestEncodingsVersion(): number {
+  return handedOutVersion;
+}
+
 /** Encode a PaymentRequest to both creqA and (best-effort) creqB. */
 function encodeDisplay(display: PaymentRequest): {
   encodedRequest: string;
@@ -155,7 +192,9 @@ function toAmountlessEncodings(
       : undefined,
     mintsPreferred ?? decoded.mintsPreferred,
   );
-  return encodeDisplay(display);
+  const encodings = encodeDisplay(display);
+  recordHandedOut(encodedRequest, encodings);
+  return encodings;
 }
 
 export interface SingleUseReencodeOptions {
@@ -180,7 +219,8 @@ export interface SingleUseReencodeOptions {
  * Re-encode a SINGLE-USE incoming request ("as Ecash") for display, KEEPING its
  * amount and `singleUse` flag (unlike the amountless standing rail) while
  * optionally narrowing the advertised mints and attaching a NUT-10 P2PK lock.
- * Pure — the durable coco op is untouched; only the displayed creq changes.
+ * The durable coco op is untouched; only the displayed creq changes. The
+ * result is recorded as handed out for that op (see `recordHandedOut`).
  */
 export function reencodeSingleUsePaymentRequest(
   encodedRequest: string,
@@ -200,7 +240,9 @@ export function reencodeSingleUsePaymentRequest(
       : undefined,
     options.mintsPreferred ?? decoded.mintsPreferred,
   );
-  return encodeDisplay(display);
+  const encodings = encodeDisplay(display);
+  recordHandedOut(encodedRequest, encodings);
+  return encodings;
 }
 
 type IncomingOp = Awaited<

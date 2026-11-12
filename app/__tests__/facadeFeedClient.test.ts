@@ -11,14 +11,7 @@ jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: j
 jest.mock('@/shared/lib/logger', () => ({ feedLog: { info: jest.fn(), warn: jest.fn() } }));
 
 const spec = JSON.stringify({ kind: 'notes', id: 'for-you' });
-const fallback: Omit<FeedClient, 'getThread'> = {
-  getFeed: jest.fn(async () => emptyFeedParseResult()),
-  getUserFeed: jest.fn(async () => emptyFeedParseResult()),
-  getPostsByPubkeys: jest.fn(async () => emptyFeedParseResult()),
-  getNotifications: jest.fn(),
-  enrich: jest.fn(async () => ({})),
-  dispose: jest.fn(),
-};
+const fallback: Pick<FeedClient, 'enrich'> = { enrich: jest.fn(async () => ({})) };
 
 it('reuses a pager across pages, resets on page zero/refresh and disposes', async () => {
   const pager: facade.FeedPager = {

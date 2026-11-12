@@ -8,13 +8,14 @@
  * 'Reading' when a tag connects, and keep listening until the sheet goes away
  * (success closes it, an error popup replaces it, the user closes it). Like
  * Minibits and the native Cashu wallet, a quiet read timeout re-arms rather
- * than ending the session. Closing the sheet cancels the read only before any
- * ecash is created — cancelling mid-write could spend without delivering.
+ * than ending the session. Closing the sheet cancels the read only while the
+ * tag is not read yet: after a read the payment machine needs the session to
+ * write the ecash back, and ends it itself.
  */
 
 import { Platform } from 'react-native';
 
-import { releaseSession, setNfcTagConnectedListener } from '@/shared/lib/nfc';
+import { holdNfcReader, nfcReader, releaseSession } from '@/shared/lib/nfc';
 import { showActionSheet } from '@/shared/lib/popup';
 import { paymentLog } from '@/shared/lib/logger';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -32,22 +33,32 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const tapSheetOpen = () => isTapSheet(usePopupStore.getState().current);
 
+/** Whether the session is the payment machine's, which a closed sheet must leave alone. */
+const sessionIsThePayments = () => {
+  const reader = nfcReader();
+  return reader.holder !== 'idle' && (reader.read || reader.writingBack);
+};
+
 export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): Promise<void> {
   if (Platform.OS !== 'android') {
-    await scan();
+    const releaseReader = holdNfcReader('explicit');
+    try {
+      await scan();
+    } finally {
+      releaseReader();
+    }
     return;
   }
 
-  let listening = true;
   useNfcTapStore.getState().setPhase('armed');
-  setNfcTagConnectedListener(() => {
-    if (listening) useNfcTapStore.getState().setPhase('reading');
-  });
+  const releaseReader = holdNfcReader('explicit', () =>
+    useNfcTapStore.getState().setPhase('reading')
+  );
   const unsubscribePopup = usePopupStore.subscribe((state, prev) => {
-    if (!listening || !isTapSheet(prev.current) || state.current != null) return;
+    if (!isTapSheet(prev.current) || state.current != null) return;
     const { phase } = useNfcTapStore.getState();
     paymentLog.info('send.nfc.tap_sheet_dismissed', { phase });
-    if (phase !== 'creating' && phase !== 'writing') void releaseSession();
+    if (!sessionIsThePayments()) void releaseSession();
   });
   showActionSheet('nfc-tap', {});
 
@@ -59,9 +70,8 @@ export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): P
       await scan();
     }
   } finally {
-    listening = false;
     unsubscribePopup();
-    setNfcTagConnectedListener(null);
+    releaseReader();
     useNfcTapStore.getState().setPhase('armed');
   }
 }

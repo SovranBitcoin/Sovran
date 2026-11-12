@@ -11,140 +11,136 @@
 
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => {
-    type MockHandler = (...args: unknown[]) => void;
+jest.mock('@nostr-dev-kit/ndk-mobile', () => {
+  type MockHandler = (...args: unknown[]) => void;
 
-    class MockEmitter {
-      private handlers = new Map<string, MockHandler[]>();
-      on = (name: string, fn: MockHandler): void => {
-        const list = this.handlers.get(name) ?? [];
-        list.push(fn);
-        this.handlers.set(name, list);
-      };
-      off = (name: string, fn: MockHandler): void => {
-        this.handlers.set(
-          name,
-          (this.handlers.get(name) ?? []).filter((handler) => handler !== fn)
-        );
-      };
-      emit = (name: string, ...args: unknown[]): void => {
-        for (const fn of this.handlers.get(name) ?? []) fn(...args);
-      };
-    }
-
-    class MockSubscription extends MockEmitter {
-      stop = jest.fn();
-      filters: unknown;
-      opts: unknown;
-      constructor(filters: unknown, opts: unknown) {
-        super();
-        this.filters = filters;
-        this.opts = opts;
-      }
-    }
-
-    class MockRelay {
-      connected = true;
-      publish = jest.fn(() => Promise.resolve(true));
-      connect = jest.fn(() => Promise.resolve());
-      disconnect = jest.fn();
-      url: string;
-      authPolicy: unknown;
-      ndk: unknown;
-      constructor(url: string, authPolicy: unknown, ndk: unknown) {
-        this.url = url;
-        this.authPolicy = authPolicy;
-        this.ndk = ndk;
-      }
-    }
-
-    class MockPool {
-      name = '';
-      relays = new Map<string, MockRelay>();
-      addRelay = jest.fn((relay: MockRelay) => {
-        this.relays.set(relay.url, relay);
-      });
-      removeRelay = jest.fn((url: string) => {
-        const relay = this.relays.get(url);
-        if (!relay) return false;
-        relay.disconnect();
-        this.relays.delete(url);
-        return true;
-      });
-    }
-
-    const instances: { ndks: unknown[] } = { ndks: [] };
-
-    class MockNDK {
-      pool = new MockPool();
-      relayAuthDefaultPolicy: unknown;
-      subscriptions: MockSubscription[] = [];
-      subscribe = jest.fn((filters: unknown, opts: unknown) => {
-        const subscription = new MockSubscription(filters, opts);
-        this.subscriptions.push(subscription);
-        return subscription;
-      });
-      opts: unknown;
-      constructor(opts: unknown) {
-        this.opts = opts;
-        instances.ndks.push(this);
-      }
-    }
-
-    class MockUser {
-      pubkey: string;
-      constructor(params: { pubkey: string }) {
-        this.pubkey = params.pubkey;
-      }
-    }
-
-    class MockEvent {
-      kind?: number;
-      content = '';
-      tags: string[][] = [];
-      created_at?: number;
-      sig?: string;
-      sign = jest.fn(async () => {
-        this.sig = 'sig';
-        return 'sig';
-      });
-      ndk: unknown;
-      constructor(ndk: unknown) {
-        this.ndk = ndk;
-      }
-    }
-
-    class MockPrivateKeySigner {}
-
-    const signInPolicy = jest.fn();
-
-    return {
-      __esModule: true,
-      default: MockNDK,
-      NDKEvent: MockEvent,
-      NDKPrivateKeySigner: MockPrivateKeySigner,
-      NDKRelay: MockRelay,
-      NDKRelayAuthPolicies: { signIn: jest.fn(() => signInPolicy), disconnect: jest.fn() },
-      NDKSubscriptionCacheUsage: {
-        ONLY_CACHE: 'ONLY_CACHE',
-        CACHE_FIRST: 'CACHE_FIRST',
-        PARALLEL: 'PARALLEL',
-        ONLY_RELAY: 'ONLY_RELAY',
-      },
-      NDKUser: MockUser,
-      normalizeRelayUrl: jest.fn((url: string) => {
-        const lower = url.toLowerCase();
-        return lower.endsWith('/') ? lower : `${lower}/`;
-      }),
-      __mock: { instances, signInPolicy },
+  class MockEmitter {
+    private handlers = new Map<string, MockHandler[]>();
+    on = (name: string, fn: MockHandler): void => {
+      const list = this.handlers.get(name) ?? [];
+      list.push(fn);
+      this.handlers.set(name, list);
     };
-    // virtual: ndk-mobile ships ESM-only exports that jest-expo/node cannot
-    // resolve; the factory above fully replaces the module surface used here.
-  },
-  { virtual: true }
-);
+    off = (name: string, fn: MockHandler): void => {
+      this.handlers.set(
+        name,
+        (this.handlers.get(name) ?? []).filter((handler) => handler !== fn)
+      );
+    };
+    emit = (name: string, ...args: unknown[]): void => {
+      for (const fn of this.handlers.get(name) ?? []) fn(...args);
+    };
+  }
+
+  class MockSubscription extends MockEmitter {
+    stop = jest.fn();
+    filters: unknown;
+    opts: unknown;
+    constructor(filters: unknown, opts: unknown) {
+      super();
+      this.filters = filters;
+      this.opts = opts;
+    }
+  }
+
+  class MockRelay {
+    connected = true;
+    publish = jest.fn(() => Promise.resolve(true));
+    connect = jest.fn(() => Promise.resolve());
+    disconnect = jest.fn();
+    url: string;
+    authPolicy: unknown;
+    ndk: unknown;
+    constructor(url: string, authPolicy: unknown, ndk: unknown) {
+      this.url = url;
+      this.authPolicy = authPolicy;
+      this.ndk = ndk;
+    }
+  }
+
+  class MockPool {
+    name = '';
+    relays = new Map<string, MockRelay>();
+    addRelay = jest.fn((relay: MockRelay) => {
+      this.relays.set(relay.url, relay);
+    });
+    removeRelay = jest.fn((url: string) => {
+      const relay = this.relays.get(url);
+      if (!relay) return false;
+      relay.disconnect();
+      this.relays.delete(url);
+      return true;
+    });
+  }
+
+  const instances: { ndks: unknown[] } = { ndks: [] };
+
+  class MockNDK {
+    pool = new MockPool();
+    relayAuthDefaultPolicy: unknown;
+    subscriptions: MockSubscription[] = [];
+    subscribe = jest.fn((filters: unknown, opts: unknown) => {
+      const subscription = new MockSubscription(filters, opts);
+      this.subscriptions.push(subscription);
+      return subscription;
+    });
+    opts: unknown;
+    constructor(opts: unknown) {
+      this.opts = opts;
+      instances.ndks.push(this);
+    }
+  }
+
+  class MockUser {
+    pubkey: string;
+    constructor(params: { pubkey: string }) {
+      this.pubkey = params.pubkey;
+    }
+  }
+
+  class MockEvent {
+    kind?: number;
+    content = '';
+    tags: string[][] = [];
+    created_at?: number;
+    sig?: string;
+    sign = jest.fn(async () => {
+      this.sig = 'sig';
+      return 'sig';
+    });
+    ndk: unknown;
+    constructor(ndk: unknown) {
+      this.ndk = ndk;
+    }
+  }
+
+  class MockPrivateKeySigner {}
+
+  const signInPolicy = jest.fn();
+
+  return {
+    __esModule: true,
+    default: MockNDK,
+    NDKEvent: MockEvent,
+    NDKPrivateKeySigner: MockPrivateKeySigner,
+    NDKRelay: MockRelay,
+    NDKRelayAuthPolicies: { signIn: jest.fn(() => signInPolicy), disconnect: jest.fn() },
+    NDKSubscriptionCacheUsage: {
+      ONLY_CACHE: 'ONLY_CACHE',
+      CACHE_FIRST: 'CACHE_FIRST',
+      PARALLEL: 'PARALLEL',
+      ONLY_RELAY: 'ONLY_RELAY',
+    },
+    NDKUser: MockUser,
+    normalizeRelayUrl: jest.fn((url: string) => {
+      const lower = url.toLowerCase();
+      return lower.endsWith('/') ? lower : `${lower}/`;
+    }),
+    __mock: { instances, signInPolicy },
+  };
+  // Mocked: ndk-mobile ships ESM-only exports that jest-expo/node cannot
+  // resolve; the factory above fully replaces the module surface used here.
+});
 
 import type { NDKEvent, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk-mobile';
 

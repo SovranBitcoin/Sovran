@@ -31,14 +31,13 @@ comparing auth modes if a prior request did not return usable change.
    **no Authorization header**. The app uses this mode only when nagg supplies
    `node.authMode: "x-cashu"`; an `sk-` key always remains Bearer.
 5. GET `/v1/wallet/info` with the current Bearer credential. Verify balance units
-   are msats; privately retain any returned `api_key`/change. A returned `sk-` key
-   must never be replaced by a later change-token header.
+   are msats; privately retain any returned `api_key`/change.
 6. Force a 402 using insufficient disposable test credit and a valid model with
    a reservation above that credit. Expect `detail.reason` and
    `detail.amount_required_msat`; `detail.balance_msat` is optional. Verify the
-   app preserves its balance when available balance is omitted, and uses an
-   explicit available value (including zero) when supplied. Older string errors
-   containing required/available mSats remain supported.
+   app's error keeps the required mSats, and the available value (including zero)
+   only when supplied. Older string errors containing required/available mSats
+   remain supported.
 7. Exercise node recovery in a controlled test setup: route-level 404, network
    failure, or 5xx causes an immediate nagg refresh, at most once per five minutes.
    A changed node gets one retry with its refreshed Auto model. An unchanged
@@ -77,9 +76,6 @@ comparing auth modes if a prior request did not return usable change.
   is the ONLY sound test for end-to-end encryption: the live catalog lists
   `glm-5-3` and `tinfoil-glm-5-3` at identical prices under the identical name
   "Private (E2EE) GLM 5.3", and only the prefixed one travels sealed.
-- `routstr.change_token.applied`: change adopted, with no token contents.
-- `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
-- `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.
 - `routstr.lineup.refresh_failed`: nagg refresh failed (warn).
 - `ai.lineup.server_applied`: lineup applied; `nodeChanged` reports repointing
   without logging the origin.

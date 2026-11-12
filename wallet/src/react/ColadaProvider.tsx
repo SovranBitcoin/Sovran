@@ -4,9 +4,10 @@
 // Creates a singleton PaymentMachine, holds live refs for wallet context,
 // unit, and handlers, and exposes hooks to bind and consume the machine.
 //
-// The wallet (e.g. Sovran) provides flat props:
+// The wallet (e.g. Sovran) provides a createColada instance, which holds the
+// wallet's settings, plus what the instance cannot hold:
 //   - handlers: factory that receives the machine and returns StepHandlerMap
-//   - operations / notifications / persistence callbacks
+//   - operations / notifications / annotation persistence
 //   - actions: post-terminal screen action handlers for useScreenActions
 // ---------------------------------------------------------------------------
 
@@ -24,24 +25,14 @@ import { useLatestRef } from "./useLatestRef";
 import { createUnitPins } from "./unitPins";
 import {
   createInMemoryAnnotationStore,
-  encodeAnnotation,
-  type AnnotationEntryLike,
   type AnnotationStoreAdapter,
-  type TransactionAnnotation,
 } from "../annotations";
-import { annotationKey as deriveAnnotationKey } from "../annotations";
-import { createPaymentCopyResolver, registerPaymentCopyLocale } from "../copy";
-import type { PaymentCopyCatalog, PaymentCopyResolver } from "../copy";
-import { registerLocale } from "../formatting/locales";
-import { errField, logger, setLogger } from "../logger";
+import { errField, logger } from "../logger";
 import { createPaymentMachine } from "../machine/createMachine";
 import type {
   ChainAdapter,
   ClipboardAdapter,
-  ImagePickerAdapter,
-  LoggerAdapter,
   NfcAdapter,
-  NostrAdapter,
   QrDecoderAdapter,
   ShareAdapter,
   ColadaAdapters,
@@ -51,7 +42,6 @@ import type {
   MachineOperations,
   NotificationHandlerMap,
   PaymentMachine,
-  ScanSourceResult,
   ScanSources,
   StepHandlerMap,
 } from "../machine/types";
@@ -109,14 +99,12 @@ export interface ColadaProviderProps {
    * created — returns the `StepHandlerMap` it will use.
    */
   handlers: (machine: PaymentMachine, refs: PaymentFlowRefs) => StepHandlerMap;
-  /** Engine instance from `createColada()`. */
-  instance?: ColadaInstance;
   /**
-   * Accessor for the live coco `Manager`. Enables colada's read hooks
-   * (`useColadaTransactions`, `useColadaBalance`) without depending on a
-   * specific coco React binding. The wallet owns the manager lifecycle.
+   * Engine instance from `createColada()`: the one source of the wallet
+   * context, the Coco `Manager` behind colada's read hooks, and the locale,
+   * offline, price, display-currency, fiat-rate and send-memo settings.
    */
-  getManager?: () => Manager | null;
+  instance: ColadaInstance;
   /**
    * Persistence for transaction annotations (per-transaction side-data the coco
    * core does not store: counterparty, scan source, P2PK lock, distribution,
@@ -134,7 +122,6 @@ export interface ColadaProviderProps {
   actions?: ScreenActionHandlerMap;
   /** Optional app bridge for `useScreenActions` enrichment/subscriptions. */
   screenActionsBridge?: ScreenActionsBridge;
-  getOffline?: () => boolean;
   /**
    * The wallet's ACTIVE unit. This is the authoritative default the flow
    * reset reads — a screen binding an explicit `unit` via
@@ -142,30 +129,12 @@ export interface ColadaProviderProps {
    * mounted. Without this getter (and no explicit binding), 'sat' is used.
    */
   getUnit?: () => string;
-  /**
-   * Sats per one minor unit of a fiat wallet unit (e.g. sats per usd-cent),
-   * from the wallet's live pricelist. Re-denominates scanned fixed sat
-   * amounts into the active unit at seeding time — see
-   * `CreateMachineConfig.getSatsPerUnitMinor`. Flat prop wins over the
-   * instance's config, mirroring the other getter props.
-   */
-  getSatsPerUnitMinor?: (unit: string) => number | null;
-  enableEcashSendMemo?: boolean;
-  getBtcPrice?: () => number;
-  getDisplayCurrency?: () => { code: string; symbol: string } | null;
-  getLocale?: () => string;
-  translations?: Record<string, Record<string, string>>;
-  /** Per-key app copy overrides for the active locale. */
-  paymentCopyOverrides?: Partial<PaymentCopyCatalog>;
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
-  imagePickerAdapter?: ImagePickerAdapter;
-  nostrAdapter?: NostrAdapter;
   nfcAdapter?: NfcAdapter;
   chainAdapter?: ChainAdapter;
   qrDecoderAdapter?: QrDecoderAdapter;
-  loggerAdapter?: LoggerAdapter;
-  /** Explicit scan sources override adapter-derived scan sources. */
+  /** Where `machine.scan()` reads clipboard, gallery and NFC input from. */
   scanSources?: ScanSources;
   /** Automatic deep-link processing. */
   deepLinks?: DeepLinkConfig;
@@ -215,11 +184,8 @@ interface ColadaContextValue {
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
   >;
-  paymentCopyOverridesRef: React.MutableRefObject<
-    Partial<PaymentCopyCatalog> | undefined
-  >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
-  getManagerRef: React.MutableRefObject<(() => Manager | null) | undefined>;
+  getManagerRef: React.MutableRefObject<() => Manager | null>;
   annotationStoreRef: React.MutableRefObject<AnnotationStoreAdapter>;
   subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
@@ -236,58 +202,6 @@ interface ColadaContextValue {
 const ColadaContext = createContext<ColadaContextValue | null>(null);
 
 const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
-
-function scanSourceFromClipboard(
-  adapter: ClipboardAdapter,
-): () => Promise<ScanSourceResult> {
-  return async () => {
-    logger.debug("react.clipboardScan.start", {
-      hasReadText: !!adapter.readText,
-    });
-    if (!adapter.readText) {
-      logger.debug("react.clipboardScan.result", {
-        empty: true,
-        reason: "missing_adapter",
-      });
-      return { empty: true };
-    }
-    try {
-      const data = await adapter.readText();
-      if (data && data.trim()) {
-        logger.info("react.clipboardScan.result", {
-          empty: false,
-          dataLength: data.length,
-          trimmedLength: data.trim().length,
-        });
-        return { data };
-      }
-      logger.debug("react.clipboardScan.result", {
-        empty: true,
-        reason: "empty_clipboard",
-      });
-      return { empty: true };
-    } catch (error) {
-      logger.warn("react.clipboardScan.failed", { error: errField(error) });
-      return {
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
-    }
-  };
-}
-
-function buildAdapterScanSources(args: {
-  clipboardAdapter?: ClipboardAdapter;
-  imagePickerAdapter?: ImagePickerAdapter;
-}): ScanSources | undefined {
-  const sources: ScanSources = {};
-  if (args.clipboardAdapter?.readText) {
-    sources.clipboard = scanSourceFromClipboard(args.clipboardAdapter);
-  }
-  if (args.imagePickerAdapter) {
-    sources.gallery = args.imagePickerAdapter.pickQrImage;
-  }
-  return Object.keys(sources).length > 0 ? sources : undefined;
-}
 
 function summarizeWalletContext(
   context: WalletContext,
@@ -322,8 +236,7 @@ function summarizeWalletContext(
 function buildProviderMachine(
   config: {
     detectors: Detectors | undefined;
-    instance: ColadaInstance | undefined;
-    enableEcashSendMemo: boolean | undefined;
+    instance: ColadaInstance;
     operations: Partial<MachineOperations> | undefined;
     notifications: NotificationHandlerMap | undefined;
     createURDecoder: Parameters<
@@ -335,7 +248,6 @@ function buildProviderMachine(
   },
   refs: {
     handlersRef: React.MutableRefObject<StepHandlerMap>;
-    walletContextRef: React.MutableRefObject<WalletContext | null>;
     unitRef: React.MutableRefObject<string | undefined>;
     getUnitRef: React.MutableRefObject<(() => string) | undefined>;
     getOfflineRef: React.MutableRefObject<(() => boolean) | undefined>;
@@ -349,7 +261,6 @@ function buildProviderMachine(
   const {
     detectors,
     instance,
-    enableEcashSendMemo,
     operations,
     notifications,
     createURDecoder,
@@ -357,9 +268,9 @@ function buildProviderMachine(
     nfcAdapter,
     handlersFactory,
   } = config;
+  const enableEcashSendMemo = instance.config.enableEcashSendMemo ?? false;
   const {
     handlersRef,
-    walletContextRef,
     unitRef,
     getUnitRef,
     getOfflineRef,
@@ -369,7 +280,6 @@ function buildProviderMachine(
   } = refs;
 
   logger.info("react.provider.machine.create", {
-    hasInstance: !!instance,
     detectorOverride: !!detectors,
     operationCount: Object.keys(operations ?? {}).length,
     notificationCount: Object.keys(notifications ?? {}).length,
@@ -387,14 +297,7 @@ function buildProviderMachine(
       },
     ) as StepHandlerMap,
     detectors,
-    getContext: instance
-      ? () => instance.tracker.getContext()
-      : () => {
-          if (!walletContextRef.current) {
-            throw new Error("ColadaProvider has no wallet context bound yet.");
-          }
-          return walletContextRef.current;
-        },
+    getContext: () => instance.tracker.getContext(),
     getUnit: () => unitRef.current ?? getUnitRef.current?.() ?? "sat",
     getOffline: () => getOfflineRef.current?.() ?? false,
     getSatsPerUnitMinor: (unit) =>
@@ -455,31 +358,19 @@ export function ColadaProvider({
   children,
   handlers: handlersFactory,
   instance,
-  getManager: getManagerProp,
   annotationStore: annotationStoreProp,
   operations: operationsProp,
   detectors,
   notifications,
   actions,
   screenActionsBridge,
-  getOffline: getOfflineProp,
   getUnit: getUnitProp,
-  getSatsPerUnitMinor: getSatsPerUnitMinorProp,
-  enableEcashSendMemo: enableEcashSendMemoProp,
-  getBtcPrice: getBtcPriceProp,
-  getDisplayCurrency: getDisplayCurrencyProp,
-  getLocale: getLocaleProp,
-  translations,
-  paymentCopyOverrides,
   clipboardAdapter,
   shareAdapter,
-  imagePickerAdapter,
-  nostrAdapter,
-  nfcAdapter: nfcAdapterProp,
+  nfcAdapter,
   chainAdapter,
   qrDecoderAdapter,
-  loggerAdapter,
-  scanSources: scanSourcesProp,
+  scanSources,
   deepLinks,
   navigation,
 }: ColadaProviderProps) {
@@ -487,94 +378,33 @@ export function ColadaProvider({
     () => ({
       clipboardAdapter,
       shareAdapter,
-      imagePickerAdapter,
-      nostrAdapter,
-      nfcAdapter: nfcAdapterProp,
+      nfcAdapter,
       chainAdapter,
       qrDecoderAdapter,
-      loggerAdapter,
     }),
-    [
-      clipboardAdapter,
-      shareAdapter,
-      imagePickerAdapter,
-      nostrAdapter,
-      nfcAdapterProp,
-      chainAdapter,
-      qrDecoderAdapter,
-      loggerAdapter,
-    ],
+    [clipboardAdapter, shareAdapter, nfcAdapter, chainAdapter, qrDecoderAdapter],
   );
 
-  // Flat props win over values carried by the createColada instance. The
-  // instance fallback lets core operations keep owning wallet context while
-  // provider consumers move away from grouped React props.
-  const ic = instance?.config;
-  const getLocale = getLocaleProp ?? ic?.getLocale;
-  const getOffline = getOfflineProp ?? ic?.getOffline;
-  const enableEcashSendMemo =
-    enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
-  const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
-  const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
-  const getSatsPerUnitMinor =
-    getSatsPerUnitMinorProp ?? ic?.getSatsPerUnitMinor;
+  const { config } = instance;
   const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
     ? (content: { message: string; url?: string }) =>
         shareAdapter.share(content)
     : undefined;
-  const adapterScanSources = useMemo(
-    () =>
-      buildAdapterScanSources({
-        clipboardAdapter,
-        imagePickerAdapter,
-      }),
-    [clipboardAdapter, imagePickerAdapter],
-  );
-  const scanSources = useMemo(
-    () => scanSourcesProp ?? adapterScanSources,
-    [adapterScanSources, scanSourcesProp],
-  );
-  const nfcAdapter = nfcAdapterProp;
   const createURDecoder = qrDecoderAdapter?.createUrDecoder;
   const subscriptionBus = useMemo(() => createSubscriptionBus(), []);
-  const baseOperations = operationsProp ?? instance?.operations;
-  const operations = useMemo<Partial<MachineOperations> | undefined>(() => {
-    if (!nostrAdapter?.sendDirectMessage && !nostrAdapter?.resolveProfile) {
-      return baseOperations;
-    }
-    logger.info("react.provider.operations.override", {
-      hasBaseOperations: !!baseOperations,
-      hasNostrSendDirectMessage: !!nostrAdapter.sendDirectMessage,
-      hasNostrResolveProfile: !!nostrAdapter.resolveProfile,
-    });
-    return {
-      ...baseOperations,
-      sendNostrDM:
-        nostrAdapter.sendDirectMessage ?? baseOperations?.sendNostrDM,
-      resolveRecipientProfile:
-        nostrAdapter.resolveProfile ?? baseOperations?.resolveRecipientProfile,
-    };
-  }, [baseOperations, nostrAdapter]);
+  const operations = operationsProp ?? instance.operations;
 
-  const getLocaleRef = useLatestRef(getLocale);
-  const paymentCopyOverridesRef = useLatestRef<
-    Partial<PaymentCopyCatalog> | undefined
-  >(paymentCopyOverrides);
+  const getLocaleRef = useLatestRef(config.getLocale);
   const adaptersRef = useLatestRef(adapters);
-  // Prefer an explicit getManager prop; otherwise fall back to the manager the
-  // createColada instance already holds, so wallets get read hooks for free.
-  const getManagerRef = useLatestRef<(() => Manager | null) | undefined>(
-    getManagerProp ??
-      (instance ? () => instance.config.manager ?? null : undefined),
+  const getManagerRef = useLatestRef<() => Manager | null>(
+    () => config.manager ?? null,
   );
-  // Annotation persistence: explicit prop wins, else the createColada instance's
-  // adapter, else a lazily-created in-memory default (stable for this mount).
+  // Annotation persistence: the wallet's adapter, else a lazily-created
+  // in-memory default (stable for this mount).
   const [defaultAnnotationStore] = useState(createInMemoryAnnotationStore);
   const annotationStoreRef = useLatestRef<AnnotationStoreAdapter>(
-    annotationStoreProp ??
-      instance?.config.annotationStore ??
-      defaultAnnotationStore,
+    annotationStoreProp ?? defaultAnnotationStore,
   );
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
@@ -587,47 +417,31 @@ export function ColadaProvider({
   const writeClipboardRef = useLatestRef(writeClipboard);
   const shareContentRef = useLatestRef(shareContent);
 
-  const getOfflineRef = useLatestRef(getOffline);
-  const getBtcPriceRef = useLatestRef(getBtcPrice);
-  const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
-  const getSatsPerUnitMinorRef = useLatestRef(getSatsPerUnitMinor);
+  const getOfflineRef = useLatestRef(config.getOffline);
+  const getBtcPriceRef = useLatestRef(config.getBtcPrice);
+  const getDisplayCurrencyRef = useLatestRef(config.getDisplayCurrency);
+  const getSatsPerUnitMinorRef = useLatestRef(config.getSatsPerUnitMinor);
 
   const getUnitRef = useLatestRef(getUnitProp);
 
   useEffect(() => {
     logger.info("react.provider.config", {
-      hasInstance: !!instance,
       hasOperationsProp: !!operationsProp,
       operationCount: Object.keys(operations ?? {}).length,
       detectorOverride: !!detectors,
       notificationCount: Object.keys(notifications ?? {}).length,
       actionScreenCount: Object.keys(actions ?? {}).length,
       hasScreenActionsBridge: !!screenActionsBridge,
-      hasOfflineGetter: !!getOffline,
-      enableEcashSendMemo,
-      hasBtcPriceGetter: !!getBtcPrice,
-      hasDisplayCurrencyGetter: !!getDisplayCurrency,
-      hasLocaleGetter: !!getLocale,
-      adapterScanSourceCount: Object.keys(adapterScanSources ?? {}).length,
       scanSourceCount: Object.keys(scanSources ?? {}).length,
       hasNfcAdapter: !!nfcAdapter,
       hasUrDecoder: !!createURDecoder,
       hasDeepLinks: !!deepLinks,
-      hasLoggerAdapter: !!loggerAdapter,
     });
   }, [
     actions,
-    adapterScanSources,
     createURDecoder,
     deepLinks,
     detectors,
-    enableEcashSendMemo,
-    getBtcPrice,
-    getDisplayCurrency,
-    getLocale,
-    getOffline,
-    instance,
-    loggerAdapter,
     nfcAdapter,
     notifications,
     operations,
@@ -635,32 +449,6 @@ export function ColadaProvider({
     scanSources,
     screenActionsBridge,
   ]);
-
-  // Translations register on a module-level locale map. Run as an effect so
-  // the side effect happens after commit (StrictMode double-invoke of render
-  // would otherwise duplicate the work and re-allocate Object.entries each
-  // render).
-  useEffect(() => {
-    if (!translations) return;
-    logger.info("react.provider.translations.register", {
-      localeCount: Object.keys(translations).length,
-      locales: Object.keys(translations),
-    });
-    for (const [lang, dict] of Object.entries(translations)) {
-      registerLocale(lang, dict);
-      registerPaymentCopyLocale(lang, dict);
-    }
-  }, [translations]);
-
-  useEffect(() => {
-    if (!loggerAdapter) return undefined;
-    logger.info("react.provider.logger.bind");
-    setLogger(loggerAdapter);
-    return () => {
-      logger.info("react.provider.logger.unbind");
-      setLogger(null);
-    };
-  }, [loggerAdapter]);
 
   useEffect(() => {
     logger.info("react.provider.subscriptionBus.bind", {
@@ -711,7 +499,6 @@ export function ColadaProvider({
       {
         detectors,
         instance,
-        enableEcashSendMemo,
         operations,
         notifications,
         createURDecoder,
@@ -721,7 +508,6 @@ export function ColadaProvider({
       },
       {
         handlersRef,
-        walletContextRef,
         unitRef,
         getUnitRef,
         getOfflineRef,
@@ -847,7 +633,7 @@ export function ColadaProvider({
   const value = useMemo<ColadaContextValue>(
     () => ({
       machine,
-      walletContextSource: instance ?? null,
+      walletContextSource: instance,
       walletContextRef,
       unitRef,
       optionDismissRef,
@@ -858,7 +644,6 @@ export function ColadaProvider({
       getOfflineRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
-      paymentCopyOverridesRef,
       adaptersRef,
       getManagerRef,
       annotationStoreRef,
@@ -889,7 +674,6 @@ export function ColadaProvider({
       notificationsRef,
       operationsRef,
       optionDismissRef,
-      paymentCopyOverridesRef,
       screenActionHandlers,
       screenActionsBridge,
       shareContentRef,
@@ -917,10 +701,6 @@ export function useColadaContext(): ColadaContextValue {
     );
   }
   return ctx;
-}
-
-export function useColadaSubscriptions(): ColadaSubscriptionBus {
-  return useColadaContext().subscriptionBusRef.current;
 }
 
 type ColadaWalletContextSource = Pick<
@@ -960,15 +740,12 @@ export function useColadaTrustedMintUrls(): readonly string[] | null {
   );
 }
 
-/**
- * The live coco `Manager`, for colada's read hooks. Requires the wallet to pass
- * `getManager` (or a `createColada` instance) to `ColadaProvider`.
- */
+/** The live coco `Manager` the `createColada` instance holds, for colada's read hooks. */
 export function useColadaManager(): Manager {
-  const manager = useColadaContext().getManagerRef.current?.();
+  const manager = useColadaContext().getManagerRef.current();
   if (!manager) {
     throw new Error(
-      "colada manager is unavailable. Pass `getManager` (or a createColada `instance`) to ColadaProvider.",
+      "colada manager is unavailable: the createColada `instance` holds none.",
     );
   }
   return manager;
@@ -980,62 +757,6 @@ export function useColadaManager(): Manager {
  */
 export function useAnnotationStore(): AnnotationStoreAdapter {
   return useColadaContext().annotationStoreRef.current;
-}
-
-export interface SetTransactionAnnotation {
-  /**
-   * Write an annotation patch. `target` is either an explicit key
-   * (`raw:...`, `quote:...`, `op:...`, `id:...`) or an entry whose canonical
-   * key is derived. Patches are additive at the field level.
-   */
-  set: (
-    target: string | AnnotationEntryLike,
-    patch: TransactionAnnotation,
-  ) => void;
-  /**
-   * Bridge a preview-time key (e.g. a `raw:` scan key) onto the final entry's
-   * key once it exists, so the annotation resolves for the persisted row.
-   */
-  linkAnnotation: (
-    fromKey: string,
-    toKey: string | AnnotationEntryLike,
-  ) => void;
-}
-
-/**
- * Writer for transaction annotations. The app calls this during payment flows
- * when it learns side-data coco never stores (counterparty, scan source, P2PK
- * lock, distribution, location, swap).
- */
-export function useSetTransactionAnnotation(): SetTransactionAnnotation {
-  const store = useAnnotationStore();
-  return useMemo<SetTransactionAnnotation>(
-    () => ({
-      set: (target, patch) => {
-        const key =
-          typeof target === "string" ? target : deriveAnnotationKey(target);
-        store.set(key, encodeAnnotation(patch));
-      },
-      linkAnnotation: (fromKey, toKey) => {
-        const record = store.get(fromKey);
-        if (!record) return;
-        const key =
-          typeof toKey === "string" ? toKey : deriveAnnotationKey(toKey);
-        store.set(key, record);
-      },
-    }),
-    [store],
-  );
-}
-
-export function usePaymentCopy(): PaymentCopyResolver {
-  const ctx = useContext(ColadaContext);
-  const locale = ctx?.getLocaleRef.current?.() ?? "en";
-  const overrides = ctx?.paymentCopyOverridesRef.current;
-  return useMemo(
-    () => createPaymentCopyResolver({ locale, overrides }),
-    [locale, overrides],
-  );
 }
 
 function usePaymentFlowContext(): ColadaContextValue {

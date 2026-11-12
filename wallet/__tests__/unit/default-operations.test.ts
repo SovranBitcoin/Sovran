@@ -23,6 +23,7 @@ import {
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
+import { PaymentRequestUndeliveredError } from "../../src/errors";
 
 import { defaultDetectors } from "../../src/detectors";
 
@@ -390,6 +391,99 @@ describe("executePaymentRequest — Nostr transport", () => {
 
     expect(result.historyEntry).toBeDefined();
     expect(typeof result.historyEntry).toBe("string");
+  });
+
+  it("names the operation when delivery fails and the ecash cannot be taken back", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.get = vi.fn().mockResolvedValue({ id: "op-1", state: "pending" });
+    mockManager.ops.send.reclaim = vi.fn().mockRejectedValue(new Error("mint down"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM: vi.fn().mockRejectedValue(new Error("relay down")),
+    });
+
+    const failure = await ops
+      .executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" })
+      .catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(PaymentRequestUndeliveredError);
+    expect(failure).toMatchObject({ operationId: "op-1", message: "relay down" });
+  });
+
+  it("cancels the prepared send and sends nothing when the token cannot be made", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi
+      .fn()
+      .mockRejectedValue(new Error("network drop mid-flight"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" }),
+    ).rejects.toThrow("network drop mid-flight");
+
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+    expect(mockManager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
+
+  it("keeps the execute error when the cancel after it fails", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi
+      .fn()
+      .mockRejectedValue(new Error("network drop mid-flight"));
+    mockManager.ops.send.cancel = vi
+      .fn()
+      .mockRejectedValue(new Error("Cannot cancel operation in state 'executing'"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM: vi.fn(),
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" }),
+    ).rejects.toThrow("network drop mid-flight");
+  });
+
+  it("reports a delivered send as delivered when its history row cannot be read", async () => {
+    const mockManager = createMockManager();
+    mockManager.history.getHistoryEntryById = vi.fn().mockRejectedValue(new Error("database is locked"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    const result = await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" });
+
+    expect(sendNostrDM).toHaveBeenCalledOnce();
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ type: "send", amount: 100, unit: "sat" });
   });
 
   it("throws when sendNostrDM is not provided for Nostr transport", async () => {
@@ -867,63 +961,6 @@ describe("buildMintReviewInfo — social enrichment", () => {
   });
 });
 
-describe("executeMintQuote — onchain", () => {
-  it("creates a fresh reusable onchain quote and prepares the operation against it (quote-first)", async () => {
-    const quote = {
-      mintUrl: MINT1,
-      method: "onchain",
-      quoteId: "oq-1",
-      request: "bc1qexampleaddress",
-      unit: "sat",
-      reusable: true,
-      expiry: null,
-    };
-    const prepared = {
-      id: "mint-op-1",
-      mintUrl: MINT1,
-      quoteId: "oq-1",
-      createdAt: 1111,
-      unit: "sat",
-      amount: 123,
-      request: "bc1qexampleaddress",
-      state: "pending",
-    };
-    const create = vi.fn().mockResolvedValue(quote);
-    const prepare = vi.fn().mockResolvedValue(prepared);
-    const mockManager = createMockManager({
-      quotes: { mint: { create } },
-      ops: { mint: { prepare } },
-    });
-
-    const ops = createDefaultOperations({
-      getManager: () => mockManager as unknown as Manager,
-    });
-
-    const result = await ops.executeMintQuote!({ mintUrl: MINT1, amount: 123, unit: "sat", method: "onchain" });
-
-    // v2 quote-first contract: the canonical quote row exists before the
-    // durable operation, and reusable quotes take an explicit amount.
-    expect(create).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: "onchain",
-      unit: "sat",
-    });
-    expect(prepare).toHaveBeenCalledWith({ quote, amount: 123 });
-    expect(create.mock.invocationCallOrder[0]).toBeLessThan(
-      prepare.mock.invocationCallOrder[0],
-    );
-
-    const entry = JSON.parse(result.historyEntry);
-    expect(entry).toMatchObject({
-      type: "mint",
-      quoteId: "oq-1",
-      state: "UNPAID",
-      amount: 123,
-      paymentRequest: "bc1qexampleaddress",
-    });
-  });
-});
-
 describe("executeMelt — onchain (coco v2)", () => {
   const ADDRESS = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
   const FEE_OPTIONS = [
@@ -1056,13 +1093,20 @@ describe("executeMelt — onchain (coco v2)", () => {
     expect(prepare).toHaveBeenCalledWith({ quote, feeIndex: 1 });
   });
 
-  it("cancels the operation when execute throws (reservation rescue)", async () => {
+  it("cancels a reservation only when execute left the operation prepared", async () => {
     const { create, prepare } = onchainMocks();
     const execute = vi.fn().mockRejectedValue(new Error("mint 500"));
     const cancel = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager({
       quotes: { melt: { create } },
-      ops: { melt: { prepare, execute, cancel } },
+      ops: {
+        melt: {
+          prepare,
+          execute,
+          cancel,
+          get: vi.fn().mockResolvedValue({ state: "prepared" }),
+        },
+      },
     });
 
     const ops = createDefaultOperations({
@@ -1443,6 +1487,24 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
   });
 
+  it("keeps the binding error when the cancel after it fails", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.cancel = vi
+      .fn()
+      .mockRejectedValue(new Error("mint unreachable"));
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      captureSendDelivery: () => async () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(mockManager.ops.send.execute).not.toHaveBeenCalled();
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+  });
+
   it("does not cancel when execute succeeds", async () => {
     const mockManager = createMockManager();
 
@@ -1730,5 +1792,91 @@ describe("legacy nearby receive history ownership", () => {
       amount: 1,
     });
     expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
+  });
+});
+
+describe("synthetic history entries keep the operation's unit", () => {
+  it("builds a usd payment-request entry when the history row is missing", async () => {
+    const manager = createMockManager({
+      history: { getHistoryEntryById: vi.fn().mockResolvedValue(null) },
+    });
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "usd",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqUSD",
+      amount: 100,
+      unit: "usd",
+    });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: "op-1",
+      amount: 100,
+      unit: "usd",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rollbackSend — says what it did, so "could not tell" is never "rolled back"
+// ---------------------------------------------------------------------------
+
+describe("rollbackSend", () => {
+  function rollback(get: () => Promise<unknown>, withManager = true) {
+    const manager = createMockManager();
+    manager.ops.send.get = vi.fn(get);
+    const ops = createDefaultOperations({
+      getManager: () => (withManager ? (manager as unknown as Manager) : null),
+    });
+    return { result: ops.rollbackSend!("op-1"), manager };
+  }
+
+  it.each(["executing", "pending"])("reclaims a %s send", async (state) => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state }));
+    await expect(result).resolves.toEqual({ kind: "reclaimed" });
+    expect(manager.ops.send.reclaim).toHaveBeenCalledWith("op-1");
+  });
+
+  it("reports a send already taken back as reclaimed", async () => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state: "rolled_back" }));
+    await expect(result).resolves.toEqual({ kind: "reclaimed" });
+    expect(manager.ops.send.reclaim).not.toHaveBeenCalled();
+  });
+
+  it.each(["prepared", "init"])("reports a %s send as never executed", async (state) => {
+    const { result } = rollback(async () => ({ id: "op-1", state }));
+    await expect(result).resolves.toEqual({ kind: "neverExecuted" });
+  });
+
+  it("cancels a prepared send", async () => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state: "prepared" }));
+    await result;
+    expect(manager.ops.send.cancel).toHaveBeenCalledWith("op-1");
+  });
+
+  it.each([
+    { name: "it could not be looked up", get: async () => Promise.reject(new Error("db")) },
+    { name: "it was not found", get: async () => null },
+    { name: "it was redeemed", get: async () => ({ id: "op-1", state: "finalized" }) },
+    { name: "it is being taken back", get: async () => ({ id: "op-1", state: "rolling_back" }) },
+  ])("cannot tell when $name", async ({ get }) => {
+    const { result, manager } = rollback(get);
+    await expect(result).resolves.toMatchObject({ kind: "unknown" });
+    expect(manager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(manager.ops.send.cancel).not.toHaveBeenCalled();
+  });
+
+  it("cannot tell without a wallet", async () => {
+    const { result } = rollback(async () => ({ id: "op-1", state: "pending" }), false);
+    await expect(result).resolves.toMatchObject({ kind: "unknown" });
   });
 });

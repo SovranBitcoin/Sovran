@@ -10,44 +10,59 @@
 import type { CheckpointStatus } from '@/shared/blocks/status';
 
 /**
- * Phases of a recovery run, in order.
- *
- * `finalizing` exists because the work after the last mint resolves — untrust
- * probed-but-empty mints, drop stuck pending mint ops, reload the mint list —
- * used to run under the `restoring` copy. Every mint row would show its green
- * check while the hero kept spinning under "Recovering Wallet", which reads as
- * a hung app. Cleanup is real work and now says so.
+ * Whether the balance read after a mint's restore found funds there;
+ * `unknown` when that read failed, so the restore may have saved ecash there.
  */
-export type RecoveryPhase =
-  'idle' | 'discovering' | 'restoring' | 'finalizing' | 'complete' | 'error';
+export type FundsFound = boolean | 'unknown';
 
 /**
- * `already-recovered` is a success: every keyset this mint holds was already in
- * the database, which is exactly what a second recovery run should find.
- * `skipped` means we never tried — the mint was cancelled past, or its keysets
- * were not restorable NUT-02 ids.
+ * Where one mint is in a recovery run, and once it is over, its outcome:
+ * restored (`done`, or `already-recovered` when every proof was already in the
+ * database, which is what a second run should find), `failed` with its reason,
+ * `timed-out`, or `skipped`: never tried, because the run was stopped first
+ * (`cancelled`, including a mint stopped before its last keyset) or because
+ * none of its keysets has an id that can be restored (`not-restorable`).
+ *
+ * An outcome is final: nothing moves a mint out of it. A mint that timed out
+ * is still restoring behind the run; what its late result found is recorded
+ * on it, and it stays timed out.
  */
-type MintRecoveryStatus =
-  'waiting' | 'restoring' | 'done' | 'already-recovered' | 'skipped' | 'failed';
+type MintRecoveryProgress =
+  | { status: 'waiting' }
+  | {
+      status: 'restoring';
+      startedAtMs: number;
+      /** null until `addMint` resolves and the keyset count is known. */
+      keysetsTotal: number | null;
+      keysetsDone: number;
+    }
+  | {
+      status: 'done' | 'already-recovered';
+      /** Whether this mint holds a balance after restore. */
+      fundsFound: FundsFound;
+      durationMs: number;
+    }
+  | { status: 'failed'; error: string; fundsFound: FundsFound; durationMs: number | null }
+  | {
+      status: 'timed-out';
+      /** A late result of its restore read a balance there. */
+      fundsFound: FundsFound;
+    }
+  | {
+      status: 'skipped';
+      reason: 'cancelled';
+      /** A mint the stop cut short may already hold what its first keysets restored. */
+      fundsFound: FundsFound;
+    }
+  | { status: 'skipped'; reason: 'not-restorable'; fundsFound: FundsFound; durationMs: number };
 
-export interface MintRecoveryState {
+type MintRecoveryStatus = MintRecoveryProgress['status'];
+
+export type MintRecoveryState = {
   mint: string;
   /** Probed from the audit API rather than already trusted by the wallet. */
   isDiscovered: boolean;
-  status: MintRecoveryStatus;
-  /** null until `addMint` resolves and the keyset count is known. */
-  keysetsTotal: number | null;
-  keysetsDone: number;
-  failedKeysets: number;
-  /** Keysets already present in full, and keysets whose id we cannot restore. */
-  alreadyRecoveredKeysets: number;
-  skippedKeysets: number;
-  /** Whether this mint holds a balance after restore. */
-  fundsFound: boolean;
-  startedAtMs: number | null;
-  durationMs: number | null;
-  error?: string;
-}
+} & MintRecoveryProgress;
 
 interface RecoveryCounts {
   /** Mints that reached a terminal status, successful or not. */
@@ -65,6 +80,13 @@ const TERMINAL: ReadonlySet<MintRecoveryStatus> = new Set<MintRecoveryStatus>([
   'already-recovered',
   'skipped',
   'failed',
+  'timed-out',
+]);
+
+/** Terminal statuses that are a problem. */
+const FAILED: ReadonlySet<MintRecoveryStatus> = new Set<MintRecoveryStatus>([
+  'failed',
+  'timed-out',
 ]);
 
 /** Terminal statuses that are not a problem. */
@@ -81,6 +103,56 @@ export function isSuccess(status: MintRecoveryStatus): boolean {
   return SUCCEEDED.has(status);
 }
 
+export function isFailure(status: MintRecoveryStatus): boolean {
+  return FAILED.has(status);
+}
+
+/** What a mint's restore found there; false for a mint never restored. */
+function fundsRead(state: MintRecoveryState): FundsFound {
+  switch (state.status) {
+    case 'done':
+    case 'already-recovered':
+    case 'failed':
+    case 'skipped':
+    case 'timed-out':
+      return state.fundsFound;
+    case 'waiting':
+    case 'restoring':
+      return false;
+  }
+}
+
+/** Whether a mint's funds were found after its restore. */
+export function fundsFound(state: MintRecoveryState): boolean {
+  return fundsRead(state) === true;
+}
+
+/**
+ * Whether the run learned that a mint holds nothing. Not for a mint that
+ * timed out, whose restore may still find funds there, nor for one whose
+ * balance could not be read.
+ */
+export function knownEmpty(state: MintRecoveryState): boolean {
+  return state.status !== 'timed-out' && fundsRead(state) === false;
+}
+
+/** Why a mint did not recover, for a row's error line; undefined when it did or is not over. */
+export function mintRecoveryError(state: MintRecoveryState): string | undefined {
+  switch (state.status) {
+    case 'failed':
+      return state.error;
+    case 'timed-out':
+      return 'Timed out';
+    case 'skipped':
+      return state.reason === 'cancelled' ? 'Cancelled' : undefined;
+    case 'waiting':
+    case 'restoring':
+    case 'done':
+    case 'already-recovered':
+      return undefined;
+  }
+}
+
 export function createInitialMintStates(
   knownMintUrls: readonly string[],
   discoveredMintUrls: readonly string[]
@@ -89,21 +161,13 @@ export function createInitialMintStates(
     mint,
     isDiscovered: index >= knownMintUrls.length,
     status: 'waiting' as const,
-    keysetsTotal: null,
-    keysetsDone: 0,
-    failedKeysets: 0,
-    alreadyRecoveredKeysets: 0,
-    skippedKeysets: 0,
-    fundsFound: false,
-    startedAtMs: null,
-    durationMs: null,
   }));
 }
 
 export function computeRecoveryCounts(states: readonly MintRecoveryState[]): RecoveryCounts {
   const total = states.length;
   const succeeded = states.filter((s) => isSuccess(s.status)).length;
-  const failed = states.filter((s) => s.status === 'failed').length;
+  const failed = states.filter((s) => isFailure(s.status)).length;
   const settled = states.filter((s) => isTerminal(s.status)).length;
   return {
     settled,
@@ -121,7 +185,7 @@ export function computeRecoveryCounts(states: readonly MintRecoveryState[]): Rec
  * wrong — so it must not turn a clean recovery red.
  */
 export function countKnownFailures(states: readonly MintRecoveryState[]): number {
-  return states.filter((s) => !s.isDiscovered && s.status === 'failed').length;
+  return states.filter((s) => !s.isDiscovered && isFailure(s.status)).length;
 }
 
 /**
@@ -137,11 +201,12 @@ export function describeMintProgress(
 ): string | null {
   switch (state.status) {
     case 'failed':
-      return state.error ?? 'Failed';
+    case 'timed-out':
+      return mintRecoveryError(state) ?? 'Failed';
     case 'already-recovered':
       return 'Already recovered';
     case 'skipped':
-      return state.error ?? 'Skipped';
+      return mintRecoveryError(state) ?? 'Skipped';
     case 'done':
       return null;
     case 'waiting':
@@ -151,7 +216,7 @@ export function describeMintProgress(
         return 'Reading keysets';
       }
       const base = `${state.keysetsDone} of ${state.keysetsTotal} keysets`;
-      const elapsed = state.startedAtMs == null ? 0 : nowMs - state.startedAtMs;
+      const elapsed = nowMs - state.startedAtMs;
       return elapsed >= slowAfterMs ? `${base} · still scanning` : base;
     }
   }
@@ -181,6 +246,7 @@ export function mintStatusToCheckpoint(status: MintRecoveryStatus): CheckpointSt
     case 'skipped':
       return 'already-spent';
     case 'failed':
+    case 'timed-out':
       return 'failed';
   }
 }

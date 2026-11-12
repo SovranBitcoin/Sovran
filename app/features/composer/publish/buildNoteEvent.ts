@@ -31,9 +31,6 @@ export type ComposerTarget =
 interface BuildNoteInput {
   blocks: readonly ComposerBlock[];
   target: ComposerTarget;
-  mentionPubkeys?: readonly string[];
-  /** Explicit content-warning reason. Empty string = warning with no reason. */
-  contentWarning?: string;
   createdAtSec?: number;
 }
 
@@ -86,15 +83,9 @@ export function buildNoteEvent(input: BuildNoteInput): UnsignedNote {
     tags.push(['q', target.quotedId, target.relayHint ?? '', target.quotedPubkey]);
     pSet.add(target.quotedPubkey);
   }
-  for (const pubkey of input.mentionPubkeys ?? []) pSet.add(pubkey);
   for (const pubkey of pSet) tags.push(['p', pubkey]);
 
-  const hasSensitive = blocks.some((b) => b.kind === 'media' && b.sensitive);
-  if (input.contentWarning !== undefined) {
-    tags.push(
-      input.contentWarning ? ['content-warning', input.contentWarning] : ['content-warning']
-    );
-  } else if (hasSensitive) {
+  if (blocks.some((b) => b.kind === 'media' && b.sensitive)) {
     tags.push(['content-warning']);
   }
 

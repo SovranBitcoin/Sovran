@@ -70,11 +70,11 @@ interface ProfileState {
 }
 
 interface ProfileActions {
-  /** Add a new profile entry (idempotent — skips if accountIndex already exists) */
   /**
    * Record a profile. Returns whether it is in the list afterwards — `true`
-   * for a fresh add AND for one already present, `false` only when the list is
-   * at `MAX_PROFILES` and this one is new. Callers must not assume success:
+   * for a fresh add AND for one already present, `false` when another key
+   * already holds this account index, or when the list is at `MAX_PROFILES`
+   * and this one is new. Callers must not assume success:
    * proceeding to switch into a profile that was refused leaves the app
    * running as an account the store does not know about.
    */
@@ -109,6 +109,11 @@ interface ProfileActions {
 
 type ProfileStore = ProfileState & ProfileActions;
 
+/** Longest cached name kept: a longer one is clipped when saved. */
+const MAX_CACHED_DISPLAY_NAME = 512;
+/** Longest cached picture URL kept: a longer one is not saved, since a clipped URL is a different URL. */
+const MAX_CACHED_PICTURE_URL = 2048;
+
 const PersistedProfileEntry = z.looseObject({
   accountIndex: z.number().int(),
   pubkey: z.string().max(128),
@@ -124,8 +129,11 @@ const PersistedProfileEntry = z.looseObject({
   // global profile store, including coco migration completion flags.
   source: z.enum(['derived', 'imported']).catch('imported').optional(),
   externalChain: z.number().int().nonnegative().optional(),
-  cachedDisplayName: z.string().max(512).optional(),
-  cachedPicture: z.string().max(2048).optional(),
+  // A label too long to read is read as absent: 0.1.3 saved kind-0 labels
+  // with no limit, and rejecting one would discard every account in the list.
+  // New labels are held to the limit by `updateProfileMetadata`.
+  cachedDisplayName: z.string().max(MAX_CACHED_DISPLAY_NAME).optional().catch(undefined),
+  cachedPicture: z.string().max(MAX_CACHED_PICTURE_URL).optional().catch(undefined),
   // Absent means not recorded, which never asks for a restore. An unreadable
   // value is read the same way; rejecting it would discard the whole store.
   walletDatabaseCreated: z.boolean().optional().catch(undefined),
@@ -202,6 +210,10 @@ export function selectActiveProfile(
   }
   return memoActiveProfile;
 }
+
+/** The active account's key, as a selector. */
+export const selectActivePubkey = (state: Pick<ProfileState, 'profiles' | 'activeAccountIndex'>) =>
+  selectActiveProfile(state)?.pubkey;
 
 export const useProfileStore = create<ProfileStore>({ name: 'profile-store', scope: 'global' })(
   persist(
@@ -315,7 +327,14 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex
-              ? { ...p, cachedDisplayName: displayName, cachedPicture: picture }
+              ? {
+                  ...p,
+                  cachedDisplayName: displayName?.slice(0, MAX_CACHED_DISPLAY_NAME),
+                  cachedPicture:
+                    picture !== undefined && picture.length <= MAX_CACHED_PICTURE_URL
+                      ? picture
+                      : undefined,
+                }
               : p
           ),
         }));
@@ -356,7 +375,7 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
         // The schema cannot express "the active index is one of these", and a
         // refine that could would discard the whole blob — the failure this
         // store is most exposed to. Repair instead: an active index with no
-        // profile behind it makes `getActiveProfilePubkey()` undefined, and
+        // profile behind it makes `activePubkey()` undefined, and
         // `createProfileScopedStorage` then falls back to the BARE key, so
         // every profile-scoped store silently reads and writes unscoped state
         // shared across profiles.
@@ -370,3 +389,26 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
     })
   )
 );
+
+/** The active account's key now. Compared with a key taken earlier, it asks about this moment only. */
+export const activePubkey = (): string | undefined =>
+  selectActivePubkey(useProfileStore.getState());
+
+/** Watches that `pubkey` stays the active account; switching away and back still counts as changed. */
+export function captureActiveProfile(pubkey: string) {
+  const initial = useProfileStore.getState();
+  let current = selectActivePubkey(initial) === pubkey;
+  const dispose = useProfileStore.subscribe((state) => {
+    if (
+      state.activeAccountIndex !== initial.activeAccountIndex ||
+      selectActivePubkey(state) !== pubkey
+    )
+      current = false;
+  });
+  return {
+    check: () => {
+      if (!current) throw new Error('Profile changed');
+    },
+    dispose,
+  };
+}

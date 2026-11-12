@@ -13,7 +13,7 @@ import { amountToNumberOrUndefined } from "./amount";
 import { logger } from "./logger";
 import { extractP2PKPubkey } from "./p2pk";
 
-export interface EcashTokenMetadata {
+interface EcashTokenMetadata {
   /** Total token amount in `unit`'s base unit (sats for `'sat'`). */
   amount: number;
   mint: string;
@@ -68,7 +68,9 @@ export function decodeEcashTokenMetadata(
   }
   const amount = amountToNumberOrUndefined(decoded.amount);
   if (amount === undefined) {
-    logger.debug("ecash.decode.unreadableAmount", { inputLength: token.length });
+    logger.debug("ecash.decode.unreadableAmount", {
+      inputLength: token.length,
+    });
     return null;
   }
   const metadata: EcashTokenMetadata = {
@@ -85,6 +87,29 @@ export function decodeEcashTokenMetadata(
     hasP2pk: !!metadata.p2pkPubkey,
   });
   return metadata;
+}
+
+/**
+ * True when `token` decodes as a cashu token whose mint is an http(s) address
+ * and whose every proof carries a secret and a signature. Stricter than
+ * `isValidEcashToken`, for callers that would otherwise alter their input to
+ * make it read as a token.
+ */
+export function isWellFormedEcashToken(token: string): boolean {
+  if (decodeEcashTokenMetadata(token) === null) return false;
+  const decoded = tryDecode(() => getTokenMetadata(token));
+  if (!decoded || decoded.incompleteProofs.length === 0) return false;
+  const mint = tryDecode(() => new URL(decoded.mint));
+  if (!mint || (mint.protocol !== "https:" && mint.protocol !== "http:")) {
+    return false;
+  }
+  return decoded.incompleteProofs.every(
+    (proof) =>
+      typeof proof.secret === "string" &&
+      proof.secret.length > 0 &&
+      typeof proof.C === "string" &&
+      proof.C.length > 0,
+  );
 }
 
 /** True when `token` decodes as a valid cashu token. */

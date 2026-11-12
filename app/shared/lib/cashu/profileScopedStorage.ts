@@ -17,12 +17,13 @@ import {
   profilePersistWritesBlocked,
   trackProfilePersistWrite,
 } from '@/shared/lib/persist/profileWriteBarrier';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { log } from '@/shared/lib/logger';
 import { StateStorage } from 'zustand/middleware';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
 
 /** The same barrier covers direct profile adapters and full persisted operations. */
@@ -56,23 +57,6 @@ export function signalMigrationsComplete(): void {
   _migrationGateResolve = null;
 }
 
-/** Wait for profileStore hydration to complete before reading profiles. */
-async function ensureProfileStoreHydrated(): Promise<void> {
-  if (useProfileStore.persist.hasHydrated()) return;
-  await new Promise<void>((resolve) => {
-    const unsub = useProfileStore.persist.onFinishHydration(() => {
-      unsub();
-      resolve();
-    });
-  });
-}
-
-/** The profile whose key the scoped stores are reading and writing under now. */
-export function getActiveProfilePubkey(): string | undefined {
-  const state = useProfileStore.getState();
-  return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
-}
-
 /**
  * No account has a row yet. This is the first launch of a new install, or of
  * one from before accounts existed, until the keys provider adds account 0.
@@ -87,8 +71,8 @@ export class NoProfileYetError extends Error {
 /** Capture after migrations/hydration, before starting an owner-bound service. */
 export async function captureProfileStorageOwner(): Promise<string> {
   await _migrationGate;
-  await ensureProfileStoreHydrated();
-  const pubkey = getActiveProfilePubkey();
+  await whenLoaded(useProfileStore);
+  const pubkey = activePubkey();
   if (!pubkey) throw new NoProfileYetError();
   return pubkey;
 }
@@ -97,7 +81,7 @@ export async function captureProfileStorageOwner(): Promise<string> {
 export function profileStorageOwnerAppears(): Promise<string> {
   return new Promise((resolve) => {
     const found = () => {
-      const pubkey = getActiveProfilePubkey();
+      const pubkey = activePubkey();
       if (pubkey) resolve(pubkey);
       return pubkey !== undefined;
     };
@@ -146,7 +130,7 @@ export function createProfileScopedStorage(
    */
   const mutateOwnedKey = (name: string, mutate: (key: string) => Promise<void>): Promise<void> => {
     if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
-    const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+    const pubkey = ownerPubkey ?? activePubkey();
     const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
     if (loaded && pubkey && loaded !== pubkey) {
       log.warn('profile.storage.cross_profile_write_refused', { store: name });
@@ -155,10 +139,10 @@ export function createProfileScopedStorage(
     return trackProfilePersistWrite(
       (async () => {
         await _migrationGate;
-        await ensureProfileStoreHydrated();
+        await whenLoaded(useProfileStore);
         // No profile existed when this was called (first launch): use whichever
         // exists now, or the bare key if there is still none.
-        await mutate(keyFor(name, pubkey ?? getActiveProfilePubkey()));
+        await mutate(keyFor(name, pubkey ?? activePubkey()));
       })()
     );
   };
@@ -167,8 +151,8 @@ export function createProfileScopedStorage(
     profileStorageOwner: ownerPubkey,
     getItem: async (name: string) => {
       await _migrationGate;
-      await ensureProfileStoreHydrated();
-      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+      await whenLoaded(useProfileStore);
+      const pubkey = ownerPubkey ?? activePubkey();
       const value = await AsyncStorage.getItem(keyFor(name, pubkey));
       // Recorded only once the read has succeeded, and only for a store that
       // follows the active profile; a captured owner cannot drift.

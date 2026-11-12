@@ -1,4 +1,4 @@
-import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
+import NDK, { type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { z } from 'zod';
 import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/features/feed/stores/ignoreStore';
 import {
@@ -9,58 +9,30 @@ import {
   type ReportReason,
 } from '@/features/feed/lib/moderation';
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { captureActiveProfile } from '@/shared/stores/global/profileStore';
+import {
+  MAX_FUTURE_SEC,
+  matchingSigner,
+  publishToRelaysRead,
+  readForEdit,
+  readNewestOwnEvent,
+  signOwnEvent,
+  signReplacement,
+  validOwnEvent,
+  type ReadForEdit,
+} from './ownReplaceableEvent';
 import { publishEvent } from './publish';
 import { getOwnWriteRelays } from './outbox/relayListStore';
 
 const Tags = z.array(z.array(z.string())).max(20_000);
 const queues = new WeakMap<NDK, Promise<unknown>>();
 
-/** Watches transitions, including switching away and back while a signer is open. */
-function captureProfile(pubkey: string) {
-  const initial = useProfileStore.getState();
-  let current =
-    initial.profiles.find((p) => p.accountIndex === initial.activeAccountIndex)?.pubkey === pubkey;
-  const dispose = useProfileStore.subscribe((state) => {
-    if (
-      state.activeAccountIndex !== initial.activeAccountIndex ||
-      state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey !== pubkey
-    )
-      current = false;
-  });
-  return {
-    check: () => {
-      if (!current) throw new Error('Profile changed');
-    },
-    dispose,
-  };
-}
-
-function validMuteEvent(event: NDKEvent, pubkey: string): boolean {
-  try {
-    return (
-      event.kind === 10000 &&
-      event.pubkey === pubkey &&
-      Number.isSafeInteger(event.created_at) &&
-      (event.created_at ?? -1) >= 0 &&
-      event.id === event.getEventHash() &&
-      event.verifySignature(false) === true
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function matchingSigner(ndk: NDK, pubkey: string) {
-  const signer = ndk.signer;
-  if (!signer || (await signer.user()).pubkey !== pubkey || ndk.signer !== signer)
-    throw new Error('Account signer is not ready');
-  return signer;
-}
-
 export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string): Promise<MuteList> {
-  if (!validMuteEvent(event, pubkey)) throw new Error('Invalid mute list');
-  if (event.content.length > 1_000_000 || event.created_at! > Math.floor(Date.now() / 1000) + 60)
+  if (!validOwnEvent(event, pubkey, 10000)) throw new Error('Invalid mute list');
+  if (
+    event.content.length > 1_000_000 ||
+    event.created_at! > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC
+  )
     throw new Error('Unsupported mute list');
   let privateTags: string[][] = [];
   if (event.content) {
@@ -75,62 +47,22 @@ export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string):
   return { id: event.id, createdAt: event.created_at!, tags: Tags.parse(event.tags), privateTags };
 }
 
-/** Fetch before editing a replaceable event; never replace unreadable encrypted entries. */
+const WAITING: Record<Extract<ReadForEdit, { status: 'waiting' }>['reason'], string> = {
+  'relay-list-unknown': 'Mute-list relays not known yet',
+  'no-relays': 'No mute-list relays configured',
+  'timed-out': 'Mute-list read timed out',
+  failed: 'Mute-list subscription failed',
+};
+
+/** Restore the list from the write relays held now, waiting for each of them. */
 async function readMuteList(ndk: NDK, pubkey: string): Promise<MuteList | null> {
-  const relayUrls = [...new Set(getOwnWriteRelays())];
-  if (relayUrls.length === 0) throw new Error('No mute-list relays configured');
-  const latest = await new Promise<NDKEvent | undefined>((resolve, reject) => {
-    let newest: NDKEvent | undefined;
-    let settled = false;
-    const pending = new Set(relayUrls);
-    const subscriptions: ReturnType<NDK['subscribe']>[] = [];
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      for (const subscription of subscriptions) subscription.stop();
-      if (error) reject(error);
-      else resolve(newest);
-    };
-    const timer = setTimeout(() => finish(new Error('Mute-list read timed out')), 12_000);
-    try {
-      for (const url of relayUrls) {
-        // A multi-relay NDK subscription may emit EOSE before all relays finish,
-        // and emits it only once. Independent reads require every relay's actual
-        // response before a replaceable list can safely be edited.
-        const relays = NDKRelaySet.fromRelayUrls([url], ndk);
-        const subscription = ndk.subscribe(
-          { kinds: [10000], authors: [pubkey] },
-          { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY, closeOnEose: false },
-          relays,
-          false
-        );
-        subscriptions.push(subscription);
-        subscription.on('event', (event: NDKEvent) => {
-          if (settled || !validMuteEvent(event, pubkey)) return;
-          if (
-            !newest ||
-            event.created_at! > newest.created_at! ||
-            (event.created_at === newest.created_at && event.id < newest.id)
-          )
-            newest = event;
-        });
-        subscription.on('eose', () => {
-          if (![...relays.relays].every((relay) => subscription.eosesSeen.has(relay))) return;
-          pending.delete(url);
-          if (pending.size === 0) finish();
-        });
-        void subscription.start().catch(() => finish(new Error('Mute-list subscription failed')));
-      }
-    } catch {
-      finish(new Error('Mute-list subscription failed'));
-    }
-  });
-  return latest ? decodeMuteList(ndk, latest, pubkey) : null;
+  const read = await readNewestOwnEvent(ndk, pubkey, 10000);
+  if (read.outcome !== 'complete') throw new Error(WAITING[read.outcome]);
+  return read.newest ? decodeMuteList(ndk, read.newest, pubkey) : null;
 }
 
 export async function syncMuteList(ndk: NDK, pubkey: string): Promise<void> {
-  const scope = captureProfile(pubkey);
+  const scope = captureActiveProfile(pubkey);
   try {
     if (!useFeedIgnoreStore.persist.hasHydrated())
       throw new Error('Moderation preferences are loading');
@@ -156,7 +88,7 @@ export function setPersonBlocked(
 ): Promise<void> {
   const pubkey = normalizeIgnoreHex(target);
   if (!pubkey || pubkey === ownPubkey) return Promise.reject(new Error('Invalid block target'));
-  const scope = captureProfile(ownPubkey);
+  const scope = captureActiveProfile(ownPubkey);
   try {
     scope.check();
   } catch (error) {
@@ -179,7 +111,13 @@ export function setPersonBlocked(
       scope.check();
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
-      const fetched = await readMuteList(ndk, ownPubkey);
+      // The edit waits until this session knows the account's relays and has
+      // read them all, a relay silent read after read left out.
+      const read = await readForEdit(ndk, ownPubkey, 10000);
+      scope.check();
+      if (read.status === 'waiting') throw new Error(WAITING[read.reason]);
+      // Never replace unreadable encrypted entries.
+      const fetched = read.newest ? await decodeMuteList(ndk, read.newest, ownPubkey) : null;
       scope.check();
       const cached = useFeedIgnoreStore.getState().muteList;
       const base = (fetched && isNewerMuteList(fetched, cached) ? fetched : cached) ?? {
@@ -188,7 +126,7 @@ export function setPersonBlocked(
         tags: [],
         privateTags: [],
       };
-      // readMuteList only returns empty after the configured relays answer;
+      // `fetched` is empty only after every relay read answered;
       // a timeout or unreadable list must never create a replacement.
       if (fetched) useFeedIgnoreStore.getState().receiveMuteList(fetched);
       let next = base;
@@ -202,25 +140,17 @@ export function setPersonBlocked(
         'nip44'
       );
       scope.check();
-      const event = new NDKEvent(ndk);
-      event.kind = 10000;
-      event.pubkey = ownPubkey;
-      event.created_at = Math.max(Math.floor(Date.now() / 1000), base.createdAt + 1);
-      event.tags = next.tags;
-      event.content = content;
-      await event.sign(signer);
-      scope.check();
-      if (event.pubkey !== ownPubkey || ndk.signer !== signer)
-        throw new Error('Account signer changed');
+      const event = await signReplacement(ndk, signer, scope, {
+        kind: 10000,
+        pubkey: ownPubkey,
+        replaces: base.createdAt,
+        tags: next.tags,
+        content,
+      });
       const latestKnown = useFeedIgnoreStore.getState().muteList;
       if (latestKnown && isNewerMuteList(latestKnown, base))
         throw new Error('Mute list changed; retry sync');
-      const published = await publishEvent({
-        ndk,
-        event,
-        relays: getOwnWriteRelays(),
-        resolveOn: 'all-settled',
-      });
+      const published = await publishToRelaysRead(ndk, event, read.relays);
       scope.check();
       if (published.isErr()) throw new Error('No relay accepted the mute list');
       const accepted = {
@@ -249,20 +179,18 @@ export async function publishReport(
   reason: ReportReason,
   publicEventId?: NostrEventId
 ): Promise<void> {
-  const scope = captureProfile(ownPubkey);
+  const scope = captureActiveProfile(ownPubkey);
   try {
     scope.check();
-    const event = new NDKEvent(ndk);
-    event.kind = 1984;
-    event.pubkey = ownPubkey;
-    event.tags = reportTags(target, reason, publicEventId);
-    event.content = '';
+    const tags = reportTags(target, reason, publicEventId);
     const signer = await matchingSigner(ndk, ownPubkey);
     scope.check();
-    await event.sign(signer);
-    scope.check();
-    if (event.pubkey !== ownPubkey || ndk.signer !== signer)
-      throw new Error('Account signer changed');
+    const event = await signOwnEvent(ndk, signer, scope, {
+      kind: 1984,
+      pubkey: ownPubkey,
+      tags,
+      content: '',
+    });
     const result = await publishEvent({
       ndk,
       event,

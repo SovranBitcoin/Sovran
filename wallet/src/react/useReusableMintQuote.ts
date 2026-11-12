@@ -18,21 +18,21 @@ type ReusableMintQuote = Awaited<
   ReturnType<Manager["quotes"]["mint"]["create"]>
 >;
 
-export interface UseReusableMintQuoteResult {
+interface UseReusableMintQuoteResult {
   /** The standing quote (offer/address in `quote.request`), null while loading. */
   quote: ReusableMintQuote | null;
   isLoading: boolean;
   /** Why the last load failed; `authored` says whether the message can be shown as is. */
   error: FailureText | null;
-  /** Re-run get-or-create (e.g. after the quote expired). */
-  refresh: () => void;
   /**
    * Retire the standing quote and record a fresh one (onchain address-reuse
    * policy). Keeps showing the current quote until the replacement resolves.
    * `reason` distinguishes a user "new address" tap (`"manual"`, default) from
    * an automatic deposit-detected rotation (`"deposit_received"`).
+   * Resolves `true` once the replacement is recorded, `false` when it was not
+   * (the current quote stays and `error` says why).
    */
-  rotate: (reason?: "manual" | "deposit_received") => Promise<void>;
+  rotate: (reason?: "manual" | "deposit_received") => Promise<boolean>;
 }
 
 /**
@@ -200,8 +200,6 @@ export function useReusableMintQuote(
     });
   }, [mintUrl, method, unit]);
 
-  const refresh = useCallback(() => setGeneration((g) => g + 1), []);
-
   // The dep list names the refs too. It used to read
   // `[manager, mintUrl, method, unit]` while the body also reached
   // `identityStoreRef`/`mountedRef`, and a memo the compiler cannot preserve
@@ -210,19 +208,20 @@ export function useReusableMintQuote(
   // not running (Jest), not only once compiled.
   const rotate = useCallback(
     async (reason: "manual" | "deposit_received" = "manual") => {
-      if (!mintUrl || !method || !unit) return;
+      if (!mintUrl || !method || !unit) return false;
       const outcome = await rotateReusableQuote(
         manager,
         { mintUrl, method, unit },
         identityStoreRef.current,
         reason,
       );
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return outcome.ok;
       if (outcome.ok) setQuote(outcome.quote);
       else setError(outcome.failure);
+      return outcome.ok;
     },
     [manager, mintUrl, method, unit, identityStoreRef, mountedRef],
   );
 
-  return { quote, isLoading, error, refresh, rotate };
+  return { quote, isLoading, error, rotate };
 }

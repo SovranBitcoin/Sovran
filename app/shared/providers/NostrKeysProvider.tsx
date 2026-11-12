@@ -86,10 +86,7 @@ interface NostrKeysProviderProps {
 export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKeysProviderProps) {
   useInitMount('NostrKeysProvider');
   const locked = useSecureStoreState((s) => s.secureStoreState === 'locked');
-  const stage = useInitializationStage('nostr', {
-    message: 'Initializing keys...',
-    dependsOn: ['global-migrations'],
-  });
+  const stage = useInitializationStage('nostr');
   const { value: mnemonic, loading: mnemonicLoading, refresh: refreshMnemonic } = useMnemonic();
   const [keys, setKeys] = useState<NostrKeys | null>(null);
   const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);

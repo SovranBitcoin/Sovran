@@ -1,4 +1,5 @@
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
+import { supersedes } from 'nostr';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -38,11 +39,35 @@ type EngagementRecord = {
  */
 const MAX_ENGAGEMENT_ENTRIES = 5000;
 
+/**
+ * One person's follow as the person last asked for it. `pending: true` is an
+ * intent not yet published in a follow list: a desired state, also after a
+ * restart, never proof that a publish is running (that lives in memory, in
+ * `followSync`). `pending: false` is only in data older releases wrote; it is
+ * shown until the follow list agrees with it.
+ */
 type FollowOptimisticState = {
   value: boolean;
   pending: boolean;
   updatedAt: number;
 };
+
+/**
+ * What the saved fields say about the account's own follow list.
+ *
+ * - `unknown`: no list and no seed was ever loaded for the account.
+ * - `known`: a list (from relays) or a seed (from nagg or Primal) was loaded;
+ *   `updatedAt` is the newest one's `created_at`, and `eventId` the id of the
+ *   list behind it when this session took that list in. The saved fields hold
+ *   no id, so after a restart, and after a seed, it is not known.
+ *
+ * Decoded from the saved fields, which stay as they are. The saved raw tags
+ * are never a base for a publish: the stamp is shared with seeds, so they can
+ * be older than `updatedAt` says. `followSync` builds only on the list a
+ * complete relay read just returned.
+ */
+export type ContactList =
+  { status: 'unknown' } | { status: 'known'; updatedAt: number; eventId: string | undefined };
 
 type EngagementOptimisticState = {
   value: boolean;
@@ -89,6 +114,13 @@ interface NostrSocialState {
   /** unix seconds (kind-3 `created_at`); persisted under this name */
   contactsUpdatedAt: number;
   followingPubkeys: Record<string, true>;
+  /**
+   * In memory only, never saved: the id of the relay list whose `tags` are
+   * `contactsTags`, so a list from the same second can be told apart (the
+   * lower id wins). It names the held list only while `tags` is the very array
+   * the store holds: a load from storage replaces that array, a seed clears it.
+   */
+  contactsEvent: { id: string; tags: string[][] } | null;
 
   /**
    * Target event id → our engagement record (liked / reposted / replied). One
@@ -117,19 +149,22 @@ interface NostrSocialActions {
     tags: string[][];
     content: string;
     createdAtSec: number;
+    eventId: string;
   }) => void;
   /**
    * Seed the read-side follow set from the tiered facade's social-graph bundle
    * (nagg → Primal → relay). Read-only accelerator: it sets `followingPubkeys`
-   * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the raw
-   * kind-3 from `useOwnEventsSync`'s relay sub stays the write-authoritative
-   * source for follow/unfollow re-publish (it preserves relay hints + petnames
-   * the facade's parsed `follows` drop). LWW-gated by the kind-3 `created_at` so
-   * a facade seed and a relay delta can't fight — the newer contact list wins.
+   * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the
+   * facade's parsed `follows` drop the relay hints and petnames, so only a raw
+   * kind-3 can be built on (see `followSync`). LWW-gated by the kind-3
+   * `created_at` so a facade seed and a relay delta can't fight — the newer
+   * contact list wins.
    */
   seedFollowsFromFacade: (params: { follows: string[]; createdAtSec: number }) => void;
-  setFollowOptimistic: (pubkey: string, value: boolean, pending: boolean) => void;
-  clearFollowOptimistic: (pubkey: string) => void;
+  /** Record the person's tap; `followSync` publishes it. */
+  setFollowIntent: (pubkey: string, value: boolean) => void;
+  /** Drop the given intents, each only if no newer tap replaced it. */
+  settleFollowIntents: (intents: Record<string, FollowOptimisticState>) => void;
   clearSettledFollowOptimistic: () => void;
 
   markRepostDeleted: (originalEventId: string) => void;
@@ -196,6 +231,11 @@ type NostrSocialStore = NostrSocialState & NostrSocialActions;
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** The id of the held list, when this session took it in. */
+function heldContactsEventId(state: NostrSocialState): string | undefined {
+  return state.contactsEvent?.tags === state.contactsTags ? state.contactsEvent.id : undefined;
+}
+
 function extractFollowingFromTags(tags: string[][]): Record<string, true> {
   const map: Record<string, true> = {};
   for (const tag of tags) {
@@ -204,6 +244,24 @@ function extractFollowingFromTags(tags: string[][]): Record<string, true> {
     }
   }
   return map;
+}
+
+function sameKeys(a: Record<string, true>, b: Record<string, true>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => b[key]);
+}
+
+/**
+ * Whether `tags` and `content` are the list the store holds: the same follows
+ * and, unless the saved tags are an older list's left under a seed (their
+ * follows are not the held ones), the same tags and content.
+ */
+function holdsHeldList(state: NostrSocialState, tags: string[][], content: string): boolean {
+  if (!sameKeys(extractFollowingFromTags(tags), state.followingPubkeys)) return false;
+  if (!sameKeys(extractFollowingFromTags(state.contactsTags), state.followingPubkeys)) return true;
+  return (
+    state.contactsContent === content && JSON.stringify(state.contactsTags) === JSON.stringify(tags)
+  );
 }
 
 /** Delete a key from a record immutably. */
@@ -334,6 +392,7 @@ const INITIAL_STATE: NostrSocialState = {
   contactsContent: '',
   contactsUpdatedAt: 0,
   followingPubkeys: {},
+  contactsEvent: null,
   engagementByEventId: {},
   deletedRepostOriginalIds: {},
   deletedNoteIds: {},
@@ -384,11 +443,12 @@ const PersistedZappedRecord = z.looseObject({
 });
 
 const PersistedNostrSocialStore = z.object({
-  contactsTags: z
-    .array(z.array(z.string().max(2048)).max(16))
-    .max(50_000)
-    .default([]),
-  contactsContent: z.string().max(65_536).default(''),
+  // The newest own kind-3, read with no limit, as it was saved: 0.1.3 stored
+  // it as the relay sent it, and any limit here would discard the whole
+  // journal. It is what the next follow or unfollow is built from, so it is
+  // never clipped, reordered or filtered.
+  contactsTags: z.array(z.array(z.string())).default([]),
+  contactsContent: z.string().default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
   // Tolerant: the follow set is a set — the `true` carries no information, so
   // a corrupt value has nothing to fall back to. Bare, one bad entry would
@@ -421,9 +481,22 @@ export const useNostrSocialStore = create<NostrSocialStore>({
 
       // ---- contacts ----
 
-      setContactsFromRelay: ({ tags, content, createdAtSec }) => {
+      setContactsFromRelay: ({ tags, content, createdAtSec, eventId }) => {
         set((state) => {
-          if (createdAtSec < state.contactsUpdatedAt) {
+          // Of two lists from the same second the lower id wins, as on relays.
+          // Without the held list's id (loaded from storage, or a seed) only
+          // the held list itself is taken, which records its id; any other
+          // could be the one relays drop, and building on it would lose follows.
+          const held = heldContactsEventId(state);
+          const sameSecondKept =
+            createdAtSec === state.contactsUpdatedAt &&
+            (held === undefined
+              ? !holdsHeldList(state, tags, content)
+              : !supersedes(
+                  { created_at: createdAtSec, id: eventId },
+                  { created_at: createdAtSec, id: held }
+                ));
+          if (createdAtSec < state.contactsUpdatedAt || sameSecondKept) {
             storeLog.debug('social.contacts.stale', {
               createdAtSec,
               current: state.contactsUpdatedAt,
@@ -441,6 +514,7 @@ export const useNostrSocialStore = create<NostrSocialStore>({
             contactsContent: content,
             contactsUpdatedAt: createdAtSec,
             followingPubkeys: following,
+            contactsEvent: { id: eventId, tags },
           };
         });
       },
@@ -464,27 +538,40 @@ export const useNostrSocialStore = create<NostrSocialStore>({
             createdAtSec,
           });
           // Read side only — no `contactsTags`/`content`; the relay sub owns those.
-          return { followingPubkeys: following, contactsUpdatedAt: createdAtSec };
+          return {
+            followingPubkeys: following,
+            contactsUpdatedAt: createdAtSec,
+            contactsEvent: null,
+          };
         });
       },
 
       // ---- follow optimistic ----
 
-      setFollowOptimistic: (pubkey, value, pending) => {
-        storeLog.debug('social.follow.optimistic', { pubkey: pubkey.slice(0, 8), value, pending });
+      setFollowIntent: (pubkey, value) => {
+        storeLog.debug('social.follow.intent', { pubkey: pubkey.slice(0, 8), value });
         set((state) => ({
           optimisticFollowsByPubkey: withOptimisticEntry(state.optimisticFollowsByPubkey, pubkey, {
             value,
-            pending,
+            pending: true,
           }),
         }));
       },
 
-      clearFollowOptimistic: (pubkey) => {
-        storeLog.debug('social.follow.optimistic.clear', { pubkey: pubkey.slice(0, 8) });
-        set((state) => ({
-          optimisticFollowsByPubkey: omitKey(state.optimisticFollowsByPubkey, pubkey),
-        }));
+      settleFollowIntents: (intents) => {
+        set((state) => {
+          let next = state.optimisticFollowsByPubkey;
+          for (const [pubkey, intent] of Object.entries(intents)) {
+            const current = next[pubkey];
+            if (current?.value === intent.value && current.updatedAt === intent.updatedAt)
+              next = omitKey(next, pubkey);
+          }
+          if (next === state.optimisticFollowsByPubkey) return state;
+          storeLog.debug('social.follow.intent.settled', {
+            settled: Object.keys(state.optimisticFollowsByPubkey).length - Object.keys(next).length,
+          });
+          return { optimisticFollowsByPubkey: next };
+        });
       },
 
       clearSettledFollowOptimistic: () => {
@@ -734,6 +821,27 @@ export const useNostrSocialStore = create<NostrSocialStore>({
 // ---------------------------------------------------------------------------
 // Selectors
 // ---------------------------------------------------------------------------
+
+export function selectContactList(state: NostrSocialState): ContactList {
+  const loaded =
+    state.contactsUpdatedAt > 0 ||
+    state.contactsTags.length > 0 ||
+    !!state.contactsContent ||
+    Object.keys(state.followingPubkeys).length > 0;
+  return loaded
+    ? { status: 'known', updatedAt: state.contactsUpdatedAt, eventId: heldContactsEventId(state) }
+    : { status: 'unknown' };
+}
+
+/** Follows and unfollows the person asked for that no published list holds yet. */
+export function selectFollowIntents(
+  state: NostrSocialState
+): Record<string, FollowOptimisticState> {
+  const intents: Record<string, FollowOptimisticState> = {};
+  for (const [pubkey, entry] of Object.entries(state.optimisticFollowsByPubkey))
+    if (entry.pending) intents[pubkey] = entry;
+  return intents;
+}
 
 export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialStore) => {
   const optimistic = state.optimisticFollowsByPubkey[pubkey];

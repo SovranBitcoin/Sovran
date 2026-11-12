@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isPaymentRequestPreview } from 'wallet';
+import { decodePaymentRequestEntryPhase } from 'wallet';
 import { useScreenActions } from 'wallet/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -77,7 +77,8 @@ export function PaymentRequestScreen({
   const nostrSent =
     entry.metadata?.nostrSent === 'true' ||
     (entry.metadata?.transportType === 'http' && entry.metadata?.phase === 'delivered');
-  const isPreview = isPaymentRequestPreview({ ...entry } as Record<string, unknown>);
+  const isPreview =
+    decodePaymentRequestEntryPhase({ ...entry } as Record<string, unknown>).kind === 'preview';
   log.debug('send.payment_request.render', {
     isPreview,
     amount: entry.amount,

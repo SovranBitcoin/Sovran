@@ -64,3 +64,72 @@ To run one fixture while writing it, listed or not:
 
 The completeness test fails with the missing piece named when a version is bumped, a store
 changes, or `epochs.py builds` records a release that no fixture claims.
+
+## Published releases and declarative cases
+
+Run `bun run persistence status` from the repository root for the corpus, or add `--json` for
+release/build mappings and the input fields without a direct named assertion. `published.json`
+keeps independent Apple history, pipeline channel confirmations, GitHub releases/APKs, and EAS
+installable-build evidence. A version may span more than one epoch: all candidates stay visible.
+Neither an EAS build nor a GitHub release without an uploaded APK proves Android publication.
+Unknown source commits and incomplete public Android history remain named limitations.
+
+`bun run persistence refresh` explicitly reads online sources and updates that local catalog;
+it publishes nothing. Review and commit its diff. CI uses the committed evidence offline. A
+new observed version without any fixture mapping fails the checks. Historical observations are
+retained even if an upstream history page shrinks. If the newest fixture has become installable,
+the frozen-data test now requires its hash too; it is no longer editable merely because it is last.
+
+All existing disks run automatically. Additional store cases are data in `cases.json`. A
+`preserve` declaration sets those historical saved fields and requires the same values in the
+current store **and on disk**, after each of three launches. It does not calculate expectations
+by running the migrator. For example:
+
+```json
+{
+  "id": "restore-pending",
+  "epoch": "E19",
+  "store": "wallet-lifecycle",
+  "source": {
+    "commit": "d9ad12c4b",
+    "path": "app/shared/stores/global/walletLifecycleStore.ts:36-41",
+    "reason": "The released restore record allowed a pending restore with a pre-existing seed."
+  },
+  "storageKey": "wallet-lifecycle",
+  "preserve": {
+    "restoreStatus": "pending",
+    "seedCreatedAt": null
+  }
+}
+```
+
+Use a new id when adding a case. Profile cases also name `accountIndex`; their scoped source
+and destination keys must belong to that account. Set `currentKey` when an old key moves during
+upgrade. For nested edits or transformations, the explicit `rows`, `replaces`, `facts` and
+`diskFacts` form in `cases.ts` separates raw input from independent expected current values.
+A replacement assertion cannot silently remove an unrelated baseline fact or hide a known gap.
+All untouched identity, retained-byte, account, defaulting and legacy ecash checks still run.
+
+Start a declaration with
+`bun run persistence scaffold --epoch E19 --store wallet-lifecycle --case my-case`.
+It prints a template; it changes no fixture and its incomplete source placeholders are rejected.
+Add the completed object to `cases.json`, citing the old writer, then run a focused check:
+
+```sh
+bun run persistence check --version 0.1.3 --store wallet-lifecycle --case restore-failed --out /tmp/upgrade.json
+```
+
+The candidate is the checked-out tree, including a PR targeting the repository's default branch
+(`main`). A case is executed once per epoch, not once per build label. Filters that match nothing
+fail. The JSON report associates the actual executed cases with published versions/builds and
+records candidate/dirty-tree provenance. Failure titles name epoch, case, store, account, field
+and launch; expected and actual values come from the real startup result. Legacy fixture-writing
+and selection environment variables are refused by this command. A fresh report is staged for
+each run so an old passing result cannot be relabelled after a failed process.
+
+Existing `bun run test:upgrade` includes the declarations and release coverage checks alongside
+the original release and Coco database tests. The normal CI app suite discovers them too. Raw
+field evidence in `status --json` is a guide to missing cases, not a claim that every enum,
+boundary or combination is tested. Add meaningful non-default and boundary cases when a store
+changes; schema snapshots and generated scaffolds cannot choose the preservation rule for you.
+These tests do not replace native backend, keychain or backup/restore verification.

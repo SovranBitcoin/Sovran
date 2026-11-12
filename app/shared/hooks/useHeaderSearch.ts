@@ -5,7 +5,7 @@ import { log } from '@/shared/lib/logger';
 /**
  * Shared search toggle state machine for header search UIs.
  *
- * Used by contacts layout and mint add screen to provide a consistent
+ * Used by `SearchLayout` and the mint add screen to provide a consistent
  * "search icon → search bar → X close" interaction pattern.
  */
 export function useHeaderSearch() {

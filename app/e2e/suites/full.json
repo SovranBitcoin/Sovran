@@ -110,6 +110,7 @@
     {"id":"send.mock-fail.ecash","file":"scenarios/send-mock-fail-ecash.json","order":400,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
     {"id":"transactions.filter.direction","file":"scenarios/transactions-filter-direction.json","order":410,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
     {"id":"send.offline.ecash","file":"scenarios/send-offline-ecash.json","order":420,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","unit.sat","device.network"],"endState":"wallet"},
+    {"id":"settings.relay-review-cancel","file":"scenarios/settings-relay-review-cancel.json","order":429,"newInstance":true,"lane":"simulator","requires":["fresh-install","relay.controlled"],"endState":"wallet"},
     {"id":"settings.notification-policy","file":"scenarios/settings-notification-policy.json","order":430,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.routing.navigate","file":"scenarios/settings-routing-navigate.json","order":434,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.notification-policy.relaunch","file":"scenarios/settings-notification-policy-relaunch.json","order":432,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

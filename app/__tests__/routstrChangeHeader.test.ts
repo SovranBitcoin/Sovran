@@ -1,16 +1,10 @@
-import {
-  checkBalance,
-  sendMessage,
-  topUpBalance,
-  setRoutstrNodeBaseUrl,
-} from '@/shared/lib/routstr/api';
+import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { apiLog, aiLog } from '@/shared/lib/logger';
 
 let mockProfile = 0;
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: mockProfile,
       profiles: [
@@ -18,8 +12,14 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
         { accountIndex: 1, pubkey: 'b'.repeat(64) },
       ],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
@@ -76,15 +76,8 @@ const completion = () =>
 
     max_tokens: 4096,
   });
-// A chat completion no longer carries a stored credential — it pays per
-// request out of the wallet — so it is not part of this matrix. The wallet
-// operations below still hold a node-issued key and still rotate it.
-const operations = [
-  ['balance', (key: string) => checkBalance(key)],
-  ['topup', (key: string) => topUpBalance({ apiKey: key, cashuToken: 'cashuA-test-topup' })],
-] as const;
 const response = (status = 200, message = 'upstream unavailable', change = 'cashuB-test-change') =>
-  new Response(JSON.stringify(status === 200 ? { balance: 10, msats: 10 } : { detail: message }), {
+  new Response(JSON.stringify(status === 200 ? { balance: 10 } : { detail: message }), {
     status,
     headers: { 'x-cashu': change, 'content-type': 'application/json' },
   });
@@ -105,20 +98,6 @@ describe('Routstr response credentials', () => {
     jest.restoreAllMocks();
   });
 
-  it.each(operations)(
-    '%s adopts change on both success and error before reading the body',
-    async (_, run) => {
-      const fetchMock = jest.spyOn(globalThis, 'fetch');
-      for (const status of [200, 402, 500]) {
-        useRoutstrStore.getState().setApiKey('cashuA-test-original');
-        fetchMock.mockResolvedValueOnce(response(status));
-        await run('cashuA-test-original').catch(() => undefined);
-        expect(useRoutstrStore.getState().apiKey).toBe('cashuB-test-change');
-      }
-      expect(aiLog.info).toHaveBeenCalledWith('routstr.change_token.applied');
-    }
-  );
-
   it('banks the change without waiting for the stream to be consumed', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('data: [DONE]\n', {
@@ -135,71 +114,6 @@ describe('Routstr response credentials', () => {
     for await (const _chunk of stream) {
       /* empty fixture */
     }
-  });
-
-  it.each(operations)('%s never overwrites an sk key', async (_, run) => {
-    useRoutstrStore.getState().setApiKey('sk-test');
-    jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
-    await run('sk-test');
-    expect(useRoutstrStore.getState().apiKey).toBe('sk-test');
-  });
-
-  it.each(['profile', 'key', 'node'])(
-    'rejects late response mutations after a %s change',
-    async (change) => {
-      jest.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
-        if (change === 'profile') mockProfile = 1;
-        if (change === 'key') useRoutstrStore.getState().setApiKey('cashuB-newer');
-        if (change === 'node') setRoutstrNodeBaseUrl('https://other-node.example');
-        return response(401, 'Expired key');
-      });
-      await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
-      expect(useRoutstrStore.getState().apiKey).toBe(
-        change === 'key' ? 'cashuB-newer' : 'cashuA-test-original'
-      );
-      expect(useRoutstrStore.getState().balance).toBe(999);
-    }
-  );
-
-  it.each([
-    'Invalid key',
-    'Expired key',
-    'Spent token',
-    'Unknown key',
-    'Key not found',
-    'Revoked key',
-  ])('retires a definitively rejected key without destroying it: %s', async (message) => {
-    useRoutstrStore.setState({ nodeBaseUrl: 'https://old.example', balance: 250_000 });
-    jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, message, ''));
-    await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
-
-    expect(useRoutstrStore.getState().apiKey).toBeNull();
-    expect(useRoutstrStore.getState().balance).toBeNull();
-    // The key is the only bearer instrument for whatever was deposited, and
-    // this message cannot distinguish "the issuing node says it is spent" from
-    // "a node that never issued it has never heard of it". Archive, so reclaim
-    // can ask each node later.
-    expect(useRoutstrStore.getState().legacyAccounts['https://old.example']).toMatchObject({
-      apiKey: 'cashuA-test-original',
-      lastKnownBalanceMsats: 250_000,
-      reclaimedAt: null,
-    });
-  });
-
-  it.each(['Unauthorized', 'Authentication service unavailable'])(
-    'keeps the key for an ambiguous 401: %s',
-    async (message) => {
-      jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, message, ''));
-      await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
-      expect(useRoutstrStore.getState().apiKey).toBe('cashuA-test-original');
-      expect(apiLog.warn).toHaveBeenCalledWith('routstr.auth.kept_key');
-    }
-  );
-
-  it('preserves returned change on a spent-key 401', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, 'Spent token'));
-    await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
-    expect(useRoutstrStore.getState().apiKey).toBe('cashuB-test-change');
   });
 
   it('pays a completion with a freshly minted token, not a stored key', async () => {
@@ -235,6 +149,11 @@ describe('Routstr response credentials', () => {
     // would charge the user for being turned away.
     expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change', {
       probeSpent: false,
+    });
+    // A key an older release saved is left exactly as it was, for reclaim.
+    expect(useRoutstrStore.getState()).toMatchObject({
+      apiKey: 'cashuA-test-original',
+      balance: 999,
     });
   });
 

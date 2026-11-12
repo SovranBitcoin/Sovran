@@ -7,13 +7,18 @@
  * Includes filter button in header right that opens filter sheet.
  *
  * Validates the deep-link `filter*` params at the route boundary per
- * AUDIT.md dim-5 — strings are downcast to closed unions.
+ * AUDIT.md dim-5 — strings are downcast to closed unions
+ * (`TransactionsRouteParamsSchema`).
  */
 
 import React, { useCallback } from 'react';
 import { Stack } from 'expo-router';
-import { z } from 'zod';
-import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
+import {
+  TransactionsScreen,
+  filtersFromTransactionsParams,
+  TransactionsRouteParamsSchema,
+  useTransactionsFilter,
+} from '@/features/transactions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { HistoryEntry } from '@cashu/coco-core';
@@ -25,25 +30,14 @@ import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailR
 import { withAlpha } from '@/shared/lib/color';
 import { cashuLog } from '@/shared/lib/logger';
 
-const ParamsSchema = z.object({
-  filterCurrency: z.string().max(16).optional(),
-  filterPaymentType: z.enum(['all', 'lightning', 'ecash', 'onchain']).optional(),
-  filterDirection: z.enum(['all', 'incoming', 'outgoing']).optional(),
-  filterStatus: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
-  filterMintUrl: z.string().max(2048).optional(),
-  filterSource: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
-  filterLock: z.enum(['all', 'locked', 'unlocked']).optional(),
-  filterCounterparty: z.enum(['all', 'with']).optional(),
-  filterZap: z.enum(['all', 'zaps']).optional(),
-});
-
 function FilterButton() {
   const [foreground, accent, accentForeground] = useThemeColor([
     'foreground',
     'accent',
     'accent-foreground',
   ] as const);
-  const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
+  const { openFilterSheet, activeFilterCount } = useTransactionsFilter();
+  const hasActiveFilters = activeFilterCount > 0;
 
   return (
     <ScreenHeaderAction
@@ -69,30 +63,12 @@ function FilterButton() {
 }
 
 function TransactionsRoute() {
-  const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.transactions' });
-  const {
-    currency,
-    paymentType,
-    direction,
-    status,
-    mintUrl,
-    source,
-    lock,
-    counterparty,
-    zap,
-    selectedMonth,
-    setSelectedMonth,
-    setCurrency,
-    setPaymentType,
-    setDirection,
-    setStatus,
-    setMintUrl,
-    setSource,
-    setLock,
-    setCounterparty,
-    setZap,
-  } = useTransactionsFilter();
+  const params = useRouteParams(TransactionsRouteParamsSchema, {
+    where: 'transactions-flow.transactions',
+  });
+  const { filters, updateFilters, selectedMonth, setSelectedMonth } = useTransactionsFilter();
 
+  // Sync filter params from URL to context (when returning from filter flow)
   const filterCurrency = params?.filterCurrency;
   const filterPaymentType = params?.filterPaymentType;
   const filterDirection = params?.filterDirection;
@@ -102,9 +78,18 @@ function TransactionsRoute() {
   const filterLock = params?.filterLock;
   const filterCounterparty = params?.filterCounterparty;
   const filterZap = params?.filterZap;
-
-  // Sync filter params from URL to context (when returning from filter flow)
   React.useEffect(() => {
+    const changes = filtersFromTransactionsParams({
+      filterCurrency,
+      filterPaymentType,
+      filterDirection,
+      filterStatus,
+      filterMintUrl,
+      filterSource,
+      filterLock,
+      filterCounterparty,
+      filterZap,
+    });
     const activeParamKeys = [
       filterCurrency ? 'filterCurrency' : null,
       filterPaymentType ? 'filterPaymentType' : null,
@@ -122,15 +107,7 @@ function TransactionsRoute() {
         hasFilterMintUrl: !!filterMintUrl,
       });
     }
-    if (filterCurrency) setCurrency(filterCurrency);
-    if (filterPaymentType) setPaymentType(filterPaymentType);
-    if (filterDirection) setDirection(filterDirection);
-    if (filterStatus) setStatus(filterStatus);
-    if (filterMintUrl) setMintUrl(filterMintUrl);
-    if (filterSource) setSource(filterSource);
-    if (filterLock) setLock(filterLock);
-    if (filterCounterparty) setCounterparty(filterCounterparty);
-    if (filterZap) setZap(filterZap);
+    updateFilters(changes);
   }, [
     filterCurrency,
     filterPaymentType,
@@ -141,15 +118,7 @@ function TransactionsRoute() {
     filterLock,
     filterCounterparty,
     filterZap,
-    setCurrency,
-    setPaymentType,
-    setDirection,
-    setStatus,
-    setMintUrl,
-    setSource,
-    setLock,
-    setCounterparty,
-    setZap,
+    updateFilters,
   ]);
 
   // Handle transaction press — declared before the early-return so the hook
@@ -173,16 +142,8 @@ function TransactionsRoute() {
       />
 
       <TransactionsScreen
-        initialTab={status}
+        filters={filters}
         onTransactionPress={handleTransactionPress}
-        filterCurrency={currency}
-        filterPaymentType={paymentType}
-        filterDirection={direction}
-        filterMintUrl={mintUrl}
-        filterSource={source}
-        filterLock={lock}
-        filterCounterparty={counterparty}
-        filterZap={zap}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
       />

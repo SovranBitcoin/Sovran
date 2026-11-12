@@ -24,6 +24,7 @@ import {
   shouldApplyEntryUpdate,
 } from '../../src/screen-actions/createManager';
 import { normalizeHistoryEntry } from '../../src/history/normalize';
+import { decodePaymentRequestEntryPhase } from '../../src/screen-actions/paymentRequestPhase';
 
 const MINT1 = 'https://mint1.example.com';
 const MINT2 = 'https://mint2.example.com';
@@ -395,6 +396,68 @@ describe('mergeEntryUpdate — phase upgrade on operationId', () => {
     };
     const merged = mergeEntryUpdate(current, updated);
     expect((merged.metadata as any).phase).toBe('custom-phase');
+  });
+
+  it('keeps phase "preview" when the only operation id is the preview id', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      state: 'prepared',
+      metadata: { paymentRequest: 'creq...', phase: 'preview' },
+    };
+    const updated = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      state: 'prepared',
+      operationId: 'pr-preview-123',
+      metadata: { operationId: 'pr-preview-123' },
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('preview');
+    // Pay stays offered: the request never sent.
+    expect(decodePaymentRequestEntryPhase(merged).kind).toBe('preview');
+  });
+
+  // Writers only ever write a string: anything else names no operation, as
+  // the merge required before it asked the decoder.
+  it.each([42, true, ''])('keeps phase "preview" when the operation id is %j', (operationId) => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      metadata: { paymentRequest: 'creq...', phase: 'preview' },
+    };
+    const updated = { ...current, operationId, metadata: { operationId } };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('preview');
+    expect(decodePaymentRequestEntryPhase(merged).kind).toBe('preview');
+    expect(
+      decodePaymentRequestEntryPhase({ metadata: { phase: 'undelivered', operationId } }).kind,
+    ).toBe('unrecognised');
+  });
+
+  it('upgrades a melt preview\'s phase when its operation arrives, as before', () => {
+    const current = {
+      id: 'melt-preview-1',
+      type: 'melt',
+      mintUrl: MINT1,
+      amount: 100,
+      metadata: { phase: 'preview', meltTarget: 'user@wallet.com' },
+    };
+    const updated = {
+      id: 'melt-op-1',
+      type: 'melt',
+      mintUrl: MINT1,
+      amount: 100,
+      operationId: 'melt-op-1',
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('delivered');
   });
 
   it('preserves paymentRequest metadata through merge', () => {

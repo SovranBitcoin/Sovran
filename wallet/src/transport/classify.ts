@@ -31,13 +31,13 @@ import { logger, mintUrlFields } from "../logger";
  *                        the manual tap-to-redeem affordance.
  * - `invalid`          — not a decodable cashu token.
  */
-export type MeshTokenClass =
+type MeshTokenClass =
   | "locked-to-me"
   | "locked-to-other"
   | "bearer"
   | "invalid";
 
-export interface ClassifiedMeshToken {
+interface ClassifiedMeshToken {
   classification: MeshTokenClass;
   mintUrl: string | null;
   /** Sum of proof amounts (mint units). */

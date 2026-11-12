@@ -9,7 +9,7 @@ import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
-import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   ABANDONED_BACKUP_GRACE_MS,
   BACKUP_SNOOZE_MS,
@@ -30,6 +30,8 @@ const mockScreenNavigation = {
 };
 
 let mockBalance = 100;
+/** What the wallet holds in units other than sat, in each unit's smallest part. */
+let mockOtherUnits: Record<string, number> = {};
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>
@@ -60,9 +62,18 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => {
   return { guardedRouter, useGuardedRouter: () => guardedRouter };
 });
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
-jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: mockBalance }) }), {
-  virtual: true,
-});
+jest.mock('@cashu/coco-react', () => ({
+  useBalanceContext: () => ({
+    balances: {
+      totalByUnit: Object.fromEntries(
+        Object.entries({ sat: mockBalance, ...mockOtherUnits }).map(([unit, total]) => [
+          unit,
+          { total, unit },
+        ])
+      ),
+    },
+  }),
+}));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
@@ -131,7 +142,6 @@ beforeEach(async () => {
     backupStartedAt: null,
   });
   useSettingsStore.setState({ lastKnownAppVersion: null, mockMode: false });
-  useSettingsHydration.setState({ status: 'ready' });
   useWalletLifecycleStore.setState({
     seedCreatedAt: Date.now(),
     restoreStatus: 'complete',
@@ -144,6 +154,7 @@ beforeEach(async () => {
   useProfileStore.setState({ activeAccountIndex: 0 });
   mockPush.mockClear();
   mockBalance = 100;
+  mockOtherUnits = {};
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 });
 afterEach(() => {
@@ -194,6 +205,18 @@ it('does nothing during pending/failed RestoreGate and evaluates once ready', as
   await act(async () => useWalletLifecycleStore.setState({ restoreStatus: 'complete' }));
   expect(mockPush).toHaveBeenCalledTimes(1);
 });
+it.each([
+  ['unknown', 1],
+  ['not-needed', 1],
+  ['pending', 0],
+  ['in-progress', 1],
+  ['complete', 1],
+  ['failed', 0],
+] as const)('with a saved %s restore status, opens %s prompt', (restoreStatus, prompts) => {
+  useWalletLifecycleStore.setState({ restoreStatus });
+  render(<HostWithScreen />);
+  expect(mockPush).toHaveBeenCalledTimes(prompts);
+});
 it('reacts to balance and verification changes without showing in Mock Mode', async () => {
   mockBalance = 0;
   const view = render(<HostWithScreen />);
@@ -204,6 +227,22 @@ it('reacts to balance and verification changes without showing in Mock Mode', as
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useWalletLifecycleStore.getState().markRecoveryPhraseVerified());
   await act(async () => useSettingsStore.setState({ mockMode: false }));
+  expect(mockPush).not.toHaveBeenCalled();
+});
+it('asks a new wallet holding only dollars to back up, and says it holds money', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 500 };
+  const view = render(<HostWithScreen id="backup-recovery-phrase" />);
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(prompt-flow)/cta',
+    params: { id: 'backup-recovery-phrase' },
+  });
+  expect(view.getByText(/You have money here now/)).toBeTruthy();
+});
+it('does not ask a new wallet that is empty in every unit', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 0, eur: 0 };
+  render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
 });
 it('suppresses automation but allows preview, close and reopening a dismissed CTA', async () => {

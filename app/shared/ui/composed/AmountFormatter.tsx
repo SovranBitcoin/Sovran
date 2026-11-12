@@ -105,7 +105,7 @@ export function AmountFormatter({
   sign,
 }: AmountFormatterProps) {
   const foreground = useThemeColor('foreground');
-  const storedDisplayPreference = useSettingsStore((state) => state.getDisplayBtc());
+  const storedDisplayPreference = useSettingsStore((state) => state.displayBtc);
   const displayBtc = displayPreference ?? storedDisplayPreference;
 
   const decorated = decorate(

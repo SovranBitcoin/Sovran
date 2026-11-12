@@ -19,10 +19,16 @@ jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) => selector({ mockMode }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: (selector: (state: { profiles: typeof mockProfiles }) => unknown) =>
-    selector({ profiles: mockProfiles }),
-}));
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = (selector: (state: { profiles: typeof mockProfiles }) => unknown) =>
+    selector({ profiles: mockProfiles });
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => ({})),
+  };
+});
 
 it('retains authentic signed public events from the requested viewer and follow graph', () => {
   expect(nip19.decode(snapshot.viewerNpub)).toEqual({ type: 'npub', data: snapshot.viewerPubkey });

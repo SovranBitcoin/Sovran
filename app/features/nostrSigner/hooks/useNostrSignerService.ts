@@ -1,4 +1,5 @@
 import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
+import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 /**
  * @fileoverview NIP-46 signer service lifecycle glue
  *
@@ -25,7 +26,7 @@ import { registerProfileSwitchService } from '@/shared/lib/account/accountRegist
  * any zustand state here.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import {
@@ -37,23 +38,6 @@ import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
 import { nostrLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
-
-/**
- * True once the persisted connections store finished rehydrating. Same
- * pattern as `useWalletLifecycleHydrated` — `hasHydrated()` for the initial
- * snapshot, `onFinishHydration` for the async flip, plus the re-check that
- * closes the render→effect race.
- */
-export function useNip46ConnectionsHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => useNip46ConnectionsStore.persist.hasHydrated());
-  useEffect(() => {
-    if (hydrated) return undefined;
-    const unsubscribe = useNip46ConnectionsStore.persist.onFinishHydration(() => setHydrated(true));
-    if (useNip46ConnectionsStore.persist.hasHydrated()) setHydrated(true);
-    return unsubscribe;
-  }, [hydrated]);
-  return hydrated;
-}
 
 /** Sorted relay union of active connections — change ⇒ the pool needs a rebuild. */
 function activeRelayFingerprint(apps: Record<string, Nip46Connection>): string {
@@ -80,7 +64,7 @@ export function useNostrSignerService(): void {
   );
   const { isInitialized: ndkInitialized } = useNostrNDKContext();
   const { keys } = useNostrKeysContext();
-  const connectionsHydrated = useNip46ConnectionsHydrated();
+  const connectionsHydrated = useStoreLoadLatched(useNip46ConnectionsStore.persist);
   const hasActiveConnection = useNip46ConnectionsStore((s) => hasActiveApp(s.apps));
   const relayFingerprint = useNip46ConnectionsStore((s) => activeRelayFingerprint(s.apps));
   const serviceHotRequested = useNip46RequestsStore((s) => s.serviceHotRequested);

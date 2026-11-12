@@ -3,11 +3,9 @@ import {
   NaggEnvelopeSchema,
   NaggNotificationsEnvelopeSchema,
   NaggProfilesEnvelopeSchema,
-  NaggFollowStatusEnvelopeSchema,
   aggregateValue,
   noteMetricsFromAggregates,
-  noteStatsFromEnvelope,
-  profileCountsFromAggregates,
+  noteMetricsMapFromAggregates,
   profileInfoMapFromEnvelope,
   profileMetadataByPubkey,
   resolveAnchors,
@@ -19,9 +17,6 @@ import {
   notificationsPageFromEnvelope,
   parseEnvelopeCursor,
   enrichmentFromEnvelope,
-  followStatusRowsFromEnvelope,
-  ownProfilesFromEnvelope,
-  seenUntilFromEnvelope,
   orderedEnvelopeEvents,
 } from '../src/envelope';
 import { bundleFromDmEnvelope } from '../src/facade/dm';
@@ -143,27 +138,14 @@ describe('aggregate accessors', () => {
     expect(aggregateValue(aggregates, ROOT_ID, 'likeCount')).toBeUndefined();
   });
 
-  test('maps pubkey-keyed rules to followers/following/postCount', () => {
-    expect(profileCountsFromAggregates(aggregates, PUBKEY)).toEqual({
-      followers: 163,
-      following: 99,
-      postCount: 1234,
-    });
-    expect(profileCountsFromAggregates(aggregates, VIEWER)).toEqual({
-      followers: 0,
-      following: 0,
-      postCount: 0,
-    });
-  });
-
-  test('noteStatsFromEnvelope rebuilds the per-id stats map (POST /nostr/events/aggregates)', () => {
+  test('noteMetricsMapFromAggregates rebuilds the per-id stats map (POST /nostr/events/aggregates)', () => {
     const envelope = NaggEnvelopeSchema.parse({
       order: [],
       orderBy: 'created_at',
       events: [],
       aggregates: { [NOTE_ID]: { k7_e: { actors: 5 }, k9735_e: { sources: 2, value_total: 42 } } },
     });
-    const stats = noteStatsFromEnvelope(envelope);
+    const stats = noteMetricsMapFromAggregates(envelope.aggregates);
     expect(stats[NOTE_ID]).toMatchObject({
       likeCount: 5,
       repostCount: 0,
@@ -486,7 +468,7 @@ describe('DM envelopes', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Profile-route extensions — search / follow-status / own-profiles / seen
+// Profile-route extensions — search
 // ---------------------------------------------------------------------------
 
 describe('profile route reconstruction', () => {
@@ -520,51 +502,6 @@ describe('profile route reconstruction', () => {
       providers: {},
     });
     expect(searchHitsFromEnvelope(envelope).map((h) => h.pubkey)).toEqual([PUBKEY]);
-  });
-
-  test('followStatusRowsFromEnvelope derives mutual = out && in', () => {
-    const envelope = NaggFollowStatusEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      events: [],
-      aggregates: {},
-      edges: {
-        [PUBKEY]: { out: true, in: true },
-        [VIEWER]: { out: true, in: false },
-        [ACTOR]: { out: false, in: false },
-      },
-    });
-    const byPubkey = Object.fromEntries(followStatusRowsFromEnvelope(envelope).map((r) => [r.pubkey, r]));
-    expect(byPubkey[PUBKEY]).toMatchObject({ mutual: true, relationship: 'mutual' });
-    expect(byPubkey[VIEWER]).toMatchObject({ following: true, followsYou: false, relationship: 'following' });
-    expect(byPubkey[ACTOR]).toMatchObject({ relationship: 'none' });
-  });
-
-  test('ownProfilesFromEnvelope joins kind-0 metadata with follower aggregates', () => {
-    const envelope = NaggProfilesEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      events: [kind0(PUBKEY, { name: 'alice' })],
-      aggregates: { [PUBKEY]: { k3_p_latest: { actors: 10 }, k3_author_latest: { sources: 20 } } },
-    });
-    const rows = ownProfilesFromEnvelope(envelope);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ pubkey: PUBKEY, name: 'alice', followers: 10, follows: 20 });
-  });
-
-  test('seenUntilFromEnvelope parses the kind-30078 marker content', () => {
-    const marker = (content: string) =>
-      NaggEnvelopeSchema.parse({
-        order: [],
-        orderBy: 'created_at',
-        events: [event('8'.repeat(64), { kind: 30078, pubkey: VIEWER, content })],
-        aggregates: {},
-      });
-    expect(seenUntilFromEnvelope(marker('1700000123'))).toBe(1_700_000_123);
-    expect(seenUntilFromEnvelope(marker('{"seenUntil":1700000456}'))).toBe(1_700_000_456);
-    expect(seenUntilFromEnvelope(marker('junk'))).toBeNull();
-    const empty = NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {} });
-    expect(seenUntilFromEnvelope(empty)).toBeNull();
   });
 
   test('enrichmentFromEnvelope splits profiles from the requested events', () => {

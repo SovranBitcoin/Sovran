@@ -144,7 +144,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### AI
 
-<!-- code: features/ai/screens/AiChatScreen.tsx; features/ai/hooks/useAiSend.ts; features/ai/components/AiHeaderTitle.tsx; features/ai/components/ModelChip.tsx; features/ai/lib/format.ts; shared/lib/routstr/api.ts; shared/lib/routstr/topUp.ts; shared/stores/profile/routstrStore.ts; shared/stores/runtime/routstrTopUpStore.ts -->
+<!-- code: features/ai/screens/AiChatScreen.tsx; features/ai/hooks/useAiSend.ts; features/ai/components/AiHeaderTitle.tsx; features/ai/components/ModelChip.tsx; features/ai/lib/format.ts; shared/lib/routstr/api.ts; shared/stores/profile/routstrStore.ts -->
 
 - [x] **Routstr integration** — [Routstr](https://routstr.com) is a decentralized reverse proxy that fronts OpenAI-compatible LLM providers and bills per request in Cashu; Sovran uses your wallet as the funding source so there's no separate billing account
 - [x] **Cashu-token top-up** — `colada` mints a Cashu token from your wallet and deposits it as Routstr balance; subsequent calls are paid out of that balance
@@ -229,7 +229,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Discovery
 
-<!-- code: features/map/screens/MapScreen.tsx; features/map/screens/MerchantDetailScreen.tsx; features/map/hooks/useMapMarkers.ts; features/map/hooks/useMapCamera.ts; shared/lib/map/mapClustering.ts; shared/lib/map/btcMapClusterCache.ts; shared/stores/global/btcMapStore.ts; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useNostrDiscoveredMints.ts -->
+<!-- code: features/map/screens/MapScreen.tsx; features/map/screens/MerchantDetailScreen.tsx; features/map/hooks/useMerchantMap.ts; features/map/hooks/useMapCamera.ts; shared/lib/map/mapClustering.ts; shared/lib/map/btcMapClusterCache.ts; shared/stores/global/btcMapStore.ts; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useNostrDiscoveredMints.ts -->
 
 - [x] **btcmaps.org merchants** — Bitcoin-accepting merchants on an interactive map
 - [x] **Map clustering** — `supercluster`-backed zoom-aware merchant clustering

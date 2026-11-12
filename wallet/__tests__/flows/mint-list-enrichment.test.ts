@@ -200,6 +200,89 @@ describe('mint list enrichment — failure handling', () => {
 });
 
 // ---------------------------------------------------------------------------
+// A list that loaded for an earlier picker
+// ---------------------------------------------------------------------------
+
+describe('mint list enrichment — an earlier picker', () => {
+  it("keeps the open picker's rows when an earlier picker's list loads after them", async () => {
+    const loads: {
+      data: StepDataMap['selectMint'];
+      resolve: (items: MintListItem[]) => void;
+    }[] = [];
+    const rows = (displayName: string): MintListItem[] => [
+      {
+        mintUrl: MINT1,
+        displayName,
+        balance: 0,
+        unit: 'sat',
+        status: 'available',
+        reason: null,
+        isPreferred: false,
+      },
+    ];
+    const tm = createTestMachine({
+      wallet: { preferredMintUrl: undefined },
+      operations: {
+        buildMintListItems: (data: StepDataMap['selectMint']) =>
+          new Promise<MintListItem[]>((resolve) => {
+            loads.push({ data, resolve });
+          }),
+      },
+    });
+
+    // The npub.cash picker opens and a mint is picked before its list loads.
+    await tm.machine.requestMintSelector({ scope: 'npc' });
+    tm.assertStep('selectMint');
+    await tm.machine.changeMint(MINT2, { scope: 'npc' });
+    tm.assertStep('dismiss');
+
+    // A send then opens its own picker.
+    await tm.machine.startSendEcash();
+    tm.assertStep('selectMint');
+    expect(loads).toHaveLength(2);
+    expect(loads[0].data.scope).toBe('npc');
+    expect(loads[1].data.scope).toBeUndefined();
+
+    loads[1].resolve(rows('for the send'));
+    const sendRows = await waitForMintListStatus(tm);
+    expect(sendRows.mintListItems).toEqual(rows('for the send'));
+
+    loads[0].resolve(rows('for npub.cash'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    expect(details.mintListItemsStatus).toBe('ready');
+    expect(details.mintListItems).toEqual(rows('for the send'));
+  });
+
+  it("keeps the open picker loading when only an earlier picker's list has loaded", async () => {
+    const loads: ((items: MintListItem[]) => void)[] = [];
+    const tm = createTestMachine({
+      wallet: { preferredMintUrl: undefined },
+      operations: {
+        buildMintListItems: () =>
+          new Promise<MintListItem[]>((resolve) => {
+            loads.push(resolve);
+          }),
+      },
+    });
+
+    await tm.machine.requestMintSelector({ scope: 'npc' });
+    await tm.machine.changeMint(MINT2, { scope: 'npc' });
+    await tm.machine.startSendEcash();
+    tm.assertStep('selectMint');
+    const before = tm.machine.inspect().details as StepDataMap['selectMint'];
+
+    loads[0]([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    expect(details.mintListItemsStatus).toBe('loading');
+    expect(details.mintListItems).toEqual(before.mintListItems);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sorting — available first, then by balance descending
 // ---------------------------------------------------------------------------
 

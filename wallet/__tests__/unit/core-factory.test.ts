@@ -126,9 +126,7 @@ describe('createColada', () => {
 
     // Core operations provided by defaultOperations
     expect(ops.executeSend).toBeDefined();
-    expect(ops.executeMintQuote).toBeDefined();
     expect(ops.executeMelt).toBeDefined();
-    expect(ops.executeReceive).toBeDefined();
     expect(ops.buildMintListItems).toBeDefined();
     expect(ops.buildMintReviewInfo).toBeDefined();
     expect(ops.checkSendStatus).toBeDefined();
@@ -398,32 +396,5 @@ describe('createWalletContextTracker', () => {
     expect(callCountAfter - callCountBefore).toBeLessThanOrEqual(2);
 
     tracker.dispose();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// createMachineFromInstance
-// ---------------------------------------------------------------------------
-
-describe('createMachineFromInstance', () => {
-  it('creates a working machine from an instance', async () => {
-    const { manager } = createMockManager();
-    const { createMachineFromInstance } = await import('../../src/core/createColada');
-
-    const instance = createColada({ manager });
-    await instance.tracker.refresh();
-
-    const machine = createMachineFromInstance({
-      instance,
-      handlers: {},
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
-
-    expect(machine).toBeDefined();
-    expect(machine.getContext).toBeDefined();
-    expect(machine.subscribe).toBeDefined();
-
-    instance.dispose();
   });
 });

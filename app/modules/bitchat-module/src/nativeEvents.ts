@@ -12,7 +12,6 @@ import type {
   BLEDeliveryStatusEvent,
   BLEMessageEvent,
   BLEPeerEvent,
-  BLEPeerIdentityEvent,
   BLEPrivateMessageEvent,
   NostrMessageEvent,
   NostrPrivateMessageEvent,
@@ -84,18 +83,6 @@ export function readBLEPrivateMessage(raw: unknown): BLEPrivateMessageEvent | nu
   };
 }
 
-export function readBLEPeerIdentity(raw: unknown): BLEPeerIdentityEvent | null {
-  const e = fields(raw);
-  if (!e || !id(e.peerID) || !flag(e.isFavorite)) return null;
-  if (!optionalText(e.nostrPubkeyHex) || !optionalText(e.creq, MAX_BODY)) return null;
-  return {
-    peerID: e.peerID,
-    isFavorite: e.isFavorite,
-    ...(e.nostrPubkeyHex ? { nostrPubkeyHex: e.nostrPubkeyHex } : {}),
-    ...(e.creq ? { creq: e.creq } : {}),
-  };
-}
-
 export function readBLEDeliveryStatus(raw: unknown): BLEDeliveryStatusEvent | null {
   const e = fields(raw);
   if (!e || !id(e.messageID)) return null;
@@ -127,11 +114,6 @@ export function readBLEPeerUpdate(raw: unknown): BLEPeerEvent | null {
 export function readBLEState(raw: unknown): { state: string } | null {
   const e = fields(raw);
   return e && text(e.state) ? { state: e.state } : null;
-}
-
-export function readBLEBackgroundTaskExpiring(raw: unknown): { handle: number } | null {
-  const e = fields(raw);
-  return e && time(e.handle) ? { handle: e.handle } : null;
 }
 
 export function readNostrMessage(raw: unknown): NostrMessageEvent | null {

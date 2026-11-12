@@ -1,6 +1,4 @@
-import { NEARBY_PAYMENT_PREFIX } from '@/features/nearPay/lib/nearbyPayments';
 import { useNearbyDiscovery } from '@/features/nearPay/hooks/useNearbyDiscovery';
-import { CAPABILITY_PREFIX } from '@/features/nearPay/lib/nearbyCapability';
 import React, { useEffect } from 'react';
 import { addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
@@ -18,6 +16,17 @@ function isPureTokenDm(content: string): boolean {
   const token = extractCashuToken(content);
   return !!token && token.trim() === content.trim();
 }
+
+/**
+ * Sovran's own messages over BitChat (`sovran:<kind>:<version>:…`, such as the
+ * nearby payment and capability) are for the listeners that handle them, never
+ * for the chat thread, whatever their kind or version: a later version must not
+ * show its proofs as a bubble. Only the chat side effect is skipped; those
+ * listeners get every message from the native module as before. A person who
+ * types a message starting with `sovran:` does not see it in chat (accepted
+ * 2026-11-10).
+ */
+const SOVRAN_PROTOCOL_NAMESPACE = 'sovran:';
 
 initLog('Module', 'BitchatBLEProvider loaded');
 
@@ -53,11 +62,7 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
     const msgSub = addBLEPrivateMessageListener((event) => {
       // Nut Drop token DMs are handled by useNutDropAutoRedeem; keep them out
       // of the chat thread so a payment never shows up as a raw-token bubble.
-      if (
-        event.content.startsWith(CAPABILITY_PREFIX) ||
-        event.content.startsWith(NEARBY_PAYMENT_PREFIX) ||
-        isPureTokenDm(event.content)
-      ) {
+      if (event.content.startsWith(SOVRAN_PROTOCOL_NAMESPACE) || isPureTokenDm(event.content)) {
         bitchatLog.info('bitchat.provider.dm_token_suppressed', {
           peerID: event.peerID,
           contentLen: event.content.length,

@@ -1,16 +1,17 @@
 // ---------------------------------------------------------------------------
 // Receive and mint-quote operations that follow Coco's own operation records.
 //
-// The plain versions in `defaultOperations.ts` hand back a history entry built
-// from what the call returned. These wait for the row Coco saved and use its
-// id, so nothing downstream is keyed to an id that history never shows, and a
-// receive that cannot reach the mint is reported as pending, not failed.
+// The wallet's only receive and mint-quote operations: `defaultOperations.ts`
+// has none. They wait for the row Coco saved and use its id, so nothing
+// downstream is keyed to an id that history never shows, and a receive that
+// cannot reach the mint is reported as pending, not failed.
 //
 // What only the app knows is passed in: how to check a token offline, how to
 // prepare a mint quote, the words for a pending receive, and a local id.
 // ---------------------------------------------------------------------------
 
 import { getTokenMetadata } from '@cashu/cashu-ts';
+import { operationHistoryId } from '@cashu/coco-core';
 import type {
   HistoryEntry,
   LegacyMintHistoryEntry,
@@ -23,6 +24,7 @@ import { amountToNumber, type AmountValue } from '../amount';
 import { serializeHistoryEntry } from '../history/normalize';
 import { logger, mintUrlFields } from '../logger';
 import type { MachineOperations } from '../machine/types';
+import { proofsHaveP2PK } from '../p2pk';
 import { withTimeout } from '../safeFetch';
 import { classifyMeshRedeemError } from '../transport/redeemOrchestrator';
 
@@ -83,26 +85,27 @@ function isRecoverableReceiveError(err: unknown): boolean {
   return kind === 'network' || kind === 'retryable';
 }
 
-function receiveHistoryId(operationId: string): string {
-  return `receive:${operationId}`;
-}
-
 async function findReceiveHistoryEntryForOperation(
   manager: Manager,
   operationId: string,
   mintUrl: string,
   beforeIds: Set<string>
 ): Promise<ReceiveHistoryEntry | null> {
-  const direct = await manager.history.getHistoryEntryById(receiveHistoryId(operationId));
+  const direct = await manager.history.getHistoryEntryById(
+    operationHistoryId('receive', operationId)
+  );
   if (direct?.type === 'receive') return direct as ReceiveHistoryEntry;
 
+  // This operation's own row wins wherever it sits in the page; a row that is
+  // merely new since the snapshot is the fallback.
   const after = await manager.history.getPaginatedHistory(0, 100);
+  const fromMint = after.filter(
+    (h): h is ReceiveHistoryEntry => h.type === 'receive' && h.mintUrl === mintUrl
+  );
   return (
-    after.find((h): h is ReceiveHistoryEntry => {
-      if (h.type !== 'receive' || h.mintUrl !== mintUrl) return false;
-      if (h.operationId === operationId) return true;
-      return !beforeIds.has(h.id);
-    }) ?? null
+    fromMint.find((h) => h.operationId === operationId) ??
+    fromMint.find((h) => !beforeIds.has(h.id)) ??
+    null
   );
 }
 
@@ -264,14 +267,7 @@ export function createExecuteReceive(
     let hadP2PKProofs = false;
     try {
       const metadata = getTokenMetadata(tokenString);
-      hadP2PKProofs = metadata.incompleteProofs.some((p) => {
-        try {
-          const parsed = JSON.parse(p.secret);
-          return Array.isArray(parsed) && parsed[0] === 'P2PK';
-        } catch {
-          return false;
-        }
-      });
+      hadP2PKProofs = proofsHaveP2PK(metadata.incompleteProofs);
     } catch (error) {
       logger.warn('payment.execute_receive.p2pk_detection_decode_failed', {
         ...mintUrlFields(mintUrl),
@@ -519,13 +515,14 @@ export function createExecuteMintQuote(
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
-        const persisted = after.find((h): h is MintHistoryEntry => {
-          if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
-          // Preferred: deterministic quoteId match
-          if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
+        const fromMint = after.filter(
+          (h): h is MintHistoryEntry => h.type === 'mint' && h.mintUrl === mintUrl
+        );
+        const persisted =
+          // Preferred: this quote's own row, wherever it sits in the page
+          (mintOp.quoteId ? fromMint.find((h) => h.quoteId === mintOp.quoteId) : undefined) ??
           // Fallback: set difference on ids
-          return !beforeIds.has(h.id);
-        });
+          fromMint.find((h) => !beforeIds.has(h.id));
         if (persisted) {
           logger.info('payment.execute_mint_quote.found', {
             ...mintUrlFields(mintUrl),

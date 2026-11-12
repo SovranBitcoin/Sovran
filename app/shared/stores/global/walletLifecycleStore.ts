@@ -1,12 +1,10 @@
 import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
-import * as React from 'react';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-
-type RestoreStatus = 'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
+import { RESTORE_STATUSES, type RestoreStatus } from './walletRestorePhase';
 
 interface WalletLifecycleState {
   /**
@@ -27,9 +25,12 @@ interface WalletLifecycleState {
   lastRestoreError: string | null;
 
   markSeedCreatedNow: () => void;
-  setRestoreStatus: (status: RestoreStatus, error?: string | null) => void;
+  setRestoreStatus: (status: RestoreStatus) => void;
   markRestoreComplete: () => void;
 }
+
+/** Longest restore error kept. */
+const MAX_RESTORE_ERROR = 500;
 
 const PersistedWalletLifecycleStore = z.object({
   seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
@@ -39,12 +40,11 @@ const PersistedWalletLifecycleStore = z.object({
   // re-resolves it. Without the catch, an unrecognized status fails the
   // whole-blob parse and wipes `seedCreatedAt` too, which is exactly the
   // false-fresh-install state AppGate guards against.
-  restoreStatus: z
-    .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
-    .default('unknown')
-    .catch('unknown'),
+  restoreStatus: z.enum(RESTORE_STATUSES).default('unknown').catch('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
-  lastRestoreError: z.string().max(500).nullable().default(null),
+  // An error too long to read is read as none: rejecting it would discard the
+  // whole record, `seedCreatedAt` included.
+  lastRestoreError: z.string().max(MAX_RESTORE_ERROR).nullable().default(null).catch(null),
 });
 
 export const useWalletLifecycleStore = create<WalletLifecycleState>({
@@ -68,8 +68,7 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>({
       markSeedCreatedNow: () =>
         set((s) => (s.seedCreatedAt == null ? { seedCreatedAt: Date.now() } : s)),
 
-      setRestoreStatus: (status, error = null) =>
-        set({ restoreStatus: status, lastRestoreError: error }),
+      setRestoreStatus: (status) => set({ restoreStatus: status, lastRestoreError: null }),
 
       markRestoreComplete: () =>
         set({ restoreStatus: 'complete', lastRestoreAt: Date.now(), lastRestoreError: null }),
@@ -90,24 +89,3 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>({
     })
   )
 );
-
-/**
- * React hook returning true once the persisted lifecycle store has finished
- * rehydrating from AsyncStorage. Components that gate on `restoreStatus` /
- * `seedCreatedAt` MUST wait for this — reading those fields before hydration
- * returns the in-memory initial values (`'unknown'` / `null`) which would
- * trigger a false-positive restore redirect on every boot for existing users.
- */
-export function useWalletLifecycleHydrated(): boolean {
-  const [hydrated, setHydrated] = React.useState(() =>
-    useWalletLifecycleStore.persist.hasHydrated()
-  );
-  React.useEffect(() => {
-    if (hydrated) return;
-    const unsub = useWalletLifecycleStore.persist.onFinishHydration(() => setHydrated(true));
-    // Fallback: hasHydrated may have flipped between initial render and effect run.
-    if (useWalletLifecycleStore.persist.hasHydrated()) setHydrated(true);
-    return unsub;
-  }, [hydrated]);
-  return hydrated;
-}

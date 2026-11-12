@@ -21,7 +21,10 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
-import { createDefaultScreenActionHandlers } from "../../src/screen-actions/defaultHandlers";
+import {
+  createDefaultScreenActionHandlers,
+  startNewEcashSendIfFinished,
+} from "../../src/screen-actions/defaultHandlers";
 import { createScreenActionManager } from "../../src/screen-actions/createManager";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
 import { setLogger } from "../../src/logger";
@@ -45,6 +48,11 @@ import {
   LEGACY_BASE64_KEYSET_V3_TOKEN,
   NUT00_V3_TOKEN,
 } from "../_harness/tokenVectors";
+import { createTestMachine, INPUTS } from "../_harness";
+import {
+  AuthoredError,
+  PaymentRequestUndeliveredError,
+} from "../../src/errors";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -67,7 +75,7 @@ function createMockConfig(overrides?: {
   const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
     checkSendStatus: vi.fn(async () => ({ state: "pending" })),
-    rollbackSend: vi.fn(async () => {}),
+    rollbackSend: vi.fn(async () => ({ kind: "reclaimed" as const })),
     executeReceive: vi.fn(async () => ({
       historyEntry: JSON.stringify({
         id: "rx-1",
@@ -93,7 +101,7 @@ function createMockConfig(overrides?: {
 
   const machine: Partial<PaymentMachine> = {
     confirmMelt: vi.fn(async () => {}),
-    confirmPaymentRequest: vi.fn(async () => ({ rolledBack: false })),
+    confirmPaymentRequest: vi.fn(async () => ({ kind: "delivered" as const })),
     scan: vi.fn(async (): Promise<ProcessResult> => ({ urInProgress: false })),
     startReceiveLightning: vi.fn(async () => {}),
     showReceiveQr: vi.fn(async () => {}),
@@ -102,6 +110,7 @@ function createMockConfig(overrides?: {
     enterAmount: vi.fn(async () => {}),
     reviewMint: vi.fn(async () => {}),
     getContext: vi.fn(() => ({ unit: "sat" })),
+    getStep: vi.fn(() => "enterAmount" as const),
     ...overrides?.machine,
   };
 
@@ -428,6 +437,27 @@ describe("sendToken default handlers", () => {
           },
         ],
       });
+    });
+
+    // A cancel that could not tell what happened to the send (not found, a
+    // lookup that failed, a send redeemed or already being taken back) did
+    // not cancel it: the token may still be out.
+    it("does not say cancelled when it could not tell", async () => {
+      const { handlers, notifications } = createMockConfig({
+        operations: {
+          rollbackSend: vi.fn(async () => ({ kind: "unknown" as const, reason: "notFound" as const })),
+        },
+      });
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-lost",
+        token: null,
+      });
+
+      await mgr.execute("cancel");
+
+      expect(notifications.map((n) => n.event)).toEqual(["onSendCancelFailed"]);
+      expect(notifications[0].args[0]).toMatchObject({ operationId: "op-lost" });
     });
 
     it("notifies onSendCancelFailed on error", async () => {
@@ -909,6 +939,157 @@ describe("paymentRequest default handlers", () => {
       await mgr.execute("cancel");
       expect(navigation.goBack).toHaveBeenCalled();
     });
+  });
+});
+
+// The confirm handler driven by the real machine: what the screen entry says
+// after each way a payment-request send can end.
+describe("paymentRequest confirm outcome on the screen entry", () => {
+  const previewEntry = {
+    id: "pr-preview-1",
+    type: "send",
+    amount: 100,
+    unit: "sat",
+    metadata: { paymentRequest: "creq-1", phase: "preview" },
+  };
+
+  async function confirmWith(
+    executePaymentRequest: MachineOperations["executePaymentRequest"],
+  ) {
+    const tm = createTestMachine({ operations: { executePaymentRequest } });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    tm.assertStep("navigateToPaymentRequest");
+    const handlers = createDefaultScreenActionHandlers({
+      getMachine: () => tm.machine,
+      getOperations: () => ({}),
+      notify: () => {},
+      navigation: {
+        scanQr: vi.fn(),
+        nutDrop: vi.fn(),
+        mintInfo: vi.fn(),
+        addMint: vi.fn(),
+        goBack: vi.fn(),
+      },
+    });
+    const { mgr } = createManager("paymentRequest", handlers, previewEntry);
+    await mgr.execute("confirm");
+    return { tm, mgr };
+  }
+
+  it("keeps the preview, with confirm available, when the send fails before any token exists", async () => {
+    const execute = vi.fn(async () => {
+      throw new AuthoredError("This payment request does not accept that mint");
+    });
+    const { mgr } = await confirmWith(execute);
+
+    expect(mgr.getEntry()).toEqual(previewEntry);
+    expect(mgr.inspect().confirm.available).toBe(true);
+
+    // The person can retry: a second Pay runs the operation again.
+    await mgr.execute("confirm");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("says token created but not sent, and offers no retry, when delivery and rollback both failed", async () => {
+    const { mgr } = await confirmWith(async () => {
+      throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+    });
+
+    const entry = mgr.getEntry() as Record<string, any>;
+    expect(entry.operationId).toBe("op-9");
+    expect(entry.metadata).toMatchObject({
+      operationId: "op-9",
+      phase: "undelivered",
+      tokenCreated: "true",
+    });
+    expect(entry.metadata.nostrSent).toBeUndefined();
+    expect(mgr.inspect().confirm.available).toBe(false);
+    expect(mgr.inspect().cancel.available).toBe(false);
+  });
+
+  it("marks the entry delivered after a successful send", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "pending" }),
+    }));
+
+    expect(mgr.getEntry()?.metadata).toMatchObject({
+      phase: "delivered",
+      tokenCreated: "true",
+      nostrSent: "true",
+    });
+    expect(mgr.inspect().confirm.available).toBe(false);
+  });
+
+  // The strings the timeline and the payment request screen read.
+  it("writes the delivered entry with the preview id as its operation id", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "pending" }),
+    }));
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "pending",
+      operationId: "pr-preview-1",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "pr-preview-1",
+        phase: "delivered",
+        tokenCreated: "true",
+        nostrSent: "true",
+      },
+    });
+    expect(mgr.inspect().cancel.available).toBe(false);
+  });
+
+  it("writes the undelivered entry with the operation's id and no sent flag", async () => {
+    const { mgr } = await confirmWith(async () => {
+      throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+    });
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "pending",
+      operationId: "op-9",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "op-9",
+        phase: "undelivered",
+        tokenCreated: "true",
+      },
+    });
+  });
+
+  it("marks the entry rolled back, with Cancel but no Pay, when the ecash was taken back", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-2", type: "send", state: "rolledBack" }),
+      rolledBack: true,
+      errorMessage: "relay down",
+    }));
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "rolledBack",
+      operationId: "pr-preview-1",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "pr-preview-1",
+        phase: "rolledBack",
+        tokenCreated: "true",
+      },
+    });
+    expect(mgr.inspect().confirm.available).toBe(false);
+    expect(mgr.inspect().cancel.available).toBe(true);
+  });
+
+  it("tells a tap locked out by a send in flight that it was ignored", async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+
+    const outcomes = await Promise.all([
+      tm.machine.confirmPaymentRequest(),
+      tm.machine.confirmPaymentRequest(),
+    ]);
+    expect(outcomes.map((o) => o.kind)).toEqual(["delivered", "ignored"]);
   });
 });
 
@@ -1659,5 +1840,110 @@ describe("three-tier fallback", () => {
     await mgr.execute("trust");
 
     expect(ops.trustMint).toHaveBeenCalledWith(MINT1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The amount screen of an ecash send that finished
+// ---------------------------------------------------------------------------
+
+// The token screen sits over the amount screen that made it. Going Back and
+// entering another amount, or choosing a mint there, is a new token the
+// person asked for: it starts a new send, and the finished one stays as it
+// is (`settled-preview-final.test.ts` pins that a bare amount or mint on it
+// changes nothing).
+describe("amount screen after its ecash send finished", () => {
+  const sends = (tm: ReturnType<typeof createTestMachine>) =>
+    tm.operationCalls.filter(
+      (call) => call.name === "executeSend" || call.name === "executeOfflineSend",
+    );
+
+  function amountScreen(
+    tm: ReturnType<typeof createTestMachine>,
+    entry: Record<string, unknown> = {},
+  ) {
+    const handlers = createDefaultScreenActionHandlers({
+      getMachine: () => tm.machine,
+      getOperations: () => undefined,
+      notify: () => {},
+      navigation: { goBack: vi.fn() },
+    });
+    const enter = async (value: number) => {
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "sendEcash",
+        unit: "sat",
+        selectedMintUrl: MINT1,
+        effectiveAmount: { value, unit: "sat" },
+        ...entry,
+      });
+      await mgr.execute("next");
+    };
+    return { enter };
+  }
+
+  it("sends a new token for the amount entered after Back", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true });
+    const screen = amountScreen(tm);
+    await screen.enter(100);
+    tm.assertStep("sendComplete");
+
+    await screen.enter(40);
+
+    tm.assertStep("sendComplete");
+    expect(sends(tm).map((call) => (call.args[0] as { amount: number }).amount)).toEqual([
+      100, 40,
+    ]);
+  });
+
+  it("keeps the recipient's mints and lock, and nothing of the old payment", async () => {
+    const lock = `02${"ab".repeat(32)}`;
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({
+      reset: true,
+      allowedMints: [MINT2],
+      p2pkLockPubkey: lock,
+    });
+    const screen = amountScreen(tm, {
+      selectedMintUrl: MINT2,
+      p2pkLockPubkey: lock,
+    });
+    await screen.enter(100);
+    tm.assertStep("sendComplete");
+
+    await screen.enter(40);
+
+    tm.assertStep("sendComplete");
+    expect(sends(tm)[1]?.args[0]).toMatchObject({
+      mintUrl: MINT2,
+      amount: 40,
+      p2pkLock: { pubkey: lock },
+    });
+    expect(tm.machine.getContext().supportedMintUrls).toEqual([MINT2]);
+  });
+
+  it("opens the mint list of a new send from the amount screen", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true });
+    await amountScreen(tm).enter(100);
+    tm.assertStep("sendComplete");
+
+    await startNewEcashSendIfFinished(tm.machine, "sendEcash");
+    await tm.machine.requestMintSelector();
+
+    tm.assertStep("selectMint");
+    tm.assertContext({ destination: "sendEcash" });
+    expect(tm.machine.getContext().amount).toBeUndefined();
+    expect(sends(tm)).toHaveLength(1);
+  });
+
+  it("leaves a send that has not finished alone", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true, entrySource: "createEcash" });
+    const context = tm.machine.getContext();
+
+    await startNewEcashSendIfFinished(tm.machine, "sendEcash");
+
+    expect(tm.machine.getContext()).toBe(context);
   });
 });

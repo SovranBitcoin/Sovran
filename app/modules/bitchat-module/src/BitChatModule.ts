@@ -2,21 +2,17 @@ import { Linking, Platform } from 'react-native';
 import { requireNativeModule, type EventSubscription } from 'expo-modules-core';
 import type {
   BLEDeliveryStatusEvent,
-  BLEDmContact,
   BLEMessageEvent,
   BLEPeer,
   BLEPeerEvent,
-  BLEPeerIdentityEvent,
   BLEPrivateMessageEvent,
   BitchatBLEIdentityMaterial,
   NostrMessageEvent,
   NostrPrivateMessageEvent,
 } from './types';
 import {
-  readBLEBackgroundTaskExpiring,
   readBLEDeliveryStatus,
   readBLEMessage,
-  readBLEPeerIdentity,
   readBLEPeerUpdate,
   readBLEPrivateMessage,
   readBLEState,
@@ -27,11 +23,9 @@ import {
 type BitChatEventName =
   | 'onBLEMessage'
   | 'onBLEPrivateMessage'
-  | 'onBLEPeerIdentity'
   | 'onBLEDeliveryStatus'
   | 'onBLEPeerUpdate'
   | 'onBLEStateChanged'
-  | 'onBLEBackgroundTaskExpiring'
   | 'onNostrMessage'
   | 'onNostrPrivateMessage';
 
@@ -49,18 +43,14 @@ interface BitChatNativeModule {
   stopBLE(): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
-  resetBLEPrivateChat(peerID: string): Promise<void>;
   sendBLEPrivateMessage(
     peerID: string,
     content: string,
     nickname: string,
     messageID: string
   ): Promise<string>;
-  sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<void>;
   getBLEPeers(): BLEPeer[];
-  getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
-  bitchatVendorVersion(): string;
   beginBLEBackgroundTask(name: string): Promise<number>;
   endBLEBackgroundTask(handle: number): Promise<void>;
   // Bluetooth helpers — implemented natively on Android only; the JS wrappers
@@ -70,7 +60,6 @@ interface BitChatNativeModule {
   // Nostr (native — wraps upstream bitchat's NostrRelayManager + GeoRelayDirectory)
   startNostr(profileScope: string): Promise<void>;
   joinGeohash(hash: string): Promise<void>;
-  leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
   sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void>;
   // Events. A payload is whatever the native side sent: it is `unknown` here
@@ -218,17 +207,6 @@ export function startBLEPrivateChat(peerID: string): Promise<void> {
 }
 
 /**
- * Clear the Noise session for `peerID`. The next outbound DM will trigger a
- * fresh XX handshake. Use this when the JS-side watchdog detects a stuck
- * `sending` message — the session is likely invalidated. Does not drain
- * upstream's pending-message queue; the JS store should mark stuck sends
- * `failed` so they don't double-send when the new handshake completes.
- */
-export function resetBLEPrivateChat(peerID: string): Promise<void> {
-  return NativeModule ? NativeModule.resetBLEPrivateChat(peerID) : unavailable();
-}
-
-/**
  * Send a Noise-encrypted 1:1 message over BLE mesh. If no session exists,
  * upstream bitchat queues the message and triggers a handshake automatically.
  * `nickname` is OUR nickname — upstream stamps it into the message for the
@@ -262,29 +240,6 @@ export function addBLEPrivateMessageListener(
 }
 
 /**
- * Hand a peer our Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:<npub>:<creq>`). This is an explicit chat action, never
- * wallet discovery or evidence that a peer controls the advertised key. If no Noise
- * session exists yet the native side defers the send until the handshake
- * completes.
- */
-export function sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<void> {
-  return NativeModule ? NativeModule.sendBLEFavorite(peerID, isFavorite) : unavailable();
-}
-
-/**
- * Fires when a peer hands us their Nostr identity over the native favorite
- * channel. iOS emits this immediately; on both platforms the same value also
- * appears on the polled `BLEPeer.nostrPubkeyHex` / `BLEPeer.creq`. Use it to
- * mark a peer ready without waiting for the next peer poll.
- */
-export function addBLEPeerIdentityListener(
-  listener: (event: BLEPeerIdentityEvent) => void
-): EventSubscription {
-  return listen('onBLEPeerIdentity', readBLEPeerIdentity, listener);
-}
-
-/**
  * Subscribe to delivery-status transitions for outbound BLE DMs. Each event
  * carries the same `messageID` originally passed to `sendBLEPrivateMessage`.
  * Subscribe once at app-level so events aren't lost while the DM screen
@@ -300,29 +255,8 @@ export function getBLEPeers(): BLEPeer[] {
   return NativeModule ? NativeModule.getBLEPeers() : [];
 }
 
-/**
- * Returns the persisted 1:1 DM-peer history (peerID + best-known nickname +
- * last activity timestamp). Survives app restarts — fed by both inbound and
- * outbound BLE DMs in the native bridge. Empty array on first launch before
- * any DM has flowed.
- */
-export function getBLEDmHistory(profileScope: string): BLEDmContact[] {
-  return NativeModule && profileScope ? NativeModule.getBLEDmHistory(profileScope) : [];
-}
-
 export function getBLEState(): string {
   return NativeModule ? NativeModule.getBLEState() : 'unavailable';
-}
-
-/** Short SHA of the vendored bitchat submodule this native build compiled from.
- * Logged at startBLE (`bitchat.peers.ble_start_ok`) so a stale build — e.g. one
- * predating a fragmentation fix — is verifiable from log.txt. */
-export function bitchatVendorVersion(): string {
-  try {
-    return NativeModule ? NativeModule.bitchatVendorVersion() : 'unavailable';
-  } catch {
-    return 'unknown';
-  }
 }
 
 export function addBLEMessageListener(
@@ -357,17 +291,6 @@ export function beginBLEBackgroundTask(name: string): Promise<number> {
 export function endBLEBackgroundTask(handle: number): Promise<void> {
   if (!NativeModule || handle < 0) return Promise.resolve();
   return NativeModule.endBLEBackgroundTask(handle);
-}
-
-/**
- * Fires when iOS reclaims a `beginBLEBackgroundTask` assertion before it was
- * ended — the in-flight work is about to be suspended; rely on persisted
- * state to resume on next foreground.
- */
-export function addBLEBackgroundTaskExpiringListener(
-  listener: (event: { handle: number }) => void
-): EventSubscription {
-  return listen('onBLEBackgroundTaskExpiring', readBLEBackgroundTaskExpiring, listener);
 }
 
 // --- Bluetooth helpers ---
@@ -406,10 +329,6 @@ export function startNostr(profileScope: string): Promise<void> {
 
 export function joinGeohash(hash: string): Promise<void> {
   return NativeModule ? NativeModule.joinGeohash(hash) : unavailable();
-}
-
-export function leaveGeohash(): Promise<void> {
-  return NativeModule ? NativeModule.leaveGeohash() : unavailable();
 }
 
 export function sendGeohashMessage(content: string, nickname: string): Promise<void> {

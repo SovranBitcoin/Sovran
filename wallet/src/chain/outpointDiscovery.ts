@@ -16,7 +16,7 @@
 
 import type { AddressOutpointCandidateTx } from "./mempool";
 
-export interface OutpointMatchCriteria {
+interface OutpointMatchCriteria {
   /** The melt destination address (NUT-30 quote `request`). */
   address: string;
   /** The exact amount the mint was asked to pay to `address`. */

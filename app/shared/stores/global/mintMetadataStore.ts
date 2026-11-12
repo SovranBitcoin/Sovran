@@ -115,6 +115,11 @@ interface MintMetadataState {
   clear: () => void;
 }
 
+/** Longest mint name, icon URL and description kept from a mint's NUT-06 info. */
+const MAX_DISPLAY_NAME = 256;
+const MAX_ICON_URL = 2048;
+const MAX_DESCRIPTION = 4096;
+
 // Envelope-only validation: `info` / `auditData` are upstream wire shapes whose
 // strict definition lives in cashu-ts / the auditor; treat them as `unknown` on
 // rehydrate and let consumers re-fetch on a miss.
@@ -123,9 +128,12 @@ const PersistedMintMetadataEntry = z.looseObject({
   // Additive optional field (persist-safe): untrusted upstream wire shape,
   // envelope-only like `info`.
   nuts: z.record(z.string(), z.unknown()).optional(),
-  displayName: z.string().max(256).optional(),
-  iconUrl: z.string().max(2048).optional(),
-  description: z.string().max(4096).optional(),
+  // A value too long to read is read as absent for this mint: 0.1.3 saved a
+  // mint's NUT-06 identity with no limit, and rejecting it would discard every
+  // mint's metadata. New values are held to the limits by `identityFromInfo`.
+  displayName: z.string().max(MAX_DISPLAY_NAME).optional().catch(undefined),
+  iconUrl: z.string().max(MAX_ICON_URL).optional().catch(undefined),
+  description: z.string().max(MAX_DESCRIPTION).optional().catch(undefined),
   supportedUnits: z.array(z.string().max(16)).max(64).optional(),
   identityAt: z.number().int().nonnegative().optional(),
   averageScore: z.number().nullable().optional(),
@@ -190,14 +198,21 @@ function evictIfOverCap(byMintUrl: Record<string, MintMetadataEntry>): void {
   if (trimmed) storeLog.debug('store.mint_metadata.evicted', trimmed);
 }
 
-/** Identity convenience scalars projected from a raw NUT-06 blob. */
+/**
+ * Identity convenience scalars projected from a raw NUT-06 blob, within the
+ * limits the store reads: a long name or description is clipped, and an icon
+ * URL over the limit is not saved, since a clipped URL points somewhere else.
+ */
 function identityFromInfo(info: GetInfoResponse): Partial<MintMetadataEntry> {
+  const { name, icon_url: iconUrl, description } = info;
   return {
     info,
-    ...(typeof info.name === 'string' && info.name ? { displayName: info.name } : {}),
-    ...(typeof info.icon_url === 'string' && info.icon_url ? { iconUrl: info.icon_url } : {}),
-    ...(typeof info.description === 'string' && info.description
-      ? { description: info.description }
+    ...(typeof name === 'string' && name ? { displayName: name.slice(0, MAX_DISPLAY_NAME) } : {}),
+    ...(typeof iconUrl === 'string' && iconUrl && iconUrl.length <= MAX_ICON_URL
+      ? { iconUrl }
+      : {}),
+    ...(typeof description === 'string' && description
+      ? { description: description.slice(0, MAX_DESCRIPTION) }
       : {}),
   };
 }

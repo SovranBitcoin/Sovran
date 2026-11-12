@@ -27,6 +27,7 @@ import type {
 } from "../machine/types";
 import { parseHistoryEntryOnce } from "../operations/historyEntry";
 import { getAvailableActions } from "./availability";
+import { withPaymentRequestSendOutcome } from "./paymentRequestPhase";
 import type { ScreenActionContext, ScreenActionHandlerMap } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,39 @@ export interface DefaultScreenActionHandlersConfig {
   getOffline?: () => boolean;
   notify: (event: string, ...args: unknown[]) => void;
   navigation: NavigationCallbacks;
+}
+
+/**
+ * Starts a new ecash send when the last one finished (`sendComplete`). A
+ * finished send is final for the machine: an amount or a mint changes
+ * nothing on it, so neither can make its token again. The amount screen that
+ * made it can still be mounted under the token screen, and an amount entered
+ * there, or its mint list, is a new token the person asked for. The new send
+ * keeps what the screen was opened with (the recipient, their mints, the
+ * lock) and nothing of the finished payment (its amount, mint or token).
+ * Anywhere else, and for any other kind of amount screen, it does nothing.
+ */
+export async function startNewEcashSendIfFinished(
+  machine: PaymentMachine,
+  destination: unknown,
+): Promise<void> {
+  if (destination !== "sendEcash" || machine.getStep() !== "sendComplete") return;
+  const finished = machine.getContext();
+  logger.info("screenAction.amountEntry.newSendAfterFinished", {
+    allowedMintCount: finished.supportedMintUrls?.length ?? 0,
+    locked: !!finished.p2pkLock,
+  });
+  await machine.startSendEcash({
+    reset: true,
+    ...(finished.meltTarget ? { meltTarget: finished.meltTarget } : {}),
+    ...(finished.recipientPubkey ? { recipientPubkey: finished.recipientPubkey } : {}),
+    ...(finished.recipientProfile ? { recipientProfile: finished.recipientProfile } : {}),
+    ...(finished.p2pkLock ? { p2pkLock: finished.p2pkLock } : {}),
+    ...(finished.supportedMintUrls?.length
+      ? { allowedMints: finished.supportedMintUrls }
+      : {}),
+    ...(finished.entrySource ? { entrySource: finished.entrySource } : {}),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -214,8 +248,24 @@ export function createDefaultScreenActionHandlers(
 
         logger.info("screenAction.sendToken.cancel.start", { operationId });
         try {
-          await ops.rollbackSend(operationId);
-          logger.info("screenAction.sendToken.cancel.done", { operationId });
+          const result = await ops.rollbackSend(operationId);
+          if (result.kind === "unknown") {
+            // Not found, unreadable, redeemed or already being taken back:
+            // the token may still be out, so it was not cancelled.
+            logger.warn("screenAction.sendToken.cancel.unknown", {
+              operationId,
+              reason: result.reason,
+            });
+            notify("onSendCancelFailed", {
+              operationId,
+              message: `Send not taken back: ${result.reason}`,
+            });
+            return;
+          }
+          logger.info("screenAction.sendToken.cancel.done", {
+            operationId,
+            result: result.kind,
+          });
           notify("onSendCancelled", { operationId });
         } catch (err) {
           const mintUnreachable = isMintOfflineError(err);
@@ -559,66 +609,28 @@ export function createDefaultScreenActionHandlers(
             null,
         });
 
-        const result = await machine.confirmPaymentRequest();
+        const outcome = await machine.confirmPaymentRequest();
 
-        const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
-
-        // If the delivery failed and ecash was rolled back, set the entry
-        // to rolledBack state instead of enriching with delivered metadata.
-        if (result.rolledBack) {
-          logger.info("screenAction.paymentRequest.confirm.rolledBack");
-          if (setEntry) {
-            const metadata = (preEntry?.metadata ?? {}) as Record<
-              string,
-              unknown
-            >;
-            const operationId =
-              getString(getMetadata(preEntry), "operationId") ??
-              getString(preEntry, "operationId") ??
-              getString(preEntry, "id");
-            setEntry({
-              ...preEntry,
-              state: "rolledBack",
-              operationId,
-              metadata: {
-                ...metadata,
-                operationId,
-                phase: "rolledBack",
-                tokenCreated: "true",
-              },
-            } as EntryLike);
-          }
+        // Nothing was sent (it failed before any ecash existed, or this tap
+        // did not run the send): the entry stays a preview so Pay can retry.
+        if (outcome.kind === "failed" || outcome.kind === "ignored") {
+          logger.info("screenAction.paymentRequest.confirm.notSent", {
+            kind: outcome.kind,
+          });
           return;
         }
 
-        // Success path — enrich the screen entry with delivery metadata.
-        if (setEntry) {
-          const metadata = (preEntry?.metadata ?? {}) as Record<
-            string,
-            unknown
-          >;
-          const operationId =
-            getString(getMetadata(preEntry), "operationId") ??
-            getString(preEntry, "operationId") ??
-            getString(preEntry, "id");
-          const enriched = {
-            ...preEntry,
-            state: "pending",
-            operationId,
-            metadata: {
-              ...metadata,
-              operationId,
-              phase: "delivered",
-              tokenCreated: "true",
-              nostrSent: "true",
-            },
-          };
-          logger.info("screenAction.paymentRequest.confirm.enrich", {
-            id: (enriched as any).id,
-            operationId,
-          });
-          setEntry(enriched as EntryLike);
-        }
+        // Delivered, rolled back, or (ecash out, neither delivered nor taken
+        // back) undelivered, which offers no retry: a second Pay could pay
+        // twice.
+        logger.info("screenAction.paymentRequest.confirm.sent", {
+          kind: outcome.kind,
+          ...(outcome.kind === "undelivered"
+            ? { operationId: outcome.operationId }
+            : {}),
+        });
+        const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
+        setEntry?.(withPaymentRequestSendOutcome(preEntry, outcome));
       },
 
       cancel: goBack,
@@ -950,6 +962,7 @@ export function createDefaultScreenActionHandlers(
           });
         }
         try {
+          await startNewEcashSendIfFinished(machine, destination);
           await machine.enterAmount(effectiveAmount, mintUrl, {
             destination,
             ...(mintQuoteMethod ? { mintQuoteMethod } : {}),

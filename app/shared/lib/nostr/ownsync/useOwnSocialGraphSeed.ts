@@ -1,15 +1,15 @@
 /**
  * @fileoverview `useOwnSocialGraphSeed` — one-shot seed of the viewer's follow
- * set from the tiered nagg-ts facade (nagg → Primal → raw relays), the
+ * set from the tiered `nostr` facade (nagg → Primal → raw relays), the
  * read-side companion to `useOwnEventsSync`.
  *
  * Per ADR 0003 the facade is the seed/backfill source; the relay subscription in
  * `useOwnEventsSync` survives as the live-delta listener. Both feed the SAME
  * `nostrSocialStore` through its last-writer-wins gate (kind-3 `created_at`), so
  * a facade seed and a relay delta can't fight. This hook only seeds the read
- * side (`followingPubkeys`); the raw kind-3 (`contactsTags`/`content`) that the
- * follow/unfollow write path re-publishes stays owned by the relay sub, which
- * preserves the relay hints + petnames the facade's parsed `follows` drop.
+ * side (`followingPubkeys`); the raw kind-3 (`contactsTags`/`content`) a follow
+ * is built on comes only from relays (this sub and `followSync`'s read), which
+ * keep the relay hints + petnames the facade's parsed `follows` drop.
  *
  * Fires once per pubkey. Best-effort: a disabled/exhausted tier chain is a
  * no-op (the relay sub still seeds the store the old way).

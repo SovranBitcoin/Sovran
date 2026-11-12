@@ -1,14 +1,11 @@
-export type RestoreReadyStatus =
-  'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
-
-const isReady = (s: RestoreReadyStatus) => s === 'complete' || s === 'not-needed';
+import { isSafeToMint, type RestoreStatus } from '@/shared/stores/global/walletRestorePhase';
 
 interface RestoreReadyStore {
-  getState: () => { restoreStatus: RestoreReadyStatus };
+  getState: () => { restoreStatus: RestoreStatus };
   subscribe: (
     listener: (
-      state: { restoreStatus: RestoreReadyStatus },
-      prev: { restoreStatus: RestoreReadyStatus }
+      state: { restoreStatus: RestoreStatus },
+      prev: { restoreStatus: RestoreStatus }
     ) => void
   ) => () => void;
 }
@@ -33,12 +30,12 @@ export function awaitRestoreReady(store: RestoreReadyStore): Promise<void> {
       resolve();
     };
     const unsub = store.subscribe((state) => {
-      if (isReady(state.restoreStatus)) finish();
+      if (isSafeToMint(state.restoreStatus)) finish();
     });
     unsubscribe = unsub;
     // If the listener fired synchronously during subscribe, the early
     // unsubscribe?.() above was a no-op — clean up now.
     if (settled) unsub();
-    if (isReady(store.getState().restoreStatus)) finish();
+    if (isSafeToMint(store.getState().restoreStatus)) finish();
   });
 }

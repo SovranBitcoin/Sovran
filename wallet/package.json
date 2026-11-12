@@ -19,7 +19,8 @@
     "./amount": "./src/amount.ts",
     "./units": "./src/units/index.ts",
     "./safeFetch": "./src/safeFetch.ts",
-    "./operations": "./src/operations/index.ts"
+    "./operations": "./src/operations/index.ts",
+    "./redeemEntry": "./src/transport/redeemEntry.ts"
   },
   "files": [
     "src"
