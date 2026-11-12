@@ -696,3 +696,18 @@ self-audited against their parents; another independent review was not repeated.
 - Unknown relay lists, pending mute delivery/signer continuation, and the pending-follow reversal label remain
   reported in the follow-up ledger; they were not silently fixed across the saved-state boundary.
 - No resumed work was pushed, no PR was opened, and nothing on main's product code changed.
+
+## Persistence coverage research (2026-11-12)
+
+**Proposal only, awaiting approval for implementation.** The owner asked whether every released Zustand format
+could be exercised over broad values and forward upgrades without routine simulator runs. Research and the
+independent repository audit are in [persistence-fixture-patterns](research/persistence-fixture-patterns.md).
+
+The existing twenty epoch fixtures and real launch runner should be extended, not rebuilt. Proposed additions:
+historical value generators and field/variant obligations, independent domain-preservation facts, selected
+historical upgrade compositions, operation/failure schedules, and an agent-readable missing-coverage report.
+No finite suite establishes every possible state; native adapter/keychain/backup behavior remains a separate
+verification layer. No persisted data, product code or migration was changed and no new release-safety verdict
+is claimed. EAS refresh succeeded (456 store builds; tracked TSV unchanged). Three existing focused gates passed:
+116 tests, one skipped. Research: GPT-6.1 Sol; independent repo audit: a separate GPT-6.1 Sol agent. Fable 5.2
+medium was attempted and failed due Claude's API rate limit. Behavior changed: none.
