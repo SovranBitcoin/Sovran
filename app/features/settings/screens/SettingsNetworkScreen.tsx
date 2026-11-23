@@ -29,9 +29,10 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 
 import { RelayListSettings } from '../components/RelayListSettings';
+import { MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
 
 const VERTEX_CREDITS_DESCRIPTION =
-  "Uses your Nostr identity's free Vertex credits to refresh reputation scores for everyone. Vertex and nagg see which profiles you look up; your keys never leave the device.";
+  "Uses your Nostr identity's free Vertex credits directly over wss://relay.vertexlab.io to refresh reputation scores. Vertex sees which profiles you look up; your keys never leave the device.";
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
@@ -48,6 +49,8 @@ export function SettingsNetworkScreen() {
   const setPrimalTierEnabled = useSettingsStore((s) => s.setPrimalTierEnabled);
   const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
   const setRelayTierEnabled = useSettingsStore((s) => s.setRelayTierEnabled);
+  const disabledMintAuditors = useSettingsStore((s) => s.disabledMintAuditors);
+  const setMintAuditorEnabled = useSettingsStore((s) => s.setMintAuditorEnabled);
   const health = useRelayHealth();
   const tierHealth = useNostrTierHealth(health);
 
@@ -195,6 +198,33 @@ export function SettingsNetworkScreen() {
                 </ListGroup.ItemSuffix>
               </ListGroup.Item>
             </PressableFeedback>
+          </ListGroup>
+        </Section>
+
+        <Section title="Mint auditors">
+          <ListGroup variant="secondary">
+            {MINT_AUDITORS.map((auditor, index) => {
+              const enabled = !disabledMintAuditors.includes(auditor.id);
+              return (
+                <React.Fragment key={auditor.id}>
+                  {index > 0 ? <Separator className="mx-4" /> : null}
+                  <ListGroup.Item className={enabled ? undefined : 'opacity-40'}>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{auditor.name}</ListGroup.ItemTitle>
+                      <ListGroup.ItemDescription>{auditor.description}</ListGroup.ItemDescription>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Switch
+                        testID={`settings-mint-auditor-${auditor.id}`}
+                        accessibilityLabel={`Use ${auditor.name}`}
+                        isSelected={enabled}
+                        onSelectedChange={(next) => setMintAuditorEnabled(auditor.id, next)}
+                      />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </React.Fragment>
+              );
+            })}
           </ListGroup>
         </Section>
 

@@ -549,20 +549,23 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
 // ---------------------------------------------------------------------------
 
 /**
- * nagg mint discovery: one app-view call returning every known mint with audit
- * state, supported units, review + favourite aggregates, and the operator's
- * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
- * the app no longer needs separate mint search + per-mint
- * review/profile fan-outs for discovery.
+ * Multi-auditor mint discovery: merges results from all enabled auditors
+ * (Nostr NIP-87, MintRadar, Cashu Auditor, IMF.gg) respecting per-auditor
+ * settings in `settingsStore.disabledMintAuditors`.
  */
-export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
-    parseDiscoverMints,
-    'nostr/mint/discover',
-    undefined,
-    { signal }
-  ).then((result) => result.map(withIdentitiesCached));
+export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) => {
+  const { discoverMintsFromAuditors } = require('@/shared/lib/cashu/auditors/discoverMints') as {
+    discoverMintsFromAuditors: typeof import('@/shared/lib/cashu/auditors/discoverMints').discoverMintsFromAuditors;
+  };
+  const { useSettingsStore } = require('@/shared/stores/global/settingsStore') as {
+    useSettingsStore: typeof import('@/shared/stores/global/settingsStore').useSettingsStore;
+  };
+  return discoverMintsFromAuditors({
+    disabledAuditors: useSettingsStore.getState().disabledMintAuditors,
+    limit,
+    signal,
+  });
+};
 
 /** Hand a response's `identities` to the single owner and pass it on unchanged. */
 function withIdentitiesCached<T extends { identities?: Record<string, NaggIdentity> }>(

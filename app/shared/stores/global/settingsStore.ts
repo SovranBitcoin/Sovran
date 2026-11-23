@@ -100,6 +100,8 @@ interface SettingsState {
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
   primalHostsDisabled: string[];
+  /** Mint auditor ids the user switched OFF (denylist: empty = all enabled). */
+  disabledMintAuditors: string[];
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -213,6 +215,9 @@ const PersistedSettings = z.object({
   primalHostsDisabled: tolerantArray(z.string().max(2048), 16)
     .default([])
     .catch(() => []),
+  disabledMintAuditors: tolerantArray(z.string().max(64), 16)
+    .default([])
+    .catch(() => []),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
   middlemanRouting:
     PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING).catch(DEFAULT_MIDDLEMAN_ROUTING),
@@ -247,6 +252,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   primalTierEnabled: true,
   relayTierEnabled: true,
   primalHostsDisabled: [],
+  disabledMintAuditors: [],
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -293,6 +299,7 @@ interface SettingsActions {
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
   setPrimalHostEnabled: (url: string, enabled: boolean) => void;
+  setMintAuditorEnabled: (id: string, enabled: boolean) => void;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -435,6 +442,13 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
             return { primalHostsDisabled: enabled ? withoutUrl : [...withoutUrl, url] };
           });
         },
+        setMintAuditorEnabled: (id: string, enabled: boolean) => {
+          storeLog.info('store.settings.set_mint_auditor_enabled', { id, enabled });
+          set((state) => {
+            const withoutId = state.disabledMintAuditors.filter((entry) => entry !== id);
+            return { disabledMintAuditors: enabled ? withoutId : [...withoutId, id] };
+          });
+        },
 
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
@@ -534,6 +548,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           primalTierEnabled: state.primalTierEnabled,
           relayTierEnabled: state.relayTierEnabled,
           primalHostsDisabled: state.primalHostsDisabled,
+          disabledMintAuditors: state.disabledMintAuditors,
         }),
         afterHydrate: (state, error) => {
           if (error) return;
