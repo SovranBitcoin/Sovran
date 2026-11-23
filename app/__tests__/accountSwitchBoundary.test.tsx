@@ -287,7 +287,6 @@ describe('AccountScopedProviders', () => {
       'NostrKeys',
       'NostrNDK',
       'NostrSigner',
-      'Whitenoise',
       'Coco',
       'WalletContext',
       'Colada',
@@ -306,7 +305,6 @@ describe('AccountScopedProviders', () => {
       'NostrKeys',
       'NostrNDK',
       'NostrSigner',
-      'Whitenoise',
       'Coco',
       'WalletContext',
       'Colada',
@@ -329,7 +327,6 @@ describe('AccountScopedProviders', () => {
         'unmount NostrKeys{"defaultAccountIndex":0}',
         'unmount NostrNDK{"accountIndex":0}',
         'unmount NostrSigner',
-        'unmount Whitenoise{"accountIndex":0}',
         'unmount Coco',
         'unmount WalletContext',
         'unmount Colada',
@@ -338,16 +335,15 @@ describe('AccountScopedProviders', () => {
         'unmount routes',
       ])
     );
-    expect(unmounts).toHaveLength(10);
+    expect(unmounts).toHaveLength(9);
     expect(mounts).toEqual(
       expect.arrayContaining([
         'mount NostrKeys{"defaultAccountIndex":1}',
         'mount NostrNDK{"accountIndex":1}',
-        'mount Whitenoise{"accountIndex":1}',
         'mount routes',
       ])
     );
-    expect(mounts).toHaveLength(10);
+    expect(mounts).toHaveLength(9);
     // Every old provider is gone before the first new one mounts.
     expect(mockEvents.findIndex((e) => e.startsWith('mount'))).toBe(unmounts.length);
   });

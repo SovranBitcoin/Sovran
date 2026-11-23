@@ -23,7 +23,7 @@ jest.mock('@/shared/stores/profile/mintStore', () => ({
 
 const RELAYS = ['wss://relay-a.example/', 'wss://relay-b.example/'];
 const MINT = 'https://mint.example/Bitcoin';
-const NAGG = 'https://configured-nagg.example/livez';
+const NAGG = 'https://api.coinbase.com/v2/time';
 
 /** A fetch that answers per host: a status, or `null` for no network path. */
 function fetchByHost(answers: Record<string, number | null>) {
@@ -74,9 +74,9 @@ describe('offline reachability', () => {
     const fetcher = jest.fn().mockResolvedValue(response(200));
     const result = await resolveOfflineReachability(connectedWifi, { fetcher });
     expect(result.isOffline).toBe(false);
-    expect(result.probes).toEqual([expect.objectContaining({ name: 'nagg', ok: true })]);
+    expect(result.probes).toEqual([expect.objectContaining({ name: 'coinbase', ok: true })]);
     expect(fetcher).toHaveBeenCalledWith(
-      'https://configured-nagg.example/livez',
+      'https://api.coinbase.com/v2/time',
       expect.objectContaining({ method: 'GET', body: undefined })
     );
   });
@@ -170,7 +170,7 @@ describe('offline reachability', () => {
   });
   it('is online when the Sovran server answers 404 and a relay answers', async () => {
     mockAccount.relays = RELAYS;
-    const fetcher = fetchByHost({ 'configured-nagg.example': 404, 'relay-b.example': 200 });
+    const fetcher = fetchByHost({ 'api.coinbase.com': 404, 'relay-b.example': 200 });
 
     const result = await resolveOfflineReachability(connectedWifi, { fetcher });
 
@@ -215,7 +215,7 @@ describe('offline reachability', () => {
     expect(mintBroken).toMatchObject({ isOffline: false, answeredBy: 'mint' });
 
     const onlySovranUnhealthy = await resolveOfflineReachability(connectedWifi, {
-      fetcher: fetchByHost({ 'configured-nagg.example': 404 }),
+      fetcher: fetchByHost({ 'api.coinbase.com': 404 }),
     });
     expect(onlySovranUnhealthy).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
   });
@@ -230,8 +230,8 @@ describe('offline reachability', () => {
     expect(result).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
     expect(result.answeredBy).toBeUndefined();
     expect(result.probes.map((probe) => probe.name).sort()).toEqual([
+      'coinbase',
       'mint',
-      'nagg',
       'relay',
       'relay',
     ]);
@@ -261,7 +261,7 @@ describe('offline reachability', () => {
 
     expect(result).toMatchObject({ isOffline: false, answeredBy: 'relay' });
     expect(aborted).toEqual(
-      expect.arrayContaining(['configured-nagg.example', 'mint.example', 'relay-b.example'])
+      expect.arrayContaining(['api.coinbase.com', 'mint.example', 'relay-b.example'])
     );
   });
 
@@ -320,7 +320,7 @@ describe('offline reachability', () => {
       mockAccount.selectedMint = 'https://mint.example/';
       const probes = defaultReachabilityProbes();
       expect(probes.map((probe) => `${probe.name} ${probe.url}`)).toEqual([
-        `nagg ${NAGG}`,
+        `coinbase ${NAGG}`,
         'relay https://relay-a.example/',
         'relay https://relay-b.example/',
         'relay https://relay-c.example/',

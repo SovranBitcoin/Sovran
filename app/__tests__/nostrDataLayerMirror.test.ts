@@ -33,9 +33,8 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   getNostrTierConfig: () => ({
-    nagg: { enabled: true, appViewBaseUrl: 'https://nagg.invalid' },
     primal: { enabled: false, urls: [] },
-    relay: { enabled: false, relays: [] },
+    relay: { enabled: true, relays: ['wss://relay.invalid'] },
   }),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => {

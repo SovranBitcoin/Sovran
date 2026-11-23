@@ -122,6 +122,6 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/rollbackStore': useRollbackStore,
   'runtime/swapStatusStore': useSwapStatusStore,
   'bitchat/bitchatDmMessages': useBitchatDmMessagesStore,
-  'feed/ignoreStore': useFeedIgnoreStore,
-  'feed/notificationPolicyStore': useNotificationPolicyStore,
+  'profile/ignoreStore': useFeedIgnoreStore,
+  'profile/notificationPolicyStore': useNotificationPolicyStore,
 };

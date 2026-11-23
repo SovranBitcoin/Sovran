@@ -27,7 +27,6 @@ const STORE_DIRS: Record<string, string> = {
   profile: 'shared/stores/profile',
   runtime: 'shared/stores/runtime',
   bitchat: 'features/bitchat/stores',
-  feed: 'features/feed/stores',
 };
 
 /** Files intentionally absent from the mirror. Every exclusion needs a durable
