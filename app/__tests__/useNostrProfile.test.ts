@@ -21,7 +21,7 @@ jest.mock('@/shared/lib/apiClient', () => ({
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: jest.fn() }));
 jest.mock('@/shared/lib/nostr/client', () => ({ npubToPubkey: jest.fn() }));
-jest.mock('@/features/feed/components/nostr/feedParse', () => ({ tryNpubEncode: jest.fn() }));
+jest.mock('@/shared/lib/nostr/nostrBech32', () => ({ tryNpubEncode: jest.fn() }));
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   getNostrTierConfig: () => ({ nagg: { enabled: true } }),

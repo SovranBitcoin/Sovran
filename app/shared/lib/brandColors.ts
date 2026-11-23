@@ -14,23 +14,6 @@ export const BLUETOOTH_ACCENT = '#0A84FF';
  *  channel state — bitchat mesh broadcast icon, BLE peer connected dots. */
 export const CONNECTED_ACCENT = '#34C759';
 
-/** Reply/comment accent (#3B9EFF). Fixed cross-theme blue used to highlight
- *  the comment icon when the viewer has replied to a post — a sibling to the
- *  fixed pink "like" accent (so the cue reads the same on every theme, unlike
- *  the theme-derived `link` token which can render greyish). */
-export const COMMENT_ACCENT = '#3B9EFF';
-
-/** Like accent (#FF5A7A). Fixed cross-theme pink used to fill the heart when
- *  the viewer has liked a post — the reference every other action accent is
- *  described against. */
-export const LIKE_ACCENT = '#FF5A7A';
-
-/** Zap accent (#F7B500). Fixed cross-theme amber used to highlight the
- *  lightning icon when the viewer has zapped a post — sibling to the fixed
- *  pink "like" and blue "reply" accents. Warmer than BITCOIN_ACCENT so a
- *  zapped bolt reads as "lit up", not as a bitcoin glyph. */
-export const ZAP_ACCENT = '#F7B500';
-
 /** Bitcoin orange (#F7931A). Used wherever a "bitcoin-accepting" or
  *  "bitcoin-denominated" semantic cue is rendered: BTCMap markers, splitBill
  *  participant pills, mint-info bitcoin glyphs. Matches `orange-300` in
@@ -71,14 +54,6 @@ export const LIGHTNING_GOLD_GLOW = '#FFE099';
 
 /** Pale gold rim-light — LIGHTNING_GOLD analog of LIGHTNING_RIM. */
 export const LIGHTNING_GOLD_RIM = '#FFECBF';
-
-/** Buzz relay brand chartreuse (#d7d72e — buzz.xyz `theme-color`). Accent for
- *  relay cards whose NIP-11 `software` is the Block buzz repo. */
-export const BUZZ_ACCENT = '#D7D72E';
-
-/** Buzz brand ink (#231e1e) — the near-black buzz.xyz pairs with BUZZ_ACCENT;
- *  the readable-on-accent text color for Buzz brand pills. */
-export const BUZZ_INK = '#231E1E';
 
 /** Theme-invariant dark success tint for animated frosted payment toasts. */
 export const TOAST_SUCCESS_DARK_BG = '#089A2C';

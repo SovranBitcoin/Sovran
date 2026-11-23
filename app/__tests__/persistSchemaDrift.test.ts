@@ -57,8 +57,8 @@ import '@/shared/stores/profile/transactionLocationStore';
 // decayed — every remaining persistConfig call site is imported so the
 // completeness assertion below can hold the registry to the source tree.
 import '@/features/bitchat/stores/bitchatDmMessages';
-import '@/features/feed/stores/ignoreStore';
-import '@/features/feed/stores/notificationPolicyStore';
+import '@/shared/stores/profile/ignoreStore';
+import '@/shared/stores/profile/notificationPolicyStore';
 import '@/features/nostrSigner/data/nip46ActivityStore';
 import '@/features/nostrSigner/data/nip46ConnectionsStore';
 import '@/shared/lib/nostr/media/mediaServerStore';

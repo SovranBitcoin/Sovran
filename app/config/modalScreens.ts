@@ -93,22 +93,6 @@ const slideFromRight = (name: string, presentation: 'modal' | 'card' = 'card'): 
 });
 
 /**
- * Slide from bottom: full-screen modal that rises vertically on both iOS and
- * Android. For self-contained screens that draw their own chrome (header,
- * safe-area insets) and want the keyboard to animate up from the bottom rather
- * than be dragged in alongside a horizontal slide. The screen owns its
- * background, so no contentStyle is set here.
- */
-const slideFromBottom = (name: string): ModalConfig => ({
-  name,
-  options: {
-    presentation: 'fullScreenModal',
-    headerShown: false,
-    animation: 'slide_from_bottom',
-  },
-});
-
-/**
  * Standalone single-screen route. iOS: pageSheet/formSheet with material blur
  * header, or the picker sheet's geometry for `picker`. Android: a pushed
  * screen with the native header, or a native bottom sheet for the routes
@@ -151,19 +135,6 @@ const cardFade = (
   };
 };
 
-/** Full-screen modal: no header, optional content style. */
-const fullScreenModal = (
-  name: string,
-  overrides?: Partial<NativeStackNavigationOptions>
-): ModalConfig => ({
-  name,
-  options: {
-    presentation: 'fullScreenModal',
-    headerShown: false,
-    ...overrides,
-  },
-});
-
 const TRANSPARENT_HEADER_OPTIONS = {
   headerTransparent: true,
   headerStyle: { backgroundColor: 'transparent' as const },
@@ -193,11 +164,9 @@ const flowGroups = [
 ].map((name) => modalFlow(name));
 
 const standaloneScreens: ModalConfig[] = [
-  slideFromBottom('composer'),
   slideFromRight('(settings-flow)'),
   slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),
-  fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   modalTransparent('camera', 'Scan QR'),
   modalWithGradient('share', 'formSheet'),
   // Every fact about one payment, under the same header as every other

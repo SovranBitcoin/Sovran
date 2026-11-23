@@ -70,7 +70,7 @@ jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
     }
   ),
 }));
-jest.mock('@/features/feed/stores/ignoreStore', () => ({
+jest.mock('@/shared/stores/profile/ignoreStore', () => ({
   useFeedIgnoreStore: {
     persist: {
       hasHydrated: () => mockHydrated,

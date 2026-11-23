@@ -6,7 +6,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import type { BLEPeer } from 'bitchat-module';
 
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
-import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { useRecentPeopleProfiles } from '@/shared/hooks/useRecentPeopleProfiles';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

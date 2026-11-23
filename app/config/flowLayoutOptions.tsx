@@ -228,14 +228,3 @@ export const getBaseModalHeaderOptions = (foreground: string): NativeStackNaviga
   ...GRADIENT_HEADER_OPTIONS,
 });
 
-/**
- * Immersive variant for full-screen takeover flows (stories, fullscreen camera).
- * No header, no animation, opaque background.
- */
-export const getImmersiveFlowScreenOptions = (
-  backgroundColor: string
-): NativeStackNavigationOptions => ({
-  headerShown: false,
-  contentStyle: { backgroundColor },
-  animation: 'none',
-});

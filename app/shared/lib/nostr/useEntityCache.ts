@@ -4,7 +4,7 @@ import { facade } from 'nostr';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
-import type { NoteMetrics, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
+import type { NoteMetrics, ProfileInfo } from '@/shared/lib/nostr/nostrEventTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { backfillProfile } from '@/shared/lib/nostr/fetchProfiles';
 import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
@@ -226,16 +226,6 @@ export function useNoteStats(eventId: string | undefined): {
     }
     return { metrics: undefined, status: pending ? ('loading' as const) : ('absent' as const) };
   }, [record, pending]);
-}
-
-/**
- * Non-reactive read of one note's counts from the single owner, in the feed's
- * shape — the base every surface's optimistic overlay is applied to, so a feed
- * row and a thread showing the same note start from the same numbers.
- */
-export function readNoteMetrics(eventId: string): NoteMetrics | undefined {
-  const stats = buildNostrDataLayer()?.cache.getNoteStats(eventId);
-  return stats ? noteMetricsFromStats(stats) : undefined;
 }
 
 /** Non-reactive read of one full profile record (for getState-style callers). */

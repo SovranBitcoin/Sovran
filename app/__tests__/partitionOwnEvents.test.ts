@@ -4,7 +4,7 @@
  * (NIP-10 markers vs quotes/mentions), like content filtering, and dedupe of
  * latest profile/contacts.
  */
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 import { partitionOwnEvents } from '@/shared/lib/nostr/ownsync/partitionOwnEvents';
 
 function ev(over: Partial<FeedEvent> & { kind: number }): FeedEvent {

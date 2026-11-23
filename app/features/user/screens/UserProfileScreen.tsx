@@ -59,10 +59,9 @@ import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
+import { useModerationActions } from '@/shared/hooks/useModerationActions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { hasFeature } from '@/shared/config/features';
 import * as nip19 from 'nostr-tools/nip19';
 import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
@@ -88,7 +87,6 @@ import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor } from '@/shared/lib/colorExtraction';
-import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -1220,35 +1218,6 @@ export function UserProfileScreen() {
   const isFollowingProfile = useNostrSocialStore(selectIsFollowingPubkey(pubkey || ''));
 
   // ===========================
-  // VIDEO STORIES STATE
-  // ===========================
-
-  const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
-  const hasStories = userVideoPosts.length > 0;
-
-  const handleVideoPostsReady = (videoPosts: VideoPostRecord[]) => {
-    setUserVideoPosts(videoPosts);
-  };
-
-  const handleAvatarStoryPress = () => {
-    // Stories belong to the feed module; without it the route is not shipped.
-    if (userVideoPosts.length === 0 || !hasFeature('feed')) return;
-    nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
-    const storyUser: StoryUser = {
-      pubkey,
-      profile: cachedProfile ? { name: displayName, picture: cachedProfile.picture } : undefined,
-      videoPosts: userVideoPosts,
-    };
-    router.navigate({
-      pathname: '/(stories-flow)/stories',
-      params: {
-        startIndex: '0',
-        storyUsersJson: JSON.stringify([storyUser]),
-      },
-    });
-  };
-
-  // ===========================
   // HANDLERS
   // ===========================
 
@@ -1337,8 +1306,6 @@ export function UserProfileScreen() {
         followingCountKnown: followingCount !== undefined,
         reputationKnown: reputationScore !== undefined,
         topFollowers: profileData?.topFollowers?.length ?? 0,
-        videos: userVideoPosts.length,
-        hasStories,
         mintKnown: !!profileMintUrl,
         followPending,
       },
@@ -1355,7 +1322,6 @@ export function UserProfileScreen() {
       followerCount,
       followingCount,
       reputationScore,
-      userVideoPosts,
       profileInfoItems,
       isMetadataLoading,
       isProfileApiLoading,
@@ -1384,7 +1350,6 @@ export function UserProfileScreen() {
       followingCountKnown: followingCount !== undefined,
       followPending,
       hasMintUrl: Boolean(profileMintUrl),
-      hasStories,
       isFollowingProfile,
       isMetadataLoading,
       isOwnProfile,
@@ -1396,7 +1361,6 @@ export function UserProfileScreen() {
       reputationKnown: reputationScore !== undefined,
       showFollowButton: !!nostrKeys?.pubkey && !isOwnProfile && !!pubkey,
       topFollowers: profileData?.topFollowers?.length ?? 0,
-      videos: userVideoPosts.length,
       websiteKnown: Boolean(cachedProfile?.website),
     },
     remeasure: {
@@ -1472,7 +1436,6 @@ export function UserProfileScreen() {
           authorName={displayName}
           authorPicture={cachedProfile?.picture}
           isOwnProfile={isOwnProfile}
-          onVideoPostsReady={handleVideoPostsReady}
           ListHeaderComponent={
             <View>
               <BannerWithAvatar
@@ -1508,8 +1471,6 @@ export function UserProfileScreen() {
                 onEditProfile={
                   isOwnProfile ? () => router.push('/(settings-flow)/edit-profile') : undefined
                 }
-                hasStories={hasStories}
-                onAvatarPress={handleAvatarStoryPress}
                 tier={profileTier}
                 visualScope={profileHeaderVisualScope}
               />

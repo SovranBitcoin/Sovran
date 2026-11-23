@@ -7,7 +7,7 @@ import {
   extractOwnedBlobs,
   extractOwnedBlobsFromDescriptors,
 } from '@/shared/lib/nostr/media/ownedBlobs';
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
 
 const SHA_A = 'a'.repeat(64);

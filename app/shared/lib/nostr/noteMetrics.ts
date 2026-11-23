@@ -1,6 +1,6 @@
 import type { NoteStats } from '@sovranbitcoin/schemas';
 
-import type { NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
+import type { NoteMetrics } from '@/shared/lib/nostr/nostrEventTypes';
 
 /** The shared `NoteStats` contract → `NoteMetrics`, the shape the feed's rows read. */
 export function noteMetricsFromStats(

@@ -13,7 +13,7 @@ import {
 } from '@/shared/lib/apiClient';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
-import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
+import { tryNpubEncode } from '@/shared/lib/nostr/nostrBech32';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {

@@ -12,7 +12,7 @@
 // ast-grep-ignore: flatlist-outside-list-seam-tsx
 import { FlatList, StyleSheet } from 'react-native';
 
-import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
+import { FeedTabButton } from '@/shared/ui/composed/search/FeedTabButton';
 import type { SearchScopeId } from './scopes';
 
 type SearchScopeTabsProps = {

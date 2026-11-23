@@ -1,4 +1,4 @@
-import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
+import { useBlockedConversation } from '@/shared/hooks/useBlockedConversation';
 import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 /**

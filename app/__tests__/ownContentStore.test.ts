@@ -19,7 +19,7 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   }),
 }));
 
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 import {
   ingestOwnContent,
   LOCAL_GRACE_MS,

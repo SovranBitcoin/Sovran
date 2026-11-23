@@ -40,8 +40,8 @@ const APP_DIR = resolve(__dirname, '..');
 /** Every module that registers a persisted store. */
 const STORE_MODULES = [
   '@/features/bitchat/stores/bitchatDmMessages',
-  '@/features/feed/stores/ignoreStore',
-  '@/features/feed/stores/notificationPolicyStore',
+  '@/shared/stores/profile/ignoreStore',
+  '@/shared/stores/profile/notificationPolicyStore',
   '@/features/nostrSigner/data/nip46ActivityStore',
   '@/features/nostrSigner/data/nip46ConnectionsStore',
   '@/shared/lib/nostr/media/mediaServerStore',

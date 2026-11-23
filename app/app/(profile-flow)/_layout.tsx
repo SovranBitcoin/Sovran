@@ -11,7 +11,6 @@ import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const SHARE_OPTIONS = { title: 'Share profile' };
-const THREAD_OPTIONS = { title: 'Thread' };
 const HIDDEN_HEADER_OPTIONS = { headerShown: false };
 
 export default function ProfileFlowLayout() {
@@ -19,7 +18,6 @@ export default function ProfileFlowLayout() {
     <AndroidSheetFlowStack flow="(profile-flow)">
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
-      <Stack.Screen name="thread" options={THREAD_OPTIONS} />
       <Stack.Screen name="bitchatNetwork" options={HIDDEN_HEADER_OPTIONS} />
       <Stack.Screen name="bitchatDM" options={HIDDEN_HEADER_OPTIONS} />
     </AndroidSheetFlowStack>

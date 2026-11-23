@@ -19,7 +19,7 @@ import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { alpha, fontSize, radius, spacing } from '@/shared/styles/tokens';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
-import { NotificationRowPressable } from '@/features/feed/components/notificationRowChrome';
+import { NotificationRowPressable } from '@/features/mint/components/mintChanges/NotificationRowPressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';

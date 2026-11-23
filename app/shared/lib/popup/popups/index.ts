@@ -12,7 +12,6 @@ export { sendMemoPopup } from './sendMemoSheet';
 export { copyTokenAsEmoji } from './emojiPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
-export { deleteStatusPopup } from './deleteStatus';
 export {
   paymentStatusPopup,
   swapStatusPopup,

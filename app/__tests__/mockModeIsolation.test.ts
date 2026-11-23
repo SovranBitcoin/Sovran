@@ -217,7 +217,7 @@ jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({
   normalizeRecentPersonPubkey: (key: unknown) => key,
 }));
 const mockProfileReader = jest.fn((..._args: unknown[]) => []);
-jest.mock('@/features/feed/hooks/useRecentPeopleProfiles', () => ({
+jest.mock('@/shared/hooks/useRecentPeopleProfiles', () => ({
   useRecentPeopleProfiles: (...args: unknown[]) => mockProfileReader(...args),
 }));
 

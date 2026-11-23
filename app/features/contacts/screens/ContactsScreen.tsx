@@ -1,6 +1,6 @@
 import { Screen } from '@/shared/ui/composed/Screen';
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { shouldCensorDm } from '@/features/feed/lib/moderation';
+import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
+import { shouldCensorDm } from '@/shared/lib/nostr/moderationHelpers';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useIsFocused } from 'expo-router';

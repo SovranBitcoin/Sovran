@@ -1,6 +1,6 @@
 import type { BLEPeer } from 'bitchat-module';
 
-import type { RecentPeopleProfileRow } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import type { RecentPeopleProfileRow } from '@/shared/hooks/useRecentPeopleProfiles';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';

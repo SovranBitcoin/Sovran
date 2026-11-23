@@ -176,7 +176,7 @@ jest.mock('@/features/user/components/ModeratedDmBubble', () => ({
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
-jest.mock('@/features/feed/stores/ignoreStore', () => {
+jest.mock('@/shared/stores/profile/ignoreStore', () => {
   const state = () => ({ ignoredPubkeys: mockIgnored, dmFilterEnabled: false, dmFilterWords: [] });
   const useFeedIgnoreStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
     selector(state());

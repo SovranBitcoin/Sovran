@@ -13,7 +13,7 @@ export const unstable_settings = {
   anchor: 'index',
 };
 
-type TabName = 'feed' | 'index' | 'contacts' | 'notifications';
+type TabName = 'index' | 'contacts';
 
 type TabDef = {
   name: TabName;
@@ -29,14 +29,6 @@ type TabDef = {
 
 const ALL_TAB_DEFS: readonly TabDef[] = [
   {
-    name: 'feed',
-    feature: 'feed',
-    testID: 'tab-feed',
-    title: 'Feed',
-    sf: { default: 'house', selected: 'house.fill' },
-    monicon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
-  },
-  {
     name: 'contacts',
     feature: 'contacts',
     testID: 'tab-contacts',
@@ -50,14 +42,6 @@ const ALL_TAB_DEFS: readonly TabDef[] = [
     testID: 'tab-wallet',
     sf: { default: 'wallet.bifold', selected: 'wallet.bifold' },
     monicon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
-  },
-  {
-    name: 'notifications',
-    feature: 'feed',
-    testID: 'tab-notifications',
-    title: 'Notifications',
-    sf: { default: 'bell', selected: 'bell.fill' },
-    monicon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
   },
 ];
 

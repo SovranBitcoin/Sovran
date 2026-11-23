@@ -17,8 +17,7 @@
 import { useEffect, useState } from 'react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 
-import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent, ProfileInfo } from '@/shared/lib/nostr/nostrEventTypes';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { nostrLog, redactError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
@@ -43,23 +42,7 @@ function cachePut(eventId: string, entry: CacheEntry): void {
   }
 }
 
-async function fetchFromNagg(eventId: string): Promise<CacheEntry | null> {
-  try {
-    const updates = await getFeedClient().enrich({
-      missingQuotedIds: [eventId],
-      missingProfilePubkeys: [],
-    });
-    const event = updates.quotedEvents?.get(eventId);
-    if (event === undefined) return null;
-    const author = updates.profiles?.get(event.pubkey);
-    return { event, ...(author !== undefined && { author }) };
-  } catch (error) {
-    nostrLog.debug('nostr.signer.preview_nagg_failed', { error: redactError(error) });
-    return null;
-  }
-}
-
-// Relay fallback — covers nagg outages and notes nagg hasn't indexed.
+// Relay fetch for referenced notes.
 // Module-scope because the try/catch (value blocks inside it) would bail the
 // React Compiler if it lived in the hook's effect closure.
 async function fetchFromRelay(
@@ -103,10 +86,7 @@ export function useReferencedEventPreview(eventId: string | undefined): Referenc
 
     let cancelled = false;
     void (async () => {
-      let entry = await fetchFromNagg(eventId);
-      if (entry === null && ndk) {
-        entry = await fetchFromRelay(eventId, ndk);
-      }
+      const entry = ndk ? await fetchFromRelay(eventId, ndk) : null;
       const final: CacheEntry = entry ?? 'missing';
       cachePut(eventId, final);
       if (!cancelled) setResolved({ id: eventId, entry: final });

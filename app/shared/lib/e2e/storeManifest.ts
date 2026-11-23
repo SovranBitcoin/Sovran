@@ -62,8 +62,8 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
+import { useNotificationPolicyStore } from '@/shared/stores/profile/notificationPolicyStore';
 
 interface MirrorableStore {
   getState(): unknown;

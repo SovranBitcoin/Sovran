@@ -38,8 +38,8 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string)
 });
 
 import '@/features/bitchat/stores/bitchatDmMessages';
-import '@/features/feed/stores/ignoreStore';
-import '@/features/feed/stores/notificationPolicyStore';
+import '@/shared/stores/profile/ignoreStore';
+import '@/shared/stores/profile/notificationPolicyStore';
 import '@/features/nostrSigner/data/nip46ActivityStore';
 import '@/features/nostrSigner/data/nip46ConnectionsStore';
 import '@/shared/lib/nostr/media/mediaServerStore';

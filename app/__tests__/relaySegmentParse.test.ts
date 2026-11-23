@@ -3,7 +3,7 @@
  * a `relay` segment (rendered as the inline RelayCard block), while `https://`
  * urls keep their existing `url` classification and garbage stays plain text.
  */
-import { parseContent } from '@/features/feed/components/nostr/feedParse';
+import { parseContent } from '@/shared/lib/nostr/nostrBech32';
 
 describe('relay segment tokenization', () => {
   it('tokenizes a wss:// url as a relay segment between text', () => {

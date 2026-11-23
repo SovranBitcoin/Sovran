@@ -12,7 +12,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
-import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { useNotificationPolicyStore } from '@/shared/stores/profile/notificationPolicyStore';
 import { log } from '@/shared/lib/logger';
 
 // One in-memory disk behind both storage adapters, so a released blob can be

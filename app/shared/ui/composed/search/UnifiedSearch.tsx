@@ -12,7 +12,6 @@ import { StyleSheet, View } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { SearchPostsList } from '@/features/contacts/components/SearchPostsList';
 import { useSearchAggregates, type SearchAggregates } from './useSearchAggregates';
 import { useRecentSearches, type RecentSearchSurface } from './useRecentSearches';
 import { SearchScopeTabs } from './SearchScopeTabs';
@@ -107,7 +106,7 @@ function ScopeBody({
         />
       );
     case 'Posts':
-      return <SearchPostsList pubkeys={aggregates.postsAuthors} />;
+      return null;
     case 'Mints':
       return (
         <SearchResultRows

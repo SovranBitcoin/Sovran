@@ -1,13 +1,13 @@
 import NDK, { type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { z } from 'zod';
-import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/features/feed/stores/ignoreStore';
+import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/shared/stores/profile/ignoreStore';
 import {
   changeMute,
   isNewerMuteList,
   reportTags,
   type MuteList,
   type ReportReason,
-} from '@/features/feed/lib/moderation';
+} from '@/shared/lib/nostr/moderationHelpers';
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {

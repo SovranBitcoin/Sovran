@@ -26,19 +26,10 @@ export default function UserFlowLayout() {
     () => createFlowLayoutScreenOptions({ foreground, background: surface }),
     [foreground, surface]
   );
-  const threadOptions = useMemo(
-    () => ({
-      title: 'Thread',
-      contentStyle: { backgroundColor: surface },
-    }),
-    [surface]
-  );
-
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
-      <Stack.Screen name="thread" options={threadOptions} />
       <Stack.Screen name="geohashChat" options={HIDDEN_HEADER_OPTIONS} />
       <Stack.Screen name="bitchatNetwork" options={HIDDEN_HEADER_OPTIONS} />
       <Stack.Screen name="bitchatDM" options={HIDDEN_HEADER_OPTIONS} />

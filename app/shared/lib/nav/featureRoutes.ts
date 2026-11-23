@@ -28,22 +28,16 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   geohashChat: 'nutDrop',
   profile: 'nostr',
   claimUsername: 'nostr',
-  composer: 'feed',
-  thread: 'feed',
-  stories: 'feed',
   aiRequest: 'ai',
 };
 
 /** Whole route groups that belong to one module. */
 const GROUP_FEATURE: Readonly<Record<string, Feature>> = {
   '(signer-flow)': 'nostr',
-  '(stories-flow)': 'feed',
 };
 
 /** Tabs that belong to one module; their nested screens go with them. */
 const TAB_FEATURE: Readonly<Record<string, Feature>> = {
-  feed: 'feed',
-  notifications: 'feed',
   contacts: 'contacts',
 };
 

@@ -3,7 +3,6 @@ import type { DesignSystemFamily } from './types';
 
 import { EMPTY_STATE_SCENARIOS } from './emptyStates';
 import { FADE_REVEAL_STRESS_SCENARIOS } from './fadeRevealStress';
-import { FAKE_POST_SCENARIOS } from './fakePosts';
 import { FOUNDATION_SCENARIOS } from './foundations';
 import { LOADING_INDICATOR_SCENARIOS } from './loadingIndicator';
 import { SEGMENTED_PROGRESS_SCENARIOS } from './segmentedProgress';
@@ -74,13 +73,6 @@ export const DESIGN_SYSTEM_CATALOG: readonly DesignSystemFamily[] = [
     title: 'Fade-reveal stress',
     description: 'Remounting fade-in grid hunting the invisible-element race (red = stuck)',
     scenarios: FADE_REVEAL_STRESS_SCENARIOS,
-  },
-  {
-    id: 'fake-posts',
-    href: '/(settings-flow)/design-system-posts',
-    title: 'Fake posts',
-    description: 'Fixture feed posts — every relay-card situation without real content',
-    scenarios: FAKE_POST_SCENARIOS,
   },
 ];
 

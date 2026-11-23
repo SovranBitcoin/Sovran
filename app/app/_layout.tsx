@@ -41,7 +41,6 @@ import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { E2EStateMirror } from '@/shared/lib/e2e/E2EStateMirror';
-import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
   AccountScopedProviders,
@@ -337,7 +336,6 @@ export default function RootLayout() {
                 {/* Same-window host for the Android feed media lightbox; must
                     sit BEFORE PopupHost so popups triggered from inside the
                     lightbox stack above it. No-op on iOS / when empty. */}
-                <AndroidImageOverlayHost />
                 <PopupHost />
                 <ActionMenuHost />
               </AccountScopedProviders>

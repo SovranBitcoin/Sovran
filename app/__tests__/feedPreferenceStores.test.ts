@@ -1,5 +1,5 @@
-import { normalizeIgnoreHex, useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { normalizeIgnoreHex, useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
+import { useNotificationPolicyStore } from '@/shared/stores/profile/notificationPolicyStore';
 
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],

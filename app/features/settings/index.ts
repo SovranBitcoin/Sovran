@@ -17,7 +17,6 @@ export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSyst
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
 export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSystemFadeStressScreen';
-export { SettingsDesignSystemPostsScreen } from './screens/SettingsDesignSystemPostsScreen';
 export { SettingsDesignSystemVariationsScreen } from './screens/SettingsDesignSystemVariationsScreen';
 export { SettingsDesignSystemScreensScreen } from './screens/SettingsDesignSystemScreensScreen';
 export { SettingsDesignSystemPromptsScreen } from './screens/SettingsDesignSystemPromptsScreen';
@@ -26,5 +25,4 @@ export {
   SettingsDesignSystemPromptPreviewScreen,
 } from './screens/SettingsDesignSystemPromptPreviewScreen';
 export { findPromptEntry } from './design-system/prompts';
-export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

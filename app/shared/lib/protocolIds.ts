@@ -74,11 +74,6 @@ export function isNostrPubkeyHex(value: unknown): value is NostrPubkeyHex {
   return isHex64(value);
 }
 
-/** Same tolerant read guard, for event ids. */
-export function isNostrEventId(value: unknown): value is NostrEventId {
-  return isHex64(value);
-}
-
 /**
  * Canonical zod schemas for 64-hex nostr fields — same tolerant acceptance,
  * branded output. Replace the per-file `HexPubkeySchema`/`PubkeyHexSchema`/

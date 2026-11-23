@@ -14,8 +14,8 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
+import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
+import { useModerationActions } from '@/shared/hooks/useModerationActions';
 import { popup } from '@/shared/lib/popup';
 
 function BlockedPerson({

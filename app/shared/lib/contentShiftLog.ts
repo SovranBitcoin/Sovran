@@ -185,7 +185,7 @@ type VisualViewToken<ItemT> = {
  * on some paths, and `item` as `any`; the caller names the row type it is
  * rendering. Cast only — no runtime narrowing.
  */
-export function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
+function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
   return {
     index: typeof token.index === 'number' ? token.index : null,
     key: token.key,
@@ -325,17 +325,12 @@ const VISUAL_SCOPE_REGISTRY = new Map<string, Map<string, VisualRecord>>();
 const VISUAL_SCOPE_LAST_REMEASURE_AT = new Map<string, number>();
 let visualLayoutMountSequence = 0;
 
-export const VISUAL_LIST_VIEWABILITY_CONFIG = {
-  itemVisiblePercentThreshold: 1,
-  minimumViewTime: 0,
-};
-
 /**
  * Collapse a viewability token batch into the {start,end} range the visual-list
  * logger reports. Buffered bounds mirror the raw ones — FlashList already
  * windows for us, so there is no extra buffer to account for.
  */
-export function visualViewabilityRange(tokens: { index: number | null }[]): {
+function visualViewabilityRange(tokens: { index: number | null }[]): {
   start: number;
   end: number;
   startBuffered: number;

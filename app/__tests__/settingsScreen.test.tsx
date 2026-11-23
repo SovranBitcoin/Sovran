@@ -37,7 +37,7 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
       setInProcessProfileSwitch: mockSetInProcessProfileSwitch,
     }),
 }));
-jest.mock('@/features/feed/stores/notificationPolicyStore', () => ({
+jest.mock('@/shared/stores/profile/notificationPolicyStore', () => ({
   useNotificationPolicyStore: (select: (state: object) => unknown) =>
     select({ policy: mockPolicy }),
 }));

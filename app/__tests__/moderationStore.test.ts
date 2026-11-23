@@ -1,5 +1,5 @@
-import { PersistedFeedIgnoreStore, useFeedIgnoreStore } from '../features/feed/stores/ignoreStore';
-import type { MuteList } from '../features/feed/lib/moderation';
+import { PersistedFeedIgnoreStore, useFeedIgnoreStore } from '../shared/stores/profile/ignoreStore';
+import type { MuteList } from '../shared/lib/nostr/moderationHelpers';
 
 jest.mock('@sovranbitcoin/schemas', () => ({ loggableIssues: () => [] }), { virtual: true });
 jest.mock('@/shared/lib/logger', () => ({

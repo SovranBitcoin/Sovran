@@ -2,7 +2,7 @@
  * Media classification by NIP-92 imeta mime (so extensionless Blossom blobs
  * from other clients still render as media) and the IMAGE_EXT extension set.
  */
-import { IMAGE_EXT, mediaKindForMime } from '@/features/feed/components/nostr/feedParse';
+import { IMAGE_EXT, mediaKindForMime } from '@/shared/lib/nostr/nostrBech32';
 
 describe('mediaKindForMime', () => {
   it('maps image/* and video/* to their kind', () => {

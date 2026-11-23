@@ -14,32 +14,18 @@ import { describeError } from '@/shared/lib/errors';
  * revalidates, and every arrival is logged under `read.mintChanges.*`.
  */
 import { useCallback, useMemo } from 'react';
-import { useMints } from '@cashu/coco-react';
 
 import { MINT_CHANGES_CACHE_KEY, mintChangesCache } from '@/features/mint/data/mintChangesCache';
 import { decodeFeed } from '@/features/mint/lib/mintChanges/decode';
 import {
   buildMintChangeListItems,
-  flattenMintChangeUpdates,
   type MintChangeRevision,
-  type MintChangeUpdate,
 } from '@/features/mint/lib/mintChanges/groupEntries';
 import type { NutsMap } from '@/features/mint/lib/mintChanges/interpret';
 import { fetchMintChanges, type MintChangesResponse } from '@/shared/lib/apiClient';
 import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-
-interface UseMintChangesResult {
-  /** One row per update across the mints this wallet trusts, newest first. */
-  updates: MintChangeUpdate[];
-  /** How many mints the wallet trusts — what the empty state is speaking for. */
-  trustedMintCount: number;
-  isLoading: boolean;
-  isRefreshing: boolean;
-  errorMessage: string | null;
-  refresh: () => void;
-}
 
 /**
  * Resolves a mint's CURRENT capability map so a limit change can name its unit
@@ -80,44 +66,6 @@ function useMintChangesSource() {
     isRefreshing: read.isFetching && read.mode === 'refresh',
     errorMessage,
     refresh: read.refresh,
-  };
-}
-
-export function useMintChanges(): UseMintChangesResult {
-  const { trustedMints } = useMints();
-  const { response, isLoading, isRefreshing, errorMessage, refresh } = useMintChangesSource();
-  const nutsFor = useNutsResolver();
-
-  // `trustedMints` is a fresh array on every coco emit; key the memo on the URLs
-  // themselves so the decode/group pass doesn't re-run for an identical wallet.
-  const trustedMintsKey = trustedMints
-    .map((mint) => mint.mintUrl)
-    .sort()
-    .join('|');
-
-  const entries = useMemo(() => {
-    if (!response) return [];
-    const trusted = new Set(
-      trustedMintsKey ? trustedMintsKey.split('|').map(normalizeMintUrlKey) : []
-    );
-    if (trusted.size === 0) return [];
-    return decodeFeed(response).entries.filter((entry) =>
-      trusted.has(normalizeMintUrlKey(entry.mintUrl))
-    );
-  }, [response, trustedMintsKey]);
-
-  const updates = useMemo(
-    () => flattenMintChangeUpdates(buildMintChangeListItems(entries, nutsFor)),
-    [entries, nutsFor]
-  );
-
-  return {
-    updates,
-    trustedMintCount: trustedMints.length,
-    isLoading,
-    isRefreshing,
-    errorMessage,
-    refresh,
   };
 }
 

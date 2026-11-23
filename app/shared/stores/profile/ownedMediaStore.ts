@@ -22,7 +22,7 @@ import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { extractOwnedBlobs, type OwnedBlob } from '@/shared/lib/nostr/media/ownedBlobs';

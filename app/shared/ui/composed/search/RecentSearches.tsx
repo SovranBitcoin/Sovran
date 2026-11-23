@@ -16,8 +16,8 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
-import { RecentPeopleSearchStrip } from '@/features/feed/components/RecentPeopleSearchStrip';
+import { FeedTabButton } from '@/shared/ui/composed/search/FeedTabButton';
+import { RecentPeopleSearchStrip } from '@/shared/ui/composed/search/RecentPeopleSearchStrip';
 import { useRecentSearches, type RecentSearchSurface } from './useRecentSearches';
 
 export type EmptySearchPrompt = { icon: string; title: string; subtitle: string };

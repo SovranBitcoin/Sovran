@@ -14,7 +14,6 @@
  * `AsyncStorage`, matching `mintMetadataStore`.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
@@ -197,31 +196,6 @@ function fetchAndCache(relayUrl: string): Promise<RelayInformation | undefined> 
   })();
   inflight.set(key, p);
   return p;
-}
-
-/** Fire-and-forget SWR revalidation — the mount hook below. No-ops when fresh,
- *  in-flight, or inside the failure-retry window. */
-function revalidateRelayInfo(relayUrl: string): void {
-  void getCachedRelayInfo(relayUrl);
-}
-
-/**
- * Selector hook + mount-triggered SWR — the RelayCard API. `status` is
- * `loading` until the first fetch settles, then `loaded` (document available,
- * possibly stale-while-revalidating) or `unreachable` (no document, recent
- * failure).
- */
-export function useRelayMetadata(relayUrl: string): {
-  entry: RelayMetadataEntry | undefined;
-  status: 'loading' | 'loaded' | 'unreachable';
-} {
-  const key = useMemo(() => relayMetadataKey(relayUrl), [relayUrl]);
-  const entry = useRelayMetadataStore((s) => s.byRelayUrl[key]);
-  useEffect(() => {
-    revalidateRelayInfo(relayUrl);
-  }, [relayUrl]);
-  const status = entry?.info ? 'loaded' : entry?.failedAt ? 'unreachable' : 'loading';
-  return { entry, status };
 }
 
 /**
