@@ -10,8 +10,6 @@ type ProfileRouteName =
   | 'share'
   | 'userMessages'
   | 'thread'
-  | 'whitenoiseSetup'
-  | 'whitenoiseDM'
   | 'bitchatDM'
   | 'bitchatNetwork';
 

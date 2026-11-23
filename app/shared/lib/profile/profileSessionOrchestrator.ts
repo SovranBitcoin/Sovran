@@ -608,8 +608,8 @@ export async function deleteAllProfiles(): Promise<boolean> {
     // still gets cleaned up. AsyncStorage.clear() then catches anything we
     // missed.
     try {
-      const { wipeWhitenoiseStorageForAccounts } = await import('@/features/whitenoise/storage');
-      await wipeWhitenoiseStorageForAccounts(accountIndexes);
+      const { wipeLegacyWhitenoiseStorageForAccounts } = await import('./profileRemovalStorage');
+      await wipeLegacyWhitenoiseStorageForAccounts(accountIndexes);
     } catch (e) {
       log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: redactError(e) });
     }

@@ -214,8 +214,6 @@ export const SettingsScreen = () => {
   const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
   const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
-  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
-  const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const layoutGuides = useSettingsStore((state) => state.layoutGuides);
   const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
   const showTouches = useSettingsStore((state) => state.showTouches);
@@ -505,17 +503,6 @@ export const SettingsScreen = () => {
                   isSelected={mockFailPaymentRequest}
                   onSelectedChange={setMockFailPaymentRequest}
                 />
-                {hasFeature('directMessages') && (
-                  <>
-                    <Separator className="mx-4" />
-                    <SettingsToggleItem
-                      title="White Noise"
-                      testID="settings-white-noise-toggle"
-                      isSelected={whitenoiseEnabled}
-                      onSelectedChange={setWhitenoiseEnabled}
-                    />
-                  </>
-                )}
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Switch profiles without restart"

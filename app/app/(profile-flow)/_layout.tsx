@@ -16,7 +16,6 @@ const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: true };
 const SHARE_OPTIONS = { title: 'Share profile' };
 const THREAD_OPTIONS = { title: 'Thread' };
-const WHITENOISE_SETUP_OPTIONS = { title: 'White Noise' };
 const HIDDEN_HEADER_OPTIONS = { headerShown: false };
 
 export default function ProfileFlowLayout() {
@@ -26,8 +25,6 @@ export default function ProfileFlowLayout() {
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
       <Stack.Screen name="thread" options={THREAD_OPTIONS} />
-      <Stack.Screen name="whitenoiseSetup" options={WHITENOISE_SETUP_OPTIONS} />
-      <Stack.Screen name="whitenoiseDM" options={HIDDEN_HEADER_OPTIONS} />
       <Stack.Screen name="bitchatNetwork" options={HIDDEN_HEADER_OPTIONS} />
       <Stack.Screen name="bitchatDM" options={HIDDEN_HEADER_OPTIONS} />
     </AndroidSheetFlowStack>

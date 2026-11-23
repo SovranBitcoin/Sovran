@@ -1,7 +1,6 @@
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { shouldCensorDm } from '@/features/feed/lib/moderation';
-import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useIsFocused } from 'expo-router';
@@ -50,12 +49,6 @@ import {
   SEARCH_FILTERS_HEIGHT,
   type ContactsFilter,
 } from '../components/search/SearchFilters';
-import {
-  useWhitenoiseRequests,
-  type WhitenoiseRequest,
-} from '@/features/whitenoise/hooks/useWhitenoiseRequests';
-import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoiseDmContacts';
-import { RequestActions } from '@/features/whitenoise/components/RequestActions';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
@@ -68,16 +61,9 @@ const ROW_LOG_OPTIONS = { logger: paymentLog } as const;
 
 type TopTab = 'contacts' | 'groups';
 
-interface WhitenoiseRequestRow {
-  type: 'request';
-  pubkey: string;
-  request: WhitenoiseRequest;
-}
-
-type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow;
+type ContactsListItem = RecentContact | MintContact;
 
 function contactsListItemKey(item: ContactsListItem, index: number): string {
-  if (item.type === 'request') return item.request.id || item.request.fromPubkey;
   if (item.type === 'mint') return item.mint?.mintUrl ?? item.pubkey ?? `mint-${index}`;
   return item.pubkey || `contact-${index}`;
 }
@@ -89,17 +75,12 @@ function locationTierKey(tier: TierEntry): string {
 /** Rows for the active filter; All/Recent merge sources deduped by pubkey. */
 function buildContactsListData(
   activeFilter: ContactsFilter,
-  whitenoiseContactRows: RecentContact[],
   displayContacts: RecentContact[],
-  mintsWithProfile: MintContact[],
-  requestRows: WhitenoiseRequestRow[]
+  mintsWithProfile: MintContact[]
 ): ContactsListItem[] {
   switch (activeFilter) {
     case 'Recent': {
-      // Merge NIP-17 recent contacts with accepted Marmot DM counterparties,
-      // deduped by nostr pubkey.
       const byKey = new Map<string, ContactsListItem>();
-      for (const item of whitenoiseContactRows) byKey.set(item.pubkey, item);
       for (const item of displayContacts) {
         if (item.pubkey) byKey.set(item.pubkey, item);
       }
@@ -107,13 +88,8 @@ function buildContactsListData(
     }
     case 'Mints':
       return mintsWithProfile;
-    case 'Requests':
-      return requestRows;
     default: {
       const byKey = new Map<string, ContactsListItem>();
-      for (const item of whitenoiseContactRows) {
-        byKey.set(item.pubkey, item);
-      }
       for (const item of displayContacts) {
         if (item.pubkey) byKey.set(item.pubkey, item);
       }
@@ -129,7 +105,6 @@ function buildContactsListData(
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
-  const [bannerClearance, setBannerClearance] = useState(0);
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const [surface, separator, muted] = useThemeColor([
     'surface',
@@ -139,11 +114,6 @@ export const ContactsScreen = () => {
   const { tiers: locationTiers } = useLocationTiers();
   const pullToAi = usePullToAiRefreshControl();
   const mockMode = useSettingsStore((state) => state.mockMode);
-  // White Noise is a DM surface: without DM pages its requests and threads stay hidden.
-  const whitenoiseEnabled =
-    useSettingsStore((state) => state.whitenoiseEnabled) &&
-    !mockMode &&
-    hasFeature('directMessages');
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
@@ -174,41 +144,10 @@ export const ContactsScreen = () => {
     !mockMode && contactsStatus === 'loading' && dmConversations.length === 0;
   const showContactsError = !mockMode && contactsStatus === 'error' && dmConversations.length === 0;
 
-  // Pending White Noise (Marmot MLS) DM invites — surfaced as the 'Requests'
-  // pill on the idle Contacts tab. The InviteReader (mounted by
-  // WhitenoiseProvider) keeps this fresh in the background; we read from it
-  // here. Pulled up next to contactPubkeys / mintPubkeys so the inviter
-  // pubkeys feed into the same batched kind-0 metadata subscription below.
-  const {
-    requests: whitenoiseRequests,
-    busyId: whitenoiseBusyId,
-    accept: acceptWhitenoiseRequest,
-    decline: declineWhitenoiseRequest,
-  } = useWhitenoiseRequests();
-  const requestPubkeys = whitenoiseEnabled ? whitenoiseRequests.map((r) => r.fromPubkey) : [];
-
-  // Accepted Marmot DM counterparties — Marmot uses kind-445 group events,
-  // not kind-4/kind-14 DMs, so they don't show up via useRecentContacts.
-  // Read them directly from our local DM-index and merge into the contact
-  // sources below.
-  const { entries: whitenoiseDmEntries } = useWhitenoiseDmContacts();
-  const whitenoiseContactPubkeys = whitenoiseEnabled
-    ? whitenoiseDmEntries.map((e) => e.pubkey)
-    : [];
-
   // Profile metadata is served from the shared SWR cache. Cache hits paint
   // immediately; misses/stale entries trigger one batched kind-0 subscription
   // with `authors: missingOrStale`.
-  const allPubkeys = mockMode
-    ? contactPubkeys
-    : [
-        ...new Set([
-          ...contactPubkeys,
-          ...mintPubkeys,
-          ...requestPubkeys,
-          ...whitenoiseContactPubkeys,
-        ]),
-      ];
+  const allPubkeys = mockMode ? contactPubkeys : [...new Set([...contactPubkeys, ...mintPubkeys])];
   const { metadata: profilesMap, loadingPubkeys } = useNostrProfileMetadataMany(allPubkeys);
   const listExtraData = useMemo(
     () => ({ profilesMap, loadingPubkeys }),
@@ -225,37 +164,13 @@ export const ContactsScreen = () => {
   // user. The row reappears automatically when the kind-0 event arrives.
   const mintsWithProfile = displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey));
 
-  const requestRows: WhitenoiseRequestRow[] = whitenoiseEnabled
-    ? whitenoiseRequests.map((r) => ({
-        type: 'request',
-        pubkey: r.fromPubkey,
-        request: r,
-      }))
-    : [];
-
-  // Map accepted Marmot DM counterparties into the same row shape used by
-  // useRecentContacts entries so renderContactItem treats them identically.
-  // timestamp 0 keeps them below entries with genuine recent activity.
-  const whitenoiseContactRows: RecentContact[] = whitenoiseEnabled
-    ? whitenoiseDmEntries.map((e) => ({
-        type: 'contact',
-        pubkey: e.pubkey,
-        dmEvent: null,
-        nip17Content: undefined,
-        timestamp: 0,
-        protocol: 'whitenoise' as const,
-      }))
-    : [];
-
   const blockedPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
   const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
   const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
   const rawListData: ContactsListItem[] = buildContactsListData(
     activeFilter,
-    whitenoiseContactRows,
     displayContacts,
-    mintsWithProfile,
-    requestRows
+    mintsWithProfile
   ).filter((item) => !item.pubkey || !blockedPeople.includes(item.pubkey));
 
   // Keep the curated public profiles and fictional chats; exclude live transports.
@@ -288,8 +203,6 @@ export const ContactsScreen = () => {
         mints: displayMints.length,
         mintsWithProfile: mintsWithProfile.length,
         mintInfoLoading,
-        requests: requestRows.length,
-        whitenoiseDms: whitenoiseContactRows.length,
         profiles: profilesMap.size,
         pubkeysAsked: allPubkeys.length,
         blocked: blockedPeople.length,
@@ -307,8 +220,6 @@ export const ContactsScreen = () => {
       displayContacts,
       displayMints,
       profilesMap,
-      whitenoiseRequests,
-      whitenoiseDmEntries,
       currentListData,
       blockedPeople,
       filterWords,
@@ -335,7 +246,6 @@ export const ContactsScreen = () => {
       rows: currentListData.length,
       conversations: dmConversations.length,
       mintsWithProfile: mintsWithProfile.length,
-      requests: requestRows.length,
       profiles: profilesMap.size,
       pubkeysAsked: allPubkeys.length,
       mintInfoLoading,
@@ -354,41 +264,6 @@ export const ContactsScreen = () => {
     // which is the classic cause of the whole list redrawing for one new name —
     // `wasted` is where that shows.
     countRowRender('ContactsScreen', contactsListItemKey(item, index), ROW_LOG_OPTIONS);
-    // White Noise pending invite — keep it in this list so the empty/
-    // loading/scrolling behaviour is the same as the other pills, but
-    // swap the trailing slot for accept/decline buttons.
-    if (item.type === 'request') {
-      const req = item.request;
-      const profile = profilesMap.get(req.fromPubkey);
-      // Strangers' kind-0 metadata may simply not be on the user's default
-      // relay set — that's the whole point of a "request". So render with
-      // grey until the first attempt settles, then the seeded fallback.
-      return (
-        <ContactRow
-          identity={[
-            nostrIdentity(req.fromPubkey, profile, {
-              isLoadingProfile: loadingPubkeys.has(req.fromPubkey),
-            }),
-          ]}
-          subtitle="Wants to start a White Noise chat"
-          hideMetadata
-          trailing={
-            <RequestActions
-              isBusy={whitenoiseBusyId === req.id}
-              onAccept={() => {
-                paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
-                void acceptWhitenoiseRequest(req);
-              }}
-              onDecline={() => {
-                paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
-                void declineWhitenoiseRequest(req);
-              }}
-            />
-          }
-          testID={`request-row:${req.fromPubkey}`}
-        />
-      );
-    }
 
     const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
     // Message previews make the row a conversation; without DM pages the row
@@ -414,14 +289,8 @@ export const ContactsScreen = () => {
       (lastMessage || previewLoading)
         ? formatRelativeUnixSeconds(item.timestamp)
         : undefined;
-    // Label non-default DM protocols so a NIP-04 / White Noise conversation is
-    // distinguishable from the default NIP-17 in the now-mixed list.
     const protocolLabel =
-      item.type === 'contact' && item.protocol === 'nip04'
-        ? 'NIP-04'
-        : item.type === 'contact' && item.protocol === 'whitenoise'
-          ? 'White Noise'
-          : undefined;
+      item.type === 'contact' && item.protocol === 'nip04' ? 'NIP-04' : undefined;
     // Don't drive the avatar's loading skeleton off "profile is missing":
     // for strangers (Marmot DM accept, Requests pill) kind-0 may simply not
     // be on our relay set, so missing IS the steady state after the first attempt.
@@ -523,10 +392,7 @@ export const ContactsScreen = () => {
   // and live search now has its own scope tabs in UnifiedSearch.
   // Memoized because the effect below depends on it: rebuilt inline it was a
   // fresh array every render, so the fallback effect re-ran on every render.
-  const visibleFilters: readonly ContactsFilter[] = useMemo(
-    () => (whitenoiseEnabled ? ['All', 'Recent', 'Requests', 'Mints'] : ['All', 'Recent', 'Mints']),
-    [whitenoiseEnabled]
-  );
+  const visibleFilters: readonly ContactsFilter[] = useMemo(() => ['All', 'Recent', 'Mints'], []);
 
   // If the active pill drops out of the visible set (e.g. White Noise gets
   // disabled while 'Requests' is active), fall back to 'All'.
@@ -588,7 +454,7 @@ export const ContactsScreen = () => {
     return (
       <List
         screen
-        bottomSpacing={Math.max(16, bannerClearance)}
+        bottomSpacing={16}
         data={currentListData}
         extraData={listExtraData}
         refreshControl={pullToAi.refreshControl}
@@ -608,7 +474,7 @@ export const ContactsScreen = () => {
   const renderGroupsList = () => (
     <List
       screen
-      bottomSpacing={Math.max(16, bannerClearance)}
+      bottomSpacing={16}
       data={locationTiers}
       keyExtractor={locationTierKey}
       refreshControl={pullToAi.refreshControl}
@@ -668,7 +534,6 @@ export const ContactsScreen = () => {
 
       <ScreenContainer>
         {activeTab === 'groups' ? renderGroupsList() : renderContactsList()}
-        <WhitenoiseSetupBanner onClearanceChange={setBannerClearance} />
       </ScreenContainer>
       <SearchOverlay recentContext="contacts" />
     </Screen>

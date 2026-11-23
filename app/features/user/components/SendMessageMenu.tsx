@@ -2,10 +2,7 @@ import { useMemo } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
-import Icon from '@/assets/icons';
 import { useDmLastMessage } from '@/shared/stores/profile/dmLastMessageStore';
 import {
   annotateSendMessageOptions,
@@ -40,8 +37,6 @@ type Props = {
 export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circle }: Props) {
   const { peers } = useBLEPeers();
   const lastMessage = useDmLastMessage(pubkey);
-  const { isReady: whitenoiseReady } = useWhitenoiseSetup();
-  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const profileFlowGroup = useActiveProfileFlowGroup();
 
   const bitchatPeer = useMemo(() => {
@@ -84,29 +79,6 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
         },
       },
     ];
-    if (whitenoiseEnabled) {
-      list.push({
-        id: 'whitenoise',
-        transport: 'whitenoise',
-        label: 'White Noise',
-        description: whitenoiseReady
-          ? 'MLS encrypted via Marmot'
-          : 'Tap to set up MLS encrypted messaging',
-        iconNode: <Icon name="internal:whitenoise" size={20} />,
-        testID: 'send-message-menu-whitenoise',
-        onPress: () => {
-          nostrLog.info('user.profile.send_message', {
-            transport: 'whitenoise',
-            ready: whitenoiseReady,
-          });
-          if (!whitenoiseReady) {
-            router.push(buildProfileHref('whitenoiseSetup', undefined, profileFlowGroup) as never);
-            return;
-          }
-          router.navigate(buildProfileHref('whitenoiseDM', { pubkey }, profileFlowGroup) as never);
-        },
-      });
-    }
     list.push({
       id: 'bitchat',
       transport: 'bitchat',
@@ -135,13 +107,13 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
       },
     });
     return list;
-  }, [pubkey, whitenoiseEnabled, whitenoiseReady, bitchatPeer, profileFlowGroup]);
+  }, [pubkey, bitchatPeer, profileFlowGroup]);
 
   const nowMs = Date.now();
   const recommendedVariants = annotateSendMessageOptions({
     options: variants.map((option) => option.transport),
     lastMessage,
-    whitenoiseReady,
+    whitenoiseReady: false,
     bitchatReachable: !!bitchatPeer,
     nowMs,
   }).map((option): ActionMenuVariant => {

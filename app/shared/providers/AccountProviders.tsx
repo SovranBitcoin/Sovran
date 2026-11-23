@@ -29,7 +29,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hasFeature } from '@/shared/config/features';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
-import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useRegisterKeyDerivation } from '@/shared/hooks/useRegisterKeyDerivation';
@@ -63,7 +62,6 @@ export function AccountScopedProviders({
         // ≥1 connected app or an in-flight pairing. Must sit directly after
         // NostrNDKProvider: it gates on its isInitialized flag.
         NostrSignerProvider,
-        [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
         SovranColadaProvider,

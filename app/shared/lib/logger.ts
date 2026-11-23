@@ -54,7 +54,6 @@ export {
   aiLog,
   chatLog,
   bitchatLog,
-  wnLog,
   popupLog,
   mapLog,
   themeLog,
