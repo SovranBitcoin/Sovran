@@ -807,6 +807,36 @@ describe('runNfcWriteBackEffect', () => {
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 
+  it('does not write and reclaims when onProgress(writing) resets the flow (F238)', async () => {
+    const writeToken = vi.fn(async () => {});
+    const releaseSession = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
+    let reset = false;
+
+    const result = await runNfcWriteBackEffect({
+      data: confirmPaymentRequestData,
+      executeNfcSend: async () => ({
+        token: 'cashuBnfc-token',
+        historyEntry: sendHistoryEntry('nfc-send-entry-1'),
+        operationId: 'operation-1',
+      }),
+      rollbackSend,
+      nfcAdapter: { writeToken, releaseSession, ownsSession: () => true },
+      context: sendContext,
+      onProgress: (progress) => {
+        if (progress.phase === 'writing') reset = true;
+      },
+      isStale: () => reset,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ kind: 'stale', delivered: false });
+    expect(writeToken).not.toHaveBeenCalled();
+    expect(rollbackSend).toHaveBeenCalledExactlyOnceWith('operation-1');
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+  });
+
   it('stays stale when taking back a token created after reset fails', async () => {
     const releaseSession = vi.fn(async () => {});
     const rollbackSend = vi.fn(async () => {

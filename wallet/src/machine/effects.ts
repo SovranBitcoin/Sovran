@@ -352,7 +352,9 @@ interface RunNfcWriteBackEffectConfig {
   data: StepDataMap['navigateToPaymentRequest'];
   executeNfcSend: NonNullable<MachineOperations['executeNfcSend']>;
   rollbackSend?: MachineOperations['rollbackSend'];
-  nfcAdapter: Pick<NfcIOAdapter, 'writeToken' | 'releaseSession'>;
+  nfcAdapter: Pick<NfcIOAdapter, 'writeToken' | 'releaseSession'> & {
+    ownsSession?: () => boolean;
+  };
   context: FlowContext;
   onProgress?: (data: NfcPaymentProgressNotificationData) => void;
   isStale: (op: string) => boolean;
@@ -1738,6 +1740,19 @@ export function runNfcWriteBackEffect({
 
         logger.info('effects.nfcWriteBack.progress', { phase: 'writing' });
         onProgress?.({ phase: 'writing' });
+        // Re-check staleness after the synchronous progress callback: a host
+        // listener may have reset the flow before native write I/O begins.
+        if (isStale('nfc.beforeWrite')) {
+          logger.info('effects.nfcWriteBack.stale', { op: 'nfc.beforeWrite' });
+          await rollBack(nfcSendResult.operationId, true);
+          await releaseSession(false);
+          return { kind: 'stale', delivered: false } as const;
+        }
+        // Check session ownership BEFORE marking writeStarted = true so a
+        // refused pre-write never prevents rollback.
+        if (nfcAdapter.ownsSession && !nfcAdapter.ownsSession()) {
+          throw new Error('NFC tag session was replaced by a newer read');
+        }
         writeStarted = true;
         await nfcAdapter.writeToken(nfcSendResult.token);
       } catch (cause) {

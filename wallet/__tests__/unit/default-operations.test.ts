@@ -1906,22 +1906,35 @@ describe("rollbackSend", () => {
     expect(listeners.size).toBe(0);
   });
 
-  it("reports reclaimed when Coco invalidates send proofs during reclaim (F238)", async () => {
-    const listeners = new Set<(event: { mintUrl: string; secrets: string[]; state: string }) => void>();
+  it("reports reclaimed when Coco saves reclaimed proofs and marks send proofs spent (F238)", async () => {
+    const stateListeners = new Set<(event: { mintUrl: string; secrets: string[]; state: string }) => void>();
+    const savedListeners = new Set<(event: { mintUrl: string; proofs: unknown[] }) => void>();
     const manager = createMockManager() as ReturnType<typeof createMockManager> & {
-      on: (event: string, cb: (payload: { mintUrl: string; secrets: string[]; state: string }) => void) => () => void;
+      on: (event: string, cb: (payload: never) => void) => () => void;
     };
-    manager.on = (_event, cb) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
+    manager.on = (event, cb) => {
+      if (event === "proofs:state-changed") {
+        stateListeners.add(cb as (event: { mintUrl: string; secrets: string[]; state: string }) => void);
+        return () => stateListeners.delete(cb as (event: { mintUrl: string; secrets: string[]; state: string }) => void);
+      }
+      if (event === "proofs:saved") {
+        savedListeners.add(cb as (event: { mintUrl: string; proofs: unknown[] }) => void);
+        return () => savedListeners.delete(cb as (event: { mintUrl: string; proofs: unknown[] }) => void);
+      }
+      return () => undefined;
     };
     manager.ops.send.get = vi.fn(async () => ({
       id: "op-1",
       state: "pending",
       mintUrl: MINT1,
+      needsSwap: false,
+      inputProofSecrets: ["s1"],
     }));
     manager.ops.send.reclaim = vi.fn(async () => {
-      for (const cb of listeners) {
+      for (const cb of savedListeners) {
+        cb({ mintUrl: MINT1, proofs: [{ secret: "reclaimed-1", amount: 99 }] });
+      }
+      for (const cb of stateListeners) {
         cb({ mintUrl: MINT1, secrets: ["s1"], state: "spent" });
       }
     });
@@ -1929,6 +1942,41 @@ describe("rollbackSend", () => {
       getManager: () => manager as unknown as Manager,
     });
     await expect(ops.rollbackSend!("op-1")).resolves.toEqual({ kind: "reclaimed" });
-    expect(listeners.size).toBe(0);
+    expect(stateListeners.size).toBe(0);
+    expect(savedListeners.size).toBe(0);
+  });
+
+  it("reports unknown if only spent fires (recipient redemption or unrelated spend, no proofs:saved, F238)", async () => {
+    const stateListeners = new Set<(event: { mintUrl: string; secrets: string[]; state: string }) => void>();
+    const manager = createMockManager() as ReturnType<typeof createMockManager> & {
+      on: (event: string, cb: (payload: never) => void) => () => void;
+    };
+    manager.on = (event, cb) => {
+      if (event === "proofs:state-changed") {
+        stateListeners.add(cb as (event: { mintUrl: string; secrets: string[]; state: string }) => void);
+        return () => stateListeners.delete(cb as (event: { mintUrl: string; secrets: string[]; state: string }) => void);
+      }
+      return () => undefined;
+    };
+    manager.ops.send.get = vi.fn(async () => ({
+      id: "op-1",
+      state: "pending",
+      mintUrl: MINT1,
+      needsSwap: false,
+      inputProofSecrets: ["s1"],
+    }));
+    manager.ops.send.reclaim = vi.fn(async () => {
+      for (const cb of stateListeners) {
+        cb({ mintUrl: MINT1, secrets: ["s1"], state: "spent" });
+      }
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    await expect(ops.rollbackSend!("op-1")).resolves.toEqual({
+      kind: "unknown",
+      reason: "notInvalidated",
+    });
+    expect(stateListeners.size).toBe(0);
   });
 });

@@ -1276,13 +1276,24 @@ export function createDefaultOperations(
           });
           // Coco's DefaultSendHandler.rollback skips the swap and still resolves
           // when fees consume the send amount, leaving the original send proofs
-          // spendable at the mint. Only treat the send as reclaimed when Coco
-          // actually marks send proofs spent during reclaim.
-          let invalidated = false;
+          // spendable at the mint. A real reclaim swap both saves new ready
+          // proofs (`proofs:saved`) AND marks the send proofs `spent`
+          // (`proofs:state-changed`), whereas a fee-skip emits neither and a
+          // recipient redemption emits `spent` without `proofs:saved`.
+          let spentSendProofs = false;
+          let savedReclaimedProofs = false;
           const canObserveProofState = typeof mgr.on === "function";
           const expectedMintUrl =
             typeof operation.mintUrl === "string" && operation.mintUrl.length > 0
               ? normalizeMintUrl(operation.mintUrl)
+              : null;
+          const expectedSecrets =
+            "needsSwap" in operation &&
+            !operation.needsSwap &&
+            "inputProofSecrets" in operation &&
+            Array.isArray(operation.inputProofSecrets) &&
+            operation.inputProofSecrets.length > 0
+              ? new Set(operation.inputProofSecrets)
               : null;
           const onProofStateChanged = (event: {
             mintUrl: string;
@@ -1296,24 +1307,53 @@ export function createDefaultOperations(
             ) {
               return;
             }
-            invalidated = true;
+            if (
+              expectedSecrets &&
+              !event.secrets.some((secret) => expectedSecrets.has(secret))
+            ) {
+              return;
+            }
+            spentSendProofs = true;
           };
-          const unsubscribe = canObserveProofState
+          const onProofsSaved = (event: {
+            mintUrl: string;
+            proofs: readonly unknown[];
+          }) => {
+            if (!event.proofs || event.proofs.length === 0) return;
+            if (
+              expectedMintUrl &&
+              normalizeMintUrl(event.mintUrl) !== expectedMintUrl
+            ) {
+              return;
+            }
+            savedReclaimedProofs = true;
+          };
+          const unsubState = canObserveProofState
             ? mgr.on("proofs:state-changed", onProofStateChanged)
+            : undefined;
+          const unsubSaved = canObserveProofState
+            ? mgr.on("proofs:saved", onProofsSaved)
             : undefined;
           try {
             await mgr.ops.send.reclaim(operationId);
           } finally {
-            if (typeof unsubscribe === "function") {
-              unsubscribe();
+            if (typeof unsubState === "function") {
+              unsubState();
             } else if (typeof mgr.off === "function") {
               mgr.off("proofs:state-changed", onProofStateChanged);
             }
+            if (typeof unsubSaved === "function") {
+              unsubSaved();
+            } else if (typeof mgr.off === "function") {
+              mgr.off("proofs:saved", onProofsSaved);
+            }
           }
-          if (canObserveProofState && !invalidated) {
+          if (canObserveProofState && !(spentSendProofs && savedReclaimedProofs)) {
             logger.warn("operations.rollbackSend.notInvalidated", {
               operationId,
               state: operation.state,
+              spentSendProofs,
+              savedReclaimedProofs,
             });
             return { kind: "unknown", reason: "notInvalidated" };
           }

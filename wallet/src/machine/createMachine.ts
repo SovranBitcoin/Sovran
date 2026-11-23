@@ -1917,6 +1917,7 @@ export function createPaymentMachine(
                   nfcAdapter: {
                     writeToken: (token) => writeNfcToken(nfcTap, token),
                     releaseSession: () => releaseNfcSession(nfcTap),
+                    ownsSession: () => nfcTap.read === nfcRead,
                   },
                   context: flowCtx,
                   onProgress: (progress) => {
