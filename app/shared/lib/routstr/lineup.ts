@@ -91,7 +91,6 @@ const MAX_PROVIDERS = 12;
  */
 const MIN_MODELS_PER_PROVIDER = 3;
 
-
 /**
  * One spelling for a model id, so a node's catalog and Routstr's curated list
  * can disagree about dots, case and vendor prefixes without disagreeing about

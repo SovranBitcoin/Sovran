@@ -54,7 +54,10 @@ async function fetchAuditorJson(
     const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
-      signal: buildAbortSignal({ timeoutMs: controls.timeoutMs ?? AUDITOR_TIMEOUT_MS, ...controls }),
+      signal: buildAbortSignal({
+        timeoutMs: controls.timeoutMs ?? AUDITOR_TIMEOUT_MS,
+        ...controls,
+      }),
     });
     if (!response.ok) {
       apiLog.debug('cashu.auditor.http_error', { source, status: response.status });
@@ -82,7 +85,10 @@ const Nut06InfoSchema = z.looseObject({
 
 function cleanQuoted(value?: string | null): string | undefined {
   if (!value) return undefined;
-  const trimmed = value.trim().replace(/^"+|"+$/g, '').trim();
+  const trimmed = value
+    .trim()
+    .replace(/^"+|"+$/g, '')
+    .trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
@@ -95,8 +101,12 @@ function extractUnitsFromNuts(nuts?: Record<string, unknown>): string[] {
     const methods = (block as { methods?: unknown }).methods;
     if (!Array.isArray(methods)) continue;
     for (const entry of methods) {
-      if (entry && typeof entry === 'object' && typeof (entry as { unit?: unknown }).unit === 'string') {
-        const u = ((entry as { unit: string }).unit).trim().toLowerCase();
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        typeof (entry as { unit?: unknown }).unit === 'string'
+      ) {
+        const u = (entry as { unit: string }).unit.trim().toLowerCase();
         if (u) units.add(u);
       }
     }
@@ -226,8 +236,10 @@ function mapMintRadarItem(mint: MintRadarMint): AuditorMintEntry | null {
   if (!isValidMintUrl(mint.url)) return null;
   const status = normalizeMintRadarStatus(mint.status);
   const total = typeof mint.audit?.swaps7d === 'number' ? mint.audit.swaps7d : undefined;
-  const failed = typeof mint.audit?.attributedFailures === 'number' ? mint.audit.attributedFailures : 0;
-  const swaps = total && total > 0 ? { okCount: Math.max(total - failed, 0), totalCount: total } : undefined;
+  const failed =
+    typeof mint.audit?.attributedFailures === 'number' ? mint.audit.attributedFailures : 0;
+  const swaps =
+    total && total > 0 ? { okCount: Math.max(total - failed, 0), totalCount: total } : undefined;
   const warnings = collectMintRadarWarnings(mint, status, swaps);
 
   return {
@@ -238,7 +250,12 @@ function mapMintRadarItem(mint: MintRadarMint): AuditorMintEntry | null {
     iconUrl: cleanQuoted(mint.iconUrl ?? mint.icon_url),
     supportedUnits: mint.units?.map((u) => u.toLowerCase()),
     state: status === 'online' ? 'OK' : status === 'degraded' ? 'WARNING' : 'ERROR',
-    status: status === 'online' ? 'online' : status === 'offline' || status === 'archived' ? 'offline' : 'unknown',
+    status:
+      status === 'online'
+        ? 'online'
+        : status === 'offline' || status === 'archived'
+          ? 'offline'
+          : 'unknown',
     testnut: mint.isTest === true,
     nMints: swaps?.okCount,
     nErrors: failed || undefined,
@@ -285,8 +302,10 @@ export async function fetchMintRadarSingle(
   const mint = parsed.data;
   const status = normalizeMintRadarStatus(mint.status);
   const total = typeof mint.audit?.swaps7d === 'number' ? mint.audit.swaps7d : undefined;
-  const failed = typeof mint.audit?.attributedFailures === 'number' ? mint.audit.attributedFailures : 0;
-  const swaps = total && total > 0 ? { okCount: Math.max(total - failed, 0), totalCount: total } : undefined;
+  const failed =
+    typeof mint.audit?.attributedFailures === 'number' ? mint.audit.attributedFailures : 0;
+  const swaps =
+    total && total > 0 ? { okCount: Math.max(total - failed, 0), totalCount: total } : undefined;
   return {
     mintUrl: mint.url,
     status,

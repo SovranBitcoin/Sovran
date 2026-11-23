@@ -347,8 +347,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                 Collect AI leftovers
               </Text>
               <Text size={12} className="text-muted">
-                {aiReclaimNote ??
-                  'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
+                {aiReclaimNote ?? 'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
               </Text>
             </VStack>
             {hasAiLeftovers && (

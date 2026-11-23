@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console */
 /**
  * Lean iOS & Android visual-parity and smoke capture runner.
  *
@@ -54,7 +55,9 @@ function parseArgs(argv) {
 
 function setAppearance(platform, appearance) {
   if (platform === 'ios') {
-    execFileSync('xcrun', ['simctl', 'ui', 'booted', 'appearance', appearance], { stdio: 'inherit' });
+    execFileSync('xcrun', ['simctl', 'ui', 'booted', 'appearance', appearance], {
+      stdio: 'inherit',
+    });
   } else {
     const night = appearance === 'dark' ? 'yes' : 'no';
     execFileSync('adb', ['shell', 'cmd', 'uimode', 'night', night], { stdio: 'inherit' });
@@ -65,9 +68,13 @@ function openUrl(platform, url) {
   if (platform === 'ios') {
     execFileSync('xcrun', ['simctl', 'openurl', 'booted', url], { stdio: 'inherit' });
   } else {
-    execFileSync('adb', ['shell', 'am', 'start', '-W', '-a', 'android.intent.action.VIEW', '-d', url], {
-      stdio: 'inherit',
-    });
+    execFileSync(
+      'adb',
+      ['shell', 'am', 'start', '-W', '-a', 'android.intent.action.VIEW', '-d', url],
+      {
+        stdio: 'inherit',
+      }
+    );
   }
 }
 
@@ -112,7 +119,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const appearances = args.mode === 'both' ? ['light', 'dark'] : [args.mode];
 
   if (args.plan) {
-    console.log(JSON.stringify({ platform: args.platform, appearances, screens: CORE_WALLET_SCREENS }, null, 2));
+    console.log(
+      JSON.stringify(
+        { platform: args.platform, appearances, screens: CORE_WALLET_SCREENS },
+        null,
+        2
+      )
+    );
     process.exit(0);
   }
 

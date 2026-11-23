@@ -10,11 +10,7 @@ import {
   type AuditorFetchControls,
   type AuditorMintEntry,
 } from './adapters';
-import {
-  resolveEnabledAuditors,
-  type MintAuditorId,
-  type MintAuditSummary,
-} from './registry';
+import { resolveEnabledAuditors, type MintAuditorId, type MintAuditSummary } from './registry';
 
 type AuditorAdapterMap = Record<
   MintAuditorId,
@@ -41,8 +37,7 @@ function rankScore(mint: DiscoverMint): number {
   // Smoothed rating (two phantom 3-star reviews so a single 5-star doesn't dominate).
   const smoothed = (avg * count + 6) / (count + 2);
   const totalSwaps = (mint.nMints ?? 0) + (mint.nMelts ?? 0) + (mint.nErrors ?? 0);
-  const swapFactor =
-    totalSwaps > 0 ? ((mint.nMints ?? 0) + (mint.nMelts ?? 0)) / totalSwaps : 0.9;
+  const swapFactor = totalSwaps > 0 ? ((mint.nMints ?? 0) + (mint.nMelts ?? 0)) / totalSwaps : 0.9;
   const healthPenalty = mint.status === 'offline' || mint.state === 'ERROR' ? 0.1 : 1;
   return (smoothed / 5) * swapFactor * healthPenalty;
 }
@@ -122,12 +117,14 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
   });
 }
 
-export async function discoverMintsFromAuditors(options: {
-  disabledAuditors?: readonly string[];
-  limit?: number;
-  signal?: AbortSignal;
-  adapters?: Partial<AuditorAdapterMap>;
-} = {}): Promise<Result<DiscoverMintsResponse, Error>> {
+export async function discoverMintsFromAuditors(
+  options: {
+    disabledAuditors?: readonly string[];
+    limit?: number;
+    signal?: AbortSignal;
+    adapters?: Partial<AuditorAdapterMap>;
+  } = {}
+): Promise<Result<DiscoverMintsResponse, Error>> {
   const enabled = resolveEnabledAuditors(options.disabledAuditors ?? []);
   if (enabled.length === 0) {
     return ok({ mints: [] });

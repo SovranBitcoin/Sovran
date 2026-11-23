@@ -462,7 +462,11 @@ interface BtcRatesResponse {
 const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError> => {
   const parsed = CoinbaseRatesEnvelope.safeParse(input);
   if (!parsed.success) {
-    return err({ type: 'schema/zod', where: 'coinbase/exchange-rates', issues: parsed.error.issues });
+    return err({
+      type: 'schema/zod',
+      where: 'coinbase/exchange-rates',
+      issues: parsed.error.issues,
+    });
   }
   const nowSec = Math.floor(Date.now() / 1000);
   const rates: Record<string, { price: number; at: number }> = {};
@@ -483,7 +487,13 @@ const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError
 };
 
 export const fetchBtcRates = (controls: RequestControls = {}) =>
-  fetchJson(COINBASE_BTC_RATES_URL, parseCoinbaseRates, 'coinbase/exchange-rates', undefined, controls);
+  fetchJson(
+    COINBASE_BTC_RATES_URL,
+    parseCoinbaseRates,
+    'coinbase/exchange-rates',
+    undefined,
+    controls
+  );
 
 /**
  * Defensive guard for arbitrary `/v1/info` responses. The full contract
@@ -648,7 +658,7 @@ export const fetchNostrProfile = async (
   if (!meta && !stats) {
     return err(new Error('Profile not found on enabled Nostr tiers'));
   }
-  return ok({
+  const profile: NostrProfileFullType = {
     pubkey,
     name: meta?.name ?? '',
     displayName: meta?.displayName ?? meta?.name ?? '',
@@ -660,7 +670,8 @@ export const fetchNostrProfile = async (
     website: meta?.website ?? '',
     followers: stats?.followersCount,
     follows: stats?.followingCount,
-  } as NostrProfileFullType);
+  };
+  return ok(profile);
 };
 
 /** Wallpapers are bundled locally; remote catalog fetching is disabled. */

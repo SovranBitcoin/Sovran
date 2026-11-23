@@ -6,10 +6,7 @@ import { readEvents, readKeyHash, newReadId } from '@/shared/lib/read/readLog';
 
 import { aggregateValue, type facade } from 'nostr';
 
-import {
-  parseNostrProfileFor,
-  type NostrProfileFull,
-} from '@/shared/lib/apiClient';
+import { parseNostrProfileFor, type NostrProfileFull } from '@/shared/lib/apiClient';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { tryNpubEncode } from '@/shared/lib/nostr/nostrBech32';

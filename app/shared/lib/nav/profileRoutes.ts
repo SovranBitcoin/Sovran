@@ -5,11 +5,7 @@ export const MODAL_PROFILE_FLOW = '(profile-flow)';
 
 type ProfileFlowGroup = typeof USER_PROFILE_FLOW | typeof MODAL_PROFILE_FLOW;
 
-type ProfileRouteName =
-  | 'profile'
-  | 'share'
-  | 'bitchatDM'
-  | 'bitchatNetwork';
+type ProfileRouteName = 'profile' | 'share' | 'bitchatDM' | 'bitchatNetwork';
 
 type ProfileRouteParamValue = string | number | (string | number)[] | null | undefined;
 type ProfileRouteParams = Record<string, ProfileRouteParamValue>;

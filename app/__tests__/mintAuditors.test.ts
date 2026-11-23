@@ -14,7 +14,10 @@ import {
   fetchMintAuditSummary,
   mergeAuditorEntries,
 } from '@/shared/lib/cashu/auditors/discoverMints';
-import { HTTP_MINT_AUDITOR_IDS, resolveEnabledAuditors } from '@/shared/lib/cashu/auditors/registry';
+import {
+  HTTP_MINT_AUDITOR_IDS,
+  resolveEnabledAuditors,
+} from '@/shared/lib/cashu/auditors/registry';
 
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => null,
@@ -65,7 +68,7 @@ describe('mint auditor registry & privacy controls', () => {
 
 describe('mint auditor adapters', () => {
   it('parses MintRadar directory and collects typed warnings', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           mints: [
@@ -96,7 +99,7 @@ describe('mint auditor adapters', () => {
     );
 
     const entries = await fetchMintRadarDirectory();
-    expect(globalThis.fetch).toHaveBeenCalledWith(MINTRADAR_LIST_URL, expect.any(Object));
+    expect(fetchSpy).toHaveBeenCalledWith(MINTRADAR_LIST_URL, expect.any(Object));
     expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({
       source: 'mintradar',
@@ -148,7 +151,7 @@ describe('mint auditor adapters', () => {
   });
 
   it('parses legacy Cashu Auditor (8333.space) and NUT-06 info JSON', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify([
           {
@@ -174,7 +177,7 @@ describe('mint auditor adapters', () => {
     );
 
     const entries = await fetchCashuAuditDirectory();
-    expect(globalThis.fetch).toHaveBeenCalledWith(CASHU_AUDIT_LIST_URL, expect.any(Object));
+    expect(fetchSpy).toHaveBeenCalledWith(CASHU_AUDIT_LIST_URL, expect.any(Object));
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       source: 'cashu-audit',
@@ -190,7 +193,7 @@ describe('mint auditor adapters', () => {
   });
 
   it('parses IMF.gg review directory', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           mints: [
@@ -208,7 +211,7 @@ describe('mint auditor adapters', () => {
     );
 
     const entries = await fetchImfDirectory();
-    expect(globalThis.fetch).toHaveBeenCalledWith(IMF_LIST_URL, expect.any(Object));
+    expect(fetchSpy).toHaveBeenCalledWith(IMF_LIST_URL, expect.any(Object));
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       source: 'imf-gg',

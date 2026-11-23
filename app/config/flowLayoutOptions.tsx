@@ -227,4 +227,3 @@ export const getBaseModalHeaderOptions = (foreground: string): NativeStackNaviga
   },
   ...GRADIENT_HEADER_OPTIONS,
 });
-

@@ -109,7 +109,13 @@ it.each(['fresh', 'toggle', 'mock', 'budget', 'no-signer', 'cancelled'] as const
 it('blocks all later triggers after insufficient credits and logs exhaustion once', async () => {
   mockSend.mockResolvedValue({ ok: false, reason: 'insufficient_credits' });
   await refreshVertex(query());
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, send: mockSend });
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
   expect(mockSend).toHaveBeenCalledTimes(1);
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(nostrLog.info).toHaveBeenCalledWith('nostr.vertex.credits_exhausted');
@@ -136,8 +142,20 @@ it('profile age uses seven days in seconds, and a stale profile signs once', asy
   expect(isVertexProfileStale(null)).toBe(true);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000))).toBe(false);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000) - 7 * 86400)).toBe(true);
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, send: mockSend });
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, send: mockSend });
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(mockSign.mock.calls[0][0].kind).toBe(5312);
 });

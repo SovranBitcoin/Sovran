@@ -19,11 +19,7 @@ import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffec
 import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
 import { useNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
-import {
-  foldRelayStatus,
-  probePrimalHealth,
-  type TierStatus,
-} from '@/shared/lib/nostr/tierHealth';
+import { foldRelayStatus, probePrimalHealth, type TierStatus } from '@/shared/lib/nostr/tierHealth';
 
 const POLL_INTERVAL_MS = 30_000;
 

@@ -84,5 +84,3 @@ describe('isTokenSpent', () => {
     expect(mockCheckStates).not.toHaveBeenCalled();
   });
 });
-
-
