@@ -1,7 +1,12 @@
 /** @jest-environment node */
 import { err, ok } from 'neverthrow';
 import { createPricelistFeed, POLL_MS } from '@/shared/lib/pricelistFeed';
-import { ApiHttpError, ApiParseError, fetchBtcRates } from '@/shared/lib/apiClient';
+import {
+  ApiHttpError,
+  ApiParseError,
+  COINBASE_BTC_RATES_URL,
+  fetchBtcRates,
+} from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
 import { PRICE_STALE_MINUTES, usePricelistStore } from '@/shared/stores/global/pricelistStore';
 
@@ -258,34 +263,58 @@ describe('pricelist polling', () => {
 });
 
 describe('pricelist HTTP boundary', () => {
-  it('uses the configured rates endpoint, forwards cancellation and accepts extra envelope fields', async () => {
+  it('fetches Coinbase BTC exchange rates, forwards cancellation and accepts extra envelope fields', async () => {
     const controller = new AbortController();
-    const body = { ...payload, version: 1, base: 'BTC', sources: [] };
+    const body = {
+      data: {
+        currency: 'BTC',
+        rates: { USD: '77242.5', EUR: '66000', GBP: '58000', ZERO: '0', BAD: 'not-a-number' },
+        extraField: true,
+      },
+    };
     const fetch = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify(body)));
     const result = await fetchBtcRates({ signal: controller.signal });
-    expect(result).toEqual(ok(body));
-    expect(fetch).toHaveBeenCalledWith('https://rates.example.test/app/rates', {
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.rates.USD?.price).toBe(77242.5);
+      expect(result.value.rates.EUR?.price).toBe(66000);
+      expect(result.value.rates.GBP?.price).toBe(58000);
+      expect(result.value.rates.ZERO).toBeUndefined();
+      expect(result.value.rates.BAD).toBeUndefined();
+      expect(result.value.updatedAt).toBeGreaterThan(0);
+    }
+    expect(fetch).toHaveBeenCalledWith(COINBASE_BTC_RATES_URL, {
       signal: controller.signal,
     });
   });
 
-  it.each([0, -1, '77242', null])('rejects invalid prices (%s)', async (price) => {
+  it.each(['0', '-1', 'NaN', ''])('rejects when all rates are invalid (%s)', async (price) => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          ...payload,
-          rates: { USD: { price, at: payload.updatedAt } },
+          data: { currency: 'BTC', rates: { USD: price } },
         })
       )
     );
     expect((await fetchBtcRates()).isErr()).toBe(true);
   });
 
-  it('preserves the status of a real 503 warming response for retries', async () => {
+  it('rejects non-BTC base currency', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('{"error":"rates warming"}', {
+      new Response(
+        JSON.stringify({
+          data: { currency: 'ETH', rates: { USD: '3000' } },
+        })
+      )
+    );
+    expect((await fetchBtcRates()).isErr()).toBe(true);
+  });
+
+  it('preserves the status of a real 503 response for retries', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":"service unavailable"}', {
         status: 503,
         statusText: 'Service Unavailable',
       })
@@ -302,7 +331,7 @@ describe('pricelist HTTP boundary', () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
-        new Response(JSON.stringify({ ...payload, rates: { USD: { price: 'leaked-input' } } }))
+        new Response(JSON.stringify({ data: { currency: 'BTC', rates: 'leaked-input' } }))
       );
     const result = await fetchBtcRates();
     expect(result.isErr()).toBe(true);

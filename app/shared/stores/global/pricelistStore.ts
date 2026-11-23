@@ -17,16 +17,16 @@ interface PricelistState {
   error: string | null;
 }
 
-/** nagg's `/app/rates` wire shape: upper-case currency codes. */
+/** BTC exchange-rate wire shape: upper-case currency codes. */
 export type BitcoinPrices = Record<Uppercase<FiatUnit>, number>;
 
 type SupportedCurrency = FiatUnit;
 
 const wireCode = (unit: FiatUnit) => unit.toUpperCase() as Uppercase<FiatUnit>;
-/** The rate codes nagg is asked about: one per fiat unit of the registry. */
+/** The rate codes requested from the price feed: one per fiat unit of the registry. */
 export const RATE_CODES = FIAT_UNITS.map(wireCode);
 
-// Nagg refreshes upstream prices hourly; allow two refresh windows before stale.
+// Allow two hours before cached fiat prices are treated as stale.
 export const PRICE_STALE_MINUTES = 120;
 
 interface PricelistActions {

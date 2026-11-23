@@ -50,6 +50,8 @@ import {
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { discoverMints } from '@/shared/lib/apiClient';
 import { fetchDiscoveredMintUrls } from '@/features/settings/lib/recoveryDiscovery';
+import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
+import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -102,6 +104,42 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+
+  // Legacy Routstr AI balance & pending-change reclaim (only shown when
+  // unclaimed credentials or pending payments still exist on this profile).
+  const hasAiLeftovers = useRoutstrStore(
+    (s) =>
+      s.pendingPayments.length > 0 ||
+      Object.values(s.legacyAccounts).some((a) => a.reclaimedAt == null && Boolean(a.apiKey))
+  );
+  const [reclaimingAi, setReclaimingAi] = useState(false);
+  const [aiReclaimNote, setAiReclaimNote] = useState<string | null>(null);
+
+  const handleReclaimAiLeftovers = async () => {
+    if (preview || locked || reclaimingAi) return;
+    setReclaimingAi(true);
+    setAiReclaimNote(null);
+    try {
+      const [legacy, pendingRecovered] = await Promise.all([
+        reclaimRoutstrBalances(),
+        recoverPendingPayments(),
+      ]);
+      const collected = legacy.reclaimed + pendingRecovered;
+      if (collected > 0) {
+        setAiReclaimNote(
+          legacy.deferred > 0
+            ? 'Collected available ecash. Some nodes did not answer — try again later.'
+            : 'Collected leftover AI ecash into your wallet.'
+        );
+      } else if (legacy.deferred > 0) {
+        setAiReclaimNote('AI node did not answer. Your credentials are kept — try again later.');
+      } else {
+        setAiReclaimNote('No leftover AI balance found.');
+      }
+    } finally {
+      setReclaimingAi(false);
+    }
+  };
 
   useEffect(() => {
     if (!deepProbe || preview) {
@@ -302,6 +340,29 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             iconColor={surfaceSecondary}
           />
         )}
+        {!gateMode && !preview && (hasAiLeftovers || aiReclaimNote) && (
+          <VStack gap={8} className="bg-surface-secondary w-full rounded-2xl px-4 py-3">
+            <VStack gap={2}>
+              <Text size={14} bold className="text-foreground">
+                Collect AI leftovers
+              </Text>
+              <Text size={12} className="text-muted">
+                {aiReclaimNote ??
+                  'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
+              </Text>
+            </VStack>
+            {hasAiLeftovers && (
+              <Button
+                testID="recovery-reclaim-ai"
+                variant="secondary"
+                text={reclaimingAi ? 'Checking AI nodes…' : 'Collect AI leftovers'}
+                disabled={reclaimingAi || locked}
+                onPress={handleReclaimAiLeftovers}
+              />
+            )}
+          </VStack>
+        )}
+
         {!gateMode && (
           <View className="w-full">
             <Button

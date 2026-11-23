@@ -473,25 +473,46 @@ const NaggLatestVersionResponse = LatestVersionResponse.extend({
   minVersion: z.string().max(32).optional(),
 });
 const parseLatestVersion = parseWith(NaggLatestVersionResponse, 'app/latest-version');
-// Move this shape into @sovranbitcoin/schemas in its next release and deprecate
-// PricelistWsMessage there. Remove the local schema once the app upgrades.
-const NaggRatesResponse = z.looseObject({
-  rates: z.record(
-    z.string(),
-    z.object({
-      price: z.number().positive(),
-      at: z.number().int(),
-      samples: z.number().int().optional(),
-      sources: z.array(z.string()).optional(),
-      confidence: z.string().optional(),
-    })
-  ),
-  updatedAt: z.number().int(),
-  degraded: z.boolean().optional(),
+export const COINBASE_BTC_RATES_URL = 'https://api.coinbase.com/v2/exchange-rates?currency=BTC';
+
+const CoinbaseRatesEnvelope = z.looseObject({
+  data: z.looseObject({
+    currency: z.literal('BTC'),
+    rates: z.record(z.string(), z.string()),
+  }),
 });
-const parseRates = parseWith(NaggRatesResponse, 'app/rates');
+
+export interface BtcRatesResponse {
+  rates: Record<string, { price: number; at: number }>;
+  updatedAt: number;
+  degraded?: boolean;
+}
+
+const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError> => {
+  const parsed = CoinbaseRatesEnvelope.safeParse(input);
+  if (!parsed.success) {
+    return err({ type: 'schema/zod', where: 'coinbase/exchange-rates', issues: parsed.error.issues });
+  }
+  const nowSec = Math.floor(Date.now() / 1000);
+  const rates: Record<string, { price: number; at: number }> = {};
+  for (const [code, raw] of Object.entries(parsed.data.data.rates)) {
+    const price = Number(raw);
+    if (Number.isFinite(price) && price > 0) {
+      rates[code.toUpperCase()] = { price, at: nowSec };
+    }
+  }
+  if (Object.keys(rates).length === 0) {
+    return err({
+      type: 'schema/zod',
+      where: 'coinbase/exchange-rates',
+      issues: [{ code: 'custom', path: ['data', 'rates'], message: 'no positive finite rates' }],
+    });
+  }
+  return ok({ rates, updatedAt: nowSec });
+};
+
 export const fetchBtcRates = (controls: RequestControls = {}) =>
-  fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
+  fetchJson(COINBASE_BTC_RATES_URL, parseCoinbaseRates, 'coinbase/exchange-rates', undefined, controls);
 
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
