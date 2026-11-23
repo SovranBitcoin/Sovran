@@ -28,8 +28,6 @@ import {
 } from '@sovranbitcoin/schemas';
 import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
-import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
-import { NaggAiProvidersSchema, serverProviders } from '@/shared/lib/routstr/providers';
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -495,8 +493,6 @@ const parseRates = parseWith(NaggRatesResponse, 'app/rates');
 export const fetchBtcRates = (controls: RequestControls = {}) =>
   fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
 
-const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
-const parseAiProviders = parseWith(NaggAiProvidersSchema, 'app/ai-providers');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
 const parseMintInfos = parseWith(MintInfoResponse, 'nostr/mint/info');
@@ -644,44 +640,6 @@ export const getLatestVersion = ({
     },
     { signal }
   );
-
-/**
- * nagg-served AI model lineup (see `shared/lib/routstr/lineup.ts` for the
- * schema and precedence rules). Served by nagg, so a
- * nagg deploy can retune the AI tab on shipped builds.
- */
-export const getAiLineup = (controls: RequestControls = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/app/ai-lineup`,
-    parseAiLineup,
-    'app/ai-lineup',
-    undefined,
-    controls
-  );
-
-/**
- * nagg's provider directory: every AI provider it has discovered, with the
- * accepted mints, the operator's key and a health probe it has already run.
- *
- * The picker's first paint. The app's own discovery (Nostr sweep + per-node
- * directory reads + `/v1/info` probes) still runs behind it and corrects it —
- * see `resolveProviderStatus` — but it no longer decides whether the list is
- * empty for the first few seconds. Same budget as every other nagg call: a
- * directory that has not answered inside `DEFAULT_TIMEOUT_MS` is a directory
- * the user is not waiting for.
- */
-export const getAiProviders = async (controls: RequestControls = {}) =>
-  (
-    await fetchJson(
-      `${SCORE_API_BASE_URL}/app/ai-providers`,
-      parseAiProviders,
-      'app/ai-providers',
-      undefined,
-      controls
-    )
-  )
-    .map(withIdentitiesCached)
-    .map(serverProviders);
 
 export const fetchNostrProfile = (
   pubkey: string,

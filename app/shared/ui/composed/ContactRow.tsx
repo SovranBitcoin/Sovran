@@ -49,8 +49,9 @@ import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
-import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
 import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
+
+const E2EE_BADGE_ICON = 'mdi:lock-outline';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -237,7 +238,7 @@ export function nostrIdentity(
 
 /** A provider row's identity. The seeded avatar is its face; there is no icon
  *  to fetch. */
-export function providerIdentity(input: {
+function providerIdentity(input: {
   baseUrl: string;
   displayName?: string;
   spendableSats?: number;

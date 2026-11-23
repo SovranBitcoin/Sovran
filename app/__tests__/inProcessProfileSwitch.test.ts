@@ -204,13 +204,6 @@ it('canary resets every registered profile/session store and invokes every reach
   // Owner-bound budget instances are tested separately without mutating the schema canary.
   const entries = env.liveStores.filter((entry) => entry.scope !== 'global');
   const sentinel = 'ACCOUNT_A_CANARY_5d71';
-  const attachments = require('@/features/ai/lib/attachments');
-  const image = { localUri: sentinel, mimeType: 'image/jpeg', width: 1, height: 1 };
-  expect(await attachments.encodeChatImage(image)).toContain(sentinel);
-  const turns = require('@/features/ai/lib/turns');
-  turns.dispatchTurn(sentinel, { type: 'failed', error: { id: 'unknown', text: sentinel } });
-  const availability = require('@/features/ai/lib/modelAvailability');
-  availability.markModelUnavailable('https://example.invalid', sentinel, { status: 404 });
   const zaps = require('@/shared/stores/runtime/pendingZapStore');
   zaps.registerPendingZap({
     meltTarget: sentinel,
@@ -298,8 +291,6 @@ it('canary resets every registered profile/session store and invokes every reach
       saveAsync: async () => ({ base64: 'ACCOUNT_B', width: 1, height: 1 }),
     }),
   });
-  expect(await attachments.encodeChatImage(image)).toBe('data:image/jpeg;base64,ACCOUNT_B');
-  expect(availability.isModelUnavailable('https://example.invalid', sentinel)).toBe(false);
   expect(zaps.peekPendingZap(sentinel)).toBeUndefined();
   expect(nip04Cache.get('a'.repeat(64), sentinel)).toBeUndefined();
   expect(turns.getTurn(sentinel)).toBeUndefined();
@@ -600,106 +591,6 @@ it('replaces the old NDK/cache through public init before exposing B', async () 
     await renderer.act(async () => {
       tree?.unmount();
     });
-    spy.mockRestore();
-  }
-});
-
-it('completes the fast path with an active idle Routstr SDK client and scheduled recovery', async () => {
-  const env = await setup();
-  const sdk = require('@/shared/lib/routstr/sdk/client');
-  const bound = await sdk.getRoutstrClient('https://example.invalid');
-  sdk.scheduleRecoverySweeps();
-  expect(bound.client.getCashuSpender()).toBeDefined();
-  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
-  expect(env.restartApp).not.toHaveBeenCalled();
-  expect(() => bound.client.getCashuSpender()).toThrow();
-  expect(env.accountHolders.find((holder) => holder.name === 'routstr.client')?.inspect?.()).toBe(
-    true
-  );
-});
-
-it('refuses only an armed SDK refund interval missing its release hook', async () => {
-  const env = await setup();
-  const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
-    'https://example.invalid'
-  );
-  const sdk = require('@routstr/sdk/browser');
-  const spy = jest
-    .spyOn(sdk.RoutstrClient.prototype, 'getCashuSpender')
-    .mockReturnValue({ _refundRetryInterval: 1 });
-  try {
-    expect(bound.client).toBeDefined();
-    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
-    expect(env.restartApp).toHaveBeenCalledTimes(1);
-    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
-    expect(env.resume).not.toHaveBeenCalled();
-  } finally {
-    spy.mockRestore();
-  }
-});
-
-it('awaits SDK stream finalization before allowing B to mount', async () => {
-  const env = await setup();
-  const sdk = require('@routstr/sdk/browser');
-  let finish: () => void = () => {};
-  const work = new Promise<void>((resolve) => {
-    finish = resolve;
-  });
-  const finalize = jest.fn(() => work);
-  const spy = jest
-    .spyOn(sdk.RoutstrClient.prototype, 'routeRequest')
-    .mockResolvedValue({ finalize });
-  try {
-    const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
-      'https://example.invalid'
-    );
-    const response = await bound.client.routeRequest({});
-    const pending = env.switchToExistingProfile({ accountIndex: 1 });
-    const settlement = response.finalize();
-    await Promise.resolve();
-    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
-    expect(env.resume).not.toHaveBeenCalled();
-    finish();
-    await settlement;
-    expect(env.resume).not.toHaveBeenCalled();
-    await bound.finish();
-    expect(await pending).toBe(true);
-    expect(env.restartApp).not.toHaveBeenCalled();
-  } finally {
-    spy.mockRestore();
-  }
-});
-
-it('stops the installed SDK refund timer hook and awaits its running refund', async () => {
-  const env = await setup();
-  const sdk = require('@routstr/sdk/browser');
-  let refundComplete: () => void = () => {};
-  const refund = new Promise<void>((resolve) => {
-    refundComplete = resolve;
-  });
-  const spender = {
-    _refundRetryInterval: 1,
-    _stopRefundRetryInterval: jest.fn(() => {
-      spender._refundRetryInterval = 0;
-    }),
-    refundXcashuTokens: jest.fn(() => refund),
-  };
-  const spy = jest.spyOn(sdk.RoutstrClient.prototype, 'getCashuSpender').mockReturnValue(spender);
-  try {
-    const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
-      'https://example.invalid'
-    );
-    const active = bound.client.getCashuSpender().refundXcashuTokens();
-    const pending = env.switchToExistingProfile({ accountIndex: 1 });
-    for (let turn = 0; turn < 15; turn++) await Promise.resolve();
-    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
-    expect(env.resume).not.toHaveBeenCalled();
-    refundComplete();
-    await active;
-    expect(await pending).toBe(true);
-    expect(spender._stopRefundRetryInterval).toHaveBeenCalledTimes(1);
-    expect(env.restartApp).not.toHaveBeenCalled();
-  } finally {
     spy.mockRestore();
   }
 });

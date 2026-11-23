@@ -4,7 +4,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { isTokenSpent } from './spentProbe';
+import { isTokenSpent } from '@/shared/lib/cashu/spentProbe';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import type { RequestControls } from 'wallet/safeFetch';
 

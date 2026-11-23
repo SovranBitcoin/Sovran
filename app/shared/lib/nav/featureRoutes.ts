@@ -32,15 +32,12 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   composer: 'feed',
   thread: 'feed',
   stories: 'feed',
-  provider: 'ai',
-  providers: 'ai',
   aiRequest: 'ai',
 };
 
 /** Whole route groups that belong to one module. */
 const GROUP_FEATURE: Readonly<Record<string, Feature>> = {
   '(signer-flow)': 'nostr',
-  '(ai-flow)': 'ai',
   '(stories-flow)': 'feed',
 };
 
@@ -48,7 +45,6 @@ const GROUP_FEATURE: Readonly<Record<string, Feature>> = {
 const TAB_FEATURE: Readonly<Record<string, Feature>> = {
   feed: 'feed',
   notifications: 'feed',
-  ai: 'ai',
   contacts: 'contacts',
 };
 

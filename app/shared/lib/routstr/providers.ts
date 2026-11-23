@@ -36,7 +36,7 @@ const DirectorySpine = z.looseObject({
   providers: z.array(ProviderRowSpine).max(128).default([]),
 });
 
-export interface RoutstrProvider {
+interface RoutstrProvider {
   baseUrl: string;
   /** What this directory calls the provider, when it calls it anything.
    *  Absent is a real answer and used to be replaced by the hostname here —
@@ -64,7 +64,7 @@ export function normalizeNodeUrl(url: string): string {
  * Returns an empty list rather than throwing — a node that does not serve the
  * directory is a normal node, not an error.
  */
-export async function fetchProviderDirectory(
+async function fetchProviderDirectory(
   nodeBaseUrl: string,
   controls: RequestControls = {}
 ): Promise<RoutstrProvider[]> {
@@ -115,7 +115,7 @@ const NodeInfoSpine = z.looseObject({
   onion_url: z.string().max(512).nullable().optional(),
 });
 
-export interface NodeInfo {
+interface NodeInfo {
   name?: string;
   description?: string;
   version?: string;
@@ -137,7 +137,7 @@ export interface NodeInfo {
  * discovery falls back to `/v1/models` and then `/` — so a `null` here means
  * "this node does not say", not "this node is broken".
  */
-export async function fetchNodeInfo(
+async function fetchNodeInfo(
   nodeBaseUrl: string,
   controls: RequestControls = {}
 ): Promise<NodeInfo | null> {
@@ -145,7 +145,7 @@ export async function fetchNodeInfo(
 }
 
 /** A responding older node is unknown, rather than falsely labelled offline. */
-export async function fetchNodeStatus(
+async function fetchNodeStatus(
   nodeBaseUrl: string,
   controls: RequestControls = {}
 ): Promise<{ status: 'online' | 'offline' | 'unknown'; info: NodeInfo | null }> {
@@ -183,7 +183,7 @@ const ModelSummarySpine = z.looseObject({
     .max(4096),
 });
 
-export interface ProviderModelSummary {
+interface ProviderModelSummary {
   /** Models this provider currently serves. */
   count: number;
   /**
@@ -211,7 +211,7 @@ export interface ProviderModelSummary {
  * user has asked about one specific provider — and what it learns is recorded,
  * so the picker can show it afterwards without ever paying for it itself.
  */
-export async function fetchProviderModelSummary(
+async function fetchProviderModelSummary(
   nodeBaseUrl: string,
   controls: RequestControls = {}
 ): Promise<ProviderModelSummary | null> {
@@ -283,7 +283,7 @@ const NaggAiProviderRowSchema = z.looseObject({
   latencyMs: z.number().nonnegative().optional().catch(undefined),
 });
 
-export const NaggAiProvidersSchema = z.object({
+const NaggAiProvidersSchema = z.object({
   providers: z
     .array(NaggAiProviderRowSchema)
     .max(256)
@@ -326,7 +326,7 @@ export interface ServerProvider {
  * the phone from the same fields would only be a second opinion on the same
  * evidence.
  */
-export function serverProviders(payload: {
+function serverProviders(payload: {
   providers: readonly z.infer<typeof NaggAiProviderRowSchema>[];
 }): ServerProvider[] {
   const seen = new Set<string>();

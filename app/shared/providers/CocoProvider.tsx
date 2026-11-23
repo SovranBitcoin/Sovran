@@ -5,7 +5,6 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
 import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
-import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -186,13 +185,6 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     await recover('routstr_payments', 'Coco-bg.routstrPaymentRecovery', () =>
       recoverPendingPayments()
     );
-    if (!isLive()) return;
-    // The same window, for payments `@routstr/sdk` now owns: it records each
-    // request token before it leaves and clears it when the change is home,
-    // so anything still recorded is money the node has to be asked about.
-    // The sweep above drains rows written before the SDK took over; this one
-    // drains everything since.
-    await recover('routstr_sdk_sweep', 'Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
     if (!isLive()) return;
     // Sats parked on a Routstr node the app has since been repointed away
     // from: money that is ours but not yet in the wallet, swept once the

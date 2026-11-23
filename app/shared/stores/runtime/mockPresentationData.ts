@@ -37,7 +37,7 @@ export const DEMO_NOTIFICATIONS: FeedNotificationsResult = {
   paginationUntil: 0,
   hasNextPage: false,
 };
-export const DEMO_AI_MESSAGES: RoutstrMessage[] = [
+const DEMO_AI_MESSAGES: RoutstrMessage[] = [
   {
     id: 'demo-ai-question',
     role: 'user',

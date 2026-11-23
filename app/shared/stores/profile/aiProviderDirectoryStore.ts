@@ -130,7 +130,7 @@ const NO_PROVIDERS: readonly ServerProvider[] = [];
  * passed, so an old snapshot of who was reachable can never be drawn as if
  * somebody had just checked.
  */
-export function useAiProviderDirectory(nowMs: number): readonly ServerProvider[] {
+function useAiProviderDirectory(nowMs: number): readonly ServerProvider[] {
   return useAiProviderDirectoryStore((state) =>
     state.fetchedAt != null && nowMs - state.fetchedAt <= DIRECTORY_TTL_MS
       ? state.providers

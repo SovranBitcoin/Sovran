@@ -186,7 +186,6 @@ const flowGroups = [
   '(transactions-flow)',
   '(prompt-flow)',
   '(mint-flow)',
-  '(ai-flow)',
   '(filter-flow)',
   '(map-flow)',
   '(theme-flow)',

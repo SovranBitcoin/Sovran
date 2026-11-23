@@ -45,7 +45,6 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
-import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -234,9 +233,6 @@ async function switchWithoutRestart(
  */
 async function restartInto(accountIndex: number): Promise<boolean> {
   await cleanupCocoWithTimeout();
-  // The Routstr client holds a store and a wallet adapter bound to the wallet
-  // just closed. A restart discards it; this covers a restart that does not happen.
-  resetRoutstrClient();
 
   let recorded = false;
   try {

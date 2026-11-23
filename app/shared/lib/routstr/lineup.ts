@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
-import type { RoutstrModel } from './api';
+import type { RoutstrModel } from '@/shared/stores/profile/routstrStore';
 
 /**
  * Dynamic AI-tab model lineup, derived from the live Routstr `/v1/models`
@@ -47,7 +47,7 @@ export const AI_PROVIDER_IDS = ['openai', 'claude', 'grok', 'google'] as const;
  * the slug or the upstream id instead will happily offer the plaintext twin
  * under an E2EE label.
  */
-export const E2EE_MODEL_PREFIX = 'tinfoil-';
+const E2EE_MODEL_PREFIX = 'tinfoil-';
 
 /**
  * The vendor id encrypted models are offered under.
@@ -100,7 +100,7 @@ const KNOWN_PROVIDER_IDS = new Set<AiProviderId>(AI_PROVIDER_IDS);
  * `deepseek-v4-1-flash` or `deepseek/deepseek-v4.1-flash`. Suffixes such as
  * `:free` or `:batch` are kept — they name a different offering.
  */
-export function normalizeModelId(id: string): string {
+function normalizeModelId(id: string): string {
   const bare = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id;
   return bare.trim().toLowerCase().replace(/\./g, '-');
 }
@@ -147,7 +147,7 @@ const LineupPricingSchema = z.object({
   image: z.number().nullable().catch(null),
   max_cost: z.number().nullable().catch(null),
 });
-export type LineupPricing = z.infer<typeof LineupPricingSchema>;
+type LineupPricing = z.infer<typeof LineupPricingSchema>;
 
 const LineupEntrySchema = z.object({
   modelId: z.string().max(256),
@@ -184,7 +184,7 @@ const LineupEntrySchema = z.object({
    */
   lastKnown: z.boolean().optional(),
 });
-export type LineupEntry = z.infer<typeof LineupEntrySchema>;
+type LineupEntry = z.infer<typeof LineupEntrySchema>;
 
 const ProviderLineupSchema = z.object({
   auto: LineupEntrySchema.nullable().catch(null),
@@ -322,7 +322,7 @@ const NAME_PREFIX_TO_PROVIDER: [string, AiProviderId][] = [
  * This used to return `null` for every vendor outside a hardcoded four, which
  * silently discarded most of the catalog before it could be ranked.
  */
-export function providerIdForModel(model: RoutstrModel): AiProviderId | null {
+function providerIdForModel(model: RoutstrModel): AiProviderId | null {
   // Before anything else: an enclave row carries no slug and a display name
   // with no vendor prefix and no colon ("Private (E2EE) GLM 5.3", "kimi-k3"),
   // so every signal below returns null for it and the whole encrypted half of
@@ -645,7 +645,7 @@ const NaggLineupModelSchema = z.object({
     .catch(() => ({})),
 });
 
-export const NaggAiLineupSchema = z.object({
+const NaggAiLineupSchema = z.object({
   version: z.number().int().catch(1),
   updatedAt: z.number().int().nonnegative().catch(0),
   node: z
@@ -678,7 +678,7 @@ type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
  * payload by construction. Returns a `null` lineup when no known provider
  * carried any model so callers fall back to the client-side derivation.
  */
-export function lineupFromNaggPayload(payload: NaggAiLineup): {
+function lineupFromNaggPayload(payload: NaggAiLineup): {
   lineup: AiLineup | null;
   nodeBaseUrl: string | null;
   authMode?: 'bearer' | 'x-cashu';

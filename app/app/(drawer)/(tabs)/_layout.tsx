@@ -13,7 +13,7 @@ export const unstable_settings = {
   anchor: 'index',
 };
 
-type TabName = 'feed' | 'index' | 'contacts' | 'notifications' | 'ai';
+type TabName = 'feed' | 'index' | 'contacts' | 'notifications';
 
 type TabDef = {
   name: TabName;
@@ -58,14 +58,6 @@ const ALL_TAB_DEFS: readonly TabDef[] = [
     title: 'Notifications',
     sf: { default: 'bell', selected: 'bell.fill' },
     monicon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
-  },
-  {
-    name: 'ai',
-    feature: 'ai',
-    title: 'AI',
-    testID: 'tab-ai',
-    sf: { default: 'brain', selected: 'brain' },
-    monicon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
   },
 ];
 
