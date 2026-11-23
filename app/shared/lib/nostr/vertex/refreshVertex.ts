@@ -1,34 +1,27 @@
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import {
-  createNaggClient,
-  facade,
-  recipes,
-  NaggProfilesEnvelopeSchema,
-  type NaggClient,
-  type NaggProfilesEnvelope,
-} from 'nostr';
-import { z } from 'zod';
+import { facade, type NaggProfilesEnvelope } from 'nostr';
 import { ResultAsync } from 'neverthrow';
 import { activePubkey } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
-import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { nostrLog } from '@/shared/lib/logger';
 import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { signVertexRequest, vertexAutomationDisabled } from './signVertexRequest';
 
-const responseSchema = z.union([recipes.VertexFailureSchema, NaggProfilesEnvelopeSchema]);
 // In-memory only: never persist lookup targets or query text. Bound by the daily cap.
 const attempted = new Map<string, Set<string>>();
 const enabled = () =>
-  useSettingsStore.getState().vertexCreditsEnabled &&
-  getNostrTierConfig().nagg.enabled &&
-  !vertexAutomationDisabled();
+  useSettingsStore.getState().vertexCreditsEnabled && !vertexAutomationDisabled();
 
 export function isVertexProfileStale(fetchedAt?: number | null): boolean {
   return fetchedAt == null || fetchedAt * 1000 <= Date.now() - 7 * 86_400_000;
 }
+
+export type DirectVertexSender = (
+  signed: facade.SignedVertexRequest,
+  options?: { signal?: AbortSignal; timeoutMs?: number }
+) => Promise<facade.DirectVertexResponse>;
 
 /** Consent, hydration, identity, dedup and budget have one owner for both surfaces. */
 export async function refreshVertex(
@@ -37,8 +30,8 @@ export async function refreshVertex(
     stale: boolean;
     ndk?: NDK;
     signal?: AbortSignal;
-    /** Defaults to a client for the configured Nagg app view. */
-    client?: Pick<NaggClient, 'rest'>;
+    /** Injectable transport for tests; defaults to direct `wss://relay.vertexlab.io`. */
+    send?: DirectVertexSender;
   }
 ): Promise<NaggProfilesEnvelope | null> {
   if (!input.stale || !enabled() || input.signal?.aborted) return null;
@@ -74,36 +67,18 @@ export async function refreshVertex(
   attempted.set(scope, seen);
   const signed = await signVertexRequest(facade.buildVertexRequest(input), input.ndk);
   if (signed.isErr() || signed.value.pubkey !== owner || !stillCurrent()) return null;
-  const client =
-    input.client ??
-    createNaggClient({ appView: { baseUrl: getNostrTierConfig().nagg.appViewBaseUrl } });
-  const binding =
-    input.kind === 'search'
-      ? recipes.profileSearchAppView({
-          query: input.query ?? '',
-          limit: input.limit,
-          signedVertexRequest: signed.value,
-        })
-      : recipes.profileAppView({ pubkey: input.target ?? '', signedVertexRequest: signed.value });
+
   nostrLog.info('nostr.vertex.client_request', { kind: input.kind, reason: 'stale' });
-  const result = await client.rest({
-    ...binding,
-    responseSchema,
-    timeoutMs: 20_000,
-    signal: input.signal,
-    refresh: true,
-  });
-  if (result.isErr()) return null;
-  const failure = recipes.VertexFailureSchema.safeParse(result.value);
-  if (failure.success) {
-    if (failure.data.reason === 'insufficient_credits' && budget.getState().block()) {
+  const send = input.send ?? facade.sendDirectVertexRequest;
+  const response = await send(signed.value, { signal: input.signal, timeoutMs: 15_000 });
+  if (!response.ok) {
+    if (response.reason === 'insufficient_credits' && budget.getState().block()) {
       nostrLog.info('nostr.vertex.credits_exhausted');
     }
     return null;
   }
   if (!stillCurrent()) return null;
-  const parsed = NaggProfilesEnvelopeSchema.safeParse(result.value);
-  return parsed.success ? parsed.data : null;
+  return facade.directVertexToProfilesEnvelope(response, input.target);
 }
 
 registerAccountScoped(
