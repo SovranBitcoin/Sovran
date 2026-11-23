@@ -1879,4 +1879,56 @@ describe("rollbackSend", () => {
     const { result } = rollback(async () => ({ id: "op-1", state: "pending" }), false);
     await expect(result).resolves.toMatchObject({ kind: "unknown" });
   });
+
+  it("reports unknown when Coco resolves reclaim without invalidating send proofs (e.g. fees consume amount, F238)", async () => {
+    const listeners = new Set<(event: { mintUrl: string; secrets: string[]; state: string }) => void>();
+    const manager = createMockManager() as ReturnType<typeof createMockManager> & {
+      on: (event: string, cb: (payload: { mintUrl: string; secrets: string[]; state: string }) => void) => () => void;
+    };
+    manager.on = (_event, cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    };
+    manager.ops.send.get = vi.fn(async () => ({
+      id: "op-1",
+      state: "pending",
+      mintUrl: MINT1,
+    }));
+    // Coco resolves reclaim without emitting proofs:state-changed(state: "spent")
+    manager.ops.send.reclaim = vi.fn(async () => undefined);
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    await expect(ops.rollbackSend!("op-1")).resolves.toEqual({
+      kind: "unknown",
+      reason: "notInvalidated",
+    });
+    expect(listeners.size).toBe(0);
+  });
+
+  it("reports reclaimed when Coco invalidates send proofs during reclaim (F238)", async () => {
+    const listeners = new Set<(event: { mintUrl: string; secrets: string[]; state: string }) => void>();
+    const manager = createMockManager() as ReturnType<typeof createMockManager> & {
+      on: (event: string, cb: (payload: { mintUrl: string; secrets: string[]; state: string }) => void) => () => void;
+    };
+    manager.on = (_event, cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    };
+    manager.ops.send.get = vi.fn(async () => ({
+      id: "op-1",
+      state: "pending",
+      mintUrl: MINT1,
+    }));
+    manager.ops.send.reclaim = vi.fn(async () => {
+      for (const cb of listeners) {
+        cb({ mintUrl: MINT1, secrets: ["s1"], state: "spent" });
+      }
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    await expect(ops.rollbackSend!("op-1")).resolves.toEqual({ kind: "reclaimed" });
+    expect(listeners.size).toBe(0);
+  });
 });

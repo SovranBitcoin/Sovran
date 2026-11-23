@@ -1269,17 +1269,60 @@ export function createDefaultOperations(
           });
           return { kind: "neverExecuted" };
         case "executing":
-        case "pending":
+        case "pending": {
           logger.info("operations.rollbackSend.reclaim", {
             state: operation.state,
             operationId,
           });
-          await mgr.ops.send.reclaim(operationId);
+          // Coco's DefaultSendHandler.rollback skips the swap and still resolves
+          // when fees consume the send amount, leaving the original send proofs
+          // spendable at the mint. Only treat the send as reclaimed when Coco
+          // actually marks send proofs spent during reclaim.
+          let invalidated = false;
+          const canObserveProofState = typeof mgr.on === "function";
+          const expectedMintUrl =
+            typeof operation.mintUrl === "string" && operation.mintUrl.length > 0
+              ? normalizeMintUrl(operation.mintUrl)
+              : null;
+          const onProofStateChanged = (event: {
+            mintUrl: string;
+            secrets: string[];
+            state: string;
+          }) => {
+            if (event.state !== "spent" || event.secrets.length === 0) return;
+            if (
+              expectedMintUrl &&
+              normalizeMintUrl(event.mintUrl) !== expectedMintUrl
+            ) {
+              return;
+            }
+            invalidated = true;
+          };
+          const unsubscribe = canObserveProofState
+            ? mgr.on("proofs:state-changed", onProofStateChanged)
+            : undefined;
+          try {
+            await mgr.ops.send.reclaim(operationId);
+          } finally {
+            if (typeof unsubscribe === "function") {
+              unsubscribe();
+            } else if (typeof mgr.off === "function") {
+              mgr.off("proofs:state-changed", onProofStateChanged);
+            }
+          }
+          if (canObserveProofState && !invalidated) {
+            logger.warn("operations.rollbackSend.notInvalidated", {
+              operationId,
+              state: operation.state,
+            });
+            return { kind: "unknown", reason: "notInvalidated" };
+          }
           logger.info("operations.rollbackSend.done", {
             operationId,
             action: "reclaim",
           });
           return { kind: "reclaimed" };
+        }
         case "rolled_back":
           logger.info("operations.rollbackSend.alreadyRolledBack", { operationId });
           return { kind: "reclaimed" };

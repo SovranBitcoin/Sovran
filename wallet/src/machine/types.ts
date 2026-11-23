@@ -979,7 +979,13 @@ export type SendRollbackResult =
   | { kind: "neverExecuted" }
   | {
       kind: "unknown";
-      reason: "noManager" | "lookupFailed" | "notFound" | "redeemed" | "rollingBack";
+      reason:
+        | "noManager"
+        | "lookupFailed"
+        | "notFound"
+        | "redeemed"
+        | "rollingBack"
+        | "notInvalidated";
     };
 
 /**
