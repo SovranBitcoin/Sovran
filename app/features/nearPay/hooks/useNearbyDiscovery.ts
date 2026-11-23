@@ -96,7 +96,7 @@ export function useNearbyDiscovery(): void {
     const manager = CocoManager.getInstance();
     void Promise.all([
       manager.mint.getAllTrustedMints().catch(() => []),
-      manager.wallet.getBalances().catch(() => ({})),
+      manager.wallet.balances.byMint().catch(() => ({})),
     ]).then(() => {
       if (!cancelled) setWalletDataReady(true);
     });

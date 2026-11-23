@@ -48,6 +48,19 @@ export interface SendDirectVertexOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   createWebSocket?: (url: string) => VertexSocketLike;
+  /**
+   * Optional cryptographic verifier (e.g. `verifyEvent` from `nostr-tools/pure`)
+   * invoked on every `6312`/`6315`/`6313` and `7000` event before accepting it.
+   */
+  verifyEvent?: (event: {
+    id: string;
+    pubkey: string;
+    created_at: number;
+    kind: number;
+    tags: string[][];
+    content: string;
+    sig: string;
+  }) => boolean;
 }
 
 const NumericLikeSchema = z.union([
@@ -72,9 +85,13 @@ const VertexEntrySchema = z.looseObject({
 const VertexEntriesSchema = z.array(VertexEntrySchema);
 
 const RelayEventSchema = z.looseObject({
+  id: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  pubkey: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  created_at: z.number().int(),
   kind: z.number().int(),
   content: z.string(),
   tags: z.array(z.array(z.string())),
+  sig: z.string().regex(/^[0-9a-fA-F]{128}$/),
 });
 
 function logicalKind(requestKind: number): 'profile' | 'search' | 'recommend' {
@@ -110,6 +127,7 @@ export function sendDirectVertexRequest(
     timeoutMs = DEFAULT_TIMEOUT_MS,
     signal,
     createWebSocket = (url) => new WebSocket(url) as unknown as VertexSocketLike,
+    verifyEvent,
   } = options;
 
   if (signal?.aborted) {
@@ -201,6 +219,7 @@ export function sendDirectVertexRequest(
       const ev = parsedEvent.data;
       const refsRequest = ev.tags.some((t) => t[0] === 'e' && t[1] === signed.id);
       if (!refsRequest) return;
+      if (verifyEvent && !verifyEvent(ev)) return;
 
       if (ev.kind === 7000) {
         const statusTag = ev.tags.find((t) => t[0] === 'status');

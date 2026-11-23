@@ -48,29 +48,21 @@ async function fetchAuditorJson(
   url: string,
   source: MintAuditorId,
   controls: AuditorFetchControls = {}
-): Promise<unknown | null> {
-  try {
-    // eslint-disable-next-line no-restricted-globals -- public third-party auditor endpoints
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: buildAbortSignal({
-        timeoutMs: controls.timeoutMs ?? AUDITOR_TIMEOUT_MS,
-        ...controls,
-      }),
-    });
-    if (!response.ok) {
-      apiLog.debug('cashu.auditor.http_error', { source, status: response.status });
-      return null;
-    }
-    return await response.json();
-  } catch (error) {
-    apiLog.debug('cashu.auditor.fetch_failed', {
-      source,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return null;
+): Promise<unknown> {
+  // eslint-disable-next-line no-restricted-globals -- public third-party auditor endpoints
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal: buildAbortSignal({
+      timeoutMs: controls.timeoutMs ?? AUDITOR_TIMEOUT_MS,
+      ...controls,
+    }),
+  });
+  if (!response.ok) {
+    apiLog.debug('cashu.auditor.http_error', { source, status: response.status });
+    throw new Error(`${source} HTTP ${response.status}`);
   }
+  return await response.json();
 }
 
 const Nut06InfoSchema = z.looseObject({
@@ -290,11 +282,16 @@ export async function fetchMintRadarSingle(
   controls: AuditorFetchControls = {}
 ): Promise<MintAuditSummary | undefined> {
   if (!isValidMintUrl(mintUrl)) return undefined;
-  const raw = await fetchAuditorJson(
-    `${MINTRADAR_LIST_URL}/${encodeURIComponent(mintUrl)}`,
-    'mintradar',
-    controls
-  );
+  let raw: unknown;
+  try {
+    raw = await fetchAuditorJson(
+      `${MINTRADAR_LIST_URL}/${encodeURIComponent(mintUrl)}`,
+      'mintradar',
+      controls
+    );
+  } catch {
+    return undefined;
+  }
   if (!raw || typeof raw !== 'object') return undefined;
   const candidate = 'mint' in raw ? (raw as { mint: unknown }).mint : raw;
   const parsed = MintRadarMintSchema.safeParse(candidate);

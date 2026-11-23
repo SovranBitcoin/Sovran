@@ -1,5 +1,6 @@
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { verifyEvent } from 'nostr-tools/pure';
 import { facade, type NaggProfilesEnvelope } from 'nostr';
 import { ResultAsync } from 'neverthrow';
 import { activePubkey } from '@/shared/stores/global/profileStore';
@@ -69,7 +70,10 @@ export async function refreshVertex(
   if (signed.isErr() || signed.value.pubkey !== owner || !stillCurrent()) return null;
 
   nostrLog.info('nostr.vertex.client_request', { kind: input.kind, reason: 'stale' });
-  const send = input.send ?? facade.sendDirectVertexRequest;
+  const send: DirectVertexSender =
+    input.send ??
+    ((signedEvent, opts) =>
+      facade.sendDirectVertexRequest(signedEvent, { ...opts, verifyEvent }));
   const response = await send(signed.value, { signal: input.signal, timeoutMs: 15_000 });
   if (!response.ok) {
     if (response.reason === 'insufficient_credits' && budget.getState().block()) {

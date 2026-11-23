@@ -43,6 +43,12 @@ class FakeVertexSocket implements VertexSocketLike {
 
 const PUBKEY_A = 'a'.repeat(64);
 const PUBKEY_B = 'b'.repeat(64);
+const FAKE_EVENT_META = {
+  id: '9'.repeat(64),
+  pubkey: '8'.repeat(64),
+  created_at: 1_700_000_001,
+  sig: '7'.repeat(128),
+};
 
 function makeSigned(kind: 5312 | 5315 = 5315): SignedVertexRequest {
   return {
@@ -95,6 +101,7 @@ describe('sendDirectVertexRequest', () => {
         'EVENT',
         subId,
         {
+          ...FAKE_EVENT_META,
           kind: 6315,
           tags: [
             ['e', signed.id],
@@ -139,6 +146,7 @@ describe('sendDirectVertexRequest', () => {
         'EVENT',
         subId,
         {
+          ...FAKE_EVENT_META,
           kind: 6312,
           tags: [['e', signed.id]],
           content: JSON.stringify([
@@ -171,6 +179,7 @@ describe('sendDirectVertexRequest', () => {
         'EVENT',
         subId,
         {
+          ...FAKE_EVENT_META,
           kind: 7000,
           tags: [
             ['e', signed.id],

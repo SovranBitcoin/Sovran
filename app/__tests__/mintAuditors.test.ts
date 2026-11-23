@@ -232,7 +232,7 @@ describe('mint auditor adapters', () => {
 });
 
 describe('multi-auditor merging and fault tolerance', () => {
-  it('merges duplicate URLs across auditors (case/trailing-slash normalized) and ranks healthy mints first', () => {
+  it('merges matching host/trailing-slash URLs while preserving path case and audit provenance', () => {
     const merged = mergeAuditorEntries([
       {
         source: 'mintradar',
@@ -244,7 +244,7 @@ describe('multi-auditor merging and fault tolerance', () => {
       },
       {
         source: 'imf-gg',
-        mintUrl: 'https://mint.minibits.cash/bitcoin/',
+        mintUrl: 'https://MINT.MINIBITS.CASH/Bitcoin/',
         reviewCount: 50,
         averageScore: 4.9,
       },
@@ -261,9 +261,11 @@ describe('multi-auditor merging and fault tolerance', () => {
 
     expect(merged).toHaveLength(2);
     expect(merged[0].mintUrl).toBe('https://mint.minibits.cash/Bitcoin');
+    expect(merged[0].hasAudit).toBe(true);
     expect(merged[0].reviewCount).toBe(50);
     expect(merged[0].averageScore).toBe(4.9);
     expect(merged[1].mintUrl).toBe('https://dead.example');
+    expect(merged[1].hasAudit).toBe(true);
   });
 
   it('succeeds when one auditor throws and others respond', async () => {

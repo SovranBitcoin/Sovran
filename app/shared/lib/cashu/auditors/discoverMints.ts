@@ -1,5 +1,5 @@
 import { err, ok, type Result } from 'neverthrow';
-import type { DiscoverMint, DiscoverMintsResponse } from '@/shared/lib/apiClient';
+import { DiscoverMintsResponse, type DiscoverMint } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import {
   fetchCashuAuditDirectory,
@@ -42,12 +42,27 @@ function rankScore(mint: DiscoverMint): number {
   return (smoothed / 5) * swapFactor * healthPenalty;
 }
 
+function isAuditSource(source: MintAuditorId): boolean {
+  return source === 'mintradar' || source === 'cashu-audit';
+}
+
 export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): DiscoverMint[] {
   const byKey = new Map<string, DiscoverMint>();
 
   for (const entry of entries) {
-    const key = normalizeMintUrlKey(entry.mintUrl).toLowerCase();
+    // Preserve path case while normalizing scheme/host/trailing-slash so
+    // distinct endpoints like /Cashu vs /cashu do not collide.
+    const key = normalizeMintUrlKey(entry.mintUrl);
     if (!key) continue;
+    const audited = isAuditSource(entry.source);
+    const reviewCount =
+      typeof entry.reviewCount === 'number' && Number.isFinite(entry.reviewCount)
+        ? Math.max(0, Math.round(entry.reviewCount))
+        : 0;
+    const averageScore =
+      typeof entry.averageScore === 'number' && Number.isFinite(entry.averageScore)
+        ? Math.min(5, Math.max(0, entry.averageScore))
+        : 0;
     const existing = byKey.get(key);
     if (!existing) {
       byKey.set(key, {
@@ -58,17 +73,20 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
         supportedUnits: mergeUnits(entry.supportedUnits),
         nuts: entry.nuts,
         operatorPubkey: entry.operatorPubkey,
+        hasAudit: audited,
         state: entry.state,
         status: entry.status,
         testnut: entry.testnut,
-        nMints: entry.nMints,
-        nMelts: entry.nMelts,
-        nErrors: entry.nErrors,
-        reviewCount: entry.reviewCount ?? 0,
-        averageScore: entry.averageScore ?? 0,
+        nMints: entry.nMints !== undefined ? Math.max(0, Math.round(entry.nMints)) : undefined,
+        nMelts: entry.nMelts !== undefined ? Math.max(0, Math.round(entry.nMelts)) : undefined,
+        nErrors: entry.nErrors !== undefined ? Math.max(0, Math.round(entry.nErrors)) : undefined,
+        reviewCount,
+        averageScore,
       });
       continue;
     }
+
+    if (audited) existing.hasAudit = true;
 
     // Merge richer metadata, preferring non-URL names and existing NUT-06 details.
     if (entry.name && (!existing.name || existing.name === existing.mintUrl)) {
@@ -98,19 +116,31 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
     const existingSwaps = (existing.nMints ?? 0) + (existing.nMelts ?? 0) + (existing.nErrors ?? 0);
     const entrySwaps = (entry.nMints ?? 0) + (entry.nMelts ?? 0) + (entry.nErrors ?? 0);
     if (entrySwaps > existingSwaps) {
-      existing.nMints = entry.nMints ?? existing.nMints;
-      existing.nMelts = entry.nMelts ?? existing.nMelts;
-      existing.nErrors = entry.nErrors ?? existing.nErrors;
+      existing.nMints =
+        entry.nMints !== undefined ? Math.max(0, Math.round(entry.nMints)) : existing.nMints;
+      existing.nMelts =
+        entry.nMelts !== undefined ? Math.max(0, Math.round(entry.nMelts)) : existing.nMelts;
+      existing.nErrors =
+        entry.nErrors !== undefined ? Math.max(0, Math.round(entry.nErrors)) : existing.nErrors;
     }
 
     // Prefer the review directory with more reviews.
-    if ((entry.reviewCount ?? 0) > (existing.reviewCount ?? 0)) {
-      existing.reviewCount = entry.reviewCount ?? existing.reviewCount;
-      if (entry.averageScore !== undefined) existing.averageScore = entry.averageScore;
+    if (reviewCount > (existing.reviewCount ?? 0)) {
+      existing.reviewCount = reviewCount;
+      if (entry.averageScore !== undefined) existing.averageScore = averageScore;
     }
   }
 
-  return [...byKey.values()].sort((a, b) => {
+  // Validate every merged row against the shared DiscoverMint schema so
+  // malformed third-party data never poisons persisted discovery/metadata caches.
+  const rowSchema = DiscoverMintsResponse.shape.mints.element;
+  const validated: DiscoverMint[] = [];
+  for (const row of byKey.values()) {
+    const parsed = rowSchema.safeParse(row);
+    if (parsed.success) validated.push(parsed.data);
+  }
+
+  return validated.sort((a, b) => {
     const scoreDiff = rankScore(b) - rankScore(a);
     if (Math.abs(scoreDiff) > 1e-6) return scoreDiff;
     return (a.name ?? a.mintUrl).localeCompare(b.name ?? b.mintUrl);

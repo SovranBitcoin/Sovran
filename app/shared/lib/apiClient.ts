@@ -556,33 +556,46 @@ export const fetchMintChanges = (
 export const MINT_INFO_MAX_URLS = 50;
 
 /**
- * Fetch NUT-06 info directly from each mint's `/v1/info` endpoint in parallel
- * (zero self-hosted backend).
+ * Resolve mint testnut verdicts via enabled auditors (MintRadar `isTest`)
+ * while preserving any existing saved verdicts so a plain `/v1/info` probe
+ * never overwrites a known test mint as a real mainnet mint.
  */
 export const fetchMintInfos = async (
   mintUrls: readonly string[],
   controls?: RequestControls
 ): Promise<Result<z.infer<typeof MintInfoResponse>['mints'], Error>> => {
-  const settled = await Promise.all(
-    mintUrls.map(async (mintUrl) => {
-      const res = await fetchMintInfo(mintUrl, controls);
-      if (res.isOk()) {
-        return {
-          mintUrl,
-          testnut: false,
-          known: true,
-          probedAt: Math.floor(Date.now() / 1000),
-          status: 'online' as const,
-          name: res.value.name,
-          description: res.value.description,
-          iconUrl: res.value.icon_url,
-          nuts: res.value.nuts as Record<string, unknown> | undefined,
-        };
-      }
-      return { mintUrl, testnut: false, known: false, status: 'offline' as const };
+  const { normalizeMintUrlKey } = require('@/shared/lib/url') as {
+    normalizeMintUrlKey: typeof import('@/shared/lib/url').normalizeMintUrlKey;
+  };
+  const { useMintTestnutStore } = require('@/shared/stores/global/mintTestnutStore') as {
+    useMintTestnutStore: typeof import('@/shared/stores/global/mintTestnutStore').useMintTestnutStore;
+  };
+  const discovered = await discoverMints({ signal: controls?.signal });
+  if (discovered.isErr()) return err(discovered.error);
+  const byKey = new Map(
+    discovered.value.mints.map((m) => [normalizeMintUrlKey(m.mintUrl), m] as const)
+  );
+  const existing = useMintTestnutStore.getState().byMintUrl;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  return ok(
+    mintUrls.map((mintUrl) => {
+      const key = normalizeMintUrlKey(mintUrl);
+      const found = byKey.get(key);
+      const saved = existing[key];
+      // Only trust an explicit auditor verdict; never downgrade a saved testnut.
+      const hasAuditedVerdict = found?.hasAudit === true && typeof found.testnut === 'boolean';
+      const testnut =
+        saved?.testnut === true ? true : hasAuditedVerdict ? (found.testnut as boolean) : false;
+      return {
+        mintUrl,
+        testnut,
+        known: Boolean(found),
+        ...(hasAuditedVerdict ? { probedAt: nowSec } : {}),
+        ...(found?.operatorPubkey ? { operatorPubkey: found.operatorPubkey } : {}),
+      };
     })
   );
-  return ok(settled);
 };
 
 /** Single-mint discovery lookup across enabled public auditors. */
@@ -590,11 +603,12 @@ export const discoverMint = async (
   mintUrl: string,
   controls?: RequestControls
 ): Promise<Result<DiscoverMint | undefined, Error>> => {
-  const target = mintUrl.trim().replace(/\/+$/, '').toLowerCase();
+  const { normalizeMintUrlKey } = require('@/shared/lib/url') as {
+    normalizeMintUrlKey: typeof import('@/shared/lib/url').normalizeMintUrlKey;
+  };
+  const target = normalizeMintUrlKey(mintUrl);
   const res = await discoverMints({ signal: controls?.signal });
-  return res.map(({ mints }) =>
-    mints.find((m) => m.mintUrl.trim().replace(/\/+$/, '').toLowerCase() === target)
-  );
+  return res.map(({ mints }) => mints.find((m) => normalizeMintUrlKey(m.mintUrl) === target));
 };
 
 /**
@@ -658,8 +672,20 @@ export const fetchNostrProfile = async (
   if (!meta && !stats) {
     return err(new Error('Profile not found on enabled Nostr tiers'));
   }
+  let npub = '';
+  try {
+    npub = nip19.npubEncode(pubkey);
+  } catch {
+    npub = pubkey;
+  }
   const profile: NostrProfileFullType = {
     pubkey,
+    npub,
+    rank: 0,
+    fromCache: false,
+    score: null,
+    created_at: stats?.joinedAtSec ?? null,
+    topFollowers: [],
     name: meta?.name ?? '',
     displayName: meta?.displayName ?? meta?.name ?? '',
     about: meta?.about ?? '',

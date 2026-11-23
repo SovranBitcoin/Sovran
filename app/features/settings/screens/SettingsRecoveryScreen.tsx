@@ -125,13 +125,15 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         recoverPendingPayments(),
       ]);
       const collected = legacy.reclaimed + pendingRecovered;
+      const stillPendingPayments = Object.keys(useRoutstrStore.getState().pendingPayments).length;
+      const hasDeferred = legacy.deferred > 0 || stillPendingPayments > 0;
       if (collected > 0) {
         setAiReclaimNote(
-          legacy.deferred > 0
+          hasDeferred
             ? 'Collected available ecash. Some nodes did not answer — try again later.'
             : 'Collected leftover AI ecash into your wallet.'
         );
-      } else if (legacy.deferred > 0) {
+      } else if (hasDeferred) {
         setAiReclaimNote('AI node did not answer. Your credentials are kept — try again later.');
       } else {
         setAiReclaimNote('No leftover AI balance found.');
