@@ -194,13 +194,6 @@ describe('CI covers every workspace package', () => {
     }
   );
 
-  it('a failed harness stops the root test before starting other suites', () => {
-    const result = aggregate('test', 'harness');
-    expect(result.signal).toBeNull();
-    expect(result.status).not.toBe(0);
-    expect(result.executed).toEqual(['harness']);
-  });
-
   it.each(['test', 'type-check'])('root `%s` preserves a workspace failure', (script) => {
     const result = aggregate(script, 'wallet');
     expect(result.signal).toBeNull();

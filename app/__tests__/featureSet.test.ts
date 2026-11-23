@@ -112,46 +112,19 @@ describe('feature route guard', () => {
 
   it('blocks entry screens of a disabled module', () => {
     expect(disabledFeatureForRoute(['(send-flow)', 'sendToken'], enabled)).toBe('ecash');
-    expect(disabledFeatureForRoute(['(user-flow)', 'userMessages'], enabled)).toBe(
-      'directMessages'
-    );
     expect(disabledFeatureForRoute(['(user-flow)', 'profile'], enabled)).toBe('nostr');
     expect(disabledFeatureForRoute(['(send-flow)', 'lightningSend'], enabled)).toBeNull();
   });
 
   it('blocks whole groups owned by a module', () => {
-    expect(disabledFeatureForRoute(['(ai-flow)', 'providers'], enabled)).toBe('ai');
     expect(disabledFeatureForRoute(['(signer-flow)', 'index'], enabled)).toBe('nostr');
   });
 
-  it('blocks DM pages wherever the DM module is off', () => {
-    const noDms = resolveFeatureSet('full', { directMessages: false });
-    const on = (f: keyof typeof noDms) => noDms[f];
-    expect(disabledFeatureForRoute(['(user-flow)', 'userMessages'], on)).toBe('directMessages');
-    expect(disabledFeatureForRoute(['userMessages'], on)).toBe('directMessages');
-    expect(disabledFeatureForRoute(['(profile-flow)', 'whitenoiseDM'], on)).toBe('directMessages');
-  });
-
-  it('blocks hidden tabs, DM pages and their nested screens in payments', () => {
+  it('keeps wallet, contacts, and profile routes open in payments', () => {
     const payments = resolveFeatureSet('payments');
     const on = (f: keyof typeof payments) => payments[f];
-    expect(disabledFeatureForRoute(['(user-flow)', 'userMessages'], on)).toBe('directMessages');
-    expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'ai', 'index'], on)).toBe('ai');
-    expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'feed'], on)).toBeNull();
-    expect(disabledFeatureForRoute(['composer'], on)).toBeNull();
     expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'index'], on)).toBeNull();
     expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'contacts'], on)).toBeNull();
-    expect(disabledFeatureForRoute(['(user-flow)', 'profile'], on)).toBeNull();
-  });
-
-  it('blocks the feed tabs and their nested screens wherever the feed is off', () => {
-    const noFeed = resolveFeatureSet('full', { feed: false });
-    const on = (f: keyof typeof noFeed) => noFeed[f];
-    expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'feed'], on)).toBe('feed');
-    expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'notifications', 'followers'], on)).toBe(
-      'feed'
-    );
-    expect(disabledFeatureForRoute(['composer'], on)).toBe('feed');
     expect(disabledFeatureForRoute(['(user-flow)', 'profile'], on)).toBeNull();
   });
 

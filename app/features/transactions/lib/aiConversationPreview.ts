@@ -12,7 +12,7 @@
  */
 
 /** The fields of a `RoutstrMessage` this preview actually reads. */
-export interface PreviewableMessage {
+interface PreviewableMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;

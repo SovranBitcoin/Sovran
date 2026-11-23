@@ -174,7 +174,7 @@ it('reserves two single-line profile placeholders and replaces them with resolve
 it('keeps live descriptions mounted and single-line as stores settle and requests clear', () => {
   render();
   const descriptions = () =>
-    ['settings-remote-login-row', 'settings-notifications-row'].map((id) =>
+    ['settings-remote-login-row'].map((id) =>
       control(id).findByType(ListGroup.ItemDescription)
     );
   const initial = descriptions();
@@ -193,7 +193,6 @@ it('keeps live descriptions mounted and single-line as stores settle and request
     });
   }
   expect(descriptions()[0].props.children).toBe('Sign in to Nostr apps with this device');
-  expect(descriptions()[1].props.children).toBe('Follows');
 });
 
 it('exposes profile switching as a checked switch and toggles in both directions', () => {

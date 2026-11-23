@@ -70,7 +70,6 @@ const wallpaper = {
   createdAt: 1,
 };
 const album = { slug: 'fixture', displayName: 'Fixture' };
-const catalog = { wallpapers: [wallpaper], albums: [album], lastUpdated: 1 };
 const place = { id: 42, lat: 51.5, lon: -0.1, icon: 'cafe', updated_at: '2026-09-13' };
 const originalFetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
 const mockFetch = jest.fn();
@@ -95,46 +94,16 @@ afterAll(() => {
   else Reflect.deleteProperty(globalThis, 'fetch');
 });
 
-it('fetches wallpapers from the app module and tolerates new fields and omitted album defaults', async () => {
-  respond({ ...catalog, future: true, wallpapers: [{ ...wallpaper, future: true }] });
+it('disables remote wallpaper catalog fetches without making network requests', async () => {
   const controller = new AbortController();
   const result = await fetchWallpaperCatalog({ signal: controller.signal });
-  expect(mockFetch).toHaveBeenCalledWith('https://catalog.example.test/app/wallpapers', {
-    signal: controller.signal,
-  });
-  expect(result.isOk()).toBe(true);
-  if (result.isOk()) {
-    expect(result.value.wallpapers).toEqual([wallpaper]);
-    expect(result.value.albums).toEqual([
-      { ...album, description: '', sortOrder: 0, topic: 'Other' },
-    ]);
-  }
-  expect(await refreshCatalog()).toBe(true);
-  expect(useWallpaperStore.getState().catalog).toEqual([wallpaper]);
+  expect(mockFetch).not.toHaveBeenCalled();
+  expect(result.isErr()).toBe(true);
+  expect(await refreshCatalog()).toBe(false);
+  expect(useWallpaperStore.getState().catalog).toEqual([]);
 });
 
-it('drops a wallpaper whose palette is missing a shade instead of caching undefined colours', async () => {
-  const { 950: _background, ...withoutBackground } = palette;
-  respond({
-    ...catalog,
-    wallpapers: [wallpaper, { ...wallpaper, themeName: 'partial', palette: withoutBackground }],
-  });
-  expect(await refreshCatalog()).toBe(true);
-  expect(useWallpaperStore.getState().catalog).toEqual([wallpaper]);
-});
-
-const failures = ['503', 'network', 'malformed'] as const;
-function failRequest(kind: (typeof failures)[number]) {
-  if (kind === '503') {
-    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: 'Service Unavailable' });
-  } else if (kind === 'network') {
-    mockFetch.mockRejectedValue(new Error('Network request failed'));
-  } else {
-    respond({ unexpected: true });
-  }
-}
-
-it.each(failures)('retains the hydrated last wallpaper catalog on %s', async (failure) => {
+it('retains the hydrated last wallpaper catalog when remote catalog refresh is disabled', async () => {
   await AsyncStorage.setItem(
     'wallpaper-store',
     JSON.stringify({
@@ -150,20 +119,31 @@ it.each(failures)('retains the hydrated last wallpaper catalog on %s', async (fa
   await useWallpaperStore.persist.rehydrate();
   const { catalog: previousCatalog, albums, catalogLastFetched } = useWallpaperStore.getState();
   expect(previousCatalog).toHaveLength(1);
-  failRequest(failure);
   expect(await refreshCatalog()).toBe(false);
+  expect(mockFetch).not.toHaveBeenCalled();
   expect(useWallpaperStore.getState().catalog).toBe(previousCatalog);
   expect(useWallpaperStore.getState().albums).toBe(albums);
   expect(useWallpaperStore.getState().catalogLastFetched).toBe(catalogLastFetched);
 });
 
-it('routes BTC Map list and details to the configured app module, preserving osm fields', async () => {
+const failures = ['503', 'network', 'malformed'] as const;
+function failRequest(kind: (typeof failures)[number]) {
+  if (kind === '503') {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: 'Service Unavailable' });
+  } else if (kind === 'network') {
+    mockFetch.mockRejectedValue(new Error('Network request failed'));
+  } else {
+    respond({ unexpected: true });
+  }
+}
+
+it('routes BTC Map list and details directly to the public BTC Map v4 API, preserving osm fields', async () => {
   respond([{ ...place, future: true }]);
   const controller = new AbortController();
   expect(await useBTCMapStore.getState().fetchPlaces(false, { signal: controller.signal })).toEqual(
     [place]
   );
-  expect(mockFetch).toHaveBeenLastCalledWith('https://catalog.example.test/app/btcmap/places', {
+  expect(mockFetch).toHaveBeenLastCalledWith('https://api.btcmap.org/v4/places', {
     signal: controller.signal,
   });
   // A fresh cache avoids a second request.
@@ -174,7 +154,7 @@ it('routes BTC Map list and details to the configured app module, preserving osm
   respond(details);
   expect(await useBTCMapStore.getState().fetchPlaceDetails(42)).toEqual(details);
   expect(mockFetch).toHaveBeenLastCalledWith(
-    'https://catalog.example.test/app/btcmap/places/42',
+    'https://api.btcmap.org/v4/places/42',
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
   await useBTCMapStore.getState().fetchPlaceDetails(42);

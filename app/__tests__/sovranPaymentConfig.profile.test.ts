@@ -596,15 +596,8 @@ describe('createSovranHandlers profile routing', () => {
     releaseDelivery();
     await sendComplete;
 
-    expect(mockDismissAll).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/userMessages',
-      params: { pubkey: recipientPubkey },
-    });
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(useContactSendStore.getState().active).toBeNull();
-    expect(mockDismissAll.mock.invocationCallOrder[0]).toBeLessThan(
-      mockNavigate.mock.invocationCallOrder[0]
-    );
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
@@ -685,10 +678,7 @@ describe('createSovranHandlers profile routing', () => {
       recipientPubkey,
       token: lockedToken,
     });
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/userMessages',
-      params: { pubkey: recipientPubkey },
-    });
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
   });
 
   it('keeps the contact target and opens bearer hand-off when DM delivery fails', async () => {

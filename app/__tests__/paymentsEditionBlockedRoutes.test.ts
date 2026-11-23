@@ -32,19 +32,5 @@ it('the payments edition turns away exactly the screens of the modules it leaves
     .filter((segments) => disabledFeatureForRoute(segments, (feature) => payments[feature]))
     .map((segments) => segments.join('/'))
     .sort();
-  expect(blocked).toMatchInlineSnapshot(`
-    [
-      "(ai-flow)/provider",
-      "(ai-flow)/providers",
-      "(drawer)/(tabs)/ai/index",
-      "(mint-flow)/userMessages",
-      "(profile-flow)/userMessages",
-      "(profile-flow)/whitenoiseDM",
-      "(profile-flow)/whitenoiseSetup",
-      "(user-flow)/userMessages",
-      "(user-flow)/whitenoiseDM",
-      "(user-flow)/whitenoiseSetup",
-      "userMessages",
-    ]
-  `);
+  expect(blocked).toMatchInlineSnapshot(`[]`);
 });

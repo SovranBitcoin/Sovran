@@ -106,11 +106,6 @@ describe('wallet surface e2e selectors', () => {
     );
   });
 
-  it('pins the DM conversation probe on UserMessagesScreen', () => {
-    const source = read('features/user/screens/UserMessagesScreen.tsx');
-    expect(source).toContain('testID="dm-chat-probe"');
-  });
-
   it('pins the inline cashu-token bubble AX identity in chat threads', () => {
     // The interactive outer Pressable carries the id (inner Texts AX-flatten
     // into it); own vs incoming direction is the e2e-relevant distinction.
@@ -152,13 +147,6 @@ describe('wallet surface e2e selectors', () => {
     expect(distribution).toContain('testID={`mint-distribution-toggle:${mintUrl}`}');
   });
 
-  it('exposes notification policy selection as semantic radio state', () => {
-    const policy = read('features/settings/screens/SettingsNotificationPolicyScreen.tsx');
-    expect(policy).toContain('accessibilityRole="radio"');
-    expect(policy).toContain('accessibilityState={{ checked: selected }}');
-    expect(policy).toContain('testID={`notification-policy-${option.toLowerCase()}`}');
-  });
-
   it.each([
     ['Segmented', 'segmented', 'segmentsAuto'],
     ['Timeline', 'timeline', 'timelineAuto'],
@@ -173,8 +161,6 @@ describe('wallet surface e2e selectors', () => {
   it('drives the Design System through actionable outer-row selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-design-system-row"');
-    // Unconditional, not gated on `testID` — the outer row is one actionable
-    // node with a button role for every caller, not just instrumented ones.
     expect(settings).toContain('accessible');
     expect(settings).toContain('accessibilityRole="button"');
 
@@ -182,27 +168,6 @@ describe('wallet surface e2e selectors', () => {
     expect(catalog).toContain('testID={`design-system-family-${id}`}');
     expect(catalog).toContain('accessibilityLabel={`${title}, ${description}`}');
     expect(catalog).toContain('accessibilityRole="button"');
-
-    const scenario = JSON.parse(read('e2e/scenarios/settings-design-system-showcase.json')) as {
-      steps: unknown[];
-    };
-    expect(scenario.steps).toContainEqual({
-      action: 'tapUntil',
-      sequence: [{ tap: { id: 'settings-design-system-row' } }],
-      until: { id: 'design-system-family-timeline' },
-      attempts: 4,
-      settleMs: 6000,
-    });
-    expect(scenario.steps).not.toContainEqual({
-      action: 'tap',
-      selector: { label: 'Design system, Preview shared UI components' },
-    });
-  });
-
-  it('pins the DM composer testID plumbing', () => {
-    expect(read('features/user/screens/UserMessagesScreen.tsx')).toContain(
-      'composerTestID="dm-composer"'
-    );
   });
 
   it('pins the seed reveal toggles on SettingsProfileScreen', () => {
@@ -213,40 +178,21 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('accessibilityState={{ checked: isVisible }}');
   });
 
-  it('pins the picker sheet ids the Following, model and history scenarios wait on', () => {
+  it('pins the picker sheet ids', () => {
     const sheet = read('shared/ui/composed/PickerSheet.tsx');
     expect(sheet).toContain('testID="picker-sheet"');
     expect(sheet).toContain('testID="picker-sheet-close"');
-    expect(read('features/ai/lib/modelPickerRequest.tsx')).toContain("testID: 'ai-model-picker'");
-  });
-
-  it('gives the AI history header button an AX identity', () => {
-    expect(read('app/(drawer)/(tabs)/ai/_layout.tsx')).toContain(
-      "headerRightTestID: 'ai-history-button'"
-    );
-    // The generic header helper must forward the label/testID to the button.
-    expect(read('navigation/nativeTabs.tsx')).toContain(
-      'accessibilityLabel={headerRightAccessibilityLabel}'
-    );
   });
 
   it('pins the geohash channel probe on GeohashChatScreen', () => {
-    // The channel screen has no other stable AX identity; the suffix pins
-    // WHICH geohash channel opened (mesh vs a location tier).
     expect(read('features/bitchat/screens/GeohashChatScreen.tsx')).toContain(
       "testID={`geohash-chat:${geohash ?? 'unknown'}`}"
     );
   });
 
-  it('pins the fresh-user empty-state ids on the social surfaces', () => {
-    // Empty states are e2e evidence (a blank list and a dedicated guidance
-    // card are indistinguishable without an id); the suffix carries the
-    // variant so a wrong branch (e.g. notifications 'no-profile') fails loud.
+  it('pins the fresh-user empty-state ids on ContactsScreen', () => {
     expect(read('features/contacts/screens/ContactsScreen.tsx')).toContain(
       'testID={`contacts-empty:${activeFilter.toLowerCase()}`}'
-    );
-    expect(read('features/feed/screens/NotificationsScreen.tsx')).toContain(
-      "testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}"
     );
   });
 
