@@ -13,7 +13,7 @@ import {
 const AUDITOR_TIMEOUT_MS = 8_000;
 
 export const MINTRADAR_LIST_URL = 'https://mintradar.org/api/v1/wallets/mints';
-export const MINTRADAR_SITE_URL = 'https://mintradar.org/mint';
+const MINTRADAR_SITE_URL = 'https://mintradar.org/mint';
 export const CASHU_AUDIT_LIST_URL = 'https://api.audit.8333.space/mints/';
 export const IMF_LIST_URL = 'https://imf.gg/api/mints?page=1';
 
@@ -398,7 +398,7 @@ export async function fetchNip87Directory(
 ): Promise<AuditorMintEntry[]> {
   const layer = buildNostrDataLayer();
   if (!layer) return [];
-  const res = await layer.discoverMints({ limit: 150 }, { signal: controls.signal });
+  const res = await layer.discoverMints({ limit: 150, signal: controls.signal });
   if (res.isErr()) return [];
   const entries: AuditorMintEntry[] = [];
   for (const mint of res.value.mints) {
@@ -416,7 +416,7 @@ export async function fetchNip87Directory(
       nMelts: mint.nMelts,
       nErrors: mint.nErrors,
       reviewCount: mint.reviewCount,
-      averageScore: mint.averageRating,
+      averageScore: mint.averageScore ?? undefined,
     });
   }
   return entries;

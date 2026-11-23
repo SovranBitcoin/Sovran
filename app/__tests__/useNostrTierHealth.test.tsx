@@ -7,7 +7,7 @@ import { ResultAsync } from 'neverthrow';
 
 import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
 import { useNostrTierConfig, type NostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
-import { probeNaggHealth, probePrimalHealth } from '@/shared/lib/nostr/tierHealth';
+import { probePrimalHealth } from '@/shared/lib/nostr/tierHealth';
 
 let mockActiveFocusCleanup: (() => void) | undefined;
 
@@ -31,8 +31,6 @@ jest.mock('expo-router', () => {
     },
   };
 });
-// The focus half of the hook is what this file exercises; the foreground half
-// has its own test. Run it as the focus effect mocked above.
 jest.mock('@/shared/hooks/useForegroundFocusEffect', () => ({
   useForegroundFocusEffect: (effect: () => void | (() => void)) =>
     jest
@@ -48,17 +46,14 @@ jest.mock('@/shared/lib/nostr/tierHealth', () => {
   const actual = jest.requireActual('@/shared/lib/nostr/tierHealth');
   return {
     ...actual,
-    probeNaggHealth: jest.fn(),
     probePrimalHealth: jest.fn(),
   };
 });
 
 const mockedUseNostrTierConfig = jest.mocked(useNostrTierConfig);
-const mockedProbeNaggHealth = jest.mocked(probeNaggHealth);
 const mockedProbePrimalHealth = jest.mocked(probePrimalHealth);
 
 const ENABLED_CONFIG: NostrTierConfig = {
-  nagg: { appViewBaseUrl: 'https://nagg.example', enabled: true },
   primal: { enabled: true, urls: ['wss://primal.example'] },
   relay: { enabled: true, relays: ['wss://relay.example'] },
 };
@@ -70,7 +65,6 @@ function deferred<T>() {
     resolve = onResolve;
     reject = onReject;
   });
-
   return { promise, reject, resolve };
 }
 
@@ -90,156 +84,61 @@ describe('useNostrTierHealth', () => {
     jest.clearAllMocks();
     mockActiveFocusCleanup = undefined;
     mockedUseNostrTierConfig.mockReturnValue(ENABLED_CONFIG);
-    jest.spyOn(console, 'debug').mockImplementation(() => undefined);
-    jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    mockActiveFocusCleanup?.();
-    mockActiveFocusCleanup = undefined;
-    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
-  it('aborts run 1 and prevents its late result from overwriting run 2', async () => {
-    const naggRun1 = deferred<boolean>();
-    const naggRun2 = deferred<boolean>();
-    const primalRun1 = deferred<boolean>();
-    const primalRun2 = deferred<boolean>();
-    mockedProbeNaggHealth
-      .mockReturnValueOnce(probeResult(naggRun1.promise))
-      .mockReturnValueOnce(probeResult(naggRun2.promise));
-    mockedProbePrimalHealth
-      .mockReturnValueOnce(probeResult(primalRun1.promise))
-      .mockReturnValueOnce(probeResult(primalRun2.promise));
+  it('probes Primal on focus, polls every 30s, and aborts on blur', async () => {
+    const first = deferred<boolean>();
+    mockedProbePrimalHealth.mockReturnValueOnce(probeResult(first.promise));
 
     const { result, unmount } = renderHook(() =>
       useNostrTierHealth({ 'wss://relay.example': 'connected' })
     );
-    expect(mockedProbeNaggHealth).toHaveBeenCalledTimes(1);
-    expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(1);
-    const run1NaggSignal = mockedProbeNaggHealth.mock.calls[0]?.[1]?.signal;
-    const run1PrimalSignal = mockedProbePrimalHealth.mock.calls[0]?.[1]?.signal;
-    expect(run1NaggSignal?.aborted).toBe(false);
-    expect(run1PrimalSignal?.aborted).toBe(false);
+    expect(result.current.primal).toBe('checking');
+    expect(result.current.relay).toBe('online');
 
-    act(() => result.current.refresh());
-    expect(mockedProbeNaggHealth).toHaveBeenCalledTimes(2);
+    first.resolve(true);
+    await flushEffects();
+    expect(result.current.primal).toBe('online');
+    expect(result.current.primalHosts['wss://primal.example']).toBe('online');
+
+    const second = deferred<boolean>();
+    mockedProbePrimalHealth.mockReturnValueOnce(probeResult(second.promise));
+    act(() => jest.advanceTimersByTime(30_000));
     expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(2);
-    expect(run1NaggSignal?.aborted).toBe(true);
-    expect(run1PrimalSignal?.aborted).toBe(true);
-    expect(mockedProbeNaggHealth.mock.calls[1]?.[1]?.signal?.aborted).toBe(false);
-
-    naggRun2.resolve(true);
-    primalRun2.resolve(false);
-    await flushEffects();
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'online',
-      primal: 'offline',
-      relay: 'online',
-    });
-
-    naggRun1.resolve(false);
-    primalRun1.resolve(true);
-    await flushEffects();
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'online',
-      primal: 'offline',
-    });
-
-    unmount();
-  });
-
-  it('suppresses in-flight writes after focus is blurred', async () => {
-    const nagg = deferred<boolean>();
-    const primal = deferred<boolean>();
-    mockedProbeNaggHealth.mockReturnValue(probeResult(nagg.promise));
-    mockedProbePrimalHealth.mockReturnValue(probeResult(primal.promise));
-
-    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
-    const naggSignal = mockedProbeNaggHealth.mock.calls[0]?.[1]?.signal;
-    const primalSignal = mockedProbePrimalHealth.mock.calls[0]?.[1]?.signal;
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'checking',
-      primal: 'checking',
-    });
 
     act(() => mockActiveFocusCleanup?.());
-    expect(naggSignal?.aborted).toBe(true);
-    expect(primalSignal?.aborted).toBe(true);
-
-    nagg.resolve(true);
-    primal.resolve(true);
+    second.resolve(false);
     await flushEffects();
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'checking',
-      primal: 'checking',
-    });
+    expect(result.current.primal).toBe('online');
 
     unmount();
   });
 
-  it('suppresses in-flight writes after unmount', async () => {
-    const nagg = deferred<boolean>();
-    const primal = deferred<boolean>();
-    mockedProbeNaggHealth.mockReturnValue(probeResult(nagg.promise));
-    mockedProbePrimalHealth.mockReturnValue(probeResult(primal.promise));
-
-    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
-    const naggSignal = mockedProbeNaggHealth.mock.calls[0]?.[1]?.signal;
-    unmount();
-    expect(naggSignal?.aborted).toBe(true);
-
-    nagg.resolve(true);
-    primal.resolve(true);
-    await flushEffects();
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'checking',
-      primal: 'checking',
-    });
-  });
-
-  it('keeps an already-online tier online while a manual refresh is running', async () => {
-    mockedProbeNaggHealth.mockReturnValueOnce(probeResult(Promise.resolve(true)));
+  it('shows pull-to-refresh spinner and clears it when probe completes', async () => {
     mockedProbePrimalHealth.mockReturnValueOnce(probeResult(Promise.resolve(true)));
-
-    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
-    await flushEffects();
-    expect(result.current).toMatchObject({
-      isRefreshing: false,
-      nagg: 'online',
-      primal: 'online',
-    });
-
-    const naggRefresh = deferred<boolean>();
-    const primalRefresh = deferred<boolean>();
-    mockedProbeNaggHealth.mockReturnValueOnce(probeResult(naggRefresh.promise));
-    mockedProbePrimalHealth.mockReturnValueOnce(probeResult(primalRefresh.promise));
-
-    act(() => result.current.refresh());
-    expect(result.current).toMatchObject({
-      isRefreshing: true,
-      nagg: 'online',
-      primal: 'online',
-    });
-
-    naggRefresh.resolve(true);
-    primalRefresh.resolve(true);
+    const { result, unmount } = renderHook(() =>
+      useNostrTierHealth({ 'wss://relay.example': 'connected' })
+    );
     await flushEffects();
     expect(result.current.isRefreshing).toBe(false);
 
+    const refresh = deferred<boolean>();
+    mockedProbePrimalHealth.mockReturnValueOnce(probeResult(refresh.promise));
+    act(() => result.current.refresh());
+    expect(result.current.isRefreshing).toBe(true);
+
+    refresh.resolve(true);
+    await flushEffects();
+    expect(result.current.isRefreshing).toBe(false);
     unmount();
   });
 
   it('never invokes a probe for disabled tiers', async () => {
     mockedUseNostrTierConfig.mockReturnValue({
-      nagg: { ...ENABLED_CONFIG.nagg, enabled: false },
       primal: { ...ENABLED_CONFIG.primal, enabled: false },
       relay: { ...ENABLED_CONFIG.relay, enabled: false },
     });
@@ -249,89 +148,16 @@ describe('useNostrTierHealth', () => {
     );
     await flushEffects();
 
-    expect(mockedProbeNaggHealth).not.toHaveBeenCalled();
     expect(mockedProbePrimalHealth).not.toHaveBeenCalled();
     expect(result.current).toMatchObject({
       isRefreshing: false,
-      nagg: 'disabled',
       primal: 'disabled',
       relay: 'disabled',
     });
 
     act(() => result.current.refresh());
     await flushEffects();
-    expect(mockedProbeNaggHealth).not.toHaveBeenCalled();
     expect(mockedProbePrimalHealth).not.toHaveBeenCalled();
-
-    unmount();
-  });
-
-  it('reports each cache host separately when one is dead and another answers', async () => {
-    // The state that started this: cache2 refuses every connection while cache1
-    // serves. The tier is genuinely online — the connection fails over — but the
-    // settings page lists the hosts, so a green tier must not hide the dead one.
-    mockedUseNostrTierConfig.mockReturnValue({
-      ...ENABLED_CONFIG,
-      // Live host FIRST: a probe loop that stopped at the first success would
-      // make one call and leave the dead host unreported.
-      primal: { enabled: true, urls: ['wss://cache-live.example', 'wss://cache-dead.example'] },
-    });
-    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(false)));
-    mockedProbePrimalHealth.mockImplementation((url: string) =>
-      probeResult(Promise.resolve(url === 'wss://cache-live.example'))
-    );
-
-    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
-    await flushEffects();
-
-    // Every host is probed, not just up to the first that answers.
-    expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(2);
-    expect(result.current.primal).toBe('online');
-    expect(result.current.primalHosts).toEqual({
-      'wss://cache-dead.example': 'offline',
-      'wss://cache-live.example': 'online',
-    });
-
-    unmount();
-  });
-
-  it('does not restart the probes when a render rebuilds an unchanged host list', async () => {
-    // useNostrTierConfig builds a new `urls` array on every call.
-    mockedUseNostrTierConfig.mockImplementation(() => ({
-      ...ENABLED_CONFIG,
-      primal: { enabled: true, urls: [...ENABLED_CONFIG.primal.urls] },
-    }));
-    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(true)));
-    mockedProbePrimalHealth.mockReturnValue(probeResult(Promise.resolve(true)));
-
-    const { rerender, unmount } = renderHook(() => useNostrTierHealth({}));
-    await flushEffects();
-    rerender({});
-    await flushEffects();
-
-    expect(mockedProbeNaggHealth).toHaveBeenCalledTimes(1);
-    expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
-
-  it('marks every cache host disabled when the tier is off', async () => {
-    mockedUseNostrTierConfig.mockReturnValue({
-      ...ENABLED_CONFIG,
-      primal: { enabled: false, urls: ['wss://cache1.example', 'wss://cache2.example'] },
-    });
-    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(true)));
-
-    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
-    await flushEffects();
-
-    expect(mockedProbePrimalHealth).not.toHaveBeenCalled();
-    expect(result.current.primal).toBe('disabled');
-    expect(result.current.primalHosts).toEqual({
-      'wss://cache1.example': 'disabled',
-      'wss://cache2.example': 'disabled',
-    });
-
     unmount();
   });
 });

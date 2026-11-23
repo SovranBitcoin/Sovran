@@ -80,7 +80,6 @@ import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore
 import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactionAnnotationStore';
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
-import { backendConfig } from '@/shared/config/backend';
 import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
@@ -432,8 +431,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
               })),
             });
           }),
-        nostrAppViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
-        nostrAppViewVersion: 'v1',
         // Per-mint audit + KYM + operator Nostr profile. Reads existing
         // source caches first so offline Select Mint rows keep the rich data
         // the app has already seen; online opens refresh those caches behind

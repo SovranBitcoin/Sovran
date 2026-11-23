@@ -17,62 +17,7 @@ jest.mock('@sovranbitcoin/schemas', () => ({
   parseWith: () => () => undefined,
 }));
 
-import { ok, err } from 'neverthrow';
-
-import { fetchJson } from '@/shared/lib/apiClient';
-import { foldRelayStatus, probeNaggHealth, probePrimalHealth } from '@/shared/lib/nostr/tierHealth';
-
-const mockFetchJson = fetchJson as jest.Mock;
-
-describe('probeNaggHealth', () => {
-  afterEach(() => {
-    mockFetchJson.mockReset();
-  });
-
-  it('is online for a body of { ok: "true" }', async () => {
-    mockFetchJson.mockResolvedValue(ok({ ok: 'true' }));
-    const result = await probeNaggHealth('https://nagg.example');
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(true);
-  });
-
-  it('is online for a body of { ok: true } (boolean)', async () => {
-    mockFetchJson.mockResolvedValue(ok({ ok: true }));
-    const result = await probeNaggHealth('https://nagg.example');
-    expect(result._unsafeUnwrap()).toBe(true);
-  });
-
-  it('is offline (ok false) for a body of { ok: "false" }', async () => {
-    mockFetchJson.mockResolvedValue(ok({ ok: 'false' }));
-    const result = await probeNaggHealth('https://nagg.example');
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(false);
-  });
-
-  it('is offline (ok false) for a body of { ok: false } (boolean)', async () => {
-    mockFetchJson.mockResolvedValue(ok({ ok: false }));
-    const result = await probeNaggHealth('https://nagg.example');
-    expect(result._unsafeUnwrap()).toBe(false);
-  });
-
-  it('errors (offline) when the fetch fails — non-2xx, malformed, or unreachable', async () => {
-    mockFetchJson.mockResolvedValue(err(new Error('Fetch error: 503')));
-    const result = await probeNaggHealth('https://nagg.example');
-    expect(result.isErr()).toBe(true);
-  });
-
-  it('strips a trailing slash before appending /healthz', async () => {
-    mockFetchJson.mockResolvedValue(ok({ ok: 'true' }));
-    await probeNaggHealth('https://nagg.example/');
-    expect(mockFetchJson).toHaveBeenCalledWith(
-      'https://nagg.example/healthz',
-      expect.anything(),
-      'nostr/nagg-healthz',
-      undefined,
-      expect.objectContaining({ timeoutMs: 4000 })
-    );
-  });
-});
+import { foldRelayStatus, probePrimalHealth } from '@/shared/lib/nostr/tierHealth';
 
 /** Minimal scriptable WebSocket stand-in driving the probe's event callbacks. */
 class FakeWebSocket {

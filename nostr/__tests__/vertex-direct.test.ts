@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { aggregateValue } from '../src/envelope';
 import {
   directVertexToProfilesEnvelope,
   sendDirectVertexRequest,
@@ -152,7 +153,8 @@ describe('sendDirectVertexRequest', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const envelope = directVertexToProfilesEnvelope(result, PUBKEY_A);
-      expect(envelope.aggregates?.[PUBKEY_A]).toEqual({ followers: 4500, following: 120 });
+      expect(aggregateValue(envelope.aggregates, PUBKEY_A, 'followers')).toBe(4500);
+      expect(aggregateValue(envelope.aggregates, PUBKEY_A, 'following')).toBe(120);
       expect(envelope.providers?.[PUBKEY_A]?.vertex?.score).toBe(0.91);
     }
   });

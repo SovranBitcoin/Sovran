@@ -16,7 +16,7 @@ import {
   type MintAuditSummary,
 } from './registry';
 
-export type AuditorAdapterMap = Record<
+type AuditorAdapterMap = Record<
   MintAuditorId,
   (controls: AuditorFetchControls) => Promise<AuditorMintEntry[]>
 >;

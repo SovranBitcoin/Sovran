@@ -1,6 +1,6 @@
 export type MintAuditorId = 'nip87' | 'mintradar' | 'cashu-audit' | 'imf-gg';
 
-export interface MintAuditorDescriptor {
+interface MintAuditorDescriptor {
   id: MintAuditorId;
   name: string;
   description: string;

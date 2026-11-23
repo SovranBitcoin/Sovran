@@ -109,7 +109,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // unclaimed credentials or pending payments still exist on this profile).
   const hasAiLeftovers = useRoutstrStore(
     (s) =>
-      s.pendingPayments.length > 0 ||
+      Object.keys(s.pendingPayments).length > 0 ||
       Object.values(s.legacyAccounts).some((a) => a.reclaimedAt == null && Boolean(a.apiKey))
   );
   const [reclaimingAi, setReclaimingAi] = useState(false);

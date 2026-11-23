@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { SignedVertexRequest } from './vertex-request';
-import type { NaggProfilesEnvelope } from '../envelope';
+import { AGGREGATE_RULES, type NaggProfilesEnvelope } from '../envelope';
 
 export const VERTEX_RELAY_URL = 'wss://relay.vertexlab.io';
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -284,7 +284,7 @@ export function directVertexToProfilesEnvelope(
 ): NaggProfilesEnvelope {
   const pubkeys: string[] = [];
   const providers: NonNullable<NaggProfilesEnvelope['providers']> = {};
-  const aggregates: NonNullable<NaggProfilesEnvelope['aggregates']> = {};
+  const aggregates: NaggProfilesEnvelope['aggregates'] = {};
 
   const normalizedTarget = targetPubkey?.toLowerCase();
   const seen = new Set<string>();
@@ -302,10 +302,18 @@ export function directVertexToProfilesEnvelope(
       },
     };
     if (entry.followers !== undefined || entry.follows !== undefined) {
-      aggregates[entry.pubkey] = {
-        ...(entry.followers !== undefined ? { followers: Math.round(entry.followers) } : {}),
-        ...(entry.follows !== undefined ? { following: Math.round(entry.follows) } : {}),
-      };
+      const bucket: Record<string, Record<string, number>> = {};
+      if (entry.followers !== undefined) {
+        bucket[AGGREGATE_RULES.followers.rule] = {
+          [AGGREGATE_RULES.followers.metric]: Math.round(entry.followers),
+        };
+      }
+      if (entry.follows !== undefined) {
+        bucket[AGGREGATE_RULES.following.rule] = {
+          [AGGREGATE_RULES.following.metric]: Math.round(entry.follows),
+        };
+      }
+      aggregates[entry.pubkey] = bucket;
     }
   }
 
@@ -317,6 +325,8 @@ export function directVertexToProfilesEnvelope(
   return {
     events: [],
     order: [],
+    orderBy: 'rank',
+    identities: {},
     pubkeys,
     providers,
     aggregates,

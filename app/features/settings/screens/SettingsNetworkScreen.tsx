@@ -40,8 +40,6 @@ export function SettingsNetworkScreen() {
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
   const vertexCreditsEnabled = useSettingsStore((s) => s.vertexCreditsEnabled);
   const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
-  const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
-  const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
   const primalHosts = backendConfig.primalCacheUrls;
   const primalHostsDisabled = useSettingsStore((st) => st.primalHostsDisabled);
   const setPrimalHostEnabled = useSettingsStore((st) => st.setPrimalHostEnabled);
@@ -71,19 +69,11 @@ export function SettingsNetworkScreen() {
 
   const tiers = [
     {
-      id: 'nagg',
-      name: 'nagg',
-      description: 'Ranked, fully bundled feeds',
-      status: tierHealth.nagg,
-      enabled: naggTierEnabled,
-      onToggle: setNaggTierEnabled,
-    },
-    {
       id: 'primal',
       name: 'Primal cache',
       // The host rows below already show how many are on and in what order, so
       // the tier line does not repeat it.
-      description: primalHosts.length > 1 ? 'Public fallback, tried in order' : 'Public fallback',
+      description: primalHosts.length > 1 ? 'Public cache, tried in order' : 'Public cache',
       status: tierHealth.primal,
       enabled: primalTierEnabled,
       onToggle: setPrimalTierEnabled,

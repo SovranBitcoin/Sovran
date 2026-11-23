@@ -13,7 +13,6 @@ import { fetchJson } from '@/shared/lib/apiClient';
 import { type RequestControls } from 'wallet';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { createFileCacheStorage } from '@/shared/lib/persist/fileCacheStorage';
-import { backendConfig } from '@/shared/config/backend';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's
 // `passthrough()` envelope; surface the ones the detail screen actually
@@ -71,7 +70,7 @@ const PLACE_DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
  */
 const MAX_PLACE_DETAILS_ENTRIES = 200;
 
-const BTCMAP_BASE_URL = `${backendConfig.scoreApiBaseUrl}/app/btcmap`;
+const BTCMAP_BASE_URL = 'https://api.btcmap.org/v4';
 
 function isCacheExpired(timestampMs: number, ttlMs: number, nowMs: number): boolean {
   return nowMs - timestampMs > ttlMs;

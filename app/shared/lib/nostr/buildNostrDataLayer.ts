@@ -1,5 +1,5 @@
 import { isLegacyMockProfile } from '@/shared/stores/runtime/legacyMockProfiles';
-import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nostr';
+import { setNostrLogger, facade, type NostrLogger } from 'nostr';
 
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { log } from '@/shared/lib/logger';
@@ -56,13 +56,6 @@ type TierConfig = ReturnType<typeof getNostrTierConfig>;
 /** Assemble a fresh facade whose tiers reflect the enable/disable toggles. */
 function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
   const tiers: facade.NostrTierStrategy[] = [];
-
-  if (config.nagg.enabled) {
-    const client = createNaggClient({
-      appView: { baseUrl: config.nagg.appViewBaseUrl, version: 'v1' },
-    });
-    tiers.push(facade.createNaggTier({ client }));
-  }
 
   if (config.primal.enabled) {
     const connection = facade.primal.createPrimalWebSocketConnection({

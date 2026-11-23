@@ -21,7 +21,6 @@ import { log } from '@/shared/lib/logger';
 import { useNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {
   foldRelayStatus,
-  probeNaggHealth,
   probePrimalHealth,
   type TierStatus,
 } from '@/shared/lib/nostr/tierHealth';
@@ -29,7 +28,6 @@ import {
 const POLL_INTERVAL_MS = 30_000;
 
 interface NostrTierHealth {
-  nagg: TierStatus;
   primal: TierStatus;
   /**
    * Per-host status for the Primal tier, keyed by url. The tier fold above says
@@ -51,7 +49,6 @@ function toChecking(prev: TierStatus): TierStatus {
 export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): NostrTierHealth {
   const config = useNostrTierConfig();
 
-  const [nagg, setNagg] = useState<TierStatus>('checking');
   const [primal, setPrimal] = useState<TierStatus>('checking');
   const [primalHosts, setPrimalHosts] = useState<Record<string, TierStatus>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -60,8 +57,6 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
 
   const relay: TierStatus = config.relay.enabled ? foldRelayStatus(relayMap) : 'disabled';
 
-  const naggEnabled = config.nagg.enabled;
-  const naggUrl = config.nagg.appViewBaseUrl;
   const primalEnabled = config.primal.enabled;
   // Identity for the deps array — the list itself is rebuilt on every config
   // read, so `runProbes` reads the hosts back from this key.
@@ -75,24 +70,10 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
       const runId = ++runIdRef.current;
       const primalUrls = primalUrlKey ? primalUrlKey.split(',') : [];
       log.debug('settings.network.health.refresh', { trigger });
-      // Only a pull shows the spinner. `isRefreshing` drives the page's
-      // RefreshControl, and setting it on focus and on every poll made iOS drag
-      // the whole list down to show a spinner nobody asked for, then snap back.
-      // The badges already say `checking`.
       if (trigger === 'pull') setIsRefreshing(true);
 
-      setNagg((prev) => (naggEnabled ? toChecking(prev) : 'disabled'));
       setPrimal((prev) => (primalEnabled ? toChecking(prev) : 'disabled'));
 
-      const naggTask: Promise<TierStatus> = naggEnabled
-        ? probeNaggHealth(naggUrl, { signal: controller.signal }).match(
-            (online) => (online ? 'online' : 'offline'),
-            () => 'offline'
-          )
-        : Promise.resolve('disabled');
-      // Probe EVERY host, not just until one answers: the tier is online when any
-      // of them is, but the page lists them individually and a green tier must
-      // not hide a dead host behind a healthy one.
       const probeEachHost = async (): Promise<Record<string, TierStatus>> => {
         const entries = await Promise.all(
           primalUrls.map(async (url): Promise<[string, TierStatus]> => {
@@ -110,7 +91,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
         ? probeEachHost()
         : Promise.resolve(Object.fromEntries(primalUrls.map((url) => [url, 'disabled' as const])));
 
-      void Promise.all([naggTask, primalTask]).then(([naggStatus, hostStatuses]) => {
+      void primalTask.then((hostStatuses) => {
         if (runId !== runIdRef.current) return; // a newer run (or cleanup) superseded this one
         const statuses = Object.values(hostStatuses);
         const primalStatus: TierStatus = !primalEnabled
@@ -118,11 +99,9 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
           : statuses.includes('online')
             ? 'online'
             : 'offline';
-        setNagg(naggStatus);
         setPrimal(primalStatus);
         setPrimalHosts(hostStatuses);
         setIsRefreshing(false);
-        log.info('settings.network.health.probe', { tier: 'nagg', status: naggStatus });
         log.info('settings.network.health.probe', {
           tier: 'primal',
           status: primalStatus,
@@ -130,7 +109,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
         });
       });
     },
-    [naggEnabled, naggUrl, primalEnabled, primalUrlKey]
+    [primalEnabled, primalUrlKey]
   );
 
   useForegroundFocusEffect(
@@ -147,5 +126,5 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
 
   const refresh = useCallback(() => runProbes('pull'), [runProbes]);
 
-  return { nagg, primal, primalHosts, relay, isRefreshing, refresh };
+  return { primal, primalHosts, relay, isRefreshing, refresh };
 }

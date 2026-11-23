@@ -298,7 +298,6 @@ export {
   type RequestControls,
 } from "./safeFetch";
 
-export { createNostrMintEnrichment } from "./nostr-mint-enrichment";
 
 // Domain types
 export type {
