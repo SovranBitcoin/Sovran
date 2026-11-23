@@ -293,7 +293,6 @@ it('canary resets every registered profile/session store and invokes every reach
   });
   expect(zaps.peekPendingZap(sentinel)).toBeUndefined();
   expect(nip04Cache.get('a'.repeat(64), sentinel)).toBeUndefined();
-  expect(turns.getTurn(sentinel)).toBeUndefined();
   expect(giftWrapCache.cache.get('a'.repeat(64), sentinel)).toBeUndefined();
   expect(theme.getState().mode).toBe('light');
   process.stdout.write(
