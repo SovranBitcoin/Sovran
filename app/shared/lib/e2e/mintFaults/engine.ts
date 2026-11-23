@@ -39,7 +39,7 @@ function pathMatches(effectivePath: string, rulePath: string): boolean {
   return next === '' || next === '/' || next === '?';
 }
 
-export class MintFaultEngine {
+class MintFaultEngine {
   private compiled: CompiledRule[] = [];
   private revision = 0;
   private entries: MintFaultLedgerEntry[] = [];

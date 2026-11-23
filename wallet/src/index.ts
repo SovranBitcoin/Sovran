@@ -273,8 +273,6 @@ export {
 
 // LNURL resolution (lightning address & lnurlp → bolt11)
 export {
-  requestInvoiceFromLnurl,
-  parseLightningAddress,
   decodeUrlOrAddress,
   isLightningInvoiceBolt11,
 } from "./lnurl";

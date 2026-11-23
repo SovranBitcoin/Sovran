@@ -15,10 +15,6 @@
     "wallet/__tests__/**": ["exports", "types"]
   },
   "workspaces": {
-    "harness": {
-      "entry": ["src/discover-upgrade.ts"],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
-    },
     "app": {
       "entry": [
         "shim.js",
@@ -28,12 +24,6 @@
         "app/**/*.{ts,tsx}",
         "plugins/*.js",
         "scripts/*.{js,ts}",
-        "e2e/viewer/server.ts",
-        "e2e/viewer/src/main.ts",
-        "e2e/audit/fresh-matrix-cli.ts",
-        "e2e/capture/refresh.ts",
-        "e2e/capture/status.ts",
-        "e2e/stories/bound.ts",
         "shared/stores/runtime/mockDataStore.ts"
       ],
       "project": ["**/*.{ts,tsx,js,jsx}"],

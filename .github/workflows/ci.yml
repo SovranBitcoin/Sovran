@@ -19,10 +19,9 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
-      # Root tests include the Node test collector in the harness workspace.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version-file: harness/.node-version
+          node-version: '22'
 
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
       # workflow so the README can carry a status badge per check. This workflow
@@ -53,11 +52,9 @@ jobs:
       - name: Claims and copy consistency
         run: bun run copy:lint
 
-      - name: Native harness contracts
+      - name: Native smoke & e2e helper tests
         working-directory: ${{ env.APP_DIR }}
-        run: |
-          bun run e2e:validate
-          bun run e2e:test
+        run: bun run e2e:test
 
       - name: Validate asset sources, geometry and generated exports
         run: |
