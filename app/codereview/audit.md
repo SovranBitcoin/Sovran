@@ -34,8 +34,6 @@ If the user gives no entry point, pick one from live evidence:
 
 ```bash
 git status --short
-node codereview/analyze-structure/index.mjs --history --reach --leakage --vocab-drift --llm | sed -n '/^Overall:/,/^# Repo/p'
-node codereview/analyze-structure/index.mjs --history --reach --leakage --vocab-drift --llm | head -180
 bun run knip
 ```
 
@@ -59,7 +57,6 @@ security/payment blast radius, or recent churn.
 Use focused commands as needed:
 
 ```bash
-node codereview/analyze-structure/index.mjs <path> --llm
 node codereview/lookalikes/index.mjs --focus <file>
 npx tsx codereview/log-doctor/index.ts full --latest
 npx tsx codereview/log-doctor/index.ts full --event js_thread_blocked --latest

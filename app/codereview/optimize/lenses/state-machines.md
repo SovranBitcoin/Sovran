@@ -56,7 +56,6 @@ re-report those as new findings).
 rg -n "await .*\n.*set\(" features shared --multiline | head -40
 rg -n "openSeq|supersede|nonce|requestId" features shared    # where the guard pattern exists
 rg -n "isLoading|isSubmitting|isOpen" features/payments features/send features/receive
-node codereview/analyze-structure/index.mjs wallet/src/machine --llm
 npx tsx codereview/log-doctor/index.ts errors --latest --context 5
 npx tsx codereview/log-doctor/index.ts coco --latest
 ```

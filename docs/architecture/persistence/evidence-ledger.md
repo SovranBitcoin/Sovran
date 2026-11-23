@@ -41,8 +41,7 @@ certify this candidate.
 
 Third artifact of the [persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
 procedure. The builds are in [release-provenance.md](release-provenance.md) and the durable
-surface is in [persistence-map.md](persistence-map.md) (the full `audit-2026-10-10` role reports
-were archived out of the repo). Tests are under `app/__tests__/`; every one named
+surface is in [persistence-map.md](persistence-map.md) (the full `audit-2026-10-10` role reports — `persistence-investigator.md`, `adversarial-and-recovery.md`, `coco-and-cashu.md`, `release-historian.md` — are archived in `~/home/archive/sovran/docs/architecture/persistence/audit-2026-10-10/`). Tests are under `app/__tests__/`; every one named
 here was run on 2026-10-10 as part of the full suite, and again on 2026-10-11 at `7131591b5`:
 7,441 app tests passed and one is skipped, with the wallet (1,714) and Nostr (352) suites,
 type-check and lint.
@@ -230,7 +229,7 @@ released shape and the candidate reader for every row are in the persistence map
 | What this adds          | Coco 1.0.0's database migrated by 2.0.0; and the first binary upgrade onto a build that contains this audit's fixes, so none of them disturbs a healthy 0.1.0 install                                                                                                            |
 | Not covered             | Spending the proofs; several accounts; Routstr                                                                                                                                                                                                                                   |
 
-Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
+Earlier, weaker runs (archived in `~/home/archive/sovran/PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
 the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
 nothing lost.
 

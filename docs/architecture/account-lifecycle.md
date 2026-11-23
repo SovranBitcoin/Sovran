@@ -274,7 +274,7 @@ What the tests hold:
 | `persistSchemaDrift.test.ts`, `persistRoundTrip.test.ts` | a recorded schema shape cannot change unnoticed, and every store's schema accepts that store's initial state as saved, plus chosen filled-in cases                                                                                                           |
 | `globalMigrationsRunner.test.ts`                         | with the marker a released build wrote, the migration runner writes nothing and resolves, which is what lets the gate open                                                                                                                                   |
 
-What was run on devices is in `PERFORMANCE.md`: v0.1.3's code created data on a fresh Android
+Earlier device runs (archived in `~/home/archive/sovran/PERFORMANCE.md`): v0.1.3's code created data on a fresh Android
 emulator and a fresh iOS simulator (new wallets, two profiles), and the current code loaded over
 it; everything inspected was still there. That was v0.1.3's JavaScript in the current native
 build. The native storage modules are the same versions in both, but an upgrade from the released
