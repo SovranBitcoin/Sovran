@@ -273,25 +273,6 @@
       }
     },
     {
-      "name": "expo-animation",
-      "kind": "upstream",
-      "repository": "https://github.com/expo/skills",
-      "revision": "39708666ce7014def1f8e34f3d8c93e8d3f588bb",
-      "source_path": "plugins/expo/skills/expo-animation",
-      "reviewed_on": "2026-09-20",
-      "license": "MIT",
-      "license_file": "LICENSE",
-      "local_changes": [
-        "Removed the 'Submitting Feedback' section: it tells agents to run `npx --yes submit-expo-feedback@latest`, which downloads and executes a remote package and sends data out."
-      ],
-      "files_sha256": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "RECIPES.md": "4db141cb346d49231c94a95aaa50844b85a71c47ec543e9f9f5a1f453abc9883",
-        "SKILL.md": "262dd8b5887a02d049602f03349af16e955a594c73904f82cfcac348e4b59220",
-        "agents/openai.yaml": "7667e1a159300ee640ffb6ed4f81281dfdc0e3a789d4f3e5179c32ab3565795a"
-      }
-    },
-    {
       "name": "typescript-best-practices",
       "kind": "upstream",
       "repository": "https://github.com/cursor/plugins",
