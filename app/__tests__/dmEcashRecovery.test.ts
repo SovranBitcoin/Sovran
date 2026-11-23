@@ -22,7 +22,7 @@ const mockManager = {
   },
 };
 
-jest.mock('@/shared/lib/routstr/spentProbe', () => ({
+jest.mock('@/shared/lib/cashu/spentProbe', () => ({
   isTokenSpent: (...args: unknown[]) => mockIsTokenSpent(...args),
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({

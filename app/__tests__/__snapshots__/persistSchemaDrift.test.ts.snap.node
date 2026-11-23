@@ -6167,6 +6167,15 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "disabledMintAuditors": {
+          "default": [],
+          "items": {
+            "maxLength": 64,
+            "type": "string",
+          },
+          "maxItems": 16,
+          "type": "array",
+        },
         "displayBtc": {
           "default": 3,
           "maximum": 8,
@@ -6421,6 +6430,9 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
+        "disabledMintAuditors": {
+          "default": [],
+        },
         "displayBtc": {
           "default": 3,
           "maximum": 8,
@@ -6701,6 +6713,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "primalTierEnabled",
         "relayTierEnabled",
         "primalHostsDisabled",
+        "disabledMintAuditors",
         "minTransferThreshold",
         "middlemanRouting",
       ],

@@ -57,7 +57,6 @@ jest.mock('@/shared/hooks/useModerationActions', () => ({}));
 jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({}));
 jest.mock('@/navigation/headerItems', () => ({}));
 jest.mock('@/shared/hooks/useNostrProfile', () => ({}));
-jest.mock('@/features/feed', () => ({}));
 jest.mock('@/shared/ui/composed/VisualLayoutProbe', () => ({}));
 jest.mock('@/shared/lib/date', () => ({}));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({}));

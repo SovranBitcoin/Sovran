@@ -64,7 +64,6 @@ jest.mock('@/shared/lib/routstr/reclaim', () => ({
   reclaimRoutstrBalances: jest.fn(),
   recoverPendingPayments: jest.fn(),
 }));
-jest.mock('@/shared/lib/routstr/sdk/client', () => ({ sweepUnsettledPayments: jest.fn() }));
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest.fn() }));
 jest.mock('@/shared/lib/mintTestnutRefresh', () => ({
   attachMintTestnutToManager: () => () => undefined,

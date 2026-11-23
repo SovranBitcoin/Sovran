@@ -49,9 +49,6 @@ jest.mock('@/shared/providers/NostrNDKProvider', () => ({
 jest.mock('@/shared/providers/NostrSignerProvider', () => ({
   NostrSignerProvider: mockRecorder('NostrSigner'),
 }));
-jest.mock('@/features/whitenoise/WhitenoiseProvider', () => ({
-  WhitenoiseProvider: mockRecorder('Whitenoise'),
-}));
 jest.mock('@/shared/providers/CocoProvider', () => ({ CocoProvider: mockRecorder('Coco') }));
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
   WalletContextProvider: mockRecorder('WalletContext'),
