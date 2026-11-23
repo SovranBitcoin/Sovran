@@ -39,8 +39,6 @@
   ],
   "asyncStorageFiles": [
     "app/features/nostrSigner/lib/pairingIntentStorage.ts",
-    "app/features/whitenoise/storage/asyncStorageBackend.ts",
-    "app/features/whitenoise/storage/cleanup.ts",
     "app/shared/lib/cache/createPubkeyScopedCache.ts",
     "app/shared/lib/cashu/legacyEcashClaim.ts",
     "app/shared/lib/cashu/npc.ts",
