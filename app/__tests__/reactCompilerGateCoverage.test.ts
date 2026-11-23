@@ -54,7 +54,7 @@ const NOT_SWEPT: Record<string, string> = {
   __mocks__: 'jest manual mocks',
   __tests__: 'this suite',
   '.expo': 'generated router types, not bundled runtime',
-  codereview: 'log-doctor / analyze-structure tooling',
+  codereview: 'log-doctor and review tooling',
   credentials: 'build credentials',
   docs: 'markdown and ADRs',
   e2e: 'the Bun-only JSON-native harness',

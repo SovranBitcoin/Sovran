@@ -91,7 +91,6 @@ const requiredBadges = [
   'type-check.yml',
   'knip.yml',
   'react-compiler.yml',
-  'react-doctor.yml',
   'styling.yml',
   'bundle-size.yml',
   'docs.yml',
@@ -161,7 +160,7 @@ const summary = [
       `| ${platform} | ${mib(metrics.bundleBytes)} | ${signedKib(metrics.deltaFromReferenceBytes.bundle)} | ${mib(metrics.assetBytes)} | ${signedKib(metrics.deltaFromReferenceBytes.assets)} | ${metrics.withinBudget ? 'pass' : 'FAIL'} |`
   ),
   '',
-  'React Doctor is advisory and intentionally excluded from the score. The workflow badges in the app README are enforced by this job; full numbers are in the `maintenance-health` artifact.',
+  'The workflow badges in the app README are enforced by this job; full numbers are in the `maintenance-health` artifact.',
   '',
 ].join('\n');
 

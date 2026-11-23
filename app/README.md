@@ -2,9 +2,9 @@
 
 **Core gates:** [![Tests](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml) [![Lint](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml) [![Type Check](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml) [![Knip](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml) [![Compiler Bailout Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml) [![Styling Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml) [![Bundle Size Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml)
 
-**Other checks:** [![Docs](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml) [![Glass Headers](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml) [![React Doctor — advisory](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml)
+**Other checks:** [![Docs](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml) [![Glass Headers](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml)
 
-Badges show the latest push to `main`. Green means the gate passed—not necessarily that historical debt is zero. React Doctor is advisory: its badge only confirms that the report was generated. Bundle Size uploads the scored iOS/Android `maintenance-health.json` artifact.
+Badges show the latest push to `main`. Green means the gate passed—not necessarily that historical debt is zero. Bundle Size uploads the scored iOS/Android `maintenance-health.json` artifact.
 
 <!-- code: app.json; app.config.js; package.json; shared/lib/cashu/manager.ts; modules/bitchat-module/src/BitChatModule.ts; features/whitenoise/WhitenoiseProvider.tsx; shared/lib/routstr/api.ts -->
 
@@ -459,12 +459,11 @@ bun run android              # build and launch on Android when configured
 - `bun run build:dev:ios` / `bun run build:dev:android` — EAS development builds
 - `bun run build:ios` — EAS production iOS build (auto-submit)
 - `bun run lint` / `bun run type-check` / `bun run test` / `bun run pretty:check` — checks
-- `bun run analyze-structure` — structural health report
 - `bun run audit` / `bun run fix` — Claude-driven audit and fix flows
 
 ## Contributing
 
-<!-- code: ../../CLAUDE.md; ../../AGENTS.md; ../../skills/; codereview/audit.md; codereview/fix.md; codereview/analyze-structure/index.mjs -->
+<!-- code: ../../CLAUDE.md; ../../AGENTS.md; ../../skills/; codereview/audit.md; codereview/fix.md -->
 
 Sovran lives inside a workspace checkout of related repos (see [`CLAUDE.md`](../../CLAUDE.md) for the layout). Before opening a PR:
 
