@@ -40,9 +40,9 @@ certify this candidate.
 - **99 builds from 2024** predate this repository. What they wrote is unknown.
 
 Third artifact of the [persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
-procedure. The builds are in [release-provenance.md](release-provenance.md), the durable
-surface in [persistence-map.md](persistence-map.md), the role reports in
-[audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
+procedure. The builds are in [release-provenance.md](release-provenance.md) and the durable
+surface is in [persistence-map.md](persistence-map.md) (the full `audit-2026-10-10` role reports
+were archived out of the repo). Tests are under `app/__tests__/`; every one named
 here was run on 2026-10-10 as part of the full suite, and again on 2026-10-11 at `7131591b5`:
 7,441 app tests passed and one is skipped, with the wallet (1,714) and Nostr (352) suites,
 type-check and lint.

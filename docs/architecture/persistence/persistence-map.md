@@ -6,8 +6,8 @@ Every durable thing a Sovran build has written, by epoch, and what the 0.1.4 can
 procedure.
 
 Built 2026-10-10 from `surface.sh` run on every store build's commit
-([epoch-diff.txt](epoch-diff.txt)) and from two independent source reads, kept in full under
-[audit-2026-10-10](audit-2026-10-10/). Paths are abbreviated: `G/` is
+([epoch-diff.txt](epoch-diff.txt)) and from two independent source reads (the full
+`audit-2026-10-10` role reports were archived out of the repo). Paths are abbreviated: `G/` is
 `app/shared/stores/global/`, `P/` is `app/shared/stores/profile/`, `L/` is `app/shared/lib/`,
 `T/` is `app/__tests__/`. A reference reads `path:line@revision`.
 
