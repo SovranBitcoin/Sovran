@@ -42,7 +42,6 @@ const MAX_PROVIDERS = 256;
  * Past this the rows still exist in `knownProviders` — only the server's
  * ranking and its status claims expire.
  */
-const DIRECTORY_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Every field is `.catch`-tolerant and the array is per-row tolerant, so a
@@ -118,22 +117,3 @@ export const useAiProviderDirectoryStore = create<AiProviderDirectoryStore>({
     })
   )
 );
-
-/** Nothing at all, shared, so a component that has no directory yet is not
- *  handed a new array identity on every render. */
-const NO_PROVIDERS: readonly ServerProvider[] = [];
-
-/**
- * The last directory worth painting.
- *
- * Returns the empty list rather than stale rows once `DIRECTORY_TTL_MS` has
- * passed, so an old snapshot of who was reachable can never be drawn as if
- * somebody had just checked.
- */
-function useAiProviderDirectory(nowMs: number): readonly ServerProvider[] {
-  return useAiProviderDirectoryStore((state) =>
-    state.fetchedAt != null && nowMs - state.fetchedAt <= DIRECTORY_TTL_MS
-      ? state.providers
-      : NO_PROVIDERS
-  );
-}

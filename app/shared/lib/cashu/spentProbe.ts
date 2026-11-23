@@ -53,7 +53,3 @@ export async function isTokenSpent(manager: Manager, token: string): Promise<boo
     if (timer) clearTimeout(timer);
   }
 }
-
-/** What the mint says when asked to redeem a spent token, so a caller that
- *  skipped the receive reports the same thing the receive would have. */
-const TOKEN_ALREADY_SPENT_MESSAGE = 'Token already spent';

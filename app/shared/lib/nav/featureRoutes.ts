@@ -26,7 +26,6 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   bitchatDM: 'nutDrop',
   bitchatNetwork: 'nutDrop',
   geohashChat: 'nutDrop',
-  userMessages: 'directMessages',
   profile: 'nostr',
   claimUsername: 'nostr',
   composer: 'feed',

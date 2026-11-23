@@ -236,19 +236,6 @@ export function nostrIdentity(
   };
 }
 
-/** A provider row's identity. The seeded avatar is its face; there is no icon
- *  to fetch. */
-function providerIdentity(input: {
-  baseUrl: string;
-  displayName?: string;
-  spendableSats?: number;
-  minMessageSats?: number;
-  encryptedModelCount?: number;
-  status?: ProviderIdentity['status'];
-}): ProviderIdentity {
-  return { kind: 'provider', ...input };
-}
-
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
 export function mintIdentity(
   item: MintListItem & { presence?: MintStatFields['presence'] }

@@ -67,7 +67,3 @@ export const useDmLastMessageStore = create<DmLastMessageStore>({
     })
   )
 );
-
-export function useDmLastMessage(pubkey: string): LastMessageEntry | undefined {
-  return useDmLastMessageStore((state) => state.byPeer[pubkey]);
-}

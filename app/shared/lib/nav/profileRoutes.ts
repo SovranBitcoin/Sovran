@@ -8,7 +8,6 @@ type ProfileFlowGroup = typeof USER_PROFILE_FLOW | typeof MODAL_PROFILE_FLOW;
 type ProfileRouteName =
   | 'profile'
   | 'share'
-  | 'userMessages'
   | 'thread'
   | 'bitchatDM'
   | 'bitchatNetwork';

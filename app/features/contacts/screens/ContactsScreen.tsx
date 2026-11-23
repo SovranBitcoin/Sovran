@@ -42,7 +42,6 @@ import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { hasFeature } from '@/shared/config/features';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
   SearchFilters,
@@ -346,14 +345,7 @@ export const ContactsScreen = () => {
             </View>
           ) : undefined
         }
-        onPress={() =>
-          hasFeature('directMessages') && mockMode && isMockContactPubkey(item.pubkey)
-            ? router.push({
-                pathname: '/(user-flow)/userMessages',
-                params: { pubkey: item.pubkey },
-              })
-            : navigateToProfile(item.pubkey, mintUrl)
-        }
+        onPress={() => navigateToProfile(item.pubkey, mintUrl)}
         testID={`contact-row:nostr:${item.pubkey}`}
       />
     );

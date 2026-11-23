@@ -63,7 +63,6 @@ import { useModerationActions } from '@/features/feed/hooks/useModerationActions
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { hasFeature } from '@/shared/config/features';
-import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import * as nip19 from 'nostr-tools/nip19';
 import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
@@ -960,18 +959,13 @@ function BannerWithAvatar({
             screen without wrapping or shrinking a label. */}
         <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
           {showFollowButton && (
-            <>
-              <CircleActionButton
-                icon="mdi:cash-multiple"
-                systemIcon="bitcoinsign.circle"
-                label="Send Money"
-                testID="profile-send-money"
-                onPress={onSendMoney}
-              />
-              {hasFeature('directMessages') && (
-                <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
-              )}
-            </>
+            <CircleActionButton
+              icon="mdi:cash-multiple"
+              systemIcon="bitcoinsign.circle"
+              label="Send Money"
+              testID="profile-send-money"
+              onPress={onSendMoney}
+            />
           )}
           <CircleActionButton
             icon="mdi:qrcode"

@@ -21,12 +21,11 @@ import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { hasFeature } from '@/shared/config/features';
 import { describeError, describeWalletFailure } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
-import { afterNextFrame, runAfterInteractions } from '@/shared/lib/interactions';
+import { afterNextFrame } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
 import { getEncodedToken, type Token } from '@cashu/cashu-ts';
@@ -1149,28 +1148,14 @@ export function createSovranHandlers({
       });
       switch (route.kind) {
         case 'contact': {
-          const recipientPubkey = route.target.pubkey;
           const delivered = await deliverContactDm(
             route.target,
             enrichedHistoryEntry,
             deliverContactEcashDm
           );
           if (delivered) {
-            if (hasFeature('directMessages')) {
-              router.dismissAll();
-              // Let the modal dismissal settle before pushing the DM thread —
-              // navigating mid-dismissal triggers react-native-screens' modal
-              // header-visibility remount loop (blank DM thread).
-              runAfterInteractions(() => {
-                router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
-              });
-            } else {
-              // Without DM pages the send ends on the wallet: the token is
-              // already with the contact, so there is no hand-off to show.
-              // `dismissAll` alone only pops this flow's stack to its first
-              // screen, the send chooser.
-              router.dismissTo('/');
-            }
+            // The token is already delivered over NIP-17, so return to the wallet.
+            router.dismissTo('/');
             return;
           }
           // Delivery failed — fall through to the bearer hand-off screen so the
