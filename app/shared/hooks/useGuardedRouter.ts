@@ -1,5 +1,6 @@
 // eslint-disable-next-line no-restricted-imports -- The one adapter to Expo's imperative router; callers use guardedRouter or its explicit raw escape hatch.
 import { router } from 'expo-router';
+import { store as routerStore } from 'expo-router/build/global-state/router-store';
 
 import { paymentLog } from '@/shared/lib/logger';
 
@@ -38,6 +39,75 @@ function shouldSuppress(signature: string): boolean {
   return false;
 }
 
+/** A path segment that only groups routes, like `(mint-flow)`. */
+const isGroup = (segment: string) => segment.startsWith('(') && segment.endsWith(')');
+
+/**
+ * A query string as sorted, decoded `key=value` pairs. Parsed by hand: React
+ * Native's `URLSearchParams` polyfill only promises `toString`, `get`, `has`.
+ */
+function queryPairs(query: string): string[] {
+  const decode = (part: string) => decodeURIComponent(part.replace(/\+/g, ' '));
+  return query
+    .split('&')
+    .filter(Boolean)
+    .map((pair) => {
+      const at = pair.indexOf('=');
+      return at < 0
+        ? `${decode(pair)}=`
+        : `${decode(pair.slice(0, at))}=${decode(pair.slice(at + 1))}`;
+    })
+    .sort();
+}
+
+/**
+ * Whether `href` names the route that is focused right now: the same path once
+ * dynamic segments are filled, `index` dropped and groups set aside, the same
+ * search params, and every group it names among the focused route's groups
+ * (so `/(map-flow)`, which is `/` too, is not the wallet home). Anything that
+ * cannot be read answers false, so an unreadable href or router state never
+ * blocks a navigation.
+ */
+function isFocusedRoute(href: unknown): boolean {
+  try {
+    const focused = routerStore.getRouteInfo();
+    if (!focused) return false;
+    let pathname: string;
+    let pairs: string[];
+    if (typeof href === 'string') {
+      const at = href.indexOf('?');
+      pathname = at < 0 ? href : href.slice(0, at);
+      pairs = at < 0 ? [] : queryPairs(href.slice(at + 1));
+    } else if (
+      href &&
+      typeof href === 'object' &&
+      typeof (href as { pathname?: unknown }).pathname === 'string'
+    ) {
+      const object = href as { pathname: string; params?: Record<string, unknown> };
+      pathname = object.pathname;
+      pairs = [];
+      for (const [key, value] of Object.entries(object.params ?? {})) {
+        if (value === undefined) continue;
+        const dynamic = `[${key}]`;
+        if (pathname.includes(dynamic)) pathname = pathname.replace(dynamic, String(value));
+        else pairs.push(`${key}=${String(value)}`);
+      }
+      pairs.sort();
+    } else {
+      return false;
+    }
+    if (!pathname.startsWith('/') || pathname.includes('[')) return false;
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.filter(isGroup).some((group) => !focused.segments.includes(group))) return false;
+    const path = segments.filter((segment) => !isGroup(segment));
+    if (path.at(-1) === 'index') path.pop();
+    if (`/${path.join('/')}` !== focused.pathname) return false;
+    return pairs.join('&') === queryPairs(focused.searchParams.toString()).join('&');
+  } catch {
+    return false;
+  }
+}
+
 // Navigation methods that open / replace / dismiss a route get the double-tap
 // cooldown. Every other property on `router` (canGoBack, canDismiss, setParams,
 // reload, prefetch, …) passes straight through, so the guarded router is a
@@ -67,6 +137,12 @@ function createGuardedRouter(target: typeof router): GuardedRouter {
             paymentLog.debug('navigation.guard.suppressed', { method: prop });
             return undefined;
           }
+          // A screen that mounts slowly outlives the cooldown: a second tap
+          // would stack a copy of the screen the first tap already focused.
+          if (prop === 'push' && isFocusedRoute(args[0])) {
+            paymentLog.debug('navigation.guard.suppressed', { method: prop, reason: 'focused' });
+            return undefined;
+          }
           return (value as (...a: unknown[]) => unknown).apply(t, args);
         };
       }
@@ -78,7 +154,8 @@ function createGuardedRouter(target: typeof router): GuardedRouter {
 /**
  * Debounced drop-in for expo-router's `router`. Suppresses repeated navigation
  * calls with the same destination within a short cooldown so a double-tap on a
- * button cannot push the same modal twice. Use it anywhere a Pressable's
+ * button cannot push the same modal twice, and a `push` of the route that is
+ * already focused however late it comes. Use it anywhere a Pressable's
  * `onPress` opens a route — either via this hook (`const router =
  * useGuardedRouter()`) or the imperative `guardedRouter` (for non-React
  * modules / `import { guardedRouter as router }`).

@@ -287,7 +287,7 @@ export function SendScreen({ unit }: { unit: string }) {
   const handleNutDrop = useCallback(() => {
     paymentLog.info('send.method.nut_drop');
     clearPaymentContext('send.near_pay');
-    router.push('/(send-flow)/nearPay');
+    router.navigate('/(send-flow)/nearPay');
   }, []);
 
   // ── Person taps ──────────────────────────────────────────────────────────

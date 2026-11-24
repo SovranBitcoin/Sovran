@@ -235,3 +235,15 @@ export function buildMintDetailsRows({
 
   return rows;
 }
+
+/** Nutshell's shipped `MINT_INFO_MOTD` default, which many mints never change. */
+const PLACEHOLDER_MOTD = 'message to users';
+
+/** The mint's message of the day, when its operator actually wrote one. */
+export function mintMotd(motd: unknown): string | undefined {
+  // Screen-action entries may carry a boxed string (`FormattedString`).
+  if (typeof motd !== 'string' && !(motd instanceof String)) return undefined;
+  const message = String(motd).trim();
+  if (!message || message.toLowerCase() === PLACEHOLDER_MOTD) return undefined;
+  return message;
+}

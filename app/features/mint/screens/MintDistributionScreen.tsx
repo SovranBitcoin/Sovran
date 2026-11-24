@@ -89,7 +89,8 @@ export function MintDistributionScreen() {
       ? 'SAT'
       : normUnit.toUpperCase();
 
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
+  // Seeded from the route so the first frame is already on its tab.
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(() => routeCurrency ?? 'SAT');
 
   // Narrow the selector to the per-unit slice. Returning the whole `distributions`
   // record made any write to any unit re-render this screen even though only the
@@ -111,9 +112,11 @@ export function MintDistributionScreen() {
   const supportedUnitsByMint = Object.fromEntries(
     trustedMints.map((mint) => [
       mint.mintUrl,
+      // A mint whose info has not loaded offers no unit yet — assuming sats
+      // would put it in the SAT split it may not be able to issue into.
       (mint.mintInfo
         ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
-        : ['sat']
+        : []
       ).map((unit) => toAccountUnit(unit, isTestnutMint(mint.mintUrl))),
     ])
   ) as Record<string, string[]>;
@@ -125,13 +128,6 @@ export function MintDistributionScreen() {
   // Filter to the wallet's accounts (display order) and ensure at least SAT
   const commonUnits = ACCOUNT_UNITS.map((unit) => unit.toUpperCase()).filter((c) => units.has(c));
   const availableCurrencies = commonUnits.length > 0 ? commonUnits : ['SAT'];
-
-  useEffect(() => {
-    if (!routeCurrency) return;
-    if (!availableCurrencies.includes(routeCurrency)) return;
-    // Only override if we're still at the default; don't clobber user-driven changes.
-    setSelectedCurrency((prev) => (prev === 'SAT' ? routeCurrency : prev));
-  }, [routeCurrency, availableCurrencies]);
 
   const mintsForCurrency = trustedMints.filter((mint) =>
     (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(

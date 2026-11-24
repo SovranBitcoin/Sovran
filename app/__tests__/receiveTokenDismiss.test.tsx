@@ -11,6 +11,15 @@ import { ReceiveTokenScreen } from '@/features/receive/screens/ReceiveTokenScree
 
 const mockBack = jest.fn(async () => undefined);
 const mockRedeem = jest.fn(async () => undefined);
+let mockFee: number | undefined;
+let mockRedeemAvailable = true;
+const mockFeeArgs: unknown[][] = [];
+jest.mock('@/features/receive/hooks/useTokenReceiveFee', () => ({
+  useTokenReceiveFee: (...args: unknown[]) => {
+    mockFeeArgs.push(args);
+    return mockFee;
+  },
+}));
 
 jest.mock('wallet', () => ({
   isReceiveTokenPending: jest.fn(() => false),
@@ -28,13 +37,14 @@ jest.mock('wallet/react', () => ({
       unit: 'sat',
       mintUrl: 'https://mint.sovran.money',
       createdAt: { datetime: '12 July 2026' },
+      tokenString: 'cashuBtoken',
     },
     error: null,
     source: 'Paste',
     mintUrl: 'https://mint.sovran.money',
     actions: {
       back: { execute: mockBack },
-      redeem: { available: true, loading: false, execute: mockRedeem },
+      redeem: { available: mockRedeemAvailable, loading: false, execute: mockRedeem },
     },
   })),
 }));
@@ -44,8 +54,10 @@ jest.mock('@/features/transactions', () => ({
   TransactionDetailShell: ({
     children,
     footer,
-  }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
+    beforeStatus,
+  }: React.PropsWithChildren<{ footer: React.ReactNode; beforeStatus?: React.ReactNode }>) => (
     <>
+      {beforeStatus}
       {children}
       {footer}
     </>
@@ -82,7 +94,14 @@ jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn(), warn: jest.fn() },
   useLifecycleLogger: jest.fn(),
 }));
-jest.mock('@/shared/lib/currency', () => ({ formatAmount: jest.fn(() => '40 sats') }));
+jest.mock('@/shared/lib/currency', () => ({
+  formatAmount: jest.fn(
+    ({ amount, unit }: { amount: number; unit: string }) => `${amount} ${unit}`
+  ),
+}));
+jest.mock('@/shared/ui/primitives/Text', () => ({
+  Text: (props: object) => jest.requireActual('react').createElement('MockText', props),
+}));
 jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
@@ -124,5 +143,47 @@ describe('ReceiveTokenScreen dismissal', () => {
 
     expect(renderer!.root.findByProps({ testID: 'receive-token-cancel' })).toBeTruthy();
     expect(renderer!.root.findByProps({ testID: 'receive-token-redeem' })).toBeTruthy();
+  });
+});
+
+describe('ReceiveTokenScreen redeem fee', () => {
+  beforeEach(() => {
+    mockFee = undefined;
+    mockRedeemAvailable = true;
+    mockFeeArgs.length = 0;
+  });
+
+  async function render() {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<ReceiveTokenScreen receiveHistoryEntry="receive-1" />);
+    });
+    return renderer!;
+  }
+
+  it('states the fee and what arrives before Redeem', async () => {
+    mockFee = 2;
+    const renderer = await render();
+    expect(mockFeeArgs.at(-1)).toEqual(['https://mint.sovran.money', 'cashuBtoken']);
+    expect(renderer.root.findByProps({ testID: 'receive-token-fee' }).props.children).toBe(
+      'Fee: -2 sat · You receive 38 sat'
+    );
+  });
+
+  it.each([
+    ['the mint charges nothing', 0],
+    ['the fee cannot be read', undefined],
+  ])('says nothing when %s', async (_name, fee) => {
+    mockFee = fee;
+    const renderer = await render();
+    expect(renderer.root.findAllByProps({ testID: 'receive-token-fee' })).toHaveLength(0);
+  });
+
+  it('does not look the fee up once Redeem is not on offer', async () => {
+    mockFee = 2;
+    mockRedeemAvailable = false;
+    const renderer = await render();
+    expect(mockFeeArgs.at(-1)?.[0]).toBeUndefined();
+    expect(renderer.root.findAllByProps({ testID: 'receive-token-fee' })).toHaveLength(0);
   });
 });

@@ -239,7 +239,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     // (e.g. bolt12+sat), not just the method — see MintAddScreen / useMintSearch.
     // Discovery tabs are ACCOUNT units: a testnut account looks for test mints.
     const testnut = isTestnutUnit(useMintStore.getState().activeUnit);
-    router.push({
+    router.navigate({
       pathname: '/(mint-flow)/add',
       params: { method, unit: toAccountUnit(unit, testnut) },
     });

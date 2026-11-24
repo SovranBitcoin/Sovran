@@ -110,3 +110,34 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
 
   return formatted;
 }
+
+/**
+ * A mint's balances in every unit it holds, e.g. `1,500 sats · $3.25`. Empty
+ * units are left out; a mint holding nothing reads `0 sats`.
+ */
+export function formatUnitBalances(
+  byUnit: Record<string, { total: AmountValue } | undefined> | undefined
+): string {
+  const parts = Object.entries(byUnit ?? {})
+    .filter(([, snapshot]) => snapshot && amountToNumber(snapshot.total) > 0)
+    .map(([unit, snapshot]) =>
+      formatAmount(
+        { amount: snapshot!.total, unit },
+        unit.toLowerCase() === 'sat' ? { currencyDisplay: 'name' } : {}
+      )
+    );
+  return parts.length > 0 ? parts.join(' · ') : '0 sats';
+}
+
+/**
+ * The `≈ $12.34` estimate under a sat balance. Before a price has loaded a
+ * balance shows `≈ —` rather than a false `≈ $0.00`.
+ */
+export function approximateFiatText(
+  sats: number,
+  btcPrice: number | null | undefined,
+  symbol: string
+): string {
+  if (!btcPrice) return sats > 0 ? '≈ —' : `≈ ${symbol}0.00`;
+  return `≈ ${symbol}${((btcPrice / 100_000_000) * sats).toFixed(2)}`;
+}

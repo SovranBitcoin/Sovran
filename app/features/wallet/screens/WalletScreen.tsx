@@ -8,6 +8,7 @@ import {
   SpentThisMonth,
   Transactions,
 } from '@/features/transactions';
+import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { Account } from '@/features/wallet/components/Account';
 import { MessageEcashToReview } from '@/features/payments/components/MessageEcashToReview';
@@ -124,7 +125,7 @@ export function WalletScreen() {
 
   const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
-    router.push('/(theme-flow)/preview');
+    router.navigate('/(theme-flow)/preview');
   };
 
   const handleSplit = () => {
@@ -148,7 +149,12 @@ export function WalletScreen() {
 
   const handleHistory = () => {
     walletLog.info('wallet.history.tap');
-    router.navigate('/(transactions-flow)/transactions');
+    // Opens on the account the wallet is showing, as the pending and
+    // View-all links do, rather than the sat default.
+    router.navigate({
+      pathname: '/(transactions-flow)/transactions',
+      params: transactionsRouteParams({ currency: account.unit }),
+    });
   };
 
   const handleMap = () => {

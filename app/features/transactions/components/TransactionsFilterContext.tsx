@@ -102,6 +102,16 @@ export function filtersFromTransactionsParams(
   return filters;
 }
 
+/** `filters` with `changes` applied; the same object when they change nothing. */
+export function mergeTransactionFilters(
+  filters: TransactionFilters,
+  changes: Partial<TransactionFilters>
+): TransactionFilters {
+  return FILTER_KEYS.every((key) => changes[key] === undefined || changes[key] === filters[key])
+    ? filters
+    : { ...filters, ...changes };
+}
+
 interface TransactionsFilterContextValue {
   filters: TransactionFilters;
   /** Changes the named filters and keeps the rest. */
@@ -123,11 +133,7 @@ export function TransactionsFilterProvider({ children }: TransactionsFilterProvi
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const updateFilters = useCallback((changes: Partial<TransactionFilters>) => {
-    setFilters((current) =>
-      FILTER_KEYS.every((key) => changes[key] === undefined || changes[key] === current[key])
-        ? current
-        : { ...current, ...changes }
-    );
+    setFilters((current) => mergeTransactionFilters(current, changes));
   }, []);
 
   const openFilterSheet = useCallback(() => {

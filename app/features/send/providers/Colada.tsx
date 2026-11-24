@@ -594,7 +594,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       nutDrop: ({ unit }) => {
         paymentLog.info('receive.nut_drop.open', { unit });
         clearPaymentContext('send.near_pay');
-        router.push('/(send-flow)/nearPay');
+        router.navigate('/(send-flow)/nearPay');
       },
       mintInfo: (mintInfoEntry) => {
         router.navigate({
@@ -603,7 +603,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         });
       },
       addMint: () => {
-        router.push('/(mint-flow)/add');
+        router.navigate('/(mint-flow)/add');
       },
       goBack: () => {
         router.back();

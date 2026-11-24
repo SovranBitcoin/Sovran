@@ -128,7 +128,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
         size="compact"
         onPress={() => {
           paymentLog.info('receive.creq.discovery_opened', { unit });
-          router.push('/(mint-flow)/add');
+          router.navigate('/(mint-flow)/add');
         }}
         style={{ marginTop: 16 }}
         testID="receive-creq-find-mints"

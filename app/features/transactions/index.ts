@@ -24,7 +24,9 @@ export {
   entryDetailItems,
 } from './components/detail/transactionDetailRows';
 export {
+  countActiveFilters,
   filtersFromTransactionsParams,
+  mergeTransactionFilters,
   TransactionsFilterProvider,
   TransactionsRouteParamsSchema,
   useTransactionsFilter,

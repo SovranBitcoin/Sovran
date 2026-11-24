@@ -23,7 +23,7 @@ export function BackupIntroScreen() {
           <Button
             testID="backup-show-words"
             text={backupIntroCopy.showWords}
-            onPress={() => router.push('/(prompt-flow)/backup-words')}
+            onPress={() => router.navigate('/(prompt-flow)/backup-words')}
           />
           <Button
             testID="backup-not-now"

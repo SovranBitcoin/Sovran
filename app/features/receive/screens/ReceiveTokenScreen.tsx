@@ -27,6 +27,18 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { Text } from '@/shared/ui/primitives/Text';
+import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber } from 'wallet/amount';
+import { useTokenReceiveFee } from '@/features/receive/hooks/useTokenReceiveFee';
+
+/** `21 sats` for sats, the unit's own format (`$0.21`) otherwise. */
+function formatTokenAmount(amount: number, unit: string): string {
+  return formatAmount(
+    { amount, unit },
+    unit.toLowerCase() === 'sat' ? { currencyDisplay: 'name' } : {}
+  );
+}
 
 interface ReceiveTokenScreenProps {
   receiveHistoryEntry?: ReceiveHistoryEntry | string;
@@ -46,6 +58,11 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   // paymentRequest annotation (written when the claim finalizes) — surface it
   // so the entry isn't read as plain redeemed ecash.
   const paymentRequest = useColadaTransactionAnnotation(entry).paymentRequest;
+  // What redeeming costs, shown before Redeem only while it is on offer.
+  const redeemFee = useTokenReceiveFee(
+    actions.redeem.available ? entry?.mintUrl : undefined,
+    entry?.tokenString != null ? String(entry.tokenString) : undefined
+  );
 
   useEffect(() => {
     if (error) paymentLog.warn('receive.token.error', { error });
@@ -91,6 +108,17 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
+
+  const amount = amountToNumber(entry.amount);
+  const feePreview =
+    actions.redeem.available && redeemFee !== undefined && redeemFee > 0 && redeemFee < amount ? (
+      <Text size={13} className="text-muted text-center" testID="receive-token-fee">
+        {`Fee: -${formatTokenAmount(redeemFee, entry.unit)} · You receive ${formatTokenAmount(
+          amount - redeemFee,
+          entry.unit
+        )}`}
+      </Text>
+    ) : null;
 
   const bottomButtons = (
     <BottomButtons>
@@ -149,7 +177,9 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       mintInfo={mintInfo}
       source={source}
       footer={bottomButtons}
-      beforeStatus={isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : null}>
+      beforeStatus={
+        isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : feePreview
+      }>
       <DetailsSection
         trigger="none"
         open={detailsOpen}

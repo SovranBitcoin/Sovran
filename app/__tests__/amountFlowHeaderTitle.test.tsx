@@ -64,7 +64,9 @@ jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: () => null }));
 jest.mock('@/shared/ui/composed/Nip05Identity', () => ({ Nip05Identity: () => null }));
-jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { push: jest.fn() } }));
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { push: jest.fn(), navigate: jest.fn() },
+}));
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
   useWalletContextWithOverride: () => ({ proofAmounts: mockProofAmounts }),
 }));

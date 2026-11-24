@@ -40,6 +40,7 @@ import {
   type RecoveryRunOwner,
 } from '@/features/settings/lib/recoveryRun';
 import { withAlpha } from '@/shared/lib/color';
+import { formatUnitBalances } from '@/shared/lib/currency';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
 import {
@@ -680,7 +681,7 @@ const MintRecoveryRow: React.FC<{
     'warning',
   ] as const);
   const { balances: liveBalances } = useBalanceContext();
-  const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
+  const mintBalances = formatUnitBalances(liveBalances.byMintAndUnit?.[mintUrl]);
 
   const displayName = getMintDisplayName(mint, mintUrl);
   // A stuck mint produces no state change, so the "still scanning" note needs
@@ -705,7 +706,7 @@ const MintRecoveryRow: React.FC<{
           size={12}
           numberOfLines={1}
           style={{ color: isFailure(state.status) ? dangerColor : withAlpha(foreground, 0.4) }}>
-          {progressLabel ?? `${mintBalance.toLocaleString()} sats`}
+          {progressLabel ?? mintBalances}
         </Text>
       </VStack>
       {/* Same dot the payment timeline draws, same size, stroke weight and

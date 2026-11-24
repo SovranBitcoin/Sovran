@@ -17,6 +17,7 @@ import {
 } from '@/shared/lib/cta/definitions';
 let mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockPreventRemove = jest.fn();
@@ -46,6 +47,7 @@ jest.mock('heroui-native', () => {
 jest.mock('expo-router', () => ({
   router: {
     push: (...args: unknown[]) => mockPush(...args),
+    navigate: (...args: unknown[]) => mockNavigate(...args),
     back: () => mockBack(),
     replace: (...args: unknown[]) => mockReplace(...args),
     canGoBack: () => true,
@@ -153,6 +155,7 @@ beforeEach(async () => {
   useLegacyEcashStore.setState(useLegacyEcashStore.getInitialState(), true);
   useProfileStore.setState({ activeAccountIndex: 0 });
   mockPush.mockClear();
+  mockNavigate.mockClear();
   mockBalance = 100;
   mockOtherUnits = {};
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
@@ -340,23 +343,24 @@ it.each(['primary', 'secondary'])(
     if (action === 'primary') {
       expect(useCtaStore.getState().dismissed).toEqual({});
       expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
-      // The intro is pushed inside the prompt flow; the host never pushes it.
-      expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+      // The intro opens inside the prompt flow; the host never pushes it.
+      expect(mockNavigate).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
     } else {
       expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
         at: now,
         revision: 2,
       });
     }
-    // primary: the cta push plus the backup-flow push; secondary: the cta push only.
-    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
+    // The cta push only: the backup flow opens with navigate.
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledTimes(action === 'primary' ? 1 : 0);
     const foreground = jest.mocked(AppState.addEventListener).mock.calls.at(-1)![1];
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS - 1);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
+    expect(mockPush).toHaveBeenCalledTimes(1);
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 3 : 1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
   }
 );
 
@@ -383,7 +387,7 @@ it('hands off a directly opened CTA route even without a reserved active ID', as
   await act(async () => {});
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
-  expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockNavigate).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
 });
 it('holds an optional update prompt while the prompt flow is open and shows it once it closes', async () => {
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
@@ -468,6 +472,7 @@ describe('ecash from before 0.0.45 at a mint the wallet does not trust', () => {
     expect(useCtaStore.getState().dismissed).toEqual({});
 
     mockPush.mockClear();
+    mockNavigate.mockClear();
     mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
     view.rerender(<HostWithScreen />);
     await act(async () => {});
@@ -481,6 +486,7 @@ describe('ecash from before 0.0.45 at a mint the wallet does not trust', () => {
     const snoozedAt = useCtaStore.getState().dismissed['claim-old-ecash:snooze'].at;
 
     mockPush.mockClear();
+    mockNavigate.mockClear();
     mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
     view.rerender(<HostWithScreen />);
     await act(async () => {});
@@ -491,6 +497,7 @@ describe('ecash from before 0.0.45 at a mint the wallet does not trust', () => {
     view.unmount();
     useCtaStore.setState({ activeId: null, closingId: null });
     mockPush.mockClear();
+    mockNavigate.mockClear();
     render(<HostWithScreen />);
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith(CTA_ROUTE);

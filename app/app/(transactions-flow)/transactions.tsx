@@ -15,7 +15,9 @@ import React, { useCallback } from 'react';
 import { Stack } from 'expo-router';
 import {
   TransactionsScreen,
+  countActiveFilters,
   filtersFromTransactionsParams,
+  mergeTransactionFilters,
   TransactionsRouteParamsSchema,
   useTransactionsFilter,
 } from '@/features/transactions';
@@ -30,13 +32,13 @@ import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailR
 import { withAlpha } from '@/shared/lib/color';
 import { cashuLog } from '@/shared/lib/logger';
 
-function FilterButton() {
+function FilterButton({ activeFilterCount }: { activeFilterCount: number }) {
   const [foreground, accent, accentForeground] = useThemeColor([
     'foreground',
     'accent',
     'accent-foreground',
   ] as const);
-  const { openFilterSheet, activeFilterCount } = useTransactionsFilter();
+  const { openFilterSheet } = useTransactionsFilter();
   const hasActiveFilters = activeFilterCount > 0;
 
   return (
@@ -78,8 +80,20 @@ function TransactionsRoute() {
   const filterLock = params?.filterLock;
   const filterCounterparty = params?.filterCounterparty;
   const filterZap = params?.filterZap;
-  React.useEffect(() => {
-    const changes = filtersFromTransactionsParams({
+  const routeChanges = React.useMemo(
+    () =>
+      filtersFromTransactionsParams({
+        filterCurrency,
+        filterPaymentType,
+        filterDirection,
+        filterStatus,
+        filterMintUrl,
+        filterSource,
+        filterLock,
+        filterCounterparty,
+        filterZap,
+      }),
+    [
       filterCurrency,
       filterPaymentType,
       filterDirection,
@@ -89,7 +103,14 @@ function TransactionsRoute() {
       filterLock,
       filterCounterparty,
       filterZap,
-    });
+    ]
+  );
+  // The route's params are the only writer of the shared filters, so the
+  // filters with them applied are what the effect below is about to store.
+  // Drawing that now keeps the first frame (and the frame after each visit)
+  // from showing the previous filters — sats and `All` on a fresh open.
+  const shownFilters = mergeTransactionFilters(filters, routeChanges);
+  React.useEffect(() => {
     const activeParamKeys = [
       filterCurrency ? 'filterCurrency' : null,
       filterPaymentType ? 'filterPaymentType' : null,
@@ -107,17 +128,14 @@ function TransactionsRoute() {
         hasFilterMintUrl: !!filterMintUrl,
       });
     }
-    updateFilters(changes);
+    updateFilters(routeChanges);
   }, [
+    routeChanges,
     filterCurrency,
     filterPaymentType,
     filterDirection,
     filterStatus,
     filterMintUrl,
-    filterSource,
-    filterLock,
-    filterCounterparty,
-    filterZap,
     updateFilters,
   ]);
 
@@ -137,12 +155,12 @@ function TransactionsRoute() {
           title: 'Transactions',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
-          headerRight: () => <FilterButton />,
+          headerRight: () => <FilterButton activeFilterCount={countActiveFilters(shownFilters)} />,
         })}
       />
 
       <TransactionsScreen
-        filters={filters}
+        filters={shownFilters}
         onTransactionPress={handleTransactionPress}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}

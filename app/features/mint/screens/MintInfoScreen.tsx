@@ -57,7 +57,7 @@ import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
 import { useMintInputFees } from '../hooks/useMintInputFees';
 import { formatInputFee, mintCapabilityPills } from '../lib/mintCapabilities';
 import { mintInfoStatCards, type MintInfoStats } from '../lib/mintInfoStats';
-import { buildMintDetailsRows } from '../lib/mintDetailsRows';
+import { buildMintDetailsRows, mintMotd } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrDisplayName,
@@ -304,6 +304,7 @@ export function MintInfoScreen() {
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
   const contactRows = getSortedMintInfoContacts(contact);
+  const motd = mintMotd(entry?.motd);
   // NUT-06 first; a placeholder there (e.g. the literal `npub…`) falls back to
   // the operator nagg's discovery row resolved for this mint.
   const nostrContactPubkey = resolveMintInfoNostrContactPubkey(
@@ -721,13 +722,13 @@ export function MintInfoScreen() {
             </>
           )}
 
-          {typeof entry?.motd === 'string' && (
+          {motd && (
             <>
               <Notice
                 status="warning"
                 title="Message from the mint"
                 collapseLines={4}
-                description={entry.motd}
+                description={motd}
                 testID="mint-info-motd"
               />
               <Spacer size={12} />

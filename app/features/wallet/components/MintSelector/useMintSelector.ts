@@ -7,6 +7,7 @@ import { useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from 'wallet/amount';
+import { toRealUnit } from 'wallet';
 import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
@@ -53,7 +54,7 @@ export function useMintSelector({
   const balance = mintUrl
     ? mockMode
       ? getMockMintBalance(mintUrl, unit)
-      : amountToNumber(liveBalances.byMint[mintUrl]?.total)
+      : amountToNumber(liveBalances.byMintAndUnit?.[mintUrl]?.[toRealUnit(unit)]?.total)
     : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),

@@ -2,6 +2,7 @@ import { Stack, useNavigation } from 'expo-router';
 import { DrawerActions } from 'expo-router/react-navigation';
 import { MintSelector } from '@/features/wallet';
 import { useWalletMintListRequest } from '@/features/wallet/hooks/useWalletMintListRequest';
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
@@ -15,6 +16,8 @@ const liquidTitleBiasClass = supportsLiquidGlass() ? '-translate-x-0.5' : undefi
 
 export default function HomeLayout() {
   const handleRequestMintList = useWalletMintListRequest();
+  // The pill shows the preferred mint's balance in the wallet's active unit.
+  const { realUnit } = useActiveUnit();
   const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
   const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
@@ -38,7 +41,11 @@ export default function HomeLayout() {
       headerBackground: () => null,
       headerTitle: () => (
         <View className={liquidTitleBiasClass}>
-          <MintSelector testID="wallet-mint-selector" onRequestMintList={handleRequestMintList} />
+          <MintSelector
+            testID="wallet-mint-selector"
+            unit={realUnit}
+            onRequestMintList={handleRequestMintList}
+          />
         </View>
       ),
     },

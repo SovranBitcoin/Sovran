@@ -22,6 +22,7 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
     back: () => mockBack(),
     replace: (...args: unknown[]) => mockReplace(...args),
     push: (...args: unknown[]) => mockPush(...args),
+    navigate: (...args: unknown[]) => mockPush(...args),
     raw: { push: (...args: unknown[]) => mockPush(...args) },
   },
 }));

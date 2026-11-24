@@ -192,9 +192,12 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     const preferredTestnut = isTestnutMint(preferredMintUrl);
     const syncKey = `${preferredMintUrl}|${preferredTestnut}`;
     if (lastUnitSyncMintRef.current === syncKey) return;
-    lastUnitSyncMintRef.current = syncKey;
+    // Until the mint's info has loaded its units are unknown: consuming the
+    // key now would either retire a persisted `usd` to `sat` on a cold boot or
+    // skip the sync for this mint for good once the info arrives.
     const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
-    if (!mint) return;
+    if (!mint || !mint.mintInfo) return;
+    lastUnitSyncMintRef.current = syncKey;
     const supported = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
     const currentUnit = useMintStore.getState().activeUnit;
     if (supported.some((unit) => toAccountUnit(unit, preferredTestnut) === currentUnit)) return;

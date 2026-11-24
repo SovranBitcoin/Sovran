@@ -4,6 +4,7 @@ import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
+import { approximateFiatText } from '@/shared/lib/currency';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
@@ -269,7 +270,6 @@ export function PrimaryBalance({
   }, [onPillVisibilityChange, account.unit, pendingTotal, reservedTotal, lockedTotal]);
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
-  const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
   const foreground = useThemeColor('foreground');
   const balanceTint = withAlpha(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
 
@@ -283,7 +283,7 @@ export function PrimaryBalance({
     });
   }, [account.unit, mockMode, pendingTotal, reservedTotal, lockedTotal]);
 
-  const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
+  const displayText = approximateFiatText(balance, btcPrice, currencyConfig.symbol);
   const handlePendingPress = () => {
     walletLog.info('wallet.pending.press', {
       pendingTotal,
