@@ -14,7 +14,7 @@ export default function DrawerLayout() {
   const [nestedPushed, setNestedPushed] = useState(false);
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(width * 0.82, 320);
-  const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
+  const surface = useThemeColor('surface');
   const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
   // Match the device's hardware screen corner radius so the scene's rounded
   // TL/BL hug the physical display curve. Falls back to a token-driven radius
@@ -46,12 +46,6 @@ export default function DrawerLayout() {
             overflow: 'hidden',
           },
           overlayColor: `rgba(${overlayRgb},${alpha.strong})`,
-          overlayStyle: {
-            borderTopLeftRadius: deviceRadius,
-            borderBottomLeftRadius: deviceRadius,
-            borderCurve: 'continuous',
-            boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
-          },
           // A narrow edge, so swipes across the wallet's account carousel stay with it.
           swipeEdgeWidth: 32,
           swipeMinDistance: 10,

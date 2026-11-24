@@ -624,6 +624,9 @@ function ActionMenuInstance({
         <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
+          // Gorhom makes the sheet one accessible element by default, which
+          // hides every row from VoiceOver/TalkBack and the native harness.
+          accessible={false}
           // Patched prop (patches/heroui-native+1.0.9.patch): forwarded to
           // gorhom `index`, so the sheet mounts open and gorhom animates it
           // up itself once layout is calculated. heroui consumes the public

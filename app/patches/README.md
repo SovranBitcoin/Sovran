@@ -6,15 +6,18 @@ Bun applies these at install time; they are registered in the root
 inspect the resulting patch and lockfile changes. On every upgrade, check whether
 the fix is upstream and whether the import still reaches the patched file.
 
+Only patches the app cannot ship without stay ([ADR 0038](../docs/adr/0038-wave-2-patch-reduction-and-hex-boundaries.md)).
+Presentation is styled through public props instead: the drawer keeps its
+`sceneStyle` clip and `overlayColor`, Android form sheets use the stock dim, and
+Sovran's sheet hosts pass `accessible={false}` to gorhom themselves
+(`PopupHost`, `ActionMenuHost`; pinned by `popupHostPresentation.test.tsx` and
+`actionMenuHandoff.test.tsx`).
+
 | Patch | Purpose | Remove when |
 | --- | --- | --- |
 | `@cashu/cashu-ts@5.0.0-rc.4` | Backports NUT-18 `mp` and NUT-26 tag `0x09`, keeping the positional constructor. See [README.cashu-mints-preferred.md](README.cashu-mints-preferred.md). | Coco accepts a cashu-ts release with `mintsPreferred` |
 | `@cashu/coco-core@2.0.0` | Adds `offline` to `ops.send.prepare`: an exact-match send is prepared from stored mint data without contacting the mint, and anything else is refused before proofs are reserved. Compiled from the coco commit in `sources/`; see [README.coco-offline-send.md](README.coco-offline-send.md) and [ADR 0019](../docs/adr/0019-an-exact-send-needs-no-mint.md). Guarded by `app/__tests__/cocoCoreUnmodified.test.ts` and `wallet/__tests__/integration/offline-send-stale-mint.test.ts`. | A published coco prepares a send from stored mint data without a network request |
-| `@gorhom/bottom-sheet@5.2.14` | Sheet and backdrop default to `accessible={false}` so descendants stay reachable. | Upstream changes the default |
-| `expo-router@56.2.11` | Exposes drawer overlay styling in Router's navigation fork. | Upstream exposes it |
-| `react-native-screens@4.25.2` | Adjusts Android form-sheet dimming. | Upstream fixes the dimming |
 | `heroui-native@1.0.9` | (1) `mountIndex` forwards to gorhom's `index` so sheets open after layout (gorhom #2690, #2719). (2) `useDirectView`/`useScrollableContainer` keep a nested `BottomSheetScrollView` scrollable. (3) Hides the toast measurement clone inline. Guarded by `app/__tests__/herouiNativePatch.test.ts`. | Each hunk: upstream forwards `index`, adopts the container flags, or fixes the clone |
-| `@routstr/sdk@0.4.6` | (1) `isTorContext` reads `window.location.hostname` behind a `typeof window` guard. React Native defines `window` but not `location`, so the guard passes and the read throws inside `findNextBestProvider` — its `catch` returns null, and the SDK gives up after ONE provider. A node answering 404 for a model it does not serve ended the whole request with eleven candidates untried. (2) `isNetworkErrorMessage` knows the Chrome, Firefox, Safari and Bun spellings of a failed fetch and none of React Native's, so `_makeRequest` rethrew every mobile network fault instead of routing it through `_handleErrorResponse` — no `X-Cashu` change reclaim, no original-token recovery, no failover, and the request's sats left stranded on the node. Guarded by `app/__tests__/routstrSdkPatch.test.ts`. | Each hunk: the SDK's browser build stops assuming `window` implies `window.location`; `isNetworkErrorMessage` recognises React Native |
 | `expo-modules-jsi@56.0.12` | Replaces `weak let` declarations unsupported by the older Swift toolchain. | Xcode 26.4+ is the minimum |
 
 A successful install doesn't prove a patch landed: inspect the patched files in

@@ -182,6 +182,16 @@ describe('PopupHost presentation', () => {
     jest.useRealTimers();
   });
 
+  // Gorhom's default `accessible` would fold the sheet into one element and
+  // hide its controls; the host opts out explicitly (no package patch).
+  it('keeps the sheet out of the accessibility tree so its controls stay reachable', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+    });
+    act(() => usePopupStore.getState().open({ message: 'reachable' }));
+    expect(content(renderer!).props.accessible).toBe(false);
+  });
+
   it('mounts each open() nonce as a fresh instance that is already open at gorhom index 0', () => {
     act(() => {
       renderer = TestRenderer.create(<PopupHost />);
