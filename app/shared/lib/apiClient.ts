@@ -548,15 +548,6 @@ export const discoverMints = ({ limit, signal }: { limit?: number; signal?: Abor
   });
 };
 
-/**
- * Mint-info changelog: no self-hosted changelog server is configured.
- * Returns an empty changelog cleanly so MintChangesScreen degrades gracefully.
- */
-export const fetchMintChanges = (
-  _args: { limit?: number; signal?: AbortSignal } = {}
-): Promise<Result<MintChangesResponse, Error>> =>
-  Promise.resolve(ok({ trackedMints: 0, reachableMints: 0, totalChanges: 0, changes: [] }));
-
 /** Batch cap for direct NUT-06 `/v1/info` probes. */
 export const MINT_INFO_MAX_URLS = 50;
 
@@ -743,19 +734,37 @@ function httpsMintBase(mintUrl: string): Result<string, Error> {
   return ok(mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`);
 }
 
-export const fetchMintInfo = (
+export const fetchMintInfo = async (
   mintUrl: string,
   controls: RequestControls = {}
 ): Promise<Result<GetInfoResponse, Error>> => {
   const base = httpsMintBase(mintUrl);
-  if (base.isErr()) return Promise.resolve(err(base.error));
-  return fetchJson(
+  if (base.isErr()) return err(base.error);
+  // The profile the request is made for: an answer that lands after a switch
+  // is not recorded under the next profile's history.
+  const { activePubkey } = require('@/shared/stores/global/profileStore') as {
+    activePubkey: typeof import('@/shared/stores/global/profileStore').activePubkey;
+  };
+  const owner = activePubkey();
+  const result = await fetchJson(
     `${base.value}v1/info`,
     parseMintInfo,
     'cashu/mint/info',
     { headers: { Accept: 'application/json' } },
     controls
   );
+  if (result.isOk() && owner) {
+    // Every validated `/v1/info` answer is a mint-history observation.
+    const { observeMintInfoResponse } = require('@/features/mint/lib/mintHistorySync') as {
+      observeMintInfoResponse: typeof import('@/features/mint/lib/mintHistorySync').observeMintInfoResponse;
+    };
+    void observeMintInfoResponse(mintUrl, result.value, { owner }).catch((error: unknown) => {
+      apiLog.warn('api.mint_history_observe_failed', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    });
+  }
+  return result;
 };
 
 // NUT-02 `/v1/keysets`: only the fields Mint Info reads (unit, active, fee).

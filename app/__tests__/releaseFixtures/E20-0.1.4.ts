@@ -69,6 +69,33 @@ const OBSERVATIONS = {
   },
 };
 
+// shared/stores/profile/mintHistoryStore.ts: a mint seen twice, one revision.
+const MINT_HISTORY_KEY = 'https://mint.minibits.cash/Bitcoin';
+const MINT_HISTORY = {
+  mintUrl: MINIBITS,
+  baseline: { name: 'Minibits mint', pubkey: '03c2', version: 'cdk-mintd/0.18.3' },
+  hash: 'd'.repeat(64),
+  firstSeenAt: 1_789_900_000_000,
+  lastSeenAt: 1_789_990_000_000,
+  lastCheckedAt: 1_789_990_000_000,
+  consecutiveFailures: 0,
+  nextRetryAt: 1_790_076_400_000,
+  lastViewedAt: 1_789_990_000_000,
+  trusted: true,
+  revisions: [
+    {
+      id: 'mfixture-cccccccc-dddddddddddd',
+      at: 1_789_950_000_000,
+      previousLastSeenAt: 1_789_900_000_000,
+      hash: 'd'.repeat(64),
+      patch: [
+        { op: 'test', path: '/version', value: 'cdk-mintd/0.18.2' },
+        { op: 'replace', path: '/version', value: 'cdk-mintd/0.18.3' },
+      ],
+    },
+  ],
+};
+
 const LAST_KNOWN_VERSION = { version: '0.1.5', minVersion: '0.1.2', fetchedAt: 1_790_000_000_000 };
 const PROVIDER = {
   baseUrl: 'https://node.example',
@@ -196,6 +223,19 @@ export const fixture: ReleaseFixture = {
       providers: [PROVIDER],
       fetchedAt: 1_789_950_000_000,
     }),
+    // shared/stores/profile/mintHistoryStore.ts: PersistedMintHistoryStore. Every
+    // account has its row; account 0 has recorded one mint.
+    ...Object.fromEntries(
+      Object.keys(disk)
+        .filter((key) => key.startsWith('search-history-store:profile:'))
+        .map((key) => [
+          key.replace('search-history-store:', 'mint-history-store:'),
+          zustandRow(1, { byMintUrl: {} }),
+        ])
+    ),
+    [accountKey('mint-history-store', A0)]: zustandRow(1, {
+      byMintUrl: { [MINT_HISTORY_KEY]: MINT_HISTORY },
+    }),
     // shared/stores/global/ctaStore.ts: the schema in its persist options
     'cta-store': zustandRow(1, {
       dismissed: {
@@ -297,6 +337,13 @@ export const fixture: ReleaseFixture = {
         accountIndex: 0,
         path: ['providers', 0],
         equals: PROVIDER,
+      },
+      {
+        what: 'the mint info history of account 0',
+        store: 'mint-history-store',
+        accountIndex: 0,
+        path: ['byMintUrl', MINT_HISTORY_KEY],
+        equals: MINT_HISTORY,
       },
       {
         what: 'when the AI provider list of account 0 was read',

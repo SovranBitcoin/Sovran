@@ -1,89 +1,132 @@
-import { describeError } from '@/shared/lib/errors';
 /**
- * The Notifications → Mints data source: what the mints in THIS wallet changed
- * about their own NUT-06 info, newest first.
+ * One mint's info history, as this phone recorded it (`mint-history-store`,
+ * ADR 0036), already phrased, newest first.
  *
- * nagg serves one ecosystem-wide changelog (there is no per-mint filter on the
- * endpoint and the whole recorded history fits in a single response), so the
- * fetch is cached once (`mintChangesCache`) and every consumer filters it down
- * locally. Decoding stays a pure `useMemo` over the cached wire response —
- * cache the fetch, not the derived rows.
- *
- * The read itself is `useCachedRead` (the reference consumer): a fresh
- * persisted entry paints with zero round-trips, a stale one paints and
- * revalidates, and every arrival is logged under `read.mintChanges.*`.
+ * The revisions are local: nothing is fetched to show them. Opening the page
+ * marks the mint as recently viewed (it is kept longest), asks the mint once
+ * when there is no baseline yet, and `refresh` asks it again on demand. A
+ * failed check leaves the saved history on screen and says so.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { MINT_CHANGES_CACHE_KEY, mintChangesCache } from '@/features/mint/data/mintChangesCache';
-import { decodeFeed } from '@/features/mint/lib/mintChanges/decode';
+import type { Entry } from '@/features/mint/lib/mintChanges/decode';
 import {
   buildMintChangeListItems,
   type MintChangeRevision,
 } from '@/features/mint/lib/mintChanges/groupEntries';
 import type { NutsMap } from '@/features/mint/lib/mintChanges/interpret';
-import { fetchMintChanges, type MintChangesResponse } from '@/shared/lib/apiClient';
-import { useCachedRead } from '@/shared/lib/read/useCachedRead';
-import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { checkMintInfoNow } from '@/features/mint/lib/mintHistorySync';
+import { describeError } from '@/shared/lib/errors';
+import { onceLoaded, useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import {
+  useMintHistoryStore,
+  type MintHistoryEntry,
+} from '@/shared/stores/profile/mintHistoryStore';
 
 /**
- * Resolves a mint's CURRENT capability map so a limit change can name its unit
- * — the patch says `max_amount: 25000 → 100000` and nothing about sats. Reads
- * the same per-mint metadata the rows already use for icons.
+ * - `loading`: the saved history has not loaded yet.
+ * - `waiting`: this phone has never had an answer from the mint.
+ * - `unchanged`: it has, and nothing changed since the first one.
+ * - `changed`: there are revisions to show.
  */
-function useNutsResolver(): (mintUrl: string) => NutsMap {
-  const byMintUrl = useMintMetadataStore((state) => state.byMintUrl);
-  return useCallback(
-    (mintUrl: string) => {
-      const entry = byMintUrl[normalizeMintUrlKey(mintUrl)];
-      if (entry?.nuts) return entry.nuts;
-      const info = entry?.info;
-      return info && typeof info === 'object'
-        ? (info as { nuts?: Record<string, unknown> }).nuts
-        : undefined;
-    },
-    [byMintUrl]
-  );
+type MintHistoryStatus = 'loading' | 'waiting' | 'unchanged' | 'changed';
+
+const hostOf = (url: string) => {
+  try {
+    const u = new URL(url);
+    return u.host + (u.pathname === '/' ? '' : u.pathname);
+  } catch {
+    return url.replace(/^https?:\/\//, '');
+  }
+};
+
+/** The saved revisions in the shape the change phrases read (seconds, newest first). */
+function historyEntries(entry: MintHistoryEntry | undefined): Entry[] {
+  if (!entry) return [];
+  const host = hostOf(entry.mintUrl);
+  const name =
+    entry.baseline && typeof entry.baseline.name === 'string' && entry.baseline.name.trim()
+      ? entry.baseline.name.trim()
+      : host;
+  return entry.revisions.map((revision) => ({
+    mintUrl: entry.mintUrl,
+    host,
+    name,
+    at: Math.floor(revision.at / 1000),
+    ...(revision.previousLastSeenAt !== undefined && revision.previousLastSeenAt < revision.at
+      ? { sincePrevious: Math.floor((revision.at - revision.previousLastSeenAt) / 1000) }
+      : {}),
+    // The revision's own id: two revisions can produce the same document.
+    hash: revision.id,
+    patch: revision.patch,
+    summary: [],
+  }));
 }
 
-function useMintChangesSource() {
-  const read = useCachedRead<MintChangesResponse>({
-    store: mintChangesCache,
-    surface: 'mintChanges',
-    key: MINT_CHANGES_CACHE_KEY,
-    viewerKey: '',
-    fetcher: async ({ signal }) => {
-      const result = await fetchMintChanges({ signal });
-      if (result.isErr()) throw result.error;
-      return { data: result.value };
-    },
-  });
-  const errorMessage = read.error ? describeError(read.error, 'nagg').text : null;
-  return {
-    response: read.data,
-    isLoading: read.status === 'loading',
-    isRefreshing: read.isFetching && read.mode === 'refresh',
-    errorMessage,
-    refresh: read.refresh,
-  };
-}
-
-/**
- * Every recorded revision of ONE mint, newest first, already phrased — the
- * detail screen's data. Reuses the list cache when fresh and fetches on cold
- * direct navigation, so a deep link does not falsely show empty history.
- */
 export function useMintChangeRevisions(mintUrl: string | undefined) {
-  const { response, ...status } = useMintChangesSource();
-  const nutsFor = useNutsResolver();
+  const loaded = useStoreLoadLatched(useMintHistoryStore.persist);
+  const key = mintUrl ? normalizeMintUrlKey(mintUrl) : '';
+  const entry = useMintHistoryStore((state) => (key ? state.byMintUrl[key] : undefined));
+  const [isRefreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<{ key: string; message: string } | null>(null);
+
   const revisions = useMemo<MintChangeRevision[]>(() => {
-    if (!response || !mintUrl) return [];
-    const key = normalizeMintUrlKey(mintUrl);
-    const entries = decodeFeed(response).entries.filter(
-      (entry) => normalizeMintUrlKey(entry.mintUrl) === key
-    );
-    return buildMintChangeListItems(entries, nutsFor)[0]?.revisions ?? [];
-  }, [response, mintUrl, nutsFor]);
-  return { revisions, ...status };
+    const entries = historyEntries(entry);
+    if (entries.length === 0) return [];
+    // The current capability map names the unit a limit change leaves out.
+    const nuts = entry?.baseline?.nuts as NutsMap;
+    return buildMintChangeListItems(entries, () => nuts)[0]?.revisions ?? [];
+  }, [entry]);
+
+  const refresh = useCallback(async () => {
+    if (!mintUrl) return;
+    setRefreshing(true);
+    const result = await checkMintInfoNow(mintUrl);
+    setRefreshing(false);
+    setRefreshError(result.ok ? null : { key, message: describeError(result.error, 'cashu').text });
+  }, [mintUrl, key]);
+
+  // On open, once the saved history has loaded: keep this mint longest, and
+  // ask it now if this phone has never had an answer from it.
+  useEffect(() => {
+    if (!mintUrl) return;
+    let cancelled = false;
+    onceLoaded(useMintHistoryStore, (ok) => {
+      if (!ok || cancelled) return;
+      const store = useMintHistoryStore.getState();
+      store.markViewed(mintUrl);
+      if (!store.byMintUrl[normalizeMintUrlKey(mintUrl)]?.baseline) void refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mintUrl, refresh]);
+
+  const status: MintHistoryStatus = !loaded
+    ? 'loading'
+    : !entry?.baseline
+      ? 'waiting'
+      : revisions.length > 0
+        ? 'changed'
+        : 'unchanged';
+
+  const lastFailed = (entry?.consecutiveFailures ?? 0) > 0;
+  const errorMessage =
+    refreshError?.key === key
+      ? refreshError.message
+      : lastFailed && !isRefreshing
+        ? "Couldn't reach this mint the last time it was checked."
+        : null;
+
+  return {
+    revisions,
+    status,
+    isLoading: status === 'loading' || (status === 'waiting' && isRefreshing),
+    isRefreshing,
+    errorMessage,
+    /** When this phone first had an answer, epoch ms. */
+    firstSeenAt: entry?.firstSeenAt,
+    refresh,
+  };
 }

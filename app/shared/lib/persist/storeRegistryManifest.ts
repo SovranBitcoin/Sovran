@@ -281,6 +281,14 @@ export const storeRegistryManifest = [
     profileStorage: true,
   },
   {
+    file: 'shared/stores/profile/mintHistoryStore.ts',
+    name: 'mint-history-store',
+    scope: 'profile',
+    persisted: true,
+    queryCache: false,
+    profileStorage: true,
+  },
+  {
     file: 'shared/stores/profile/mintStore.ts',
     name: 'mint-store',
     scope: 'profile',

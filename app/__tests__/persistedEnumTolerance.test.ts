@@ -71,6 +71,7 @@ import '@/shared/stores/profile/routstrStore';
 import '@/shared/stores/profile/aiProviderDirectoryStore';
 import '@/shared/stores/profile/scanHistoryStore';
 import '@/shared/stores/profile/searchHistoryStore';
+import '@/shared/stores/profile/mintHistoryStore';
 import '@/shared/stores/profile/sendReachabilityStore';
 import '@/shared/stores/profile/swapTransactionsStore';
 import '@/shared/stores/profile/themeStore';

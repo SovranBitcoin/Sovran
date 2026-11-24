@@ -74,6 +74,7 @@ const STORE_MODULES = [
   '@/shared/stores/profile/routstrStore',
   '@/shared/stores/profile/scanHistoryStore',
   '@/shared/stores/profile/searchHistoryStore',
+  '@/shared/stores/profile/mintHistoryStore',
   '@/shared/stores/profile/sendReachabilityStore',
   '@/shared/stores/profile/swapTransactionsStore',
   '@/shared/stores/profile/themeStore',

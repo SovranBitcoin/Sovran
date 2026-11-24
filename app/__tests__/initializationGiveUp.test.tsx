@@ -68,6 +68,9 @@ jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest
 jest.mock('@/shared/lib/mintTestnutRefresh', () => ({
   attachMintTestnutToManager: () => () => undefined,
 }));
+jest.mock('@/features/mint/lib/mintHistorySync', () => ({
+  attachMintHistoryToManager: () => () => undefined,
+}));
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   attachMintMetadataToManager: () => () => undefined,
 }));

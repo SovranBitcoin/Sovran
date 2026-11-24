@@ -10,6 +10,7 @@ import { useInitializationStage } from '@/shared/providers/InitializationProvide
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintTestnutToManager } from '@/shared/lib/mintTestnutRefresh';
+import { attachMintHistoryToManager } from '@/features/mint/lib/mintHistorySync';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
@@ -367,6 +368,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
   useEffect(() => {
     if (!manager) return;
     return attachMintTestnutToManager(manager);
+  }, [manager]);
+
+  // Mint history (ADR 0036): Coco's mint-info refreshes are observations, and
+  // the wallet's mints are re-checked in the background, never blocking start.
+  useEffect(() => {
+    if (!manager) return;
+    return attachMintHistoryToManager(manager);
   }, [manager]);
 
   if (failed) {

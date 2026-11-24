@@ -4,8 +4,9 @@
  * dated, with the precise value (a version string, the full notice) underneath
  * where there is room for it.
  *
- * Reads the same cached changelog response as the list, so opening a row costs
- * no fetch.
+ * Reads the history this phone recorded (`mint-history-store`), so nothing is
+ * fetched to show it. Pull to refresh, or Retry, asks the mint now and records
+ * any change it finds.
  */
 import { StyleSheet } from 'react-native';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { Button } from '@/shared/ui/primitives/Button';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -119,7 +121,8 @@ export function MintChangesScreen() {
   useLifecycleLogger('MintChangesScreen');
   const params = useRouteParams(ParamsSchema, { where: 'mint-changes' });
   const mintUrl = params?.mintUrl;
-  const { revisions, isLoading, errorMessage, refresh } = useMintChangeRevisions(mintUrl);
+  const { revisions, status, isLoading, isRefreshing, errorMessage, refresh } =
+    useMintChangeRevisions(mintUrl);
   const metadata = useCachedMintMetadata(mintUrl);
   const [foreground, muted, surface, separator] = useThemeColor([
     'foreground',
@@ -132,19 +135,32 @@ export function MintChangesScreen() {
   const host = revisions[0]?.entry.host ?? mintUrl ?? '';
 
   const listHeader = (
-    <HStack align="center" gap={spacing.md} style={styles.header}>
-      <MintIcon iconUrl={metadata?.iconUrl} name={name} size={48} />
-      <VStack gap={2} flex={1}>
-        <Text bold numberOfLines={1} size={fontSize['2xl']} style={{ color: foreground }}>
-          {name || host}
-        </Text>
-        <Text numberOfLines={1} size={fontSize.sm} style={{ color: muted }}>
-          {revisions.length === 1 ? '1 update' : `${revisions.length} updates`}
-          {'  ·  '}
-          {host}
-        </Text>
-      </VStack>
-    </HStack>
+    <VStack>
+      <HStack align="center" gap={spacing.md} style={styles.header}>
+        <MintIcon iconUrl={metadata?.iconUrl} name={name} size={48} />
+        <VStack gap={2} flex={1}>
+          <Text bold numberOfLines={1} size={fontSize['2xl']} style={{ color: foreground }}>
+            {name || host}
+          </Text>
+          <Text numberOfLines={1} size={fontSize.sm} style={{ color: muted }}>
+            {revisions.length === 1 ? '1 update' : `${revisions.length} updates`}
+            {'  ·  '}
+            {host}
+          </Text>
+        </VStack>
+      </HStack>
+      {/* A failed check keeps the saved history on screen and says so. */}
+      {errorMessage ? (
+        <View className="px-5 pb-3">
+          <Notice
+            status="warning"
+            description={errorMessage}
+            testID="mint-changes-refresh-failed"
+            action={<Button text="Retry" variant="secondary" size="compact" onPress={refresh} />}
+          />
+        </View>
+      ) : null}
+    </VStack>
   );
 
   const renderItem = ({ item }: { item: MintChangeRevision }) => (
@@ -167,23 +183,39 @@ export function MintChangesScreen() {
           testID="mint-changes-detail"
           data={revisions}
           keyExtractor={(revision) => revision.entry.hash}
+          // `entry.hash` is the revision id here (unique even for A → B → A).
           ListHeaderComponent={revisions.length > 0 ? listHeader : null}
           ItemSeparatorComponent={renderSeparator}
+          refreshing={isRefreshing && revisions.length > 0}
+          onRefresh={refresh}
           ListEmptyComponent={
             isLoading ? (
               <Spinner size={22} color={foreground} />
-            ) : errorMessage ? (
+            ) : status === 'waiting' ? (
               <EmptyState
-                icon="mdi:alert-circle-outline"
-                title="Mint updates unavailable"
-                subtitle={errorMessage}
+                testID="mint-changes-waiting"
+                icon={errorMessage ? 'mdi:alert-circle-outline' : 'mdi:clock-outline'}
+                title="Waiting for first check"
+                subtitle={
+                  errorMessage ??
+                  'This phone has not heard from this mint yet. Its changes are recorded from the first answer on.'
+                }
                 action={<Button text="Retry" variant="secondary" onPress={refresh} />}
               />
             ) : (
               <EmptyState
+                testID="mint-changes-none"
                 icon="mingcute:bank-fill"
-                title="No updates recorded"
-                subtitle="Nothing has changed for this mint since it was first seen."
+                title="No changes observed on this device"
+                subtitle={
+                  errorMessage ??
+                  'Nothing this mint publishes about itself has changed since this phone first checked it.'
+                }
+                action={
+                  errorMessage ? (
+                    <Button text="Retry" variant="secondary" onPress={refresh} />
+                  ) : undefined
+                }
               />
             )
           }

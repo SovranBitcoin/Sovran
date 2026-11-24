@@ -39,6 +39,7 @@ import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore'
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
+import { useMintHistoryStore } from '@/shared/stores/profile/mintHistoryStore';
 import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
@@ -99,6 +100,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/routstrStore': useRoutstrStore,
   'profile/scanHistoryStore': useScanHistoryStore,
   'profile/searchHistoryStore': useSearchHistoryStore,
+  'profile/mintHistoryStore': useMintHistoryStore,
   'profile/sendReachabilityStore': useSendReachabilityStore,
   'profile/swapTransactionsStore': useSwapTransactionsStore,
   'profile/themeStore': useThemeStore,
