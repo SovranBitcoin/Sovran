@@ -15,6 +15,16 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
   const { isOffline } = useOfflineStatus();
 
   const feedRef = useRef<PricelistFeed | null>(null);
+  const offlineRef = useRef(isOffline);
+
+  // Confirmed offline pauses the feed (cancelling any request); reconnecting
+  // refreshes at once when a poll is due or the last one failed. The feed
+  // ignores a repeated state. Declared first so a feed created below starts
+  // from the current connectivity rather than dialling out while offline.
+  useEffect(() => {
+    offlineRef.current = isOffline;
+    feedRef.current?.setOffline(isOffline);
+  }, [isOffline]);
 
   useEffect(() => {
     const feed = createPricelistFeed({
@@ -23,6 +33,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
       onError: setError,
     });
     feedRef.current = feed;
+    feed.setOffline(offlineRef.current);
     feed.start();
     return () => {
       feedRef.current = null;
@@ -30,8 +41,8 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, [setBtcPrices, setLoading, setError]);
 
-  // Refresh on foreground or connectivity recovery. The feed deduplicates
-  // requests and skips resumes within 60 seconds of a successful poll.
+  // Refresh on foreground. The feed deduplicates requests and skips resumes
+  // within 60 seconds of a successful poll.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
@@ -39,16 +50,6 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     });
     return () => subscription.remove();
   }, []);
-
-  const wasOfflineRef = useRef(false);
-  useEffect(() => {
-    const wasOffline = wasOfflineRef.current;
-    wasOfflineRef.current = isOffline;
-    // Only the offline→online EDGE. Firing on the initial `false` would just
-    // re-enter a request already in flight from the effect above.
-    if (isOffline || !wasOffline) return;
-    feedRef.current?.resume('online');
-  }, [isOffline]);
 
   return <>{children}</>;
 };

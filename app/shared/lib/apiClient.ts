@@ -11,6 +11,7 @@ import {
 import { ok, err, Result } from 'neverthrow';
 import * as nip19 from 'nostr-tools/nip19';
 import { z } from 'zod';
+import { FIAT_UNITS } from 'wallet/units';
 import { apiLog } from './logger';
 import {
   CatalogResponse,
@@ -447,7 +448,22 @@ export const parseNostrProfileFor =
   (pubkey: string) =>
   (input: unknown): Result<NostrProfileFullType, ParseError> =>
     parseProfileEnvelopeFor(pubkey)(input).map((r) => r.profile);
+// BTC prices: Coinbase first, Mempool.space when Coinbase cannot answer.
+// Both are fixed public GETs with no headers or body, so nothing about the
+// wallet or account travels with them. A snapshot is accepted only when it
+// prices EVERY fiat unit the wallet supports; a partial one is a failure, so
+// the cache is never half-refreshed from one provider.
 export const COINBASE_BTC_RATES_URL = 'https://api.coinbase.com/v2/exchange-rates?currency=BTC';
+export const MEMPOOL_BTC_PRICES_URL = 'https://mempool.space/api/v1/prices';
+/** Per-provider ceiling: the fallback must still answer quickly. */
+const PRICE_PROVIDER_TIMEOUT_MS = 3_000;
+/** Mempool's `time` must be no older than the cache's staleness budget… */
+const MEMPOOL_MAX_AGE_SECONDS = 2 * 60 * 60;
+/** …and no further ahead than ordinary clock skew. */
+const MEMPOOL_MAX_SKEW_SECONDS = 5 * 60;
+const PRICE_CODES = FIAT_UNITS.map((unit) => unit.toUpperCase());
+/** A plain positive decimal as Coinbase writes it: no sign, exponent or padding. */
+const DECIMAL_RATE = /^\d+(?:\.\d+)?$/;
 
 const CoinbaseRatesEnvelope = z.looseObject({
   data: z.looseObject({
@@ -456,11 +472,24 @@ const CoinbaseRatesEnvelope = z.looseObject({
   }),
 });
 
+const MempoolPrices = z.looseObject({
+  time: z.number().int().positive(),
+  ...Object.fromEntries(PRICE_CODES.map((code) => [code, z.number().positive().finite()])),
+});
+
 interface BtcRatesResponse {
   rates: Record<string, { price: number; at: number }>;
   updatedAt: number;
   degraded?: boolean;
+  /** Which provider answered. */
+  source: 'coinbase' | 'mempool';
 }
+
+const incomplete = (where: string, path: string[], message: string): ParseError => ({
+  type: 'schema/zod',
+  where,
+  issues: [{ code: 'custom', path, message }],
+});
 
 const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError> => {
   const parsed = CoinbaseRatesEnvelope.safeParse(input);
@@ -473,30 +502,73 @@ const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError
   }
   const nowSec = Math.floor(Date.now() / 1000);
   const rates: Record<string, { price: number; at: number }> = {};
-  for (const [code, raw] of Object.entries(parsed.data.data.rates)) {
-    const price = Number(raw);
-    if (Number.isFinite(price) && price > 0) {
-      rates[code.toUpperCase()] = { price, at: nowSec };
+  for (const code of PRICE_CODES) {
+    const raw = Object.hasOwn(parsed.data.data.rates, code)
+      ? parsed.data.data.rates[code]
+      : undefined;
+    const price = raw !== undefined && DECIMAL_RATE.test(raw) ? Number(raw) : Number.NaN;
+    if (!Number.isFinite(price) || price <= 0) {
+      return err(
+        incomplete('coinbase/exchange-rates', ['data', 'rates', code], 'missing or invalid rate')
+      );
     }
+    rates[code] = { price, at: nowSec };
   }
-  if (Object.keys(rates).length === 0) {
-    return err({
-      type: 'schema/zod',
-      where: 'coinbase/exchange-rates',
-      issues: [{ code: 'custom', path: ['data', 'rates'], message: 'no positive finite rates' }],
-    });
-  }
-  return ok({ rates, updatedAt: nowSec });
+  return ok({ rates, updatedAt: nowSec, source: 'coinbase' });
 };
 
-export const fetchBtcRates = (controls: RequestControls = {}) =>
-  fetchJson(
+const parseMempoolPrices = (input: unknown): Result<BtcRatesResponse, ParseError> => {
+  const parsed = MempoolPrices.safeParse(input);
+  if (!parsed.success) {
+    return err({ type: 'schema/zod', where: 'mempool/prices', issues: parsed.error.issues });
+  }
+  const time = parsed.data.time;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (time < nowSec - MEMPOOL_MAX_AGE_SECONDS || time > nowSec + MEMPOOL_MAX_SKEW_SECONDS) {
+    return err(incomplete('mempool/prices', ['time'], 'outside the accepted window'));
+  }
+  const prices = parsed.data as Record<string, unknown>;
+  const rates: Record<string, { price: number; at: number }> = {};
+  for (const code of PRICE_CODES) rates[code] = { price: prices[code] as number, at: time };
+  return ok({ rates, updatedAt: time, source: 'mempool' });
+};
+
+/**
+ * Complete BTC prices for every supported fiat unit. Coinbase answers first;
+ * any HTTP, network, timeout, JSON or schema failure falls through to
+ * Mempool.space, unless the caller aborted. Each request gets its own
+ * three-second ceiling and the caller's signal. When both fail, Coinbase's
+ * error is returned, so the feed backs off on the primary provider's status.
+ */
+export const fetchBtcRates = async (
+  controls: RequestControls = {}
+): Promise<Result<BtcRatesResponse, Error>> => {
+  const providerControls = {
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs ?? PRICE_PROVIDER_TIMEOUT_MS,
+  };
+  const primary = await fetchJson(
     COINBASE_BTC_RATES_URL,
     parseCoinbaseRates,
     'coinbase/exchange-rates',
     undefined,
-    controls
+    providerControls
   );
+  if (primary.isOk() || controls.signal?.aborted) return primary;
+  apiLog.warn('api.btc_rates.fallback', {
+    from: 'coinbase',
+    to: 'mempool',
+    status: primary.error instanceof ApiHttpError ? primary.error.status : null,
+  });
+  const fallback = await fetchJson(
+    MEMPOOL_BTC_PRICES_URL,
+    parseMempoolPrices,
+    'mempool/prices',
+    undefined,
+    providerControls
+  );
+  return fallback.isOk() ? fallback : primary;
+};
 
 /**
  * Defensive guard for arbitrary `/v1/info` responses. The full contract
