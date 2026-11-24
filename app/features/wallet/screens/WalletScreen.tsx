@@ -19,7 +19,6 @@ import { LayoutShiftProbe } from '@/shared/ui/composed/LayoutShiftProbe';
 import { HomeTop } from '@/features/wallet/home/HomeLayouts';
 import type { HomeActions } from '@/features/wallet/home/types';
 import { useAppStyle } from '@/shared/styles/appStyle';
-import { walletScrollY } from '@/features/wallet/lib/walletScroll';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
@@ -232,7 +231,6 @@ export function WalletScreen() {
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={pullToAi.refreshControl}
-        scrollY={walletScrollY}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <E2EReadyProofProbe />

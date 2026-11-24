@@ -1,14 +1,13 @@
 import { MintSelector } from '@/features/wallet';
 import { useWalletMintListRequest } from '@/features/wallet/hooks/useWalletMintListRequest';
 import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
-import { WALLET_HEADER_SCRIM_DISTANCE, walletScrollY } from '@/features/wallet/lib/walletScroll';
 
 export { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 
 export default function HomeLayout() {
   const handleRequestMintList = useWalletMintListRequest();
 
-  // Shared inline header search, like Feed/Contacts. `transparent` keeps the
+  // Shared inline header search, like Contacts. `transparent` keeps the
   // wallpaper showing through the header; the wallet's MintSelector stays as the
   // idle title (GlassSearchBar takes over while searching). The drawer button +
   // search toggle are supplied by SearchLayout. WalletScreen layers the shared
@@ -18,8 +17,6 @@ export default function HomeLayout() {
       title="Wallet"
       placeholder="Search people..."
       transparent
-      scrimScrollY={walletScrollY}
-      scrimDistance={WALLET_HEADER_SCRIM_DISTANCE}
       searchTestIDPrefix="wallet"
       renderIdleTitle={() => (
         <MintSelector testID="wallet-mint-selector" onRequestMintList={handleRequestMintList} />
