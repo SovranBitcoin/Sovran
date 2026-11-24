@@ -27,7 +27,7 @@ export function parseAvailability(input: unknown): ReleaseAvailability {
       freedomStore: url.hostname === 'freedomstore.io' && url.pathname === '/' && !url.search,
       googlePlay: url.hostname === 'play.google.com' && url.pathname === '/store/apps/details' && url.search === '?id=com.sovranbitcoin',
       githubApk: url.hostname === 'github.com' && url.pathname === `/SovranBitcoin/Sovran/releases/download/v${value.version}/sovran-${value.version}.apk` && !url.search,
-      zapstore: url.hostname === 'zapstore.dev' && url.pathname === '/apps/com.sovranbitcoin' && !url.search,
+      zapstore: url.hostname === 'zapstore.dev' && (url.pathname === '/apps/com.sovranbitcoin' || url.pathname === '/apps/com.sovranbitcoin.zapstore') && !url.search,
     }[channel];
     if (!validDestination) throw new Error('Unexpected release destination');
     for (const field of ['sha256', 'certificateSha256'] as const) {
