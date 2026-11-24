@@ -8,23 +8,6 @@
   "app/_layout.tsx": {
     "inline-style": 1
   },
-  "features/ai/components/AiEmptyState.tsx": {
-    "inline-style": 1
-  },
-  "features/ai/components/AiMessageBubble.tsx": {
-    "inline-style": 19,
-    "stack-layout-props": 10
-  },
-  "features/ai/components/ModelChip.tsx": {
-    "stack-layout-props": 1
-  },
-  "features/ai/screens/AiChatScreen.tsx": {
-    "inline-style": 8,
-    "content-container-style": 3
-  },
-  "features/ai/screens/ProviderListScreen.tsx": {
-    "inline-style": 1
-  },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
     "inline-style": 7,
     "stack-layout-props": 2
@@ -37,132 +20,6 @@
   "features/camera/screens/CameraScreen/CameraLayout.tsx": {
     "inline-style": 7,
     "stack-layout-props": 1
-  },
-  "features/composer/ui/ComposeFab.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/composer/ui/PollComposeForm.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 4
-  },
-  "features/composer/ui/PostComposer.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 10,
-    "content-container-style": 1
-  },
-  "features/composer/ui/PostProgressBar.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/FeedTabButton.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/HomeFeed.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/RecentPeopleSearchStrip.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1,
-    "content-container-style": 1
-  },
-  "features/feed/components/ThreadReplyBar.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 4,
-    "stack-layout-props": 3
-  },
-  "features/feed/components/ThreadView.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 1,
-    "content-container-style": 1
-  },
-  "features/feed/components/UserFeed.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "stack-layout-props": 2
-  },
-  "features/feed/components/nostr/DeletedTombstone.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "stack-layout-props": 1
-  },
-  "features/feed/components/nostr/MetricsFooter.tsx": {
-    "stack-layout-props": 2
-  },
-  "features/feed/components/nostr/NoteContent.tsx": {
-    "inline-style": 9,
-    "stack-layout-props": 6
-  },
-  "features/feed/components/nostr/PostCard.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 8
-  },
-  "features/feed/components/nostr/RelayCard.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
-  },
-  "features/feed/components/nostr/StoriesCarousel.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/nostr/StoryProgressBar.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/nostr/feedStyles.ts": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/nostr/image-overlay/AndroidImageOverlayHost.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "content-container-style": 1
-  },
-  "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
-    "stylesheet-create": 2,
-    "inline-style": 2
-  },
-  "features/feed/components/nostr/image-overlay/ImageBlock.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3
-  },
-  "features/feed/components/nostr/image-overlay/PagerDots.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/nostr/poll/PollCard.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 5
-  },
-  "features/feed/components/notificationRowChrome.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/thread-embed/EmbedActionBar.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/thread-embed/LinkEmbedView.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/components/thread-embed/ThreadEmbedSheet.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/feed/lib/zapMenu.tsx": {
-    "inline-style": 1
-  },
-  "features/feed/screens/FeedScreen.tsx": {
-    "stylesheet-create": 2
-  },
-  "features/feed/screens/NotificationFollowersScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3,
-    "stack-layout-props": 4,
-    "content-container-style": 1
-  },
-  "features/feed/screens/NotificationsScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 6,
-    "stack-layout-props": 7,
-    "content-container-style": 1
-  },
-  "features/feed/screens/StoriesScreen.tsx": {
-    "inline-style": 1
   },
   "features/map/components/StatsCard.tsx": {
     "stylesheet-create": 1,
@@ -188,10 +45,6 @@
   "features/mint/components/mintChanges/MintChangeRow.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 3
-  },
-  "features/mint/components/mintChanges/MintChangesList.tsx": {
-    "stylesheet-create": 1,
-    "content-container-style": 1
   },
   "features/mint/components/rebalance/RebalanceChainCard.tsx": {
     "stack-layout-props": 2
@@ -451,7 +304,7 @@
     "stack-layout-props": 2
   },
   "features/settings/screens/SettingsNetworkScreen.tsx": {
-    "inline-style": 4
+    "inline-style": 1
   },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
     "inline-style": 15,
@@ -569,9 +422,6 @@
   "features/user/components/ProfileBody.tsx": {
     "stylesheet-create": 1
   },
-  "features/user/screens/UserMessagesScreen.tsx": {
-    "inline-style": 2
-  },
   "features/user/screens/UserProfileScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 17,
@@ -610,22 +460,6 @@
   "features/wallet/screens/WalletScreen.tsx": {
     "stylesheet-create": 1,
     "content-container-style": 1
-  },
-  "features/whitenoise/components/RequestActions.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3,
-    "stack-layout-props": 2
-  },
-  "features/whitenoise/components/WhitenoiseSetupBanner.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3
-  },
-  "features/whitenoise/screens/WhitenoiseDMScreen.tsx": {
-    "inline-style": 3,
-    "stack-layout-props": 1
-  },
-  "features/whitenoise/screens/WhitenoiseSetupScreen.tsx": {
-    "stylesheet-create": 1
   },
   "shared/blocks/NotFoundScreen.tsx": {
     "stylesheet-create": 1,

@@ -119,28 +119,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     if (preview || locked || reclaimingAi) return;
     setReclaimingAi(true);
     setAiReclaimNote(null);
-    try {
-      const [legacy, pendingRecovered] = await Promise.all([
-        reclaimRoutstrBalances(),
-        recoverPendingPayments(),
-      ]);
-      const collected = legacy.reclaimed + pendingRecovered;
-      const stillPendingPayments = Object.keys(useRoutstrStore.getState().pendingPayments).length;
-      const hasDeferred = legacy.deferred > 0 || stillPendingPayments > 0;
-      if (collected > 0) {
-        setAiReclaimNote(
-          hasDeferred
-            ? 'Collected available ecash. Some nodes did not answer — try again later.'
-            : 'Collected leftover AI ecash into your wallet.'
-        );
-      } else if (hasDeferred) {
-        setAiReclaimNote('AI node did not answer. Your credentials are kept — try again later.');
-      } else {
-        setAiReclaimNote('No leftover AI balance found.');
-      }
-    } finally {
-      setReclaimingAi(false);
-    }
+    setAiReclaimNote(await collectAiLeftovers());
+    setReclaimingAi(false);
   };
 
   useEffect(() => {
@@ -343,8 +323,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           />
         )}
         {!gateMode && !preview && (hasAiLeftovers || aiReclaimNote) && (
-          <VStack gap={8} className="bg-surface-secondary w-full rounded-2xl px-4 py-3">
-            <VStack gap={2}>
+          <VStack className="bg-surface-secondary w-full gap-2 rounded-2xl px-4 py-3">
+            <VStack className="gap-0.5">
               <Text size={14} bold className="text-foreground">
                 Collect AI leftovers
               </Text>
@@ -748,3 +728,30 @@ const MintRecoveryRow: React.FC<{
     </HStack>
   );
 };
+
+/** Sweep legacy Routstr balances and pending AI change into the wallet, and
+ *  describe the outcome for the recovery card. Never rejects. */
+async function collectAiLeftovers(): Promise<string> {
+  try {
+    const [legacy, pendingRecovered] = await Promise.all([
+      reclaimRoutstrBalances(),
+      recoverPendingPayments(),
+    ]);
+    const collected = legacy.reclaimed + pendingRecovered;
+    const stillPendingPayments = Object.keys(useRoutstrStore.getState().pendingPayments).length;
+    const hasDeferred = legacy.deferred > 0 || stillPendingPayments > 0;
+    if (collected > 0) {
+      return hasDeferred
+        ? 'Collected available ecash. Some nodes did not answer — try again later.'
+        : 'Collected leftover AI ecash into your wallet.';
+    }
+    if (hasDeferred) return 'AI node did not answer. Your credentials are kept — try again later.';
+    return 'No leftover AI balance found.';
+  } catch (error) {
+    // Shown in the card instead of escaping the press handler unhandled.
+    cashuLog.warn('recovery.ai_reclaim.failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    return "Couldn't check AI nodes. Your credentials are kept — try again later.";
+  }
+}

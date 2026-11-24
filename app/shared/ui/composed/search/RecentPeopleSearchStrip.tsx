@@ -1,10 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { ScrollView, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import * as nip19 from 'nostr-tools/nip19';
 
 import { useRecentPeopleProfiles } from '@/shared/hooks/useRecentPeopleProfiles';
@@ -79,9 +74,9 @@ export function RecentPeopleSearchStrip({
       component="RecentPeopleSearchStrip"
       itemKey="section"
       itemType="strip"
-      style={styles.section}
+      className="pb-2 pt-4"
       extra={{ rows: rows.length, title, showClear }}>
-      <HStack align="center" justify="space-between" style={styles.title}>
+      <HStack className="mb-2.5 items-center justify-between">
         <Text bold size={15} color={foreground}>
           {title}
         </Text>
@@ -106,7 +101,7 @@ export function RecentPeopleSearchStrip({
         onContentSizeChange={handleStripContentSizeChange}
         onScroll={stripScrollHandler}
         scrollEventThrottle={250}
-        contentContainerStyle={styles.listContent}>
+        contentContainerClassName="gap-2.5">
         {rows.map((row, index) => (
           <VisualLayoutProbe
             key={row.pubkey}
@@ -165,7 +160,7 @@ function RecentPersonCard({
       haptics
       activeOpacity={0.72}
       onPress={handlePress}
-      style={styles.card}>
+      className="min-h-[88px] w-[82px] items-center justify-center">
       <Avatar
         state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
         picture={picture}
@@ -173,7 +168,12 @@ function RecentPersonCard({
         name={displayName}
         seed={pubkey}
       />
-      <Text bold size={13} color={foreground} numberOfLines={1} style={styles.nameText}>
+      <Text
+        bold
+        size={13}
+        color={foreground}
+        numberOfLines={1}
+        className="mt-2 self-stretch text-center">
         {displayName}
       </Text>
       <Text
@@ -181,7 +181,7 @@ function RecentPersonCard({
         color={muted}
         numberOfLines={1}
         ellipsizeMode={subtitleEllipsizeMode}
-        style={styles.subtitleText}>
+        className="mt-[3px] self-stretch text-center">
         {subtitle}
       </Text>
     </Pressable>
@@ -195,32 +195,3 @@ function safeNpub(pubkey: string): string {
     return pubkey;
   }
 }
-
-const styles = StyleSheet.create({
-  section: {
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  title: {
-    marginBottom: 10,
-  },
-  listContent: {
-    gap: 10,
-  },
-  card: {
-    width: 82,
-    minHeight: 88,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nameText: {
-    alignSelf: 'stretch',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  subtitleText: {
-    alignSelf: 'stretch',
-    marginTop: 3,
-    textAlign: 'center',
-  },
-});

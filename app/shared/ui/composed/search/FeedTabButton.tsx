@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -41,16 +41,13 @@ export function FeedTabButton({
       onPress={onPress}
       haptics={!!onPress}
       activeOpacity={1}
-      style={({ pressed }) => [
-        styles.tabButton,
-        { backgroundColor: pressed ? pressedBg : active ? activeBg : 'transparent' },
-      ]}>
-      <View style={styles.tabInner}>
+      className="rounded-full"
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? pressedBg : active ? activeBg : 'transparent',
+      })}>
+      <View className="min-h-[34px] flex-row items-center justify-center gap-1.5 rounded-full px-4 py-1">
         {/* Selection reads in the type too (weight + ink), not only the pill. */}
-        <Text
-          family={POST_FONT_FAMILY}
-          semibold={active}
-          style={[styles.tabLabel, { color: labelColor }]}>
+        <Text family={POST_FONT_FAMILY} semibold={active} size={fontSize.xl} color={labelColor}>
           {label}
         </Text>
         {showChevron ? <Icon name="mdi:chevron-down" size={16} color={labelColor} /> : null}
@@ -58,22 +55,3 @@ export function FeedTabButton({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  tabButton: {
-    borderRadius: 999,
-  },
-  tabInner: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 34,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  tabLabel: {
-    fontSize: fontSize.xl,
-  },
-});

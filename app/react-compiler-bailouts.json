@@ -1,24 +1,10 @@
 {
   "$comment": "Files containing at least one function the React Compiler cannot compile. App paths are relative to app/; workspace-package paths (wallet/src, nostr/src) are relative to the repo root. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
   "bailouts": {
-    "features/ai/hooks/useAiSend.ts": [
-      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
-      "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
-      "(BuildHIR::lowerStatement) Handle for-await loops",
-      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
-    ],
     "features/bitchat/hooks/useBitchatBLEIdentityMaterial.ts": [
       "Existing memoization could not be preserved"
     ],
     "features/bitchat/hooks/useBitchatNickname.ts": ["Existing memoization could not be preserved"],
-    "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
-      "Cannot access refs during render"
-    ],
-    "features/feed/components/nostr/useVideoTapGesture.ts": ["Cannot access refs during render"],
-    "features/feed/components/ThreadView.tsx": ["Cannot access refs during render"],
-    "features/feed/hooks/useCardTapGesture.ts": ["Cannot access refs during render"],
-    "features/feed/hooks/useFeedCardProps.ts": ["Cannot access refs during render"],
-    "features/feed/hooks/useFeedRows.ts": ["Cannot access refs during render"],
     "features/mint/hooks/useMintRebalanceOrchestrator.ts": ["Cannot access refs during render"],
     "features/mint/hooks/useStickyMintSelectorItems.ts": ["Cannot access refs during render"],
     "features/nearPay/hooks/useNutDropCelebration.ts": ["Cannot access refs during render"],

@@ -68,7 +68,7 @@ export function useRouteParams<S extends ZodType>(
   options: UseRouteParamsOptions
 ): zInfer<S> | null {
   const raw = useLocalSearchParams();
-  const pathname = typeof usePathname === 'function' ? usePathname() : '';
+  const pathname = usePathname() ?? '';
   const parsed = useMemo(() => schema.safeParse(raw), [schema, raw]);
 
   useEffect(() => {

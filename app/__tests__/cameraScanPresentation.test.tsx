@@ -26,6 +26,7 @@ jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
     useLocalSearchParams: () => ({}),
+    usePathname: () => '',
     useFocusEffect: (effect: () => void | (() => void)) => {
       mockFocus.effect = effect;
       ReactActual.useEffect(() => effect() ?? undefined, [effect]);

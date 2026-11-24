@@ -21,6 +21,7 @@ const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockRaw,
+  usePathname: () => '',
   // The header's right item, drawn in place so it reads the same filters.
   Stack: {
     Screen: ({ options }: { options: { headerRight?: () => React.ReactElement } }) =>

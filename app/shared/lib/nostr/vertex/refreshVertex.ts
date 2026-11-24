@@ -72,8 +72,7 @@ export async function refreshVertex(
   nostrLog.info('nostr.vertex.client_request', { kind: input.kind, reason: 'stale' });
   const send: DirectVertexSender =
     input.send ??
-    ((signedEvent, opts) =>
-      facade.sendDirectVertexRequest(signedEvent, { ...opts, verifyEvent }));
+    ((signedEvent, opts) => facade.sendDirectVertexRequest(signedEvent, { ...opts, verifyEvent }));
   const response = await send(signed.value, { signal: input.signal, timeoutMs: 15_000 });
   if (!response.ok) {
     if (response.reason === 'insufficient_credits' && budget.getState().block()) {

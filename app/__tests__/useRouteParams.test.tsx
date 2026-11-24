@@ -23,6 +23,7 @@ jest.mock('expo-router', () => ({
   },
   useLocalSearchParams: () =>
     mockFreshParamsPerCall ? { ...paramsRef.current } : paramsRef.current,
+  usePathname: () => '',
 }));
 
 // The guarded router dedupes repeated calls within 600ms, so a recovery

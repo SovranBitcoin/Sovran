@@ -51,6 +51,7 @@ jest.mock('expo-router', () => {
     useNavigationContainerRef: () => ({ isReady: () => false, getRootState: () => undefined }),
     useSegments: () => [],
     useLocalSearchParams: () => mockParams,
+    usePathname: () => '',
     useFocusEffect: (effect: () => void | (() => void)) => {
       ReactActual.useEffect(() => {
         const cleanup = effect();

@@ -19,7 +19,9 @@ module.exports = ({ config }) => {
 
   // Debug logging to verify bundle identifier selection
   if (process.env.EAS_BUILD_PROFILE || process.env.APP_VARIANT) {
-    console.log(`[app.config.js] Build profile: ${buildProfile}, isDevelopment: ${isDevelopment}, isZapstore: ${isZapstore}`);
+    console.log(
+      `[app.config.js] Build profile: ${buildProfile}, isDevelopment: ${isDevelopment}, isZapstore: ${isZapstore}`
+    );
     console.log(`[app.config.js] iOS bundle: ${iosBundleId}, Android package: ${androidPackage}`);
   }
 

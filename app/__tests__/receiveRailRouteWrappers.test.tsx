@@ -23,6 +23,7 @@ const mockWalletContext = {
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
+  usePathname: () => '',
   router: { back: (...args: unknown[]) => mockBack(...args), canGoBack: () => true },
   Stack: { Screen: () => null },
 }));

@@ -1,9 +1,4 @@
 {
-  "app/(drawer)/(tabs)/_layout.tsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "features/map/screens/MapScreen.tsx": {
     "no-restricted-syntax": {
       "count": 1
