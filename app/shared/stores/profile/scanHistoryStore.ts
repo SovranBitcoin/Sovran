@@ -127,6 +127,27 @@ const PersistedScanHistoryStore = z.object({
     .default([]),
 });
 
+/**
+ * Secret-bearing URIs that must never land in plaintext AsyncStorage scan
+ * history or transaction annotations (e.g. NIP-46 pairing links with bearer
+ * secrets, or raw Nostr private keys).
+ */
+const SENSITIVE_SCAN_RE = /(?:^|\s|[?&=#/])(?:nostrconnect|bunker):\/\/|(?:^|\s|nostr:)nsec1[02-9ac-hj-np-z]+/i;
+
+export function isSensitiveScanInput(raw: string): boolean {
+  if (!raw) return false;
+  if (SENSITIVE_SCAN_RE.test(raw)) return true;
+  if (raw.includes('%')) {
+    try {
+      const decoded = decodeURIComponent(raw);
+      if (SENSITIVE_SCAN_RE.test(decoded)) return true;
+    } catch {
+      // Malformed percent-encoding: fall back to raw check above.
+    }
+  }
+  return false;
+}
+
 export const useScanHistoryStore = create<ScanHistoryStore>({
   name: 'scan-history-store',
   scope: 'profile',
@@ -137,6 +158,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
         entries: [],
 
         addScan: ({ raw, type, source, inputType, container, optionKinds }) => {
+          // Never persist secret-bearing pairing URIs or raw private keys in plaintext history.
+          if (isSensitiveScanInput(raw)) return;
           // Too long to be worth keeping; a history of these fills storage.
           if (raw.length > MAX_SCAN_RAW_LENGTH) return;
           storeLog.info('store.scan_history.add', { type, source, inputType, container });

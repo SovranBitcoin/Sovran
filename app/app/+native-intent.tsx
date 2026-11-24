@@ -16,7 +16,9 @@
  * unchanged.
  */
 
-const NOSTRCONNECT_SCHEME_RE = /^nostrconnect:\/\//i;
+const PAIRING_SCHEME_RE = /^(?:nostrconnect|bunker):\/\//i;
+/** Any decoded query/fragment carrying a NIP-46 pairing URI payload. */
+const EMBEDDED_PAIRING_URI_RE = /(?:^|[?&=#/])(?:nostrconnect|bunker):\/\//i;
 /** A link naming the old connect route and carrying a pairing link as a param. */
 const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
 /**
@@ -27,11 +29,41 @@ const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
 const CONTACTS_ROUTE_RE =
   /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?(?:\((?:drawer|tabs)\)\/)*contacts(?:[/?#].*)?$/i;
 
+function safeDecode(value: string): string {
+  let current = value;
+  for (let i = 0; i < 2; i += 1) {
+    try {
+      const next = decodeURIComponent(current);
+      if (next === current) break;
+      current = next;
+    } catch {
+      break;
+    }
+  }
+  return current;
+}
+
+function carriesPairingSecret(path: string): boolean {
+  if (PAIRING_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return true;
+  if (EMBEDDED_PAIRING_URI_RE.test(path)) return true;
+  const decoded = safeDecode(path);
+  if (decoded !== path) {
+    if (
+      PAIRING_SCHEME_RE.test(decoded) ||
+      CONNECT_WITH_URI_RE.test(decoded) ||
+      EMBEDDED_PAIRING_URI_RE.test(decoded)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Exported for direct unit coverage. */
 export function rewriteSystemPath(path: string): string {
   try {
     if (typeof path !== 'string') return path;
-    if (NOSTRCONNECT_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return '/';
+    if (carriesPairingSecret(path)) return '/';
     if (CONTACTS_ROUTE_RE.test(path)) return '/search';
     return path;
   } catch {

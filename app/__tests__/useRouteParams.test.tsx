@@ -129,4 +129,18 @@ describe('useRouteParams', () => {
     expect(mockBack).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
+
+  it('coalesces duplicate invalid-param back() calls from nested hooks in the same commit', () => {
+    paramsRef.current = { pubkey: 'not-hex' };
+    act(() => {
+      TestRenderer.create(
+        <>
+          <Probe options={{ where: 'wrapper.route' }} onResult={() => undefined} />
+          <Probe options={{ where: 'screen.route' }} onResult={() => undefined} />
+        </>
+      );
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 });

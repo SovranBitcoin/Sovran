@@ -35,6 +35,11 @@ export interface UseRouteParamsOptions {
  * `loggableIssues`) and dispatches `onInvalid` from a `useEffect`. Effects
  * are used so React strict-mode double-invokes never fight `router.back()`.
  */
+// Coalesce multiple useRouteParams recovery dispatches in the same commit
+// (e.g. a route wrapper and its mounted screen both validating the same bad
+// params) without interfering with a later recovery after a user back().
+let recoveryDispatchedInTurn = false;
+
 export function useRouteParams<S extends ZodType>(
   schema: S,
   options: UseRouteParamsOptions
@@ -52,6 +57,11 @@ export function useRouteParams<S extends ZodType>(
     log.warn(`nav.${options.where}.invalid_params`, { issues });
     const policy = options.onInvalid ?? 'back';
     if (policy === 'back') {
+      if (recoveryDispatchedInTurn) return;
+      recoveryDispatchedInTurn = true;
+      queueMicrotask(() => {
+        recoveryDispatchedInTurn = false;
+      });
       // Unguarded: the 600ms dedupe would swallow a recovery back() dispatched
       // right after the navigation that opened this route.
       const rawRouter = guardedRouter.raw;

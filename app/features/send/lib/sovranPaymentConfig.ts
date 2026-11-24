@@ -95,7 +95,10 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import {
+  isSensitiveScanInput,
+  useScanHistoryStore,
+} from '@/shared/stores/profile/scanHistoryStore';
 import {
   linkTransactionAnnotation,
   setDistributionAnnotation,
@@ -514,6 +517,7 @@ export function createSovranNotifications(
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
+      if (isSensitiveScanInput(rawInput)) return;
       useScanHistoryStore.getState().addScan({
         raw: rawInput,
         type: scanType,

@@ -93,6 +93,17 @@ describe('useScanHistoryStore.addScan', () => {
     expect(entries.some((e) => e.id === 'seed-0')).toBe(false);
     expect(entries.some((e) => e.id === 'seed-499')).toBe(true);
   });
+
+  it.each([
+    'nostrconnect://abc?secret=s3cr3t&relay=wss://r',
+    'bunker://abc?secret=s3cr3t&relay=wss://r',
+    '  BUNKER://abc?secret=s3cr3t  ',
+    'sovran://camera?uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
+    'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5',
+  ])('refuses to persist secret-bearing scan %s in plaintext history', (secretInput) => {
+    useScanHistoryStore.getState().addScan({ raw: secretInput, type: 'unknown', source: 'qr' });
+    expect(useScanHistoryStore.getState().entries).toHaveLength(0);
+  });
 });
 
 describe('useScanHistoryStore.linkTransaction', () => {
