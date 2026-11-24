@@ -44,6 +44,31 @@ const SWAP_GROUP_A0 = {
   legs: [{ ...SWAP_A0.state.groups[SWAP_GROUP].legs[0], mintOperationId: 'mint-op-fixture-1' }],
 };
 
+const MINIBITS = 'https://mint.minibits.cash/Bitcoin';
+const METADATA = disk['mint-metadata-store'] as {
+  state: { byMintUrl: Record<string, object> };
+  version: number;
+};
+const OBSERVATIONS = {
+  ucash: {
+    source: 'ucash',
+    observedAt: 1_789_960_000_000,
+    status: 'online',
+    uptime: { pct: 100, window: '24h', checks: 25 },
+    operations: { okCount: 230, totalCount: 241, window: 'all' },
+    latency: { ms: 3394, kind: 'mean', window: '24h' },
+    auditorMintId: 2,
+  },
+  mintradar: {
+    source: 'mintradar',
+    observedAt: 1_789_960_000_000,
+    uptime: { pct: 99.5, window: '24h' },
+    operations: { okCount: 48, totalCount: 50, window: '7d' },
+    latency: { ms: 145, kind: 'median', window: '24h' },
+    sourceUrl: 'https://mintradar.org/mint/https%3A%2F%2Fmint.minibits.cash%2FBitcoin',
+  },
+};
+
 const LAST_KNOWN_VERSION = { version: '0.1.5', minVersion: '0.1.2', fetchedAt: 1_790_000_000_000 };
 const PROVIDER = {
   baseUrl: 'https://node.example',
@@ -143,10 +168,21 @@ export const fixture: ReleaseFixture = {
         .filter((key) => key.startsWith('nut-drop-redeem-queue:profile:'))
         .map((key) => [key, withState(key, { recoveredCopy: null })])
     ),
+    // shared/stores/global/settingsStore.ts: `enabledMintAuditors`, the
+    // allowlist for opt-in auditors (Macadamia), beside the saved denylist.
     'settings-store': withState('settings-store', {
       lastKnownAppVersion: LAST_KNOWN_VERSION,
       vertexCreditsEnabled: false,
       primalHostsDisabled: ['wss://cache2.primal.net/v1'],
+      enabledMintAuditors: ['macadamia'],
+    }),
+    // shared/stores/global/mintMetadataStore.ts: `auditObservations`, each
+    // auditor's own reading of a mint (shared/lib/cashu/auditors/observation.ts).
+    'mint-metadata-store': withState('mint-metadata-store', {
+      byMintUrl: {
+        ...METADATA.state.byMintUrl,
+        [MINIBITS]: { ...METADATA.state.byMintUrl[MINIBITS], auditObservations: OBSERVATIONS },
+      },
     }),
     // shared/stores/global/pricelistStore.ts: serverUpdatedAt
     'pricelist-store': withState('pricelist-store', { serverUpdatedAt: 1_789_199_340 }),
@@ -224,6 +260,18 @@ export const fixture: ReleaseFixture = {
         store: 'settings-store',
         path: ['primalHostsDisabled'],
         equals: ['wss://cache2.primal.net/v1'],
+      },
+      {
+        what: 'the opt-in mint auditor that was turned on',
+        store: 'settings-store',
+        path: ['enabledMintAuditors'],
+        equals: ['macadamia'],
+      },
+      {
+        what: "each auditor's reading of a mint",
+        store: 'mint-metadata-store',
+        path: ['byMintUrl', MINIBITS, 'auditObservations'],
+        equals: OBSERVATIONS,
       },
       {
         what: 'when the server last priced bitcoin',

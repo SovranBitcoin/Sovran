@@ -23,16 +23,12 @@ import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { buildMintHistoryHref } from '@/shared/lib/nav/mintInfoRoutes';
-import { formatRate } from '@/shared/lib/number';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
-import {
-  StatsGrid as StatsGridBlock,
-  UNKNOWN_STAT,
-  type GridStat,
-} from '@/shared/ui/composed/StatsGrid';
+import { StatsGrid as StatsGridBlock } from '@/shared/ui/composed/StatsGrid';
+import { Badge } from '@/shared/ui/primitives/Badge';
 import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -57,7 +53,9 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
-import type { MintAuditSummary } from '../lib/auditInfo';
+import { useMintInputFees } from '../hooks/useMintInputFees';
+import { formatInputFee, mintCapabilityPills } from '../lib/mintCapabilities';
+import { mintInfoStatCards, type MintInfoStats } from '../lib/mintInfoStats';
 import { buildMintDetailsRows } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
@@ -175,45 +173,15 @@ function AnimatedAvatar({
 function StatsGrid({
   status,
   onRetry,
-  audit,
+  stats,
 }: {
   /** The audit group's read status; the block is ALWAYS mounted and swaps content in place. */
   status: MintDetailGroupStatus;
   onRetry: () => void;
-  /** The same `selectMintAudit` reading the mint rows show, so the two agree. */
-  audit?: MintAuditSummary;
+  /** Each number from one named source (`selectMintInfoStats`). */
+  stats: MintInfoStats;
 }) {
-  const { successRate, avgLatencyMs, mints, melts } = audit ?? {};
-
-  const stats: GridStat[] = [
-    {
-      label: 'Success rate',
-      description: 'Of mint and melt operations',
-      value: successRate !== undefined ? formatRate(successRate) : UNKNOWN_STAT,
-      placeholder: '100%',
-      accent: true,
-    },
-    {
-      label: 'Average time',
-      // ucash reports its own probe latency; the retired audit API timed swaps.
-      description: audit?.source === 'ucash' ? 'Measured by the auditor' : 'For successful swaps',
-      value: avgLatencyMs !== undefined ? `${Math.round(avgLatencyMs)} ms` : UNKNOWN_STAT,
-      placeholder: '420 ms',
-      accent: true,
-    },
-    {
-      label: 'Total mints',
-      description: 'Total mint operations',
-      value: mints !== undefined ? Math.round(mints).toString() : UNKNOWN_STAT,
-      placeholder: '12,345',
-    },
-    {
-      label: 'Total melts',
-      description: 'Total melt operations',
-      value: melts !== undefined ? Math.round(melts).toString() : UNKNOWN_STAT,
-      placeholder: '12,345',
-    },
-  ];
+  const cards = mintInfoStatCards(stats);
 
   // One slot for every state so the block never unmounts (no layout shift
   // when audit lands, is missing, or fails): skeleton → values, or an inline
@@ -253,7 +221,7 @@ function StatsGrid({
   }
   return (
     <StatsGridBlock
-      stats={stats}
+      stats={cards}
       loading={status === 'loading'}
       visualKey="mint-info-stats"
       visualSurface="mint-info"
@@ -325,6 +293,9 @@ export function MintInfoScreen() {
   // rows use. The entry's audit fields are a snapshot of that store taken at
   // navigation, so reading them here let the page lag behind its own row.
   const audit = detail.meta.audit;
+  // Capabilities from the cached NUT-06 info, else the map discovery carried (as Details reads them).
+  const capabilityPills = mintCapabilityPills(cachedMeta?.info?.nuts ?? cachedMeta?.nuts);
+  const inputFees = useMintInputFees(mintUrl, isTrusted);
   const identityError = detail.identityError;
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
@@ -626,7 +597,7 @@ export function MintInfoScreen() {
               </VStack>
             )}
 
-            <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
+            <StatsGrid status={detail.audit} onRetry={detail.retry} stats={detail.stats} />
           </VStack>
 
           {identityError && (
@@ -667,6 +638,27 @@ export function MintInfoScreen() {
               />
               <Spacer size={12} />
             </>
+          ) : null}
+
+          {capabilityPills.length > 0 || (inputFees?.length ?? 0) > 0 ? (
+            <Section title="What this mint supports">
+              <View className="flex-row flex-wrap gap-2 px-1" testID="mint-info-capabilities">
+                {capabilityPills.map((label) => (
+                  <Badge key={label} variant="secondary" size={12}>
+                    {label}
+                  </Badge>
+                ))}
+                {inputFees?.map((fee) => (
+                  <Badge
+                    key={`fee:${fee.unit}`}
+                    variant={fee.ppk > 0 ? 'warning' : 'success'}
+                    icon="mdi:cash-multiple"
+                    size={12}>
+                    {formatInputFee(fee)}
+                  </Badge>
+                ))}
+              </View>
+            </Section>
           ) : null}
 
           {mintUrl && (

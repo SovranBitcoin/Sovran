@@ -34,8 +34,19 @@ afterEach(() => {
 
 describe('mint auditor registry & privacy controls', () => {
   it('enables all auditors by default and filters disabled ids', () => {
-    expect(resolveEnabledAuditors([])).toEqual(['nip87', 'mintradar', 'cashu-audit', 'imf-gg']);
-    expect(resolveEnabledAuditors(['mintradar', 'imf-gg'])).toEqual(['nip87', 'cashu-audit']);
+    // uCash is on by default; Macadamia is opt-in, so it is absent here.
+    expect(resolveEnabledAuditors([])).toEqual([
+      'nip87',
+      'mintradar',
+      'cashu-audit',
+      'imf-gg',
+      'ucash',
+    ]);
+    expect(resolveEnabledAuditors(['mintradar', 'imf-gg'])).toEqual([
+      'nip87',
+      'cashu-audit',
+      'ucash',
+    ]);
   });
 
   it('makes ZERO HTTP fetch calls when all HTTP auditors are disabled', async () => {
@@ -211,7 +222,7 @@ describe('mint auditor adapters', () => {
     );
 
     const entries = await fetchImfDirectory();
-    expect(fetchSpy).toHaveBeenCalledWith(IMF_LIST_URL, expect.any(Object));
+    expect(fetchSpy).toHaveBeenCalledWith(`${IMF_LIST_URL}?page=1`, expect.any(Object));
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       source: 'imf-gg',
@@ -285,6 +296,7 @@ describe('multi-auditor merging and fault tolerance', () => {
         ],
         'cashu-audit': async () => [],
         'imf-gg': async () => [],
+        ucash: async () => [],
       },
     });
 

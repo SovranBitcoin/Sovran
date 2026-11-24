@@ -24,6 +24,7 @@ import {
   type ParseError,
 } from '@sovranbitcoin/schemas';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
+import { AuditObservationsSchema } from '@/shared/lib/cashu/auditors/observation';
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -109,6 +110,8 @@ const DiscoverMint = z.looseObject({
   // nagg's unpaid-quote probe saw the mint mark a never-paid quote as paid: a
   // fake payment backend. The row's units are then testnut account units.
   testnut: z.boolean().optional().catch(undefined),
+  /** Each auditor's own typed reading of the mint, by source (additive, tolerant). */
+  auditObservations: AuditObservationsSchema.optional().catch(undefined),
   /** nagg's own `/v1/info` probe, on the provider directory's terms: `unknown`
    *  when never probed or older than its max age, `checkedAt` omitted while
    *  unknown, `latencyMs` from the last successful probe. Feedback, not a gate. */
@@ -536,8 +539,10 @@ export const discoverMints = ({ limit, signal }: { limit?: number; signal?: Abor
   const { useSettingsStore } = require('@/shared/stores/global/settingsStore') as {
     useSettingsStore: typeof import('@/shared/stores/global/settingsStore').useSettingsStore;
   };
+  const settings = useSettingsStore.getState();
   return discoverMintsFromAuditors({
-    disabledAuditors: useSettingsStore.getState().disabledMintAuditors,
+    disabledAuditors: settings.disabledMintAuditors,
+    enabledAuditors: settings.enabledMintAuditors,
     limit,
     signal,
   });
@@ -715,34 +720,78 @@ export const fetchWallpaperCatalog = (
 // share the canonical `fetchJson` scaffolding.
 // ---------------------------------------------------------------------------
 
-export const fetchMintInfo = (
-  mintUrl: string,
-  controls: RequestControls = {}
-): Promise<Result<GetInfoResponse, Error>> => {
-  // Defence-in-depth: this is the one helper that dials arbitrary
-  // user-supplied hosts. Callers normalize the URL, but a stray `http://`
-  // or `file://` would otherwise sail through to `fetch`. Reject anything
-  // that isn't `https:` here so the policy is enforced at the boundary
-  // regardless of which call site forgot to validate.
+/**
+ * The `https:` base of a mint, with its trailing slash. Defence-in-depth: the
+ * helpers below dial arbitrary user-supplied hosts, and callers normalize the
+ * URL, but a stray `http://` or `file://` would otherwise sail through to
+ * `fetch`, so the policy is enforced here regardless of which call site forgot.
+ */
+function httpsMintBase(mintUrl: string): Result<string, Error> {
   let parsed: URL;
   try {
     parsed = new URL(mintUrl);
   } catch {
-    return Promise.resolve(err(new Error('Invalid mint URL')));
+    return err(new Error('Invalid mint URL'));
   }
   if (parsed.protocol !== 'https:') {
     apiLog.warn('api.mint_info_scheme_rejected', {
       host: parsed.host,
       protocol: parsed.protocol,
     });
-    return Promise.resolve(err(new Error(`Mint URL must use https: (got ${parsed.protocol})`)));
+    return err(new Error(`Mint URL must use https: (got ${parsed.protocol})`));
   }
+  return ok(mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`);
+}
 
-  const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
+export const fetchMintInfo = (
+  mintUrl: string,
+  controls: RequestControls = {}
+): Promise<Result<GetInfoResponse, Error>> => {
+  const base = httpsMintBase(mintUrl);
+  if (base.isErr()) return Promise.resolve(err(base.error));
   return fetchJson(
-    `${normalizedUrl}v1/info`,
+    `${base.value}v1/info`,
     parseMintInfo,
     'cashu/mint/info',
+    { headers: { Accept: 'application/json' } },
+    controls
+  );
+};
+
+// NUT-02 `/v1/keysets`: only the fields Mint Info reads (unit, active, fee).
+const MintKeysetsResponse = z.looseObject({
+  keysets: z
+    .array(
+      z.looseObject({
+        id: z.string().max(128),
+        unit: z.string().max(32),
+        active: z.boolean(),
+        input_fee_ppk: z.number().int().nonnegative().optional().catch(undefined),
+      })
+    )
+    .max(256),
+});
+type MintKeysetsResponse = z.infer<typeof MintKeysetsResponse>;
+
+const parseMintKeysets = (input: unknown): Result<MintKeysetsResponse, ParseError> => {
+  const r = MintKeysetsResponse.safeParse(input);
+  if (!r.success) {
+    return err({ type: 'schema/zod', where: 'cashu/mint/keysets', issues: r.error.issues });
+  }
+  return ok(r.data);
+};
+
+/** A mint's keysets straight from the mint, for one it is not in the wallet yet. */
+export const fetchMintKeysets = (
+  mintUrl: string,
+  controls: RequestControls = {}
+): Promise<Result<MintKeysetsResponse, Error>> => {
+  const base = httpsMintBase(mintUrl);
+  if (base.isErr()) return Promise.resolve(err(base.error));
+  return fetchJson(
+    `${base.value}v1/keysets`,
+    parseMintKeysets,
+    'cashu/mint/keysets',
     { headers: { Accept: 'application/json' } },
     controls
   );

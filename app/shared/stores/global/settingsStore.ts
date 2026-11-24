@@ -7,6 +7,7 @@ import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
+import { MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -102,6 +103,12 @@ interface SettingsState {
   primalHostsDisabled: string[];
   /** Mint auditor ids the user switched OFF (denylist: empty = all enabled). */
   disabledMintAuditors: string[];
+  /**
+   * Off-by-default mint auditor ids the user switched ON. Kept apart from the
+   * denylist so an install that saved `disabledMintAuditors` before an opt-in
+   * auditor existed never starts using it.
+   */
+  enabledMintAuditors: string[];
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -218,6 +225,9 @@ const PersistedSettings = z.object({
   disabledMintAuditors: tolerantArray(z.string().max(64), 16)
     .default([])
     .catch(() => []),
+  enabledMintAuditors: tolerantArray(z.string().max(64), 16)
+    .default([])
+    .catch(() => []),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
   middlemanRouting:
     PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING).catch(DEFAULT_MIDDLEMAN_ROUTING),
@@ -253,6 +263,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   relayTierEnabled: true,
   primalHostsDisabled: [],
   disabledMintAuditors: [],
+  enabledMintAuditors: [],
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -444,9 +455,17 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
         },
         setMintAuditorEnabled: (id: string, enabled: boolean) => {
           storeLog.info('store.settings.set_mint_auditor_enabled', { id, enabled });
+          // A default-on auditor is switched through the denylist, a default-off
+          // one through the allowlist; the other list is left as it was.
+          const defaultOn =
+            MINT_AUDITORS.find((auditor) => auditor.id === id)?.defaultEnabled ?? true;
           set((state) => {
-            const withoutId = state.disabledMintAuditors.filter((entry) => entry !== id);
-            return { disabledMintAuditors: enabled ? withoutId : [...withoutId, id] };
+            if (defaultOn) {
+              const withoutId = state.disabledMintAuditors.filter((entry) => entry !== id);
+              return { disabledMintAuditors: enabled ? withoutId : [...withoutId, id] };
+            }
+            const withoutId = state.enabledMintAuditors.filter((entry) => entry !== id);
+            return { enabledMintAuditors: enabled ? [...withoutId, id] : withoutId };
           });
         },
 
@@ -549,6 +568,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           relayTierEnabled: state.relayTierEnabled,
           primalHostsDisabled: state.primalHostsDisabled,
           disabledMintAuditors: state.disabledMintAuditors,
+          enabledMintAuditors: state.enabledMintAuditors,
         }),
         afterHydrate: (state, error) => {
           if (error) return;

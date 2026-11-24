@@ -65,11 +65,11 @@ function when(value: unknown, now: number): string | undefined {
 }
 
 /**
- * The NUTs a mint offers, named. A NUT counts only when its settings are an
- * object that is not `disabled` and, where it says, is `supported` (a NUT-17
- * list of subscriptions counts when it is not empty).
+ * The NUTs a mint offers, by number, in order. A NUT counts only when its
+ * settings are an object that is not `disabled` and, where it says, is
+ * `supported` (a NUT-17 list of subscriptions counts when it is not empty).
  */
-export function supportedNutNames(nuts: unknown): string[] {
+export function supportedNuts(nuts: unknown): string[] {
   if (!nuts || typeof nuts !== 'object') return [];
   return Object.entries(nuts as Record<string, unknown>)
     .filter(([, setting]) => {
@@ -80,12 +80,16 @@ export function supportedNutNames(nuts: unknown): string[] {
       return Array.isArray(supported) ? supported.length > 0 : supported === true;
     })
     .map(([nut]) => nut)
-    .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
-    .map((nut) =>
-      Object.prototype.hasOwnProperty.call(NUT_TITLES, nut)
-        ? `${NUT_TITLES[nut]} (NUT-${nut})`
-        : `NUT-${nut}`
-    );
+    .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+}
+
+/** The NUTs a mint offers, named by their spec titles. */
+export function supportedNutNames(nuts: unknown): string[] {
+  return supportedNuts(nuts).map((nut) =>
+    Object.prototype.hasOwnProperty.call(NUT_TITLES, nut)
+      ? `${NUT_TITLES[nut]} (NUT-${nut})`
+      : `NUT-${nut}`
+  );
 }
 
 function npubOf(pubkey: string | undefined): string | undefined {

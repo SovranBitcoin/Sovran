@@ -4,12 +4,15 @@ import { normalizeMintUrlKey } from '@/shared/lib/url';
 import {
   fetchCashuAuditDirectory,
   fetchImfDirectory,
+  fetchMacadamiaDirectory,
   fetchMintRadarDirectory,
   fetchMintRadarSingle,
   fetchNip87Directory,
+  fetchUcashDirectory,
   type AuditorFetchControls,
   type AuditorMintEntry,
 } from './adapters';
+import { mergeAuditObservations } from './observation';
 import { resolveEnabledAuditors, type MintAuditorId, type MintAuditSummary } from './registry';
 
 type AuditorAdapterMap = Record<
@@ -22,6 +25,8 @@ const DEFAULT_ADAPTERS: AuditorAdapterMap = {
   mintradar: fetchMintRadarDirectory,
   'cashu-audit': fetchCashuAuditDirectory,
   'imf-gg': fetchImfDirectory,
+  ucash: fetchUcashDirectory,
+  macadamia: fetchMacadamiaDirectory,
 };
 
 function mergeUnits(a?: string[], b?: string[]): string[] {
@@ -43,7 +48,12 @@ function rankScore(mint: DiscoverMint): number {
 }
 
 function isAuditSource(source: MintAuditorId): boolean {
-  return source === 'mintradar' || source === 'cashu-audit';
+  return (
+    source === 'mintradar' ||
+    source === 'cashu-audit' ||
+    source === 'ucash' ||
+    source === 'macadamia'
+  );
 }
 
 export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): DiscoverMint[] {
@@ -82,8 +92,17 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
         nErrors: entry.nErrors !== undefined ? Math.max(0, Math.round(entry.nErrors)) : undefined,
         reviewCount,
         averageScore,
+        ...(entry.observation
+          ? { auditObservations: mergeAuditObservations(undefined, [entry.observation]) }
+          : {}),
       });
       continue;
+    }
+
+    if (entry.observation) {
+      existing.auditObservations = mergeAuditObservations(existing.auditObservations, [
+        entry.observation,
+      ]);
     }
 
     if (audited) existing.hasAudit = true;
@@ -150,12 +169,17 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
 export async function discoverMintsFromAuditors(
   options: {
     disabledAuditors?: readonly string[];
+    /** Opt-in auditors the person switched on (`settingsStore.enabledMintAuditors`). */
+    enabledAuditors?: readonly string[];
     limit?: number;
     signal?: AbortSignal;
     adapters?: Partial<AuditorAdapterMap>;
   } = {}
 ): Promise<Result<DiscoverMintsResponse, Error>> {
-  const enabled = resolveEnabledAuditors(options.disabledAuditors ?? []);
+  const enabled = resolveEnabledAuditors(
+    options.disabledAuditors ?? [],
+    options.enabledAuditors ?? []
+  );
   if (enabled.length === 0) {
     return ok({ mints: [] });
   }

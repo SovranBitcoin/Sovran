@@ -29,7 +29,7 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 
 import { RelayListSettings } from '../components/RelayListSettings';
-import { MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
+import { isAuditorEnabled, MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
 
 const VERTEX_CREDITS_DESCRIPTION =
   "Uses your Nostr identity's free Vertex credits, directly over wss://relay.vertexlab.io, to improve people search and look up profiles. Vertex sees which names you search for and which profiles you open; your keys never leave the device.";
@@ -48,6 +48,7 @@ export function SettingsNetworkScreen() {
   const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
   const setRelayTierEnabled = useSettingsStore((s) => s.setRelayTierEnabled);
   const disabledMintAuditors = useSettingsStore((s) => s.disabledMintAuditors);
+  const enabledMintAuditors = useSettingsStore((s) => s.enabledMintAuditors);
   const setMintAuditorEnabled = useSettingsStore((s) => s.setMintAuditorEnabled);
   const health = useRelayHealth();
   const tierHealth = useNostrTierHealth(health);
@@ -192,7 +193,11 @@ export function SettingsNetworkScreen() {
         <Section title="Mint auditors">
           <ListGroup variant="secondary">
             {MINT_AUDITORS.map((auditor, index) => {
-              const enabled = !disabledMintAuditors.includes(auditor.id);
+              const enabled = isAuditorEnabled(
+                auditor.id,
+                disabledMintAuditors,
+                enabledMintAuditors
+              );
               return (
                 <React.Fragment key={auditor.id}>
                   {index > 0 ? <Separator className="mx-4" /> : null}

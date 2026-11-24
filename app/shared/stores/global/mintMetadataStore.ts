@@ -38,6 +38,11 @@ import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
+import {
+  AuditObservationsSchema,
+  mergeAuditObservations,
+  type AuditObservationUpdate,
+} from '@/shared/lib/cashu/auditors/observation';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -110,6 +115,12 @@ interface MintMetadataState {
     atMs?: number
   ) => void;
 
+  /**
+   * Record auditor readings for one mint, per source, newer winning. Leaves
+   * every freshness stamp alone: a lazy per-mint read is not a discovery pass.
+   */
+  recordAuditObservations: (mintUrl: string, updates: readonly AuditObservationUpdate[]) => void;
+
   /** Bulk upsert from a nagg `/nostr/mint/discover` response. */
   upsertFromDiscover: (mints: DiscoverMint[]) => void;
   clear: () => void;
@@ -164,6 +175,10 @@ const PersistedMintMetadataEntry = z.looseObject({
   liveness: z.enum(['online', 'offline']).optional().catch(undefined),
   livenessAt: z.number().int().nonnegative().optional().catch(undefined),
   livenessSource: z.enum(['probe', 'nagg']).optional().catch(undefined),
+  // per-source auditor readings — additive, tolerant twice over: a reading that
+  // does not parse costs that reading, and a map that does not parse costs the
+  // field, never the mint's row (rebalance reads `auditData.swaps` beside it).
+  auditObservations: AuditObservationsSchema.optional().catch(undefined),
 });
 
 const PersistedMintMetadataStore = z.object({
@@ -329,6 +344,24 @@ export const useMintMetadataStore = create<MintMetadataState>({
           }));
         },
 
+        recordAuditObservations: (mintUrl, updates) => {
+          if (updates.length === 0) return;
+          const key = normalizeMintUrlKey(mintUrl);
+          if (!key) return;
+          set((state) => {
+            const prev = state.byMintUrl[key] ?? {};
+            const next = {
+              ...state.byMintUrl,
+              [key]: {
+                ...prev,
+                auditObservations: mergeAuditObservations(prev.auditObservations, updates),
+              },
+            };
+            evictIfOverCap(next);
+            return { byMintUrl: next };
+          });
+        },
+
         upsertFromDiscover: (mints) => {
           const now = Date.now();
           set((state) => {
@@ -392,6 +425,14 @@ export const useMintMetadataStore = create<MintMetadataState>({
                 ...(m.vertexRank !== undefined ? { vertexRank: m.vertexRank } : {}),
                 ...(hasSocial ? { socialAt: now } : {}),
                 ...livenessGroup,
+                ...(m.auditObservations
+                  ? {
+                      auditObservations: mergeAuditObservations(
+                        prev.auditObservations,
+                        m.auditObservations
+                      ),
+                    }
+                  : {}),
               };
             }
             evictIfOverCap(next);

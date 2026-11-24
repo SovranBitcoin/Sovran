@@ -56,9 +56,14 @@ interface ManagerInternals {
   };
   mintService: {
     keysetRepo: {
-      getKeysetsByMintUrl(
-        mintUrl: string
-      ): Promise<{ unit?: string; keypairs?: Record<string, unknown> }[]>;
+      getKeysetsByMintUrl(mintUrl: string): Promise<
+        {
+          unit?: string;
+          keypairs?: Record<string, unknown>;
+          active?: boolean;
+          feePpk?: number;
+        }[]
+      >;
     };
   };
 }
@@ -69,6 +74,19 @@ function internals(manager: Manager): ManagerInternals {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The unit, active flag and NUT-02 fee of each keyset Coco saved for a mint,
+ * through the same private keyset repository `getMintKeysetUnits` reads:
+ * local DB, no network. Throws when the read fails.
+ */
+export async function getMintKeysetFees(
+  manager: Manager,
+  mintUrl: string
+): Promise<{ unit?: string; active?: boolean; feePpk?: number }[]> {
+  const keysets = await internals(manager).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
+  return keysets.map(({ unit, active, feePpk }) => ({ unit, active, feePpk }));
 }
 
 /**

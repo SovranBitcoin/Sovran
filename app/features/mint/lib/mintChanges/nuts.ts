@@ -79,3 +79,33 @@ export const LEAF_FIELDS: Record<string, string> = {
   bat_max_mint: 'max auth tokens per mint',
   protected_endpoints: 'protected endpoints',
 };
+
+/**
+ * Capability NUTs worth naming to a user. Everything absent here is either
+ * plumbing (NUT-07 state checks, NUT-19 endpoint lists) or wallet-side only.
+ * Shared by the change phrases and Mint Info's capability pills.
+ */
+const FEATURE_NAMES: Record<string, string> = {
+  '8': 'Lightning fee refunds',
+  '9': 'backup restore',
+  '10': 'locked ecash',
+  '11': 'locked ecash',
+  '12': 'offline verification',
+  '14': 'timelocked payments',
+  '15': 'multi-path payments',
+  '17': 'live payment updates',
+  '19': 'safer retries',
+  '20': 'signed mint quotes',
+  '28': 'pay to blinded key',
+  '29': 'batched deposits',
+};
+
+/** NUTs whose entire subtree is internal detail. */
+export const NOISE_NUTS: ReadonlySet<string> = new Set(['7']);
+
+/** What a capability NUT lets a person do, in lower case; the spec title, or `NUT-n`, otherwise. */
+export function nutFeatureName(nut: string): string {
+  if (Object.hasOwn(FEATURE_NAMES, nut)) return FEATURE_NAMES[nut]!;
+  const title = NUT_TITLES[String(Number(nut))];
+  return title ? title.toLowerCase() : `NUT-${nut}`;
+}

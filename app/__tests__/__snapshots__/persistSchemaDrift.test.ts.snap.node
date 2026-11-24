@@ -1344,6 +1344,138 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "auditData": {},
+              "auditObservations": {
+                "additionalProperties": {
+                  "properties": {
+                    "auditorMintId": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        {
+                          "maxLength": 128,
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    "latency": {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "median",
+                            "mean",
+                          ],
+                          "type": "string",
+                        },
+                        "ms": {
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                        "window": {
+                          "enum": [
+                            "24h",
+                            "all",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "ms",
+                        "kind",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                    "observedAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                    "operations": {
+                      "properties": {
+                        "okCount": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        "totalCount": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "window": {
+                          "enum": [
+                            "7d",
+                            "24h",
+                            "all",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "okCount",
+                        "totalCount",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                    "source": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                    "sourceUrl": {
+                      "maxLength": 2048,
+                      "type": "string",
+                    },
+                    "status": {
+                      "enum": [
+                        "online",
+                        "offline",
+                        "degraded",
+                        "archived",
+                      ],
+                      "type": "string",
+                    },
+                    "uptime": {
+                      "properties": {
+                        "checks": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        "pct": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                        "window": {
+                          "enum": [
+                            "24h",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "pct",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "source",
+                    "observedAt",
+                  ],
+                  "type": "object",
+                },
+                "propertyNames": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+                "type": "object",
+              },
               "auditScore": {
                 "anyOf": [
                   {
@@ -1536,6 +1668,142 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "auditData": {},
+              "auditObservations": {
+                "additionalProperties": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "auditorMintId": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        {
+                          "maxLength": 128,
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    "latency": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "median",
+                            "mean",
+                          ],
+                          "type": "string",
+                        },
+                        "ms": {
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                        "window": {
+                          "enum": [
+                            "24h",
+                            "all",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "ms",
+                        "kind",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                    "observedAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                    "operations": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "okCount": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        "totalCount": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "window": {
+                          "enum": [
+                            "7d",
+                            "24h",
+                            "all",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "okCount",
+                        "totalCount",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                    "source": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                    "sourceUrl": {
+                      "maxLength": 2048,
+                      "type": "string",
+                    },
+                    "status": {
+                      "enum": [
+                        "online",
+                        "offline",
+                        "degraded",
+                        "archived",
+                      ],
+                      "type": "string",
+                    },
+                    "uptime": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "checks": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        "pct": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                        "window": {
+                          "enum": [
+                            "24h",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "pct",
+                        "window",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "source",
+                    "observedAt",
+                  ],
+                  "type": "object",
+                },
+                "propertyNames": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+                "type": "object",
+              },
               "auditScore": {
                 "anyOf": [
                   {
@@ -6191,6 +6459,15 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "type": "string",
         },
+        "enabledMintAuditors": {
+          "default": [],
+          "items": {
+            "maxLength": 64,
+            "type": "string",
+          },
+          "maxItems": 16,
+          "type": "array",
+        },
         "experimental": {
           "default": false,
           "type": "boolean",
@@ -6447,6 +6724,9 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
             "gbp",
           ],
           "type": "string",
+        },
+        "enabledMintAuditors": {
+          "default": [],
         },
         "experimental": {
           "default": false,
@@ -6714,6 +6994,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "relayTierEnabled",
         "primalHostsDisabled",
         "disabledMintAuditors",
+        "enabledMintAuditors",
         "minTransferThreshold",
         "middlemanRouting",
       ],

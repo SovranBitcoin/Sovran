@@ -377,4 +377,53 @@ describe('onboarding flag for an install from before it existed', () => {
 
     expect(store.getState().hasSeenOnboarding).toBe(false);
   });
+
+  describe('mint auditor toggles', () => {
+    it('keeps an opt-in auditor off for a blob saved before the allowlist existed', async () => {
+      preload(
+        {
+          disabledMintAuditors: ['imf-gg'],
+          termsAccepted: { termsAccepted: true, date: '2025-01-01' },
+        },
+        4
+      );
+      const store = await loadStore();
+      const { resolveEnabledAuditors } =
+        require('@/shared/lib/cashu/auditors/registry') as typeof import('@/shared/lib/cashu/auditors/registry');
+      const { disabledMintAuditors, enabledMintAuditors } = store.getState();
+      expect(disabledMintAuditors).toEqual(['imf-gg']);
+      expect(enabledMintAuditors).toEqual([]);
+      const enabled = resolveEnabledAuditors(disabledMintAuditors, enabledMintAuditors);
+      expect(enabled).toContain('ucash');
+      expect(enabled).not.toContain('macadamia');
+      expect(enabled).not.toContain('imf-gg');
+      expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
+    });
+
+    it.each([
+      ['a non-array', 'macadamia'],
+      ['a null', null],
+      ['wrong types', [1, {}]],
+    ])('reads %s allowlist as empty and keeps terms', async (_label, enabledMintAuditors) => {
+      preload(
+        { enabledMintAuditors, termsAccepted: { termsAccepted: true, date: '2025-01-01' } },
+        4
+      );
+      const store = await loadStore();
+      expect(store.getState().enabledMintAuditors).toEqual([]);
+      expect(store.getState().termsAccepted?.termsAccepted).toBe(true);
+    });
+
+    it('switches a default-on auditor through the denylist and an opt-in one through the allowlist', async () => {
+      const store = await loadStore();
+      store.getState().setMintAuditorEnabled('macadamia', true);
+      store.getState().setMintAuditorEnabled('ucash', false);
+      expect(store.getState().enabledMintAuditors).toEqual(['macadamia']);
+      expect(store.getState().disabledMintAuditors).toEqual(['ucash']);
+      store.getState().setMintAuditorEnabled('macadamia', false);
+      store.getState().setMintAuditorEnabled('ucash', true);
+      expect(store.getState().enabledMintAuditors).toEqual([]);
+      expect(store.getState().disabledMintAuditors).toEqual([]);
+    });
+  });
 });

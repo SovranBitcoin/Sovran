@@ -5,6 +5,8 @@ const ROOT = resolve(__dirname, '..');
 
 describe('mint info screen source', () => {
   const source = readFileSync(resolve(ROOT, 'features/mint/screens/MintInfoScreen.tsx'), 'utf8');
+  // The four stat cards are built by the pure selector the screen renders.
+  const statsSource = readFileSync(resolve(ROOT, 'features/mint/lib/mintInfoStats.ts'), 'utf8');
 
   it('renders the mint address from the shared screen path before contacts', () => {
     const mintAddressStart = source.indexOf('<Section title="Mint address">');
@@ -42,7 +44,8 @@ describe('mint info screen source', () => {
     // Unknown counts never render as zero. The dash now belongs to the shared
     // grid, so both counterparty pages spell "nobody measured this" the same
     // way rather than each declaring their own.
-    expect(source).toContain('UNKNOWN_STAT');
+    expect(statsSource).toContain('UNKNOWN_STAT');
+    expect(statsSource).toContain("from '@/shared/ui/composed/StatsGrid'");
     expect(source).toContain("from '@/shared/ui/composed/StatsGrid'");
     expect(source).not.toContain(": '0.0'");
   });

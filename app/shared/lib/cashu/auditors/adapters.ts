@@ -2,8 +2,12 @@ import { z } from 'zod';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { normalizeMintUrlKey } from '@/shared/lib/url';
+import type { AuditObservationUpdate } from './observation';
 import {
   AUDIT_THRESHOLDS,
+  auditorDescriptor,
+  type CdkAuditorId,
   type MintAuditorId,
   type MintAuditStatus,
   type MintAuditSummary,
@@ -15,7 +19,9 @@ const AUDITOR_TIMEOUT_MS = 8_000;
 export const MINTRADAR_LIST_URL = 'https://mintradar.org/api/v1/wallets/mints';
 const MINTRADAR_SITE_URL = 'https://mintradar.org/mint';
 export const CASHU_AUDIT_LIST_URL = 'https://api.audit.8333.space/mints/';
-export const IMF_LIST_URL = 'https://imf.gg/api/mints?page=1';
+export const IMF_LIST_URL = 'https://imf.gg/api/mints';
+/** Directory pages read per auditor, at most: a broken server never loops. */
+export const AUDITOR_MAX_PAGES = 20;
 
 export interface AuditorMintEntry {
   source: MintAuditorId;
@@ -37,6 +43,8 @@ export interface AuditorMintEntry {
   auditScore?: number;
   uptime30d?: number;
   warnings?: MintAuditWarning[];
+  /** This source's typed reading, kept per source on the cached mint row. */
+  observation?: AuditObservationUpdate;
 }
 
 export interface AuditorFetchControls {
@@ -47,12 +55,17 @@ export interface AuditorFetchControls {
 async function fetchAuditorJson(
   url: string,
   source: MintAuditorId,
-  controls: AuditorFetchControls = {}
+  controls: AuditorFetchControls = {},
+  init: { form?: Record<string, string> } = {}
 ): Promise<unknown> {
+  const { form } = init;
   // eslint-disable-next-line no-restricted-globals -- public third-party auditor endpoints
   const response = await fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method: form ? 'POST' : 'GET',
+    headers: form
+      ? { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }
+      : { Accept: 'application/json' },
+    ...(form ? { body: encodeForm(form) } : {}),
     signal: buildAbortSignal({
       timeoutMs: controls.timeoutMs ?? AUDITOR_TIMEOUT_MS,
       ...controls,
@@ -63,6 +76,66 @@ async function fetchAuditorJson(
     throw new Error(`${source} HTTP ${response.status}`);
   }
   return await response.json();
+}
+
+/** `application/x-www-form-urlencoded`, without relying on React Native's partial URLSearchParams. */
+function encodeForm(form: Record<string, string>): string {
+  return Object.entries(form)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    const error = new Error('Aborted');
+    error.name = 'AbortError';
+    throw error;
+  }
+}
+
+const finiteOrUndefined = (value: number | null | undefined): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+/**
+ * Read a paged directory: `page` from `first` until a page brings nothing new,
+ * the reported `total` is reached, or `AUDITOR_MAX_PAGES` pages were read.
+ * Rows are de-duplicated by normalized mint URL, first seen wins. The first
+ * page's failure is the source's failure; a later one keeps what was read.
+ */
+async function readPagedDirectory(
+  source: MintAuditorId,
+  first: 0 | 1,
+  fetchPage: (page: number) => Promise<unknown>,
+  controls: AuditorFetchControls
+): Promise<unknown[]> {
+  const rows: unknown[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < AUDITOR_MAX_PAGES; i++) {
+    throwIfAborted(controls.signal);
+    let raw: unknown;
+    try {
+      raw = await fetchPage(first + i);
+    } catch (error) {
+      if (i === 0 || controls.signal?.aborted) throw error;
+      apiLog.debug('cashu.auditor.page_failed', { source, page: first + i });
+      break;
+    }
+    const envelope =
+      raw && typeof raw === 'object' ? (raw as { mints?: unknown; total?: unknown }) : {};
+    const list = Array.isArray(envelope.mints) ? envelope.mints : [];
+    let added = 0;
+    for (const item of list) {
+      const url = item && typeof item === 'object' ? (item as { url?: unknown }).url : undefined;
+      const key = typeof url === 'string' ? normalizeMintUrlKey(url) : '';
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      rows.push(item);
+      added += 1;
+    }
+    const total = typeof envelope.total === 'number' ? envelope.total : undefined;
+    if (added === 0 || (total !== undefined && seen.size >= total)) break;
+  }
+  return rows;
 }
 
 const Nut06InfoSchema = z.looseObject({
@@ -254,6 +327,39 @@ function mapMintRadarItem(mint: MintRadarMint): AuditorMintEntry | null {
     auditScore: typeof mint.score === 'number' ? mint.score : undefined,
     uptime30d: typeof mint.uptime30dPct === 'number' ? mint.uptime30dPct : undefined,
     warnings,
+    observation: mintRadarObservation(mint, status, Date.now()),
+  };
+}
+
+/**
+ * MintRadar's reading: 24h uptime, 7-day swap probes with the failures it
+ * attributes to the mint, and the 24h median probe latency.
+ */
+function mintRadarObservation(
+  mint: MintRadarMint,
+  status: MintAuditStatus,
+  observedAt: number
+): AuditObservationUpdate {
+  const total = finiteOrUndefined(mint.audit?.swaps7d);
+  const failed = finiteOrUndefined(mint.audit?.attributedFailures) ?? 0;
+  const uptime = finiteOrUndefined(mint.uptime24hPct);
+  const p50 = finiteOrUndefined(mint.latency24h?.p50Ms);
+  return {
+    source: 'mintradar',
+    observedAt,
+    status,
+    uptime:
+      uptime !== undefined && uptime >= 0 && uptime <= 100 ? { pct: uptime, window: '24h' } : null,
+    operations:
+      total !== undefined && total > 0
+        ? {
+            okCount: Math.max(0, Math.round(total - Math.min(Math.max(failed, 0), total))),
+            totalCount: Math.round(total),
+            window: '7d',
+          }
+        : null,
+    latency: p50 !== undefined && p50 >= 0 ? { ms: p50, kind: 'median', window: '24h' } : null,
+    sourceUrl: `${MINTRADAR_SITE_URL}/${encodeURIComponent(mint.url)}`,
   };
 }
 
@@ -280,7 +386,7 @@ export async function fetchMintRadarDirectory(
 export async function fetchMintRadarSingle(
   mintUrl: string,
   controls: AuditorFetchControls = {}
-): Promise<MintAuditSummary | undefined> {
+): Promise<(MintAuditSummary & { observation: AuditObservationUpdate }) | undefined> {
   if (!isValidMintUrl(mintUrl)) return undefined;
   let raw: unknown;
   try {
@@ -315,6 +421,7 @@ export async function fetchMintRadarSingle(
     warnings: collectMintRadarWarnings(mint, status, swaps),
     sources: ['mintradar'],
     auditUrl: `${MINTRADAR_SITE_URL}/${encodeURIComponent(mint.url)}`,
+    observation: mintRadarObservation(mint, status, Date.now()),
   };
 }
 
@@ -358,19 +465,67 @@ export async function fetchCashuAuditDirectory(
       nMints: row.n_mints ?? undefined,
       nMelts: row.n_melts ?? undefined,
       nErrors: row.n_errors ?? undefined,
+      observation: countsObservation('cashu-audit', row, Date.now()),
     });
   }
   return entries;
 }
 
+function statusFromAuditorState(state: string | null | undefined): MintAuditStatus | undefined {
+  const s = (state ?? '').toUpperCase();
+  if (s === 'OK') return 'online';
+  if (s === 'WARN' || s === 'WARNING') return 'degraded';
+  if (s === 'ERROR') return 'offline';
+  return undefined;
+}
+
+/**
+ * The all-time operation counts the 8333 and CDK auditors keep: successful
+ * mints plus melts, out of those plus errors (`n_errors` counts failures
+ * separately; see `auditScoreFromOps`).
+ */
+function countsObservation(
+  source: 'cashu-audit' | CdkAuditorId,
+  row: {
+    id?: unknown;
+    state?: string | null;
+    n_mints?: number | null;
+    n_melts?: number | null;
+    n_errors?: number | null;
+  },
+  observedAt: number
+): AuditObservationUpdate {
+  const mints = finiteOrUndefined(row.n_mints);
+  const melts = finiteOrUndefined(row.n_melts);
+  const errors = finiteOrUndefined(row.n_errors);
+  const ok =
+    mints !== undefined && melts !== undefined
+      ? Math.max(0, Math.round(mints)) + Math.max(0, Math.round(melts))
+      : undefined;
+  const total = ok !== undefined && errors !== undefined ? ok + Math.max(0, Math.round(errors)) : 0;
+  const id = row.id;
+  return {
+    source,
+    observedAt,
+    status: statusFromAuditorState(row.state) ?? null,
+    operations:
+      ok !== undefined && total > 0 ? { okCount: ok, totalCount: total, window: 'all' } : null,
+    ...(typeof id === 'number' || typeof id === 'string' ? { auditorMintId: id } : {}),
+  };
+}
+
 // ---------------------------------------------------------------------------
-// 3. IMF.gg (https://imf.gg/api/mints?page=1)
+// 3. IMF.gg (https://imf.gg/api/mints?page=1..N)
 // ---------------------------------------------------------------------------
 
+// The live directory sends snake_case (`review_count`, `review_avg`); older
+// responses used camelCase. Either is read.
 const ImfMintSchema = z.looseObject({
   url: z.string(),
   name: z.string().nullish(),
   info: z.string().nullish(),
+  review_count: z.number().nullish(),
+  review_avg: z.number().nullish(),
   reviewCount: z.number().nullish(),
   reviewAvg: z.number().nullish(),
 });
@@ -378,13 +533,15 @@ const ImfMintSchema = z.looseObject({
 export async function fetchImfDirectory(
   controls: AuditorFetchControls = {}
 ): Promise<AuditorMintEntry[]> {
-  const raw = await fetchAuditorJson(IMF_LIST_URL, 'imf-gg', controls);
-  if (!raw || typeof raw !== 'object') return [];
-  const list = Array.isArray((raw as { mints?: unknown }).mints)
-    ? (raw as { mints: unknown[] }).mints
-    : [];
+  // imf.gg pages from 1 and answers past the end with an empty page.
+  const rows = await readPagedDirectory(
+    'imf-gg',
+    1,
+    (page) => fetchAuditorJson(`${IMF_LIST_URL}?page=${page}`, 'imf-gg', controls),
+    controls
+  );
   const entries: AuditorMintEntry[] = [];
-  for (const item of list) {
+  for (const item of rows) {
     const parsed = ImfMintSchema.safeParse(item);
     if (!parsed.success || !isValidMintUrl(parsed.data.url)) continue;
     const row = parsed.data;
@@ -398,11 +555,224 @@ export async function fetchImfDirectory(
       nuts: nut06.nuts,
       supportedUnits: nut06.supportedUnits,
       operatorPubkey: nut06.operatorPubkey,
-      reviewCount: typeof row.reviewCount === 'number' ? row.reviewCount : undefined,
-      averageScore: typeof row.reviewAvg === 'number' ? row.reviewAvg : undefined,
+      reviewCount: finiteOrUndefined(row.review_count ?? row.reviewCount),
+      averageScore: finiteOrUndefined(row.review_avg ?? row.reviewAvg),
     });
   }
   return entries;
+}
+
+// ---------------------------------------------------------------------------
+// 3b. CDK auditors (auditor.ucash.space, auditor.regtest.macadamia.cash)
+//
+// cashubtc/cdk's auditor serves Leptos server functions: form-encoded POSTs
+// to `/api/<name><suffix>`. The directory pages from 0. Per-mint uptime and
+// metrics are separate calls, made only by the mint info page, never once per
+// directory row.
+// ---------------------------------------------------------------------------
+
+const CdkMintRowSchema = z.looseObject({
+  id: z.union([z.number().int().nonnegative(), z.string().max(128)]),
+  url: z.string(),
+  name: z.string().nullish(),
+  info: z.string().nullish(),
+  state: z.string().nullish(),
+  n_errors: z.number().nullish(),
+  n_mints: z.number().nullish(),
+  n_melts: z.number().nullish(),
+});
+
+type CdkMintRow = z.infer<typeof CdkMintRowSchema>;
+
+const CdkUptimeSchema = z.looseObject({
+  window_hours: z.number().nullish(),
+  checks: z.number().int().nonnegative(),
+  successes: z.number().int().nonnegative().nullish(),
+  failures: z.number().int().nonnegative().nullish(),
+  uptime_percent: z.number().nullish(),
+});
+
+const CdkMetricsSchema = z.looseObject({
+  attempts: z.number().nonnegative().nullish(),
+  successes: z.number().nonnegative().nullish(),
+  attempts_24h: z.number().nonnegative().nullish(),
+  successes_24h: z.number().nonnegative().nullish(),
+  avg_latency_ms: z.number().nullish(),
+  avg_latency_ms_24h: z.number().nullish(),
+});
+
+type CdkMintUptime = z.infer<typeof CdkUptimeSchema>;
+type CdkMintMetrics = z.infer<typeof CdkMetricsSchema>;
+
+function cdkRoute(id: CdkAuditorId, name: string): string {
+  const descriptor = auditorDescriptor(id);
+  if (!descriptor?.endpoint || descriptor.functionSuffix === undefined) {
+    throw new Error(`${id} has no CDK endpoint`);
+  }
+  return `${descriptor.endpoint}/api/${name}${descriptor.functionSuffix}`;
+}
+
+function cdkSearch(
+  id: CdkAuditorId,
+  search: string,
+  page: number,
+  controls: AuditorFetchControls
+): Promise<unknown> {
+  return fetchAuditorJson(cdkRoute(id, 'search_mints'), id, controls, {
+    form: { search, page: String(page) },
+  });
+}
+
+function mapCdkRow(id: CdkAuditorId, row: CdkMintRow, observedAt: number): AuditorMintEntry {
+  const nut06 = parseNut06InfoJson(row.info);
+  const status = statusFromAuditorState(row.state);
+  return {
+    source: id,
+    mintUrl: row.url,
+    name: nut06.name ?? cleanQuoted(row.name),
+    description: nut06.description,
+    iconUrl: nut06.iconUrl,
+    nuts: nut06.nuts,
+    supportedUnits: nut06.supportedUnits,
+    operatorPubkey: nut06.operatorPubkey,
+    state: row.state ?? undefined,
+    status: status === 'online' ? 'online' : status === 'offline' ? 'offline' : 'unknown',
+    // No test-mint verdict here: an auditor's own hostname says nothing about
+    // each mint it watches, so `testnut` is left to the sources that classify.
+    nMints: finiteOrUndefined(row.n_mints),
+    nMelts: finiteOrUndefined(row.n_melts),
+    nErrors: finiteOrUndefined(row.n_errors),
+    observation: countsObservation(id, row, observedAt),
+  };
+}
+
+/** Every mint one CDK auditor lists, with its all-time counts. */
+export async function fetchCdkDirectory(
+  id: CdkAuditorId,
+  controls: AuditorFetchControls = {}
+): Promise<AuditorMintEntry[]> {
+  const rows = await readPagedDirectory(
+    id,
+    0,
+    (page) => cdkSearch(id, '', page, controls),
+    controls
+  );
+  const now = Date.now();
+  const entries: AuditorMintEntry[] = [];
+  for (const item of rows) {
+    const parsed = CdkMintRowSchema.safeParse(item);
+    if (!parsed.success || !isValidMintUrl(parsed.data.url)) continue;
+    entries.push(mapCdkRow(id, parsed.data, now));
+  }
+  return entries;
+}
+
+export const fetchUcashDirectory = (controls?: AuditorFetchControls) =>
+  fetchCdkDirectory('ucash', controls);
+export const fetchMacadamiaDirectory = (controls?: AuditorFetchControls) =>
+  fetchCdkDirectory('macadamia', controls);
+
+/**
+ * One mint's row on a CDK auditor, found by searching for its host (one
+ * request). `undefined` when the auditor does not list it or cannot answer.
+ */
+export async function findCdkMint(
+  id: CdkAuditorId,
+  mintUrl: string,
+  controls: AuditorFetchControls = {}
+): Promise<AuditorMintEntry | undefined> {
+  let host: string;
+  try {
+    host = new URL(mintUrl).host;
+  } catch {
+    return undefined;
+  }
+  const target = normalizeMintUrlKey(mintUrl);
+  try {
+    const raw = await cdkSearch(id, host, 0, controls);
+    const list =
+      raw && typeof raw === 'object' && Array.isArray((raw as { mints?: unknown }).mints)
+        ? (raw as { mints: unknown[] }).mints
+        : [];
+    for (const item of list) {
+      const parsed = CdkMintRowSchema.safeParse(item);
+      if (!parsed.success || normalizeMintUrlKey(parsed.data.url) !== target) continue;
+      return mapCdkRow(id, parsed.data, Date.now());
+    }
+  } catch {
+    // A source that cannot answer is a soft failure for the page.
+  }
+  return undefined;
+}
+
+async function cdkDetail<T>(
+  id: CdkAuditorId,
+  name: string,
+  auditorMintId: number | string,
+  schema: z.ZodType<T>,
+  controls: AuditorFetchControls
+): Promise<T | undefined> {
+  try {
+    const raw = await fetchAuditorJson(cdkRoute(id, name), id, controls, {
+      form: { id: String(auditorMintId) },
+    });
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      apiLog.debug('cashu.auditor.detail_shape', { source: id, name });
+      return undefined;
+    }
+    return parsed.data;
+  } catch {
+    // 404, 5xx, timeouts and bad JSON all mean "nothing from this source now".
+    return undefined;
+  }
+}
+
+export const fetchCdkMintUptime = (
+  id: CdkAuditorId,
+  auditorMintId: number | string,
+  controls: AuditorFetchControls = {}
+) => cdkDetail(id, 'get_mint_uptime', auditorMintId, CdkUptimeSchema, controls);
+
+export const fetchCdkMintMetrics = (
+  id: CdkAuditorId,
+  auditorMintId: number | string,
+  controls: AuditorFetchControls = {}
+) => cdkDetail(id, 'get_mint_metrics', auditorMintId, CdkMetricsSchema, controls);
+
+/**
+ * A CDK auditor's per-mint detail as an observation update. Uptime counts only
+ * when some check ran. Both live auditors report `avg_latency_ms_24h: 0.0`
+ * when no probe succeeded in 24h, so that mean is read only with
+ * `successes_24h > 0`; otherwise the all-time mean stands in, with
+ * `successes > 0`. A call that did not answer leaves its group alone.
+ */
+export function cdkDetailObservation(
+  id: CdkAuditorId,
+  detail: { uptime?: CdkMintUptime; metrics?: CdkMintMetrics },
+  observedAt: number
+): AuditObservationUpdate {
+  const update: AuditObservationUpdate = { source: id, observedAt };
+  const { uptime, metrics } = detail;
+  if (uptime) {
+    const pct = finiteOrUndefined(uptime.uptime_percent);
+    update.uptime =
+      uptime.checks > 0 && pct !== undefined && pct >= 0 && pct <= 100
+        ? { pct, window: '24h', checks: uptime.checks }
+        : null;
+  }
+  if (metrics) {
+    const recent = finiteOrUndefined(metrics.avg_latency_ms_24h);
+    const allTime = finiteOrUndefined(metrics.avg_latency_ms);
+    if ((metrics.successes_24h ?? 0) > 0 && recent !== undefined && recent > 0) {
+      update.latency = { ms: recent, kind: 'mean', window: '24h' };
+    } else if ((metrics.successes ?? 0) > 0 && allTime !== undefined && allTime > 0) {
+      update.latency = { ms: allTime, kind: 'mean', window: 'all' };
+    } else {
+      update.latency = null;
+    }
+  }
+  return update;
 }
 
 // ---------------------------------------------------------------------------

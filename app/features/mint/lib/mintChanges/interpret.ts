@@ -20,7 +20,7 @@
  * unmapped change is never silently swallowed.
  */
 import { decodePointer, pairPatchOps, type PatchOp, own } from './decode';
-import { NUT_TITLES } from './nuts';
+import { NOISE_NUTS, nutFeatureName as featureName } from './nuts';
 
 export type Direction = 'receive' | 'send';
 type FactAction = 'added' | 'removed';
@@ -75,35 +75,6 @@ const RAIL_NAMES: Record<string, string> = {
 
 export function railName(method: string): string {
   return own(RAIL_NAMES, method.toLowerCase()) ?? method;
-}
-
-/**
- * Capability NUTs worth naming to a user. Everything absent here is either
- * plumbing (NUT-07 state checks, NUT-19 endpoint lists) or wallet-side only.
- */
-const FEATURE_NAMES: Record<string, string> = {
-  '8': 'Lightning fee refunds',
-  '9': 'backup restore',
-  '10': 'locked ecash',
-  '11': 'locked ecash',
-  '12': 'offline verification',
-  '14': 'timelocked payments',
-  '15': 'multi-path payments',
-  '17': 'live payment updates',
-  '19': 'safer retries',
-  '20': 'signed mint quotes',
-  '28': 'pay to blinded key',
-  '29': 'batched deposits',
-};
-
-/** NUTs whose entire subtree is internal detail. */
-const NOISE_NUTS = new Set(['7']);
-
-function featureName(nut: string): string {
-  const known = own(FEATURE_NAMES, nut);
-  if (known) return known;
-  const title = NUT_TITLES[String(Number(nut))];
-  return title ? title.toLowerCase() : `NUT-${nut}`;
 }
 
 /* ── small readers (every value here is untrusted mint output) ────────── */

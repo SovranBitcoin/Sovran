@@ -7,6 +7,7 @@ import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadat
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
+import { readMintAuditDetail } from '@/features/mint/lib/mintAuditDetail';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -30,6 +31,11 @@ jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
 }));
 jest.mock('@/shared/lib/nostr/fetchMintReviews', () => ({ fetchMintReviews: jest.fn() }));
 jest.mock('@/features/mint/hooks/useMintProfiles', () => ({ useMintProfiles: jest.fn() }));
+// Mint Info's own per-mint auditor reads: stubbed, so no test reaches a network.
+jest.mock('@/features/mint/lib/mintAuditDetail', () => ({
+  mintAuditDetailDue: () => true,
+  readMintAuditDetail: jest.fn(),
+}));
 jest.mock('@/features/send/lib/createSovranScreenActionsBridge', () => ({
   retryMintInfoFetch: jest.fn(() => true),
 }));
@@ -41,6 +47,8 @@ jest.mock('@/shared/lib/logger', () => {
     cashuLog: sink,
     monotonicNow: () => Date.now(),
     mintUrlLogFields: () => ({}),
+    applyFileLogging: jest.fn(),
+    redactError: (e: unknown) => e,
   };
 });
 
@@ -56,6 +64,7 @@ beforeEach(() => {
   useMintMetadataStore.setState({ byMintUrl: {} });
   mintReviewsCache.clear();
   jest.mocked(getDiscoveredMintMetadata).mockImplementation(async () => store().getCached(MINT));
+  jest.mocked(readMintAuditDetail).mockResolvedValue({ updates: [], answered: false });
   jest
     .mocked(fetchMintReviews)
     .mockResolvedValue(
@@ -185,4 +194,32 @@ it('accepts late review updates until the detail read is aborted', async () => {
   act(() => update?.({ ...first, tier: 'nagg', score: 2, reviewCount: 3 }));
   expect(store().getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90 });
   expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data.score).toBe(4.5);
+});
+
+it('records the per-mint auditor reads and shows the stats they carry', async () => {
+  jest.mocked(readMintAuditDetail).mockResolvedValue({
+    updates: [
+      {
+        source: 'ucash',
+        observedAt: 1,
+        uptime: { pct: 100, window: '24h', checks: 25 },
+        latency: { ms: 3394, kind: 'mean', window: '24h' },
+      },
+    ],
+    answered: true,
+  });
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  await waitFor(() => expect(result.current.stats.uptime?.source).toBe('ucash'));
+  // One source answering is an answer, even with the directory read failing.
+  await waitFor(() => expect(result.current.audit).toBe('ready'));
+  expect(result.current.stats.latency).toEqual({
+    ms: 3394,
+    kind: 'mean',
+    window: '24h',
+    source: 'ucash',
+  });
+  expect(readMintAuditDetail).toHaveBeenCalledWith(
+    MINT,
+    expect.objectContaining({ disabledAuditors: [], enabledAuditors: [] })
+  );
 });
