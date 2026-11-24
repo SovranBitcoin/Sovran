@@ -53,10 +53,12 @@ import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { useOverlaidContactSearch } from '@/features/search/hooks/useOverlaidContactSearch';
 import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
-import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
-import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import {
+  startContactSend as startContactSendTo,
+  type ContactSendTarget,
+} from '@/features/send/lib/startContactSend';
 import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
@@ -150,7 +152,7 @@ export function SendScreen({ unit }: { unit: string }) {
   // ── People search — the SAME canonical assembly the Search tab uses ───────
   // `useOverlaidContactSearch` wraps `useContactSearch` + the kind-0 overlay so
   // Send inherits identical results and per-result metrics, but WITHOUT
-  // `useAllSearchResults`' place matches, which read the location.
+  // the Search tab's place matches, which read the location.
   const { contactRows, loading: searchLoading } = useOverlaidContactSearch(
     hasFeature('nostrSearch') ? query : ''
   );
@@ -294,40 +296,8 @@ export function SendScreen({ unit }: { unit: string }) {
   // by DMing the token to this npub — see contactSendStore) and route to amount
   // entry, seeding `meltTarget` when they advertise a lud16 (Lightning option).
   const startContactSend = useCallback(
-    (target: {
-      pubkey: string;
-      displayName: string | null;
-      picture: string | null;
-      nip05: string | null;
-      lud16: string | null;
-    }) => {
-      const { pubkey, displayName, picture, nip05, lud16 } = target;
-      // The lock option's kind:10019 lookup is the slowest thing on the amount
-      // screen. Start it here, where the recipient first becomes known, so the
-      // answer is usually already cached by the time the menu asks.
-      prefetchNutzapProfile(pubkey);
-      // No advertised Lightning address → npub.cash, which can receive for any
-      // Nostr key. It is a fallback we chose, not one they published, so the
-      // Lightning option carries that caveat (see `availability.ts`).
-      const npcFallback = npcAddressForPubkey(pubkey);
-      const lightningTarget = lud16 ?? npcFallback;
-      // Without ecash messages the contact is paid over Lightning only, so
-      // no DM delivery is armed.
-      if (hasFeature('ecashMessages')) {
-        useContactSendStore.getState().start({
-          pubkey,
-          delivery: 'nip17',
-          ...(displayName ? { displayName } : {}),
-          avatarUrl: picture,
-          nip05,
-          ...(lud16 ? { lud16 } : {}),
-        });
-      }
-      void machine.startSendEcash({
-        recipientPubkey: pubkey,
-        recipientProfile: { displayName: displayName ?? '', avatarUrl: picture, nip05 },
-        ...(lightningTarget ? { meltTarget: lightningTarget } : {}),
-      });
+    (target: ContactSendTarget) => {
+      void startContactSendTo(machine, target);
     },
     [machine]
   );

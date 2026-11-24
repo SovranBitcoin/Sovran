@@ -1,125 +1,101 @@
 /**
- * @fileoverview Single aggregation seam behind the unified search surface.
+ * @fileoverview The Search tab's one read: what to show for a query.
  *
- * Composes the existing people/place search (`useAllSearchResults`) with the
- * server-backed mint search (`useMintSearch`) into one set of per-scope buckets
- * plus a flat, relevance-ranked "All" feed. The Search tab reads this one hook,
- * so every scope aggregates the same things — no per-scope result wiring.
+ * Tier 0 answers on the first character, with no network and no wait: the
+ * action card for a pasted payment string, people and mints already on the
+ * phone, the discovered-mint list (filtered on the phone from its cached
+ * copy), and the Bluetooth row. Tier 1, the remote people search, waits for
+ * the one 250 ms pause in `useContactSearch` and streams in under the local
+ * people. The field itself emits every keystroke, so there is one wait, not
+ * two.
  *
- * Mint search only fires once the query is long enough to be worth a network
- * round-trip; below that the Mints bucket is simply empty (and its tab hidden).
+ * A payment string or a secret never reaches the remote search (see
+ * `classifySearchQuery`).
  */
 import { useMemo } from 'react';
 
-import {
-  useAllSearchResults,
-  type AllSearchResult,
-} from '@/features/search/hooks/useAllSearchResults';
+import { BLUETOOTH_TIER_ENTRY, useLocationTiers } from '@/features/bitchat/hooks/useLocationTiers';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import { useLocalSearchCandidates } from '@/features/search/hooks/useLocalSearchCandidates';
+import { useOverlaidContactSearch } from '@/features/search/hooks/useOverlaidContactSearch';
+import { matchLocalMints, matchLocalPeople } from '@/features/search/lib/localSearch';
+import { matchTiers } from '@/features/search/lib/matchTiers';
+import { parseGeohashQuery } from '@/features/search/lib/parseGeohashQuery';
+import {
+  classifySearchQuery,
+  isRecordableSearch,
+  remoteSearchText,
+  type SearchQueryKind,
+} from '@/features/search/lib/searchAction';
+import { buildSearchSections, type SearchListItem } from '@/features/search/lib/searchSections';
+import { buildDetectors } from '@/shared/config/featureDetectors';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import type { SearchStatus } from './searchListState';
 
-/** Shorter than the people minimum (3) — mint names are often 2-letter brands. */
-const MINT_SEARCH_MIN_LENGTH = 2;
+/**
+ * Place matches use the location only once a query is typed, and only when the
+ * person already allowed it: opening Search never shows the location prompt.
+ */
+const LOCATION_TIER_OPTIONS = { requestPermission: false } as const;
 
-/** Mint relevance band: below the geohash jump (110) and top contacts (100…),
- *  above tier matches (80–90), so the ranked "All" feed interleaves sensibly. */
-const SCORE_MINT_BASE = 95;
-
-export type SearchAggregates = {
-  /** Trimmed query the buckets reflect. */
+type SearchAggregates = {
+  /** Trimmed query the rows reflect. */
   query: string;
-  /** Flat relevance-ranked feed: people + places + mints (the "All" scope). */
-  all: AllSearchResult[];
-  /** Contact rows (the People scope). */
-  people: AllSearchResult[];
-  /** Geohash-jump + tier rows (the Groups scope). */
-  groups: AllSearchResult[];
-  /** Mint rows (the Mints scope). */
-  mints: AllSearchResult[];
-  /** Per-scope counts, used to decide which scope tabs are visible. */
-  counts: { people: number; groups: number; mints: number };
-  /** Combined loading (people OR mints) — drives the All scope skeletons. */
-  loading: boolean;
-  /** People search in flight — drives the People scope skeletons. */
-  peopleLoading: boolean;
-  /** Mint search in flight — drives the Mints scope skeletons. */
-  mintsLoading: boolean;
-  /** People-search read status: placeholders / no-results / error decisions. */
+  /** What the query is: empty, a secret, a payment string or words. */
+  kind: SearchQueryKind;
+  /** Header and result rows, in section order. */
+  items: SearchListItem[];
+  /** Rows per section. */
+  counts: { people: number; mints: number; nearby: number };
+  /** The remote people search's status; `idle` while it has nothing to do. */
   peopleStatus: SearchStatus;
-  /** Mint-search read status. */
-  mintsStatus: SearchStatus;
-  /** Re-run the people search after a failure. */
+  /** A settled query that found something and may go in recent searches. */
+  recordable: boolean;
   retryPeople: () => void;
-  /** Re-run the mint discovery read after a failure. */
-  retryMints: () => void;
 };
 
 export function useSearchAggregates(query: string): SearchAggregates {
-  const { results, people, groups, peoplePubkeys, loading, status, retry } =
-    useAllSearchResults(query);
-
+  const walletContext = useWalletContext();
   const trimmed = query.trim();
-  const mintEnabled = trimmed.length >= MINT_SEARCH_MIN_LENGTH;
-  const {
-    results: mintResults,
-    loading: mintLoading,
-    status: mintStatus,
-    refresh: retryMints,
-  } = useMintSearch(query, 'ALL', {
-    enabled: mintEnabled,
-  });
-
-  const mints = useMemo<AllSearchResult[]>(
-    () =>
-      mintResults.map((mint, i) => ({
-        type: 'mint' as const,
-        id: `mint:${mint.url}`,
-        mint,
-        score: SCORE_MINT_BASE - i,
-      })),
-    [mintResults]
+  const kind = useMemo(
+    () => classifySearchQuery(trimmed, buildDetectors, walletContext),
+    [trimmed, walletContext]
   );
+  const text = kind.kind === 'text' ? kind.query : '';
 
-  const all = useMemo<AllSearchResult[]>(() => {
-    const combined = [...results, ...mints];
-    combined.sort((a, b) => b.score - a.score);
-    return combined;
-  }, [results, mints]);
+  const remote = useOverlaidContactSearch(remoteSearchText(kind));
+  const local = useLocalSearchCandidates();
+  const { results: discovered } = useMintSearch(text, 'ALL', { enabled: text.length > 0 });
+  const { tiers } = useLocationTiers({ ...LOCATION_TIER_OPTIONS, enabled: text.length > 0 });
 
-  return useMemo(
-    () => ({
-      query: trimmed,
-      all,
-      people,
-      groups,
-      mints,
-      counts: {
-        people: peoplePubkeys.length,
-        groups: groups.length,
-        mints: mints.length,
-      },
-      loading: loading || (mintEnabled && mintLoading),
-      peopleLoading: loading,
-      mintsLoading: mintEnabled && mintLoading,
-      peopleStatus: status,
-      mintsStatus: mintEnabled ? mintStatus : 'idle',
-      retryPeople: retry,
-      retryMints,
-    }),
-    [
-      trimmed,
-      all,
-      people,
-      groups,
-      mints,
-      peoplePubkeys,
-      loading,
-      mintEnabled,
-      mintLoading,
-      status,
-      mintStatus,
-      retry,
-      retryMints,
-    ]
-  );
+  const sections = useMemo(() => {
+    const lower = text.toLowerCase();
+    // The Bluetooth row is always there to match, whatever the location says.
+    const allTiers = tiers.some((tier) => tier.transport === 'ble')
+      ? tiers
+      : [BLUETOOTH_TIER_ENTRY, ...tiers];
+    return buildSearchSections({
+      action: kind.kind === 'payment' ? kind.descriptor : null,
+      localPeople: matchLocalPeople(local.people, text),
+      remotePeople: remote.contactRows,
+      ownMints: matchLocalMints(local.mints, text),
+      discoveredMints: text ? discovered : [],
+      geohash: parseGeohashQuery(text),
+      tiers: matchTiers(allTiers, lower),
+    });
+  }, [kind, text, local.people, local.mints, remote.contactRows, discovered, tiers]);
+
+  const peopleStatus = remote.status;
+  const settled = peopleStatus !== 'loading' && peopleStatus !== 'revalidating';
+  const found = sections.counts.people + sections.counts.mints + sections.counts.nearby > 0;
+
+  return {
+    query: trimmed,
+    kind,
+    items: sections.items,
+    counts: sections.counts,
+    peopleStatus,
+    recordable: isRecordableSearch(kind) && settled && found,
+    retryPeople: remote.retry,
+  };
 }

@@ -32,6 +32,10 @@ export const useSearchContext = () => {
 
 // --- Android header field (iOS uses the native header search bar) ---
 
+// The field emits every keystroke, like iOS's native bar: local results answer
+// at once, and the remote people search keeps the only pause
+// (`SEARCH_DEBOUNCE_MS`). A debounce here would stack on top of that one.
+
 function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?: string }) {
   const { clearKey, seedText, onSearchChange } = useSearchContext();
   const { width } = useWindowDimensions();
@@ -46,7 +50,6 @@ function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?:
       onChangeText={onSearchChange}
       placeholder={placeholder}
       keyboardType="web-search"
-      debounceMs={300}
     />
   );
 }

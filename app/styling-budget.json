@@ -936,17 +936,6 @@
     "stack-layout-props": 4,
     "content-container-style": 1
   },
-  "shared/ui/composed/search/SearchResultRows.tsx": {
-    "stylesheet-create": 1,
-    "content-container-style": 1
-  },
-  "shared/ui/composed/search/SearchScopeTabs.tsx": {
-    "stylesheet-create": 1,
-    "content-container-style": 1
-  },
-  "shared/ui/composed/search/UnifiedSearch.tsx": {
-    "stylesheet-create": 1
-  },
   "shared/ui/primitives/AnimatedEmoji.tsx": {
     "inline-style": 2
   },

@@ -37,6 +37,19 @@ function namesFromPlacemark(
   };
 }
 
+/**
+ * The Bluetooth mesh row. It needs no location: it is shown whether or not the
+ * person allowed it, and whether or not a fix arrives.
+ */
+export const BLUETOOTH_TIER_ENTRY: TierEntry = {
+  key: BLUETOOTH_TIER.key,
+  label: BLUETOOTH_TIER.label,
+  precision: 0,
+  geohash: 'mesh',
+  transport: 'ble',
+  icon: BLUETOOTH_TIER.icon,
+};
+
 async function computeLocationTiers(ctx: {
   isCancelled: () => boolean;
   setTiers: Dispatch<SetStateAction<TierEntry[]>>;
@@ -51,6 +64,8 @@ async function computeLocationTiers(ctx: {
       ? await Location.requestForegroundPermissionsAsync()
       : await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') {
+      // Place rows need the location; the Bluetooth row does not.
+      setTiers([BLUETOOTH_TIER_ENTRY]);
       setError('Location permission not granted');
       setLoading(false);
       return;
@@ -64,15 +79,6 @@ async function computeLocationTiers(ctx: {
 
     const { latitude, longitude } = location.coords;
 
-    const bluetoothEntry: TierEntry = {
-      key: BLUETOOTH_TIER.key,
-      label: BLUETOOTH_TIER.label,
-      precision: 0,
-      geohash: 'mesh',
-      transport: 'ble',
-      icon: BLUETOOTH_TIER.icon,
-    };
-
     const locationEntries: TierEntry[] = LOCATION_TIERS.map((tier) => ({
       key: tier.key,
       label: tier.label,
@@ -82,7 +88,7 @@ async function computeLocationTiers(ctx: {
       icon: tier.icon,
     }));
 
-    setTiers([bluetoothEntry, ...locationEntries]);
+    setTiers([BLUETOOTH_TIER_ENTRY, ...locationEntries]);
     setError(null);
 
     // Reverse geocode after the tiers are on screen so we don't block the
@@ -107,6 +113,8 @@ async function computeLocationTiers(ctx: {
     }
   } catch (e) {
     if (!isCancelled()) {
+      // No fix (GPS off, timeout): the Bluetooth row still works.
+      setTiers((prev) => (prev.length > 0 ? prev : [BLUETOOTH_TIER_ENTRY]));
       setError(e instanceof Error ? e.message : 'Failed to get location');
     }
   } finally {

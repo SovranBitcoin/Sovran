@@ -6,12 +6,12 @@
  * only a pubkey still renders with cached name/picture/nip05/lud16 instead of a
  * fallback gradient + abbreviated pubkey.
  *
- * This is the SINGLE owner of that overlay. Both `useAllSearchResults` (the
- * Search tab's "All" search) and the Send modal consume it, so their People
+ * This is the SINGLE owner of that overlay. Both `useSearchAggregates` (the
+ * Search tab) and the Send modal consume it, so their People
  * results and per-result metrics are identical — one implementation, two
  * consumers, no parallel copy.
  *
- * Unlike `useAllSearchResults`, it reads NO location (that hook also matches
+ * Unlike `useSearchAggregates`, it reads NO location (that hook also matches
  * places through `useLocationTiers`). So a payment surface like Send can reuse
  * the canonical people search without touching a location it never uses.
  */
@@ -23,13 +23,8 @@ import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetad
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import type { SearchStatus } from '@/shared/ui/composed/search/searchListState';
 
-/**
- * One overlaid contact-search row. Structurally the `'contact'` arm of
- * `AllSearchResult` (which is defined as `ContactSearchRow`), so the shared union
- * has a single source of truth and callers access `pubkey`/`profile` without
- * narrowing a 4-arm union.
- */
-export interface ContactSearchRow {
+/** One overlaid contact-search row. */
+interface ContactSearchRow {
   type: 'contact';
   id: string;
   pubkey: string;
@@ -38,8 +33,7 @@ export interface ContactSearchRow {
   score: number;
 }
 
-// Score base for contact rows. `useAllSearchResults` sorts the shared union
-// against its geohash/tier scores using the `score` each row already carries.
+// Score base for contact rows: API order, best first.
 const SCORE_CONTACT_BASE = 100;
 
 export function useOverlaidContactSearch(query: string): {

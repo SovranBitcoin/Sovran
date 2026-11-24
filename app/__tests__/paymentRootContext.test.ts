@@ -46,6 +46,18 @@ describe('fresh payment-root context clearing', () => {
       via: 'startSendMoneyToProfile(',
       start: 'machine.startSendEcash({',
     },
+    {
+      // Search's Pay buttons and action card start a payment from outside the
+      // send flow, so they pass a root and the helper clears first.
+      file: 'app/features/send/lib/startContactSend.ts',
+      clear: 'if (options.root) clearPaymentContext(options.root)',
+      start: 'machine.startSendEcash({',
+    },
+    {
+      file: 'app/shared/ui/composed/search/SearchResultRows.tsx',
+      clear: "clearPaymentContext('search.action')",
+      start: 'machine.scan?.(item.descriptor.raw',
+    },
   ])('$file clears stale routing state before starting Colada', ({ file, clear, via, start }) => {
     const source = readSource(file);
     if (via) expectBeforeVia(source, clear, via, start);

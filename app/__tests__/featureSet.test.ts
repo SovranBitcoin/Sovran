@@ -17,7 +17,7 @@ import {
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { featureDetectors } from '@/shared/config/featureDetectors';
 import { disabledFeatureForRoute } from '@/shared/lib/nav/featureRoutes';
-import { computeVisibleScopes } from '@/shared/ui/composed/search/scopes';
+import { remoteSearchText } from '@/features/search/lib/searchAction';
 
 describe('feature set', () => {
   it('ships the payments edition by default', () => {
@@ -124,23 +124,13 @@ describe('feature route guard', () => {
   });
 });
 
-describe('search scopes', () => {
-  const counts = { people: 1, mints: 1, groups: 1 };
-
-  it('offers People only with people search', () => {
+describe('search people', () => {
+  it('asks the remote people search only with people search', () => {
     const full = resolveFeatureSet('full');
     const noNostr = resolveFeatureSet('full', { nostr: false });
-    expect(computeVisibleScopes('', counts, (f) => full[f])).toEqual([
-      'All',
-      'People',
-      'Mints',
-      'Groups',
-    ]);
-    expect(computeVisibleScopes('lon', counts, (f) => noNostr[f])).toEqual([
-      'All',
-      'Mints',
-      'Groups',
-    ]);
+    const words = { kind: 'text' as const, query: 'lon' };
+    expect(remoteSearchText(words, (f) => full[f])).toBe('lon');
+    expect(remoteSearchText(words, (f) => noNostr[f])).toBe('');
   });
 });
 
