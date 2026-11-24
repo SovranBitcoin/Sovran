@@ -13,11 +13,11 @@ const rows = (edition: Edition) => {
 
 describe('drawer menu', () => {
   it('lists every row in the full edition', () => {
-    expect(rows('full')).toEqual(['wallet', 'contacts', 'remote-login', 'settings']);
+    expect(rows('full')).toEqual(['wallet', 'contacts', 'settings']);
   });
 
   it('lists the same rows in payments', () => {
-    expect(rows('payments')).toEqual(['wallet', 'contacts', 'remote-login', 'settings']);
+    expect(rows('payments')).toEqual(['wallet', 'contacts', 'settings']);
   });
 
   it('keeps only rows with a destination when nostr is off', () => {

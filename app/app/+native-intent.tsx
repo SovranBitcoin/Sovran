@@ -1,39 +1,28 @@
 /**
- * @fileoverview expo-router native intent — nostrconnect:// rewrite
+ * @fileoverview expo-router native intent: drop Remote Login pairing links.
  *
- * System URLs with the `nostrconnect` scheme carry the entire NIP-46 pairing
- * payload in the URL itself (there is no path to route), so the URL is held
- * in memory and the app is sent to the signer deep-link target with a ticket
- * for it. The target redeems the ticket and opens the 'signer-connect' sheet.
+ * Remote Login (NIP-46) was removed (ADR 0035) and the app no longer claims
+ * the `nostrconnect` scheme, but a link can still arrive: an install that has
+ * not picked up the new scheme list, or a `sovran://…/connect?uri=` link an
+ * older build produced. Such a link carries a pairing bearer secret, so it is
+ * sent to the wallet (`/`) before the router can put it in navigation state.
  * Everything else passes through unchanged.
  *
  * Defensive by contract: expo-router documents that throwing here can crash
- * the app, so the rewrite never throws — any failure returns the path
- * unchanged. The URL embeds a pairing bearer secret — never log it and never
- * put it in a route param.
+ * the app, so the rewrite never throws; any failure returns the path
+ * unchanged.
  */
 
-import { holdPairingUri } from '@/features/nostrSigner/lib/pendingPairingUri';
-
 const NOSTRCONNECT_SCHEME_RE = /^nostrconnect:\/\//i;
-/** A link that names the connect route itself and carries the pairing link as a param. */
-const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=([^&#]*)/i;
-const CONNECT_ROUTE = '/(signer-flow)/connect';
+/** A link naming the old connect route and carrying a pairing link as a param. */
+const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
 
 /** Exported for direct unit coverage. */
 export function rewriteSystemPath(path: string): string {
   try {
     if (typeof path !== 'string') return path;
-    if (NOSTRCONNECT_SCHEME_RE.test(path)) return `${CONNECT_ROUTE}?ticket=${holdPairingUri(path)}`;
-    const carried = CONNECT_WITH_URI_RE.exec(path);
-    if (!carried) return path;
-    // Passing this through would put the link in navigation state before the
-    // route could refuse it.
-    try {
-      return `${CONNECT_ROUTE}?ticket=${holdPairingUri(decodeURIComponent(carried[1]))}`;
-    } catch {
-      return CONNECT_ROUTE;
-    }
+    if (NOSTRCONNECT_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return '/';
+    return path;
   } catch {
     return path;
   }

@@ -30,11 +30,6 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   claimUsername: 'nostr',
 };
 
-/** Whole route groups that belong to one module. */
-const GROUP_FEATURE: Readonly<Record<string, Feature>> = {
-  '(signer-flow)': 'nostr',
-};
-
 /** Tabs that belong to one module; their nested screens go with them. */
 const TAB_FEATURE: Readonly<Record<string, Feature>> = {
   contacts: 'contacts',
@@ -48,17 +43,11 @@ export function disabledFeatureForRoute(
   enabled: (feature: Feature) => boolean = hasFeature
 ): Feature | null {
   if (segments.some((segment) => EXEMPT_GROUPS.has(segment))) return null;
-  const group = segments.find((segment) => segment in GROUP_FEATURE);
   const tabsAt = segments.indexOf('(tabs)');
   const tab = tabsAt === -1 ? undefined : segments[tabsAt + 1];
   const leaf = segments.at(-1);
-  const feature = group
-    ? GROUP_FEATURE[group]
-    : tab && tab in TAB_FEATURE
-      ? TAB_FEATURE[tab]
-      : leaf
-        ? ROUTE_FEATURE[leaf]
-        : undefined;
+  const feature =
+    tab && tab in TAB_FEATURE ? TAB_FEATURE[tab] : leaf ? ROUTE_FEATURE[leaf] : undefined;
   return feature && !enabled(feature) ? feature : null;
 }
 

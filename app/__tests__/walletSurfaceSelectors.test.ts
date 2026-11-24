@@ -202,7 +202,7 @@ describe('wallet surface e2e selectors', () => {
     const drawer = read('navigation/drawerMenu.ts');
     // Row ids are the e2e selector suffixes (drawer-menu-wallet, …); renaming
     // one breaks every scenario that opens that route from the drawer.
-    for (const id of ['wallet', 'contacts', 'remote-login', 'settings']) {
+    for (const id of ['wallet', 'contacts', 'settings']) {
       expect(drawer).toContain(`id: '${id}',`);
     }
   });

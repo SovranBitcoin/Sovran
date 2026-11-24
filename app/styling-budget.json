@@ -257,49 +257,6 @@
     "stylesheet-create": 1,
     "stack-layout-props": 4
   },
-  "features/nostrSigner/components/PermissionKeyRows.tsx": {
-    "inline-style": 2
-  },
-  "features/nostrSigner/components/SignerApprovalSheetContent.tsx": {
-    "stack-layout-props": 6
-  },
-  "features/nostrSigner/components/SignerConnectSheetContent.tsx": {
-    "stack-layout-props": 20
-  },
-  "features/nostrSigner/components/SummaryPreviewCards.tsx": {
-    "stack-layout-props": 9
-  },
-  "features/nostrSigner/components/display.tsx": {
-    "inline-style": 1
-  },
-  "features/nostrSigner/screens/ShareSignerScreen.tsx": {
-    "inline-style": 6,
-    "stack-layout-props": 1
-  },
-  "features/nostrSigner/screens/SignerActivityDetailScreen.tsx": {
-    "inline-style": 8,
-    "stack-layout-props": 6
-  },
-  "features/nostrSigner/screens/SignerActivityScreen.tsx": {
-    "inline-style": 2,
-    "content-container-style": 1
-  },
-  "features/nostrSigner/screens/SignerAppDetailScreen.tsx": {
-    "stack-layout-props": 4,
-    "content-container-style": 1
-  },
-  "features/nostrSigner/screens/SignerAppPermissionsScreen.tsx": {
-    "inline-style": 1,
-    "stack-layout-props": 1
-  },
-  "features/nostrSigner/screens/SignerAppPersonScreen.tsx": {
-    "inline-style": 3,
-    "stack-layout-props": 4
-  },
-  "features/nostrSigner/screens/SignerRequestsScreen.tsx": {
-    "inline-style": 5,
-    "stack-layout-props": 1
-  },
   "features/onboarding/screens/ClaimUsernameScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 21,

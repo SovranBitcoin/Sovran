@@ -51,11 +51,6 @@ import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
-import { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
-import {
-  SignerConnectSheetContent,
-  SignerProfilePickerContent,
-} from '@/features/nostrSigner/components/SignerConnectSheetContent';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -261,9 +256,6 @@ type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
-  'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,
-  'signer-connect': SignerConnectSheetContent as CustomSheetRenderer,
-  'signer-profile-picker': SignerProfilePickerContent as CustomSheetRenderer,
   'nfc-tap': NfcTapContent as CustomSheetRenderer,
 };
 
@@ -809,12 +801,7 @@ function SheetPopup() {
 
   const handleNativeSheetChange = useCallback(
     (index: number) => {
-      if (
-        index >= 0 &&
-        isOpen &&
-        (activeCustomPage?.sheetId === 'action-menu' ||
-          activeCustomPage?.sheetId === 'signer-connect')
-      ) {
+      if (index >= 0 && isOpen && activeCustomPage?.sheetId === 'action-menu') {
         markE2EActionMenuPresented(openSeq);
       }
     },
@@ -947,7 +934,7 @@ function SheetPopup() {
             // Custom sheets render the same chrome as `ActionMenuHost`
             // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
             // its content background. Match it here so surfaces routed through
-            // PopupHost (the send memo, the signer sheets — all need
+            // PopupHost (the send memo, the NFC tap sheet — all need
             // FullWindowOverlay above route modals) are visually
             // indistinguishable from menu-lane surfaces.
             backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
@@ -985,8 +972,7 @@ function SheetPopup() {
             // dynamic content height back to gorhom — unless the sheet opts
             // into `scrollable`, where the patched `useScrollableContainer`
             // renders a BottomSheetScrollView instead (still reports dynamic
-            // height, but scrolls rather than clipping past the cap — the
-            // signer sheets' expandable sections need this).
+            // height, but scrolls rather than clipping past the cap).
             contentContainerProps={patchedContentContainerProps as never}>
             <SheetContent
               payload={payload}

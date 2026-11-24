@@ -104,10 +104,6 @@ describe('feature route guard', () => {
     expect(disabledFeatureForRoute(['(send-flow)', 'lightningSend'], enabled)).toBeNull();
   });
 
-  it('blocks whole groups owned by a module', () => {
-    expect(disabledFeatureForRoute(['(signer-flow)', 'index'], enabled)).toBe('nostr');
-  });
-
   it('keeps wallet, contacts, and profile routes open in payments', () => {
     const payments = resolveFeatureSet('payments');
     const on = (f: keyof typeof payments) => payments[f];

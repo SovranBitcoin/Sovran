@@ -55,7 +55,6 @@ export const CANONICAL_PAGES = [
   'settings', // settings root screen ((settings-flow), SettingsScreen)
   'image-viewer', // fullscreen media overlay; no standalone route
   'contacts', // contacts tab (ContactsScreen)
-  'signer-hub', // Remote Login / NIP-46 signer hub
   'theme-preview', // per-unit wallpaper preview cards ((theme-flow)/preview)
   'gallery', // wallpaper album gallery ((theme-flow)/gallery)
   'transactions', // full transactions list ((transactions-flow)/transactions)
@@ -106,14 +105,6 @@ export const CANONICAL_PAGES = [
   'settings-routing',
   'settings-storage',
   'settings-terms',
-  'signer-activity',
-  'signer-activity-detail',
-  'signer-app',
-  'signer-app-permissions',
-  'signer-app-person',
-  'signer-connect',
-  'signer-requests',
-  'signer-share',
   'theme-background',
   'transaction-filters',
 ] as const;

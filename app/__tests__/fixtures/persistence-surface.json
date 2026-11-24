@@ -21,11 +21,10 @@
     "user_mnemonic"
   ],
   "secureStoreFiles": [
-    "app/features/nostrSigner/lib/bunkerSecrets.ts",
-    "app/features/nostrSigner/lib/pairingIntentStorage.ts",
     "app/shared/lib/debug/storageInventory.ts",
     "app/shared/lib/nostr/secureStorage.ts",
-    "app/shared/lib/persist/secureVault.ts"
+    "app/shared/lib/persist/secureVault.ts",
+    "app/shared/lib/profile/legacyNip46Cleanup.ts"
   ],
   "asyncStorageKeys": [
     "${opts.storagePrefixNeg}:${pubkey}",
@@ -38,7 +37,6 @@
     "wallet-lifecycle"
   ],
   "asyncStorageFiles": [
-    "app/features/nostrSigner/lib/pairingIntentStorage.ts",
     "app/shared/lib/cache/createPubkeyScopedCache.ts",
     "app/shared/lib/cashu/legacyEcashClaim.ts",
     "app/shared/lib/cashu/npc.ts",
@@ -50,6 +48,7 @@
     "app/shared/lib/persist/fileCacheStorage.ts",
     "app/shared/lib/persist/storageUsage.ts",
     "app/shared/lib/profile/inProcessProfileSwitch.ts",
+    "app/shared/lib/profile/legacyNip46Cleanup.ts",
     "app/shared/lib/profile/profileRemovalStorage.ts",
     "app/shared/lib/profile/profileSessionOrchestrator.ts",
     "app/shared/lib/profile/profileTransition.ts",

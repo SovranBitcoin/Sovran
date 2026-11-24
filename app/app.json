@@ -4,17 +4,7 @@
     "slug": "sovran",
     "version": "0.1.3",
     "orientation": "portrait",
-    "scheme": [
-      "sovran",
-      "cashu",
-      "lightning",
-      "lnurl",
-      "lnurlw",
-      "lnurlp",
-      "bitcoin",
-      "nostr",
-      "nostrconnect"
-    ],
+    "scheme": ["sovran", "cashu", "lightning", "lnurl", "lnurlw", "lnurlp", "bitcoin", "nostr"],
     "userInterfaceStyle": "dark",
     "icon": "./assets/brand/generated/symbol/black-on-light/1024x1024.png",
     "assetBundlePatterns": ["**/*"],

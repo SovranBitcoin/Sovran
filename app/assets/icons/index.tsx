@@ -108,10 +108,6 @@ export const icons: string[] = [
   'proicons:photo',
   'majesticons:search-line',
   'solar:key-bold',
-  // Post action bar — one family (Tabler), outline at rest, filled when active.
-  'garden:arrow-retweet-fill-16',
-  'iconamoon:comment-fill',
-  'iconamoon:heart-fill',
   'hugeicons:new-twitter',
   'mdi:at',
   'mingcute:lightning-fill',
@@ -126,7 +122,6 @@ export const icons: string[] = [
   'ic:round-star',
   'humbleicons:url',
   'mdi:menu',
-  'mdi:bell',
   'mdi:bell-off-outline',
 
   // Mint-update glyphs (Notifications → Mints, and the Mint updates screen).
@@ -172,7 +167,6 @@ export const icons: string[] = [
   'mdi:key-plus',
   'mdi:key-arrow-right',
   'mdi:trash-can-outline',
-  'mdi:chevron-up',
   'mdi:key-variant',
 
   // Lightning Address card icons
@@ -186,10 +180,8 @@ export const icons: string[] = [
   // Pending Ecash icons
   'mdi:clock-outline',
   'mdi:history',
-  'mdi:clock-alert-outline',
   'mdi:broom',
   'mdi:check-circle-outline',
-  'fluent:wallet-24-filled',
 
   // Video feed icons (iconamoon to match comment/heart engagement icons)
   'mdi:fullscreen',

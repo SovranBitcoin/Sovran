@@ -5,9 +5,8 @@
  * pasted payload to what the app does with it. The real CameraScreen runs
  * inside the real SovranColadaProvider, so the payment machine, the scan
  * sources and the Sovran step handlers are real; the camera view, the router,
- * the clipboard, the image picker, the manager and the NIP-46 pairing entry are
- * replaced. Pinned at what a person sees happen: the route opened, the popup
- * shown, the pairing sheet asked for, or nothing.
+ * the clipboard, the image picker and the manager are replaced. Pinned at what
+ * a person sees happen: the route opened, the popup shown, or nothing.
  */
 
 /* eslint-disable import/first */
@@ -113,13 +112,6 @@ jest.mock(
   }),
   { virtual: true }
 );
-jest.mock('@/features/nostrSigner', () => ({
-  openPairingFromUri: jest.fn(),
-  PAIRING_ERROR_TITLE: "Couldn't connect",
-  PAIRING_ERROR_INVALID_QR: "That QR code isn't a Nostr connection link.",
-  PAIRING_ERROR_INVALID_LINK: "That doesn't look like a Nostr connection link.",
-  PAIRING_ERROR_BUNKER: 'bunker unsupported',
-}));
 jest.mock('@/shared/lib/nfc', () => ({
   createNfcAdapter: () => undefined,
   writeTokenToNFC: jest.fn(),
@@ -163,12 +155,10 @@ import React from 'react';
 import { AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { ok, err } from 'neverthrow';
 import { act, render } from '@testing-library/react-native';
 
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { CameraScreen } from '@/features/camera/screens/CameraScreen/CameraScreen';
-import { openPairingFromUri } from '@/features/nostrSigner';
 import { popup, staticPopup } from '@/shared/lib/popup';
 
 const TOKEN =
@@ -193,10 +183,10 @@ async function flush() {
   });
 }
 
-async function mount(props: React.ComponentProps<typeof CameraScreen> = {}) {
+async function mount() {
   const view = render(
     <SovranColadaProvider>
-      <CameraScreen {...props} />
+      <CameraScreen />
     </SovranColadaProvider>
   );
   await flush();
@@ -245,7 +235,6 @@ beforeEach(() => {
     mockAppStateListeners.push(listener);
     return { remove: jest.fn() };
   }) as never);
-  jest.mocked(openPairingFromUri).mockReturnValue(ok(undefined));
 });
 
 afterEach(() => {
@@ -260,7 +249,6 @@ describe('a live scan', () => {
 
     expect(receiveTokenOpens()).toBe(1);
     expect(layout().loading).toBe(false);
-    expect(openPairingFromUri).not.toHaveBeenCalled();
   });
 
   it('shows the unsupported-input popup for an unreadable code and unwinds the busy state', async () => {
@@ -276,34 +264,19 @@ describe('a live scan', () => {
     expect(receiveTokenOpens()).toBe(1);
   });
 
-  it('hands a nostrconnect code to pairing and never to the payment machine', async () => {
-    await mount();
+  it.each([PAIRING, 'bunker://abc'])(
+    'treats a Remote Login code (%s) as unsupported input, like any other',
+    async (code) => {
+      // Remote Login is gone (ADR 0035): the code reaches the payment machine,
+      // which logs lengths only and turns it down.
+      await mount();
 
-    await scan(`  ${PAIRING}  `);
+      await scan(`  ${code}  `);
 
-    expect(openPairingFromUri).toHaveBeenCalledWith(PAIRING);
-    expect(staticPopup).not.toHaveBeenCalled();
-    expect(mockRouter.navigate).not.toHaveBeenCalled();
-  });
-
-  it('shows the bunker error for a bunker code and throttles the same code for 2.5 s', async () => {
-    jest.mocked(openPairingFromUri).mockReturnValue(err({ type: 'bunker-unsupported' }) as never);
-    await mount();
-
-    await scan('bunker://abc');
-    now += 600;
-    await scan('bunker://abc');
-    expect(popup).toHaveBeenCalledTimes(1);
-    expect(popup).toHaveBeenCalledWith({
-      message: "Couldn't connect",
-      text: 'bunker unsupported',
-      type: 'error',
-    });
-
-    now += 2_000;
-    await scan('bunker://abc');
-    expect(popup).toHaveBeenCalledTimes(2);
-  });
+      expect(staticPopup).toHaveBeenCalledWith('unsupported-input', { text: 'Unsupported input' });
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    }
+  );
 
   it('drops the same code repeated inside 500 ms', async () => {
     await mount();
@@ -331,25 +304,14 @@ describe('a live scan', () => {
     expect(receiveTokenOpens()).toBe(0);
   });
 
-  it('accepts only pairing codes in signer-pair mode and hides the gallery', async () => {
-    jest.mocked(openPairingFromUri).mockReturnValue(err({ type: 'invalid-uri' }) as never);
-    await mount({ signerPairOnly: true });
-
-    await scan(TOKEN);
-
-    expect(receiveTokenOpens()).toBe(0);
-    expect(openPairingFromUri).toHaveBeenCalledWith(TOKEN);
-    expect(popup).toHaveBeenCalledWith({
-      message: "Couldn't connect",
-      text: "That QR code isn't a Nostr connection link.",
-      type: 'error',
-    });
-    expect(mockButtons.current?.onGallery).toBeUndefined();
+  it('offers the gallery', async () => {
+    await mount();
+    expect(mockButtons.current?.onGallery).toEqual(expect.any(Function));
   });
 });
 
 describe('paste and gallery', () => {
-  it('pastes a token through the payment scan, reading the clipboard twice', async () => {
+  it('pastes a token through the payment scan, reading the clipboard once', async () => {
     mockClipboardText = ` ${TOKEN} `;
     await mount();
 
@@ -357,25 +319,18 @@ describe('paste and gallery', () => {
     await flush();
 
     expect(receiveTokenOpens()).toBe(1);
-    // QUIRK: the screen reads the clipboard to check for a pairing link, then the
-    // payment machine's clipboard source reads it again.
-    expect(Clipboard.getStringAsync).toHaveBeenCalledTimes(2);
+    // The payment machine's clipboard source is the only reader.
+    expect(Clipboard.getStringAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('sends a pasted nostrconnect link to pairing with the invalid-link wording on failure', async () => {
+  it('turns down a pasted Remote Login link as unsupported input', async () => {
     mockClipboardText = 'nostrconnect://broken';
-    jest.mocked(openPairingFromUri).mockReturnValue(err({ type: 'invalid-uri' }) as never);
     await mount();
 
     await act(async () => layout().handleClipboardPress());
     await flush();
 
-    expect(openPairingFromUri).toHaveBeenCalledWith('nostrconnect://broken');
-    expect(popup).toHaveBeenCalledWith({
-      message: "Couldn't connect",
-      text: "That doesn't look like a Nostr connection link.",
-      type: 'error',
-    });
+    expect(staticPopup).toHaveBeenCalledWith('unsupported-input', { text: 'Unsupported input' });
     expect(Clipboard.getStringAsync).toHaveBeenCalledTimes(1);
   });
 

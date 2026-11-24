@@ -43,12 +43,7 @@ export async function runInProcessProfileSwitch(options: {
   const boundary = profileSwitchBoundary();
   const services = new Map(profileSwitchServices());
   if (!boundary) throw new Error('Unsafe account boundary');
-  // NIP-46 must relinquish signing authority before the shared NDK pool closes.
-  const signer = services.get('nostr.nip46');
-  if (signer) await switchStep(signer);
-  for (const [name, stop] of services) {
-    if (name !== 'nostr.nip46') await switchStep(stop);
-  }
+  for (const stop of services.values()) await switchStep(stop);
   await switchStep(boundary.suspend);
   await switchStep(options.cleanupCoco);
   // Owner-bound holders flush and detach while the old identity still owns writes.

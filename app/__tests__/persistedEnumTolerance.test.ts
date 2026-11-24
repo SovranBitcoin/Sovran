@@ -17,8 +17,7 @@
  * syntactically, but it matches `z.enum(...)` text inside store-file globs, so
  * it cannot see:
  *   - an enum imported from elsewhere (`ThemeMode` from
- *     `@sovranbitcoin/schemas`, `ConnectionStatusSchema` from
- *     `features/nostrSigner/lib/nip46Types.ts`), which its own `note` admits;
+ *     `@sovranbitcoin/schemas`), which its own `note` admits;
  *   - `z.literal(...)`, which it does not match at all.
  * It reported this class at zero while eleven such fields were unprotected.
  *
@@ -40,8 +39,8 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string)
 import '@/features/bitchat/stores/bitchatDmMessages';
 import '@/shared/stores/profile/ignoreStore';
 import '@/shared/stores/profile/notificationPolicyStore';
-import '@/features/nostrSigner/data/nip46ActivityStore';
-import '@/features/nostrSigner/data/nip46ConnectionsStore';
+import '@/shared/stores/profile/nip46ActivityStore';
+import '@/shared/stores/profile/nip46ConnectionsStore';
 import '@/shared/lib/nostr/media/mediaServerStore';
 import '@/shared/lib/nostr/outbox/relayListStore';
 import '@/shared/stores/global/btcMapStore';

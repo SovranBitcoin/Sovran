@@ -16,27 +16,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
 import { alpha, iconSize, spacing } from '@/shared/styles/tokens';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Badge } from '@/shared/ui/primitives/Badge';
-import { useNip46RequestsStore } from '@/features/nostrSigner';
 import { drawerMenuItems, type MenuIconPair, type MenuRoute } from '@/navigation/drawerMenu';
-
-/** Pending NIP-46 requests, rendered on the Remote Login row. */
-const SignerPendingBadge = React.memo(function SignerPendingBadge() {
-  const count = useNip46RequestsStore((s) => s.pending.length);
-  if (count <= 0) return null;
-  return <Badge variant="primary">{count}</Badge>;
-});
-
-/**
- * Live badges by row id. A COMPONENT, not a count hook: a hook passed as a
- * prop is a rules-of-react violation (its identity could change between
- * renders and reorder the row's hooks), and React Compiler refuses to
- * compile any component that calls one. Subscribing inside the badge also
- * narrows a count change to the badge itself rather than the row.
- */
-const MENU_BADGES: Readonly<Record<string, React.ComponentType>> = {
-  'remote-login': SignerPendingBadge,
-};
 
 const MENU_ITEMS = drawerMenuItems();
 
@@ -69,7 +49,6 @@ const MenuButton = React.memo(function MenuButton({
   route,
   onNavigate,
   isActive,
-  Badge: RowBadge,
 }: {
   id: string;
   icon: MenuIconPair;
@@ -77,7 +56,6 @@ const MenuButton = React.memo(function MenuButton({
   route: MenuRoute;
   onNavigate: (route: MenuRoute) => void;
   isActive: boolean;
-  Badge?: React.ComponentType;
 }) {
   const foreground = useThemeColor('foreground');
 
@@ -103,7 +81,6 @@ const MenuButton = React.memo(function MenuButton({
         <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>
-        {RowBadge ? <RowBadge /> : null}
       </HStack>
     </Pressable>
   );
@@ -194,7 +171,6 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               route={item.route}
               onNavigate={handleNavigation}
               isActive={isRouteActive(item.route)}
-              Badge={MENU_BADGES[item.id]}
             />
           ))}
         </VStack>

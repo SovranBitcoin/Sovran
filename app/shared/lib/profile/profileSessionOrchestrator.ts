@@ -581,7 +581,11 @@ export async function deleteAllProfiles(): Promise<boolean> {
     const accountIndexes = Array.from(new Set([0, ...profiles.map((p) => p.accountIndex)]));
     const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
-    const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+    const clearSecureData = await prepareSecureDataReset(
+      accountIndexes,
+      importedPubkeys,
+      profiles.map((p) => p.pubkey)
+    );
 
     // If the wipe stops after the databases are gone, reopening must not take
     // their absence for a loss and ask for a restore. Waited for, but a list

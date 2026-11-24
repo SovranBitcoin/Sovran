@@ -4,26 +4,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
-import {
-  openPairingFromUri,
-  PAIRING_ERROR_BUNKER,
-  PAIRING_ERROR_INVALID_LINK,
-  PAIRING_ERROR_INVALID_QR,
-  PAIRING_ERROR_TITLE,
-} from '@/features/nostrSigner';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { popup } from '@/shared/lib/popup';
 
 import { CameraActionButtons } from './CameraActionButtons';
 import { CameraLayout } from './CameraLayout';
@@ -41,28 +32,6 @@ export const cameraRouteParamsSchema = z.object({
     .regex(/^[a-z]{2,8}$/, 'unit must be a short lowercase token')
     .optional(),
 });
-
-/**
- * NIP-46 pairing URIs are intercepted BEFORE the payment machine sees the
- * scan (same pattern as the `ur:` prefix special-case in handleScan).
- * Case-insensitive per the Layer-4 plan; the matched value embeds a pairing
- * bearer secret and must never be logged.
- */
-const NIP46_SCHEME_RE = /^(?:nostrconnect|bunker):\/\//i;
-
-/** Identical signer scans re-deliver every few hundred ms while the QR stays
- * in frame — throttle longer than the generic 500ms payment debounce so the
- * error toast doesn't stack and the connect sheet isn't re-opened mid-review. */
-const SIGNER_RESCAN_WINDOW_MS = 2500;
-
-interface CameraScreenProps {
-  /**
-   * Signer-pair mode (`/camera?action=signer-pair`, set by
-   * StandaloneCameraScreen): the scanner ONLY accepts NIP-46 pairing URIs.
-   * Non-matching scans show the pairing error toast — never the payment flow.
-   */
-  signerPairOnly?: boolean;
-}
 
 interface ScanOutcome {
   urInProgress?: boolean;
@@ -89,7 +58,7 @@ async function attemptScan(
   }
 }
 
-export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {}) {
+export function CameraScreen() {
   useLifecycleLogger('CameraScreen');
   const params = useRouteParams(cameraRouteParamsSchema, { where: 'camera' });
   const unit = params?.unit;
@@ -149,37 +118,10 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   }, [cameraReady]);
 
   const lastScanRef = useRef<{ data: string; t: number }>({ data: '', t: 0 });
-  const lastSignerScanRef = useRef<{ data: string; t: number }>({ data: '', t: 0 });
 
   /** Common gate for every scan source. iOS can deliver taps during the
    * inactive→background transition; AppState/isFocused must be live. */
   const shouldAcceptScan = () => appStateRef.current === 'active' && isFocused;
-
-  /**
-   * NIP-46 pairing entry. Hands the raw value to the shared
-   * openPairingFromUri dispatch (hot flag + engine pairing + connect sheet);
-   * failures surface as the plan's error toast. The value embeds a pairing
-   * bearer secret — never logged.
-   */
-  const handleSignerScan = (raw: string, invalidBody: string) => {
-    const now = Date.now();
-    if (
-      raw === lastSignerScanRef.current.data &&
-      now - lastSignerScanRef.current.t < SIGNER_RESCAN_WINDOW_MS
-    ) {
-      return;
-    }
-    lastSignerScanRef.current = { data: raw, t: now };
-    log.info('camera.scan.nip46_intercept', { dataLength: raw.length });
-    const opened = openPairingFromUri(raw);
-    if (opened.isErr()) {
-      popup({
-        message: PAIRING_ERROR_TITLE,
-        text: opened.error.type === 'bunker-unsupported' ? PAIRING_ERROR_BUNKER : invalidBody,
-        type: 'error',
-      });
-    }
-  };
 
   /**
    * Every entry point (live barcode, paste, gallery) runs through here, so the
@@ -211,13 +153,6 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
     lastScanRef.current = { data: data.data, t: now };
 
-    // NIP-46 pairing intercept — BEFORE the payment machine sees the value.
-    // In signer-pair mode EVERY scan routes here: no payment fallback.
-    if (NIP46_SCHEME_RE.test(data.data.trim()) || signerPairOnly) {
-      handleSignerScan(data.data.trim(), PAIRING_ERROR_INVALID_QR);
-      return;
-    }
-
     log.info('camera.scan.detected', {
       type: data.type ?? 'qr',
       isUr,
@@ -235,17 +170,7 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   const handleClipboardPress = async () => {
     if (!shouldAcceptScan()) return;
     log.info('camera.scan.clipboard');
-    // Clipboard paste honors the same NIP-46 intercept as live scans — a
-    // copied nostrconnect:// link must never reach the payment machine
-    // (which would reject it as "Unsupported input"). The read here is
-    // check-only for the payment path: machine.scan() with no args reads
-    // the clipboard itself. In signer-pair mode EVERY paste routes to the
-    // signer path: no payment fallback.
-    const text = (await Clipboard.getStringAsync().catch(() => '')).trim();
-    if (NIP46_SCHEME_RE.test(text) || signerPairOnly) {
-      handleSignerScan(text, PAIRING_ERROR_INVALID_LINK);
-      return;
-    }
+    // machine.scan() with no args reads the clipboard itself.
     await runScan('camera.scan.clipboard_failed', () => machine.scan?.());
   };
 
@@ -287,11 +212,9 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   return (
     <Log name="CameraScreen">
       <CameraLayout {...shared}>
-        {/* Gallery decodes inside the payment machine — no pre-machine hook
-            exists, so signer-pair mode hides it instead of half-supporting it. */}
         <CameraActionButtons
           onPaste={handleClipboardPress}
-          onGallery={signerPairOnly ? undefined : handleGalleryPress}
+          onGallery={handleGalleryPress}
           onToggleFlashlight={toggleFlashlight}
           flashlightOn={flashlightOn}
         />

@@ -1,10 +1,9 @@
 /**
  * @fileoverview Tunables for the central publish seam.
  *
- * Mirrors the per-relay timeout convention proven in the NIP-46 transport
- * (`features/nostrSigner/lib/nip46Transport.ts`), but for general event
- * publishing the default window is more generous: feed/profile relays are
- * slower and less reliable than a paired signer relay.
+ * A per-relay timeout, as the removed NIP-46 transport used, but with a more
+ * generous window: feed/profile relays are slower and less reliable than a
+ * paired signer relay.
  */
 import type { RetryPolicy } from '@/shared/lib/nostr/publish/types';
 

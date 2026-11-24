@@ -223,10 +223,11 @@ describe('the native-intent rewrite before the router', () => {
     }
   );
 
-  it('sends a nostrconnect link to the signer connect route with a ticket, not the link', () => {
-    const rewritten = rewriteSystemPath('nostrconnect://abc?secret=s3cr3t&relay=wss://r');
-
-    expect(rewritten).toMatch(/^\/\(signer-flow\)\/connect\?ticket=/);
-    expect(rewritten).not.toContain('s3cr3t');
+  it.each([
+    'nostrconnect://abc?secret=s3cr3t&relay=wss://r',
+    'sovran://connect?uri=nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds3cr3t',
+  ])('sends the Remote Login link %s to the wallet, without its secret', (url) => {
+    // Remote Login is gone (ADR 0035); the pairing secret must never reach navigation state.
+    expect(rewriteSystemPath(url)).toBe('/');
   });
 });

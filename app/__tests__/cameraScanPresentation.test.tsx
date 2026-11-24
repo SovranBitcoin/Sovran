@@ -58,13 +58,6 @@ jest.mock(
   () => ({ CameraActionButtons: () => null }),
   { virtual: true }
 );
-jest.mock('@/features/nostrSigner', () => ({
-  openPairingFromUri: jest.fn(),
-  PAIRING_ERROR_TITLE: 'title',
-  PAIRING_ERROR_INVALID_QR: 'qr',
-  PAIRING_ERROR_INVALID_LINK: 'link',
-  PAIRING_ERROR_BUNKER: 'bunker',
-}));
 jest.mock('@/shared/lib/popup', () => ({ popup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,

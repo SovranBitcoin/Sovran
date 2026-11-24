@@ -65,12 +65,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/nearPay/components/NearbyPeerRow.tsx",
     "features/nearPay/components/NutDropCelebrationCanvas.tsx",
     "features/nearPay/components/NutDropCelebrationOverlay.tsx",
-    "features/nostrSigner/components/PermissionGestureDemo.tsx",
-    "features/nostrSigner/components/PermissionKeyRows.tsx",
-    "features/nostrSigner/components/SignerApprovalSheetContent.tsx",
-    "features/nostrSigner/components/SignerConnectSheetContent.tsx",
-    "features/nostrSigner/components/SummaryPreviewCards.tsx",
-    "features/nostrSigner/components/display.tsx",
     "features/onboarding/components/OnboardingIllustration.tsx",
     "features/onboarding/components/OnboardingScreen.tsx",
     "features/payments/components/MessageEcashRow.tsx",
@@ -249,6 +243,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 243,
+  "total": 237,
 }
 `;

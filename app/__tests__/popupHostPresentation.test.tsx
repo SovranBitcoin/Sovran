@@ -80,12 +80,6 @@ jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
   return { NfcTapContent: () => ReactActual.createElement('NfcTapContent') };
 });
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({ SendMemoContent: () => null }));
-jest.mock('@/features/nostrSigner/components/SignerApprovalSheetContent', () => ({
-  SignerApprovalSheetContent: () => null,
-}));
-jest.mock('@/features/nostrSigner/components/SignerConnectSheetContent', () => ({
-  SignerConnectSheetContent: () => null,
-}));
 jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children, ...props }: { children?: React.ReactNode }) => {

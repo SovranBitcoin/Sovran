@@ -29,7 +29,6 @@ import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useMediaServerStore } from '@/shared/lib/nostr/media/mediaServerStore';
-import { useNip46RequestsStore } from '@/features/nostrSigner';
 import { hasFeature } from '@/shared/config/features';
 
 const name = Application.applicationName;
@@ -94,14 +93,6 @@ const ProfileButton = () => {
 // e2e simulator taps arrive ~2s apart (one HID session per tap), which can
 // never satisfy a human triple-tap window — the owned e2e Metro widens it.
 const TRIPLE_TAP_WINDOW_MS = Number(process.env.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS ?? '') || 1500;
-
-const SIGNER_ROW_DESCRIPTION = 'Sign in to Nostr apps with this device';
-
-/** Live row description: pending-count variant when the signer queue is non-empty. */
-function signerRowDescription(pendingCount: number): string {
-  if (pendingCount <= 0) return SIGNER_ROW_DESCRIPTION;
-  return pendingCount === 1 ? '1 pending request' : `${pendingCount} pending requests`;
-}
 
 const SettingsListActionItem: React.FC<{
   title: string;
@@ -220,7 +211,6 @@ export const SettingsScreen = () => {
   const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
-  const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -318,18 +308,6 @@ export const SettingsScreen = () => {
         <LayoutShiftProbe tag="settings.security">
           <Section title="Security">
             <ListGroup variant="secondary">
-              {hasFeature('nostr') && (
-                <>
-                  <SettingsListLinkItem
-                    href="/(signer-flow)"
-                    title="Remote Login"
-                    testID="settings-remote-login-row"
-                    description={signerRowDescription(signerPendingCount)}
-                    descriptionNumberOfLines={1}
-                  />
-                  <Separator className="mx-4" />
-                </>
-              )}
               <SettingsListLinkItem
                 href="/(settings-flow)/keyring"
                 title="P2PK Keys"

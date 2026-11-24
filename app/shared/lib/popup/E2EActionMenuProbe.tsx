@@ -253,9 +253,8 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
   const openSheetId = usePopupStore((state) =>
     state.isOpen &&
     isCustomSheetPayload(state.current) &&
-    // Any FullWindowOverlay sheet whose rows need coordinate selection: the
-    // classic action menu and the NIP-46 signer connect approval.
-    (state.current.sheetId === 'action-menu' || state.current.sheetId === 'signer-connect')
+    // The FullWindowOverlay sheet whose rows need coordinate selection.
+    state.current.sheetId === 'action-menu'
       ? state.current.sheetId
       : null
   );

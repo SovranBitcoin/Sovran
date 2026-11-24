@@ -7,7 +7,7 @@ export type MenuRoute =
   // Wallet is the `(tabs)/index` folder, which expo-router collapses to an
   // empty path segment — so its canonical route is the app root `/`, not
   // `/(drawer)/(tabs)/index` (that path resolves to +not-found at runtime).
-  '/' | '/(drawer)/(tabs)/contacts' | '/(signer-flow)' | '/(settings-flow)';
+  '/' | '/(drawer)/(tabs)/contacts' | '/(settings-flow)';
 
 export type MenuIconPair = {
   default: string;
@@ -41,14 +41,6 @@ const ALL_MENU_ITEMS: readonly MenuItem[] = [
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
-  },
-  {
-    id: 'remote-login',
-    feature: 'nostr',
-    icon: { default: 'mdi:key-variant', selected: 'mdi:key-variant' },
-    label: 'Remote Login',
-    route: '/(signer-flow)',
-    activeSegments: ['(signer-flow)'],
   },
   {
     id: 'settings',

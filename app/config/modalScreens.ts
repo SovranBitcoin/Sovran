@@ -165,7 +165,6 @@ const flowGroups = [
 
 const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
-  slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),
   modalTransparent('camera', 'Scan QR'),
   modalWithGradient('share', 'formSheet'),

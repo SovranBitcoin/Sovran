@@ -193,7 +193,7 @@ function Harness({ successorRendered = false }: { successorRendered?: boolean })
   return (
     <>
       <ActionMenuHost />
-      {successorRendered ? <E2EActionMenuRenderMarker presentationKey="signer-connect" /> : null}
+      {successorRendered ? <E2EActionMenuRenderMarker presentationKey="action-menu" /> : null}
       <E2EActionMenuProbe />
     </>
   );
@@ -484,15 +484,15 @@ describe('action-menu successor handoff', () => {
     act(() => {
       renderer = TestRenderer.create(<Harness />);
       actionMenuPopup({
-        title: 'Paste Connection Link',
+        title: 'Paste a link',
         primaryAction: {
-          text: 'Connect',
+          text: 'Continue',
           testID: 'paste-connect',
           onPress: (_values, { close }) => {
             close(() => {
               usePopupStore.getState().open({
-                sheetId: 'signer-connect',
-                payload: { uri: 'nostrconnect://fixture' },
+                sheetId: 'action-menu',
+                payload: { title: 'Next', buttons: [] },
               });
             });
           },
@@ -507,7 +507,7 @@ describe('action-menu successor handoff', () => {
 
     expect(usePopupStore.getState().isOpen).toBe(false);
     expect(
-      renderer!.root.findAllByProps({ testID: 'e2e-action-menu-open:signer-connect' })
+      renderer!.root.findAllByProps({ testID: 'e2e-action-menu-open:action-menu' })
     ).toHaveLength(0);
 
     const content = renderer!.root.find((node) => String(node.type) === 'Menu.Content');
@@ -519,17 +519,17 @@ describe('action-menu successor handoff', () => {
 
     expect(usePopupStore.getState()).toMatchObject({
       isOpen: true,
-      current: { sheetId: 'signer-connect' },
+      current: { sheetId: 'action-menu' },
     });
     expect(
-      renderer!.root.findAllByProps({ testID: 'e2e-action-menu-open:signer-connect' })
+      renderer!.root.findAllByProps({ testID: 'e2e-action-menu-open:action-menu' })
     ).toHaveLength(0);
 
     act(() => renderer!.update(<Harness successorRendered />));
     act(() => markE2EActionMenuPresented(usePopupStore.getState().openSeq));
 
     expect(
-      renderer!.root.findByProps({ testID: 'e2e-action-menu-open:signer-connect' })
+      renderer!.root.findByProps({ testID: 'e2e-action-menu-open:action-menu' })
     ).toBeDefined();
   });
 });

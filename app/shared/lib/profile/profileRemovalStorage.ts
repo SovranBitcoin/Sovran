@@ -9,7 +9,7 @@ import { sdkRecoveryVaultNames } from '@/shared/lib/routstr/sdk/driver';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from '@/features/nearPay/lib/nearbyPaymentStorage';
 import { assertRoutstrStorageEmptyForRemoval } from '@/shared/lib/routstr/securePersistence';
 import { prepareProfileSecureRemoval } from '@/shared/lib/nostr/secureStorage';
-import { clearSecrets } from '@/features/nostrSigner/lib/bunkerSecrets';
+import { clearLegacyBunkerSecrets } from '@/shared/lib/profile/legacyNip46Cleanup';
 import { removePlaintextCaches } from '@/shared/lib/cache/createPubkeyScopedCache';
 
 /** Legacy Whitenoise AsyncStorage namespaces written by 0.1.0–0.1.3; kept here so profile removal still wipes them. */
@@ -346,10 +346,7 @@ export const profileRemovalPorts: RemovalPorts = {
       { name: 'account keys and payment recovery records', run: secure },
       {
         name: 'NIP-46 bunker secrets',
-        run: async () => {
-          const result = await clearSecrets(profile.pubkey);
-          if (result.isErr()) throw new Error('Bunker secret deletion failed');
-        },
+        run: () => clearLegacyBunkerSecrets(profile.pubkey),
       },
       {
         name: 'wallet database',
