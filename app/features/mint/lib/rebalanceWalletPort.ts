@@ -52,6 +52,8 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     async restoreInflightProofs(mintUrl) {
       await CocoManager.restoreInflightProofsForMint(mintUrl);
     },
+    cancelPreparedMelt: (operationId) =>
+      manager.ops.melt.cancel(operationId, 'Rebalance melt not executed'),
     async trustMint(mintUrl) {
       await manager.mint.addMint(mintUrl, { trusted: true });
     },

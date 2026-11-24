@@ -38,6 +38,9 @@ function admitMintUrl(raw: string): string | null {
   } catch {
     return null;
   }
+  // The parsed URL is checked too: `https:///user@host:444` has an empty raw
+  // authority, and URL parsing still finds the credentials and port in it.
+  if (parsed.username !== '' || parsed.password !== '' || parsed.port !== '') return null;
   if (!isAllowedMintHost(parsed.hostname) || parsed.search || parsed.hash) return null;
   return parsed.href.replace(/\/$/, '');
 }

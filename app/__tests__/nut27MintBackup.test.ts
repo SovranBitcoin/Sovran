@@ -174,6 +174,15 @@ describe('NUT-27 event codec', () => {
     expect(latestMintBackup(k, [newer, older, null])?.mints).toEqual(['https://new.example']);
     expect(latestMintBackup(k, [])).toBeNull();
   });
+
+  it('breaks a created_at tie by the lowest event id, whatever order relays answer in', () => {
+    const k = keys();
+    const a = cashuMeStyleEvent(k, ['https://a.example'], 300);
+    const b = cashuMeStyleEvent(k, ['https://b.example'], 300);
+    const expected = a.id < b.id ? ['https://a.example'] : ['https://b.example'];
+    expect(latestMintBackup(k, [a, b])?.mints).toEqual(expected);
+    expect(latestMintBackup(k, [b, a])?.mints).toEqual(expected);
+  });
 });
 
 describe('recovery: read-only NUT-27 discovery', () => {

@@ -93,6 +93,7 @@ function fakeWallet(balances: Record<string, number> = { [SOURCE]: 1000 }) {
     refreshMelt: vi.fn(async (operationId: string) => ({ id: operationId, state: 'finalized' })),
     getMeltOperation: vi.fn(async (_operationId: string) => null as { state: string } | null),
     restoreInflightProofs: vi.fn(async (_mintUrl: string) => {}),
+    cancelPreparedMelt: vi.fn(async (_operationId: string) => {}),
     trustMint: vi.fn(async (_mintUrl: string) => {}),
     releaseTrust: vi.fn(async (_mintUrls: readonly string[]) => ({
       stranded: [],

@@ -420,3 +420,45 @@ describe('buildExactOfflineAmountIndex', () => {
     expect(index.reachableSums).not.toContain(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// composeSatoshis — amounts a double cannot hold, and large proofs
+// ---------------------------------------------------------------------------
+
+describe('composeSatoshis — unsafe amounts and large proofs', () => {
+  it('never reports a total that rounding made up', () => {
+    // 2 ** 53 + 1 rounds to 2 ** 53 as a double.
+    const result = composeSatoshis([2 ** 53, 1], 2 ** 53 + 1);
+    expect(result.exactMatch).toBe(false);
+    expect(result.nearestLower).toBeNull();
+    expect(result.nearestUpper).toBeNull();
+    expect(composeSatoshis([2 ** 53, 1], 2 ** 53).exactMatch).toBe(false);
+    expect(composeSatoshis([Number.MAX_SAFE_INTEGER, 1], 5).exactMatch).toBe(false);
+  });
+
+  it('finds an exact match among small proofs hidden by many large ones', () => {
+    const coins = [
+      ...Array.from({ length: 37 }, () => 6),
+      3,
+      3,
+      3,
+      5,
+      ...Array.from({ length: 41 }, (_, i) => 2_000_001 + i),
+    ];
+    const result = composeSatoshis(coins, 8);
+    expect(result.exactMatch).toBe(true);
+    expect(result.nearestLower).toBe(8);
+    expect(result.nearestUpper).toBe(8);
+  });
+
+  it('gives the nearest amounts around a target only large proofs pass', () => {
+    const coins = [
+      ...Array.from({ length: 37 }, () => 6),
+      ...Array.from({ length: 41 }, (_, i) => 2_000_001 + i),
+    ];
+    const result = composeSatoshis(coins, 7);
+    expect(result.exactMatch).toBe(false);
+    expect(result.nearestLower).toBe(6);
+    expect(result.nearestUpper).toBe(12);
+  });
+});

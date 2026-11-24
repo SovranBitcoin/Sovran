@@ -131,10 +131,11 @@ const PersistedScanHistoryStore = z.object({
 /**
  * Secret-bearing URIs that must never land in plaintext AsyncStorage scan
  * history or transaction annotations (e.g. NIP-46 pairing links with bearer
- * secrets, or raw Nostr private keys).
+ * secrets, or raw Nostr private keys). Any character that cannot be part of a
+ * word may come before one: a space, `nostr:`, a query separator, a bracket
+ * or a quote.
  */
-const SENSITIVE_SCAN_RE =
-  /(?:^|\s|[?&=#/])(?:nostrconnect|bunker):\/\/|(?:^|\s|nostr:)nsec1[02-9ac-hj-np-z]+/i;
+const SENSITIVE_SCAN_RE = /(?:^|[^a-z0-9])(?:(?:nostrconnect|bunker):\/\/|nsec1[02-9ac-hj-np-z]+)/i;
 
 export function isSensitiveScanInput(raw: string): boolean {
   if (!raw) return false;

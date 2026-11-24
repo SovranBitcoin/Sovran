@@ -49,6 +49,8 @@ type SearchAggregates = {
   counts: { people: number; mints: number; nearby: number };
   /** The remote people search's status; `idle` while it has nothing to do. */
   peopleStatus: SearchStatus;
+  /** Length of what the remote people search is given; 0 when it is off for this query. */
+  remoteQueryLength: number;
   /** A settled query that found something and may go in recent searches. */
   recordable: boolean;
   retryPeople: () => void;
@@ -63,7 +65,8 @@ export function useSearchAggregates(query: string): SearchAggregates {
   );
   const text = kind.kind === 'text' ? kind.query : '';
 
-  const remote = useOverlaidContactSearch(remoteSearchText(kind));
+  const remoteText = remoteSearchText(kind);
+  const remote = useOverlaidContactSearch(remoteText);
   const local = useLocalSearchCandidates();
   const { results: discovered } = useMintSearch(text, 'ALL', { enabled: text.length > 0 });
   const { tiers } = useLocationTiers({ ...LOCATION_TIER_OPTIONS, enabled: text.length > 0 });
@@ -95,6 +98,7 @@ export function useSearchAggregates(query: string): SearchAggregates {
     items: sections.items,
     counts: sections.counts,
     peopleStatus,
+    remoteQueryLength: remoteText.length,
     recordable: isRecordableSearch(kind) && settled && found,
     retryPeople: remote.retry,
   };

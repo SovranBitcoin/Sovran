@@ -5,6 +5,7 @@
 import { defaultDetectors } from 'wallet';
 
 import { INPUTS, WALLETS } from '../../../../wallet/__tests__/_harness/fixtures';
+import { isSensitiveScanInput } from '@/shared/stores/profile/scanHistoryStore';
 import {
   classifySearchQuery,
   isRecordableSearch,
@@ -69,6 +70,60 @@ describe('classifySearchQuery: secrets', () => {
     expect(result).toEqual({ kind: 'sensitive' });
     expect(remoteSearchText(result, allOn)).toBe('');
     expect(isRecordableSearch(result)).toBe(false);
+  });
+});
+
+describe('classifySearchQuery: payment strings inside words', () => {
+  const NSEC = 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+  it.each([
+    ['a labelled ecash token', `pay ${INPUTS.cashuTokenV3}`],
+    ['a labelled V4 token', 'here is cashuBo2FteBtodHRwczovL21pbnQuZXhhbXBsZS5jb20'],
+    ['a labelled invoice', `invoice: ${INPUTS.bolt11WithAmount}`],
+    ['a quoted invoice', `"${INPUTS.bolt11WithAmount}"`],
+    ['a labelled payment request', `request ${INPUTS.paymentRequestBasic}`],
+    ['a parenthesised token', `(${INPUTS.cashuTokenV3})`],
+    [
+      'a labelled offer',
+      'offer lno1qcp4256ypqpq86q2pucnq42ngssx2an9wfujqerp0y2pqun4wd68jtn00fkxzcnn9ehhyec6qgqsz',
+    ],
+    [
+      'a labelled LNURL',
+      'lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns',
+    ],
+    ['a parenthesised private key', `(${NSEC})`],
+    ['a parenthesised bunker link', '(bunker://abc?secret=s)'],
+    ['a parenthesised nostrconnect link', '(nostrconnect://abc?secret=s)'],
+    ['a labelled private key', `my key: ${NSEC}`],
+  ])('never sends %s to the remote search or recent searches', (_name, input) => {
+    const result = classify(input);
+    expect(remoteSearchText(result, allOn)).toBe('');
+    expect(isRecordableSearch(result)).toBe(false);
+  });
+
+  it('still searches words that only start like a payment string', () => {
+    for (const words of ['lnbc meetup', 'cashu wallets', 'bunker hill', 'creq']) {
+      expect(remoteSearchText(classify(words), allOn)).toBe(words);
+    }
+  });
+});
+
+describe('isSensitiveScanInput: secrets behind punctuation', () => {
+  const NSEC = 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+  it.each([
+    `(${NSEC})`,
+    `[${NSEC}]`,
+    `"${NSEC}"`,
+    `key:${NSEC}`,
+    '(bunker://abc?secret=s)',
+    '"nostrconnect://abc?secret=s"',
+    '<bunker://abc?secret=s>',
+  ])('keeps %s out of scan history', (input) => {
+    expect(isSensitiveScanInput(input)).toBe(true);
+  });
+
+  it('does not match a key name inside a longer word', () => {
+    expect(isSensitiveScanInput('xnsec1abc')).toBe(false);
+    expect(isSensitiveScanInput('notbunker://x')).toBe(false);
   });
 });
 

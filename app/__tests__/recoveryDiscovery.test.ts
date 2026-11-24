@@ -73,6 +73,10 @@ describe('recovery discovery', () => {
     'https://mint.example?target=localhost',
     'https://mint.example#fragment',
     'https://',
+    'https:///user@mint.example:444/path',
+    'https:///mint.example:444',
+    'https:///user:pw@mint.example',
+    'https:\\\\user@mint.example',
   ])('never returns unsafe URL %s', async (url) => {
     await expect(fetchDiscoveredMintUrls([], transport([row(url)]))).resolves.toEqual([]);
   });

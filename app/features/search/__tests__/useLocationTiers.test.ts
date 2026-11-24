@@ -62,3 +62,15 @@ it('adds the place rows after Bluetooth when a fix arrives', async () => {
   await waitFor(() => expect(result.current.tiers.length).toBeGreaterThan(1));
   expect(result.current.tiers[0]).toEqual(BLUETOOTH_TIER_ENTRY);
 });
+
+it('never opens the Android location-accuracy dialog when it may not ask', async () => {
+  mockGetPermission.mockResolvedValue({ status: 'granted' });
+  mockGetPosition.mockResolvedValue({ coords: { latitude: 51.5, longitude: -0.12 } });
+  const { result } = renderHook(() =>
+    useLocationTiers({ enabled: true, requestPermission: false })
+  );
+  await waitFor(() => expect(result.current.tiers.length).toBeGreaterThan(1));
+  expect(mockGetPosition).toHaveBeenCalledWith(
+    expect.objectContaining({ mayShowUserSettingsDialog: false })
+  );
+});

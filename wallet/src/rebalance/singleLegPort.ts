@@ -214,6 +214,27 @@ export function createEngineSingleLegTransferPort(options: {
   const { engine, wallet, unit } = options;
   const classify = options.classifyFailure ?? failureReason;
   const legs = new Map<string, LegRecord & { sourceMintUrl: string }>();
+  /**
+   * The last leg queued on each source mint. Legs from one mint run one after
+   * another, each checking `pendingFrom` only once the leg before it has
+   * recorded its outcome: a leg waiting while another sends must see that
+   * send come back pending before it decides to draw on the mint.
+   */
+  const sourceQueues = new Map<string, Promise<unknown>>();
+
+  function oneAtATimeFrom<T>(sourceMintUrl: string, task: () => Promise<T>): Promise<T> {
+    const previous = sourceQueues.get(sourceMintUrl) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    const settled = next.then(
+      () => undefined,
+      () => undefined
+    );
+    sourceQueues.set(sourceMintUrl, settled);
+    void settled.then(() => {
+      if (sourceQueues.get(sourceMintUrl) === settled) sourceQueues.delete(sourceMintUrl);
+    });
+    return next;
+  }
 
   /**
    * A leg still pending from this mint, after reading it back. While one is,
@@ -317,13 +338,16 @@ export function createEngineSingleLegTransferPort(options: {
       // Registered before the first await, so a second call joins this one.
       legs.set(input.id, record);
       const leg = record;
-      const attempt = async (): Promise<SingleLegOutcome> =>
-        (await pendingFrom(input.sourceMintUrl, input.id))
-          ? { status: 'busy', id: input.id }
-          : run(input, leg, activity);
-      leg.running = attempt().then(
+      // The check and the outcome it guards happen inside the mint's queue.
+      const attempt = async (): Promise<SingleLegOutcome> => {
+        const outcome = (await pendingFrom(input.sourceMintUrl, input.id))
+          ? ({ status: 'busy', id: input.id } as const)
+          : await run(input, leg, activity);
+        leg.outcome = outcome;
+        return outcome;
+      };
+      leg.running = oneAtATimeFrom(input.sourceMintUrl, attempt).then(
         (outcome) => {
-          leg.outcome = outcome;
           leg.running = undefined;
           return outcome;
         },

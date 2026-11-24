@@ -46,6 +46,7 @@ export function UnifiedSearch({
           status={aggregates.peopleStatus}
           onRetry={aggregates.retryPeople}
           searchQuery={searchQuery}
+          remoteQueryLength={aggregates.remoteQueryLength}
         />
       )}
     </View>

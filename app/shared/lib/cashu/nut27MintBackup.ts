@@ -130,15 +130,28 @@ export function decodeMintBackupEvent(
   return { ...payload.data, createdAt: data.created_at };
 }
 
-/** The newest valid backup among relay events (addressable: the latest wins). */
+/**
+ * The newest valid backup among relay events (addressable: the latest wins).
+ * Equal `created_at` goes to the lowest event id (NIP-01), so the answer does
+ * not depend on which relay answered first.
+ */
 export function latestMintBackup(
   keys: MintBackupKeys,
   events: readonly unknown[]
 ): (MintBackupPayload & { createdAt: number }) | null {
-  let latest: (MintBackupPayload & { createdAt: number }) | null = null;
+  let latest: { backup: MintBackupPayload & { createdAt: number }; id: string } | null = null;
   for (const raw of events) {
     const backup = decodeMintBackupEvent(keys, raw);
-    if (backup && (!latest || backup.createdAt > latest.createdAt)) latest = backup;
+    if (!backup) continue;
+    // A decoded event passed `verifyEvent`, so its id is its hash.
+    const id = (raw as { id: string }).id;
+    if (
+      !latest ||
+      backup.createdAt > latest.backup.createdAt ||
+      (backup.createdAt === latest.backup.createdAt && id < latest.id)
+    ) {
+      latest = { backup, id };
+    }
   }
-  return latest;
+  return latest?.backup ?? null;
 }

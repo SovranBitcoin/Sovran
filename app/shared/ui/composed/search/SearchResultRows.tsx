@@ -45,6 +45,8 @@ type SearchResultRowsProps = {
   status: SearchStatus;
   /** The active query — gates the "no results" copy to non-trivial searches. */
   searchQuery: string;
+  /** Length of what the remote people search is given; 0 when it is off for this query. */
+  remoteQueryLength: number;
   /** Re-run the people search after a failure; renders the error state's action. */
   onRetry?: () => void;
 };
@@ -232,7 +234,13 @@ const PLACEHOLDER_DATA: SearchListItem[] = Array.from({ length: 4 }, (_, i) => (
   isLoadingProfile: true,
 }));
 
-export function SearchResultRows({ items, status, searchQuery, onRetry }: SearchResultRowsProps) {
+export function SearchResultRows({
+  items,
+  status,
+  searchQuery,
+  remoteQueryLength,
+  onRetry,
+}: SearchResultRowsProps) {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
@@ -243,7 +251,8 @@ export function SearchResultRows({ items, status, searchQuery, onRetry }: Search
     status,
     items.length,
     searchQuery.trim().length,
-    CONTACT_SEARCH_MIN_LENGTH
+    CONTACT_SEARCH_MIN_LENGTH,
+    remoteQueryLength
   );
   const showEmptyState = state === 'no-results' || state === 'error';
   const emptyContent =
@@ -267,9 +276,10 @@ export function SearchResultRows({ items, status, searchQuery, onRetry }: Search
               paymentLog.info('search.action.execute', { kind: item.descriptor.kind });
               // The same canonical entry as Send's paste: identical parse,
               // dedup and `'paste'` tagging, and a fresh generation. Search
-              // is a payment root, so stale routing context goes first.
+              // is a payment root, so stale routing context goes first. The
+              // `'search'` source keeps a pasted token out of scan history.
               clearPaymentContext('search.action');
-              void machine.scan?.(item.descriptor.raw, { source: 'clipboard', reset: true });
+              void machine.scan?.(item.descriptor.raw, { source: 'search', reset: true });
             }}
             onStartContactSend={(target) => {
               paymentLog.info('search.action.contact', { kind: item.descriptor.kind });

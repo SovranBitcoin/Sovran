@@ -18,6 +18,7 @@ import type {
   RebalanceClock,
   RebalanceMintReceipt,
   RebalanceMintSnapshot,
+  RebalancePreparedMelt,
   RebalanceWalletPort,
 } from '../../src/rebalance/types';
 
@@ -77,7 +78,7 @@ function fakeWallet() {
       async (operationId: string): Promise<RebalanceMintSnapshot | null> =>
         receipts.get(operationId) ?? null
     ),
-    prepareMelt: vi.fn(async (_mintUrl: string, invoice: string) => {
+    prepareMelt: vi.fn(async (_mintUrl: string, invoice: string): Promise<RebalancePreparedMelt> => {
       const id = `melt-${++nextMelt}`;
       invoiceByMelt.set(id, invoice);
       return { id, quoteId: `melt-quote-${nextMelt}`, amount: 100, fee_reserve: feeReserve, swap_fee: 1 };
@@ -89,6 +90,7 @@ function fakeWallet() {
     refreshMelt: vi.fn(async (operationId: string) => ({ id: operationId, state: 'finalized' })),
     getMeltOperation: vi.fn(async (_operationId: string) => null as { state: string } | null),
     restoreInflightProofs: vi.fn(async (_mintUrl: string) => {}),
+    cancelPreparedMelt: vi.fn(async (_operationId: string) => {}),
     trustMint: vi.fn(async (_mintUrl: string) => {}),
     releaseTrust: vi.fn(async (_mintUrls: readonly string[]) => ({
       stranded: [],
@@ -105,7 +107,7 @@ function fakeWallet() {
   };
 }
 
-function setup() {
+function setup(options: { lockClock?: RebalanceClock } = {}) {
   const wallet = fakeWallet();
   const clock = fakeClock();
   const findRoutes = vi.fn(async () => []);
@@ -115,7 +117,7 @@ function setup() {
     trustedMintUrls: new Set([SOURCE, OTHER_SOURCE, DESTINATION]),
     minTransferThreshold: 5,
     minFeeReserve: 5,
-    lock: createRebalanceLock(clock),
+    lock: createRebalanceLock(options.lockClock ?? clock),
     clock,
   });
   const port = createEngineSingleLegTransferPort({ engine, wallet: wallet.port, unit: 'sat' });
@@ -230,6 +232,105 @@ describe('single-leg transfer port', () => {
       reason: 'source_debit_cap_exceeded',
     });
     expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+  });
+
+  it('counts a direct melt\'s input fee: every selected proof can leave the source', async () => {
+    const { port, wallet } = setup();
+    // 100 invoice + 10 reserve, paid with 112 of proofs: 2 sats of input fee.
+    wallet.port.prepareMelt.mockImplementationOnce(async () => ({
+      id: 'melt-1',
+      quoteId: 'melt-quote-1',
+      amount: 100,
+      fee_reserve: 10,
+      swap_fee: 0,
+      needsSwap: false,
+      inputAmount: 112,
+    }));
+    await expect(port.executeLeg({ ...LEG, sourceDebitCap: 110 })).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'source_debit_cap_exceeded',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+  });
+
+  it('counts the swapped proofs a swap-then-melt sends, with the swap fee', async () => {
+    const { port, wallet } = setup();
+    const output = (amount: string) => ({ blindedMessage: { amount } });
+    wallet.port.prepareMelt.mockImplementationOnce(async () => ({
+      id: 'melt-1',
+      amount: 100,
+      fee_reserve: 10,
+      swap_fee: 1,
+      needsSwap: true,
+      inputAmount: 512,
+      // 110 plus 2 sats to spend the swapped proofs.
+      swapOutputData: { keep: [output('400')], send: [output('64'), output('32'), output('16')] },
+    }));
+    await expect(port.executeLeg({ ...LEG, sourceDebitCap: 112 })).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'source_debit_cap_exceeded',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an unreadable reserve', { fee_reserve: 'ten' }],
+    ['a negative reserve', { fee_reserve: -5 }],
+    ['a fractional swap fee', { swap_fee: 0.5 }],
+    ['an unsafe input amount', { needsSwap: false, inputAmount: 2 ** 53 }],
+  ])('refuses %s instead of reading it as nothing', async (_name, fields) => {
+    const { port, wallet } = setup();
+    wallet.port.prepareMelt.mockImplementationOnce(async () => ({
+      id: 'melt-1',
+      amount: 100,
+      fee_reserve: 0,
+      swap_fee: 0,
+      ...fields,
+    }));
+    await expect(port.executeLeg({ ...LEG, sourceDebitCap: 1000 })).resolves.toMatchObject({
+      status: 'failed',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledWith('melt-1');
+  });
+
+  it('gives back the proofs a melt over the cap reserved', async () => {
+    const { port, wallet } = setup();
+    wallet.setFeeReserve(30);
+    await port.executeLeg({ ...LEG, sourceDebitCap: 120 });
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledTimes(1);
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledWith('melt-1');
+  });
+
+  it('a leg queued behind a leg that ends pending never draws on the same mint', async () => {
+    // A lock waiter that waits as long as it takes, a macrotask per poll, so
+    // Leg B is still queued when Leg A lets go.
+    const patientLock: RebalanceClock = {
+      now: () => 0,
+      sleep: () => new Promise((resolve) => setTimeout(resolve, 0)),
+    };
+    const { port, wallet } = setup({ lockClock: patientLock });
+    // Leg A's melt is sent and its outcome stays unknown.
+    let releaseA!: () => void;
+    const aSent = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    wallet.port.executeMelt.mockImplementation(async (operationId: string) => {
+      await aSent;
+      return { id: operationId, state: 'pending' };
+    });
+    wallet.port.refreshMelt.mockImplementation(async (operationId: string) => ({
+      id: operationId,
+      state: 'pending',
+    }));
+    const legA = port.executeLeg(LEG);
+    const legB = port.executeLeg({ ...LEG, id: 'leg-2' });
+    await vi.waitFor(() => expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1));
+    releaseA();
+    await expect(legA).resolves.toEqual({ status: 'pending', id: 'leg-1' });
+    await expect(legB).resolves.toEqual({ status: 'busy', id: 'leg-2' });
+    expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
   });
 
   it('pays within the cap', async () => {

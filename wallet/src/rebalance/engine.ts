@@ -16,7 +16,7 @@
 // injected, so the engine runs the same under tests and in the app.
 // ---------------------------------------------------------------------------
 
-import { amountToNumber } from '../amount';
+import { amountToNumber, requireAmount } from '../amount';
 import { logger as packageLogger, mintUrlFields, errField } from '../logger';
 import { meltDidNotPay, meltSettledUnpaid, outcomeOfFailedMeltExecute } from '../melt-outcome';
 import {
@@ -143,13 +143,27 @@ export interface RebalanceEngine {
 }
 
 /**
- * The most a prepared melt can take from its source: the invoice, the mint's
- * Lightning fee reserve and the input (swap) fee. Change can make the real
- * debit lower, never higher.
+ * The most a prepared melt can take from its source. A direct melt spends
+ * exactly the proofs it reserved, input fee included. A swap-then-melt pays
+ * the swap fee and spends the swapped `send` proofs, which carry their own
+ * input fee. Without either, the invoice, the Lightning fee reserve and the
+ * swap fee. Change can make the real debit lower, never higher. Throws on an
+ * amount that is missing, unreadable, fractional, negative or too large to
+ * hold exactly, rather than counting it as nothing.
  */
 function preparedMeltDebit(melt: RebalancePreparedMelt, fallbackAmount: number): number {
-  const amount = melt.amount == null ? fallbackAmount : amountToNumber(melt.amount);
-  return amount + amountToNumber(melt.fee_reserve ?? 0) + amountToNumber(melt.swap_fee ?? 0);
+  const send = melt.needsSwap === true ? melt.swapOutputData?.send : undefined;
+  const debit =
+    melt.needsSwap === false && melt.inputAmount != null
+      ? requireAmount(melt.inputAmount)
+      : send
+        ? send.reduce((sum, output) => sum + requireAmount(output.blindedMessage?.amount), 0) +
+          requireAmount(melt.swap_fee ?? 0)
+        : requireAmount(melt.amount ?? fallbackAmount) +
+          requireAmount(melt.fee_reserve ?? 0) +
+          requireAmount(melt.swap_fee ?? 0);
+  if (!Number.isSafeInteger(debit)) throw new TypeError('source debit is too large to hold exactly');
+  return debit;
 }
 
 /**
@@ -206,6 +220,15 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       // re-preparation absorbs any remaining shortfall.
       log.debug('mint.rebalance.melt_probe_failed', { ...mintUrlFields(mintUrl), error });
       return null;
+    }
+  }
+
+  /** Release a prepared melt that will not run; a failure leaves it to Coco's recovery. */
+  async function cancelPrepared(operationId: string): Promise<void> {
+    try {
+      await wallet.cancelPreparedMelt(operationId);
+    } catch (error) {
+      log.warn('mint.rebalance.cancel_prepared_failed', { operationId, error: errField(error) });
     }
   }
 
@@ -952,11 +975,17 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       const prepareForInvoice = async (invoice: string) => {
         const prepared = await wallet.prepareMelt(fromMintUrl, invoice);
         sink.meltPrepared(id, prepared);
-        // Checked before execute: over the cap, nothing has been paid.
+        // Checked before execute: over the cap, nothing has been paid, and
+        // the proofs the melt reserved go back.
         if (step.sourceDebitCap !== undefined) {
-          const debit = preparedMeltDebit(prepared, transferAmount);
-          if (debit > step.sourceDebitCap) {
-            throw new RebalanceSourceDebitCapError(prepared.id, debit, step.sourceDebitCap);
+          try {
+            const debit = preparedMeltDebit(prepared, transferAmount);
+            if (debit > step.sourceDebitCap) {
+              throw new RebalanceSourceDebitCapError(prepared.id, debit, step.sourceDebitCap);
+            }
+          } catch (error) {
+            await cancelPrepared(prepared.id);
+            throw error;
           }
         }
         return prepared;

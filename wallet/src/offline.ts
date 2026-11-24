@@ -443,6 +443,15 @@ export function composeSatoshis(
   }
 
   const totalSum = valid.reduce((a, b) => a + b, 0);
+  // A double cannot hold these exactly: `[2 ** 53, 1]` sums to `2 ** 53`.
+  // An answer would be made up, so there is none.
+  if (!valid.every(Number.isSafeInteger) || !Number.isSafeInteger(totalSum)) {
+    const result = compositionResult(false, target, null, null, 'exhaustive', t0);
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'unsafe-amounts',
+    });
+    return result;
+  }
 
   if (target <= 0) {
     const result = compositionResult(
@@ -522,12 +531,29 @@ export function composeSatoshis(
     } else if (valid.length <= MITM_LIMIT) {
       reason = 'mitm-limit';
       result = meetInTheMiddle(valid, target, t0);
+    } else if (valid.some((coin) => coin > target)) {
+      // A proof larger than the target is in no exact or lower subset, so
+      // those are searched among the rest alone, before any pruning. Any
+      // subset holding a larger proof sums to at least the smallest of them.
+      reason = 'split-at-target';
+      const fitting = valid.filter((coin) => coin <= target);
+      const smallestOver = Math.min(...valid.filter((coin) => coin > target));
+      const below = fitting.length > 0 ? composeSatoshis(fitting, target) : null;
+      const upper = Math.min(below?.nearestUpper ?? smallestOver, smallestOver);
+      result = compositionResult(
+        below?.exactMatch ?? false,
+        target,
+        below?.nearestLower ?? null,
+        upper,
+        below?.strategy ?? 'exhaustive',
+        t0,
+      );
     } else {
       // Too many proofs to search one by one. Bundled by denomination they
       // may fit a complete search; otherwise a pruned search is topped up
       // with greedy subsets of every proof.
-      const bundles = Number.isSafeInteger(totalSum) ? mergeDenominations(valid) : null;
-      if (bundles && bundles.length <= MITM_LIMIT) {
+      const bundles = mergeDenominations(valid);
+      if (bundles.length <= MITM_LIMIT) {
         reason = 'mitm-merged-denominations';
         result = meetInTheMiddle(bundles, target, t0);
       } else {

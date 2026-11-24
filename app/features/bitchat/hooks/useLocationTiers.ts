@@ -73,6 +73,9 @@ async function computeLocationTiers(ctx: {
 
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
+      // A caller that may not ask for the permission may not ask Android to
+      // turn on location accuracy either.
+      ...(requestPermission ? {} : { mayShowUserSettingsDialog: false }),
     });
 
     if (isCancelled()) return;

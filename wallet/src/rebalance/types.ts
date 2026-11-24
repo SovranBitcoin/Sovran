@@ -56,6 +56,14 @@ export interface RebalancePreparedMelt {
   amount?: AmountValue;
   fee_reserve?: AmountValue;
   swap_fee?: AmountValue;
+  /** False when the selected proofs are melted as they are (no pre-swap). */
+  needsSwap?: boolean;
+  /** Sum of the proofs reserved for this melt. */
+  inputAmount?: AmountValue;
+  /** The pre-swap's outputs; `send` is what the melt then spends. */
+  swapOutputData?: {
+    send?: readonly { blindedMessage?: { amount?: AmountValue } }[];
+  };
 }
 
 /** A melt operation's persisted state. */
@@ -88,6 +96,8 @@ export interface RebalanceWalletPort {
   getMeltOperation(operationId: string): Promise<RebalanceMeltSnapshot | null>;
   /** Return proofs stuck `inflight` on the mint to ready. */
   restoreInflightProofs(mintUrl: string): Promise<void>;
+  /** Cancel a prepared melt that will not be executed, releasing its reserved proofs. */
+  cancelPreparedMelt(operationId: string): Promise<void>;
   trustMint(mintUrl: string): Promise<void>;
   /** Untrust every URL; report those still holding a balance. */
   releaseTrust(mintUrls: readonly string[]): Promise<{

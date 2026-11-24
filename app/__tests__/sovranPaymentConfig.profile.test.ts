@@ -142,8 +142,10 @@ jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: { getState: jest.fn(() => ({})) },
 }));
+const mockAddScan = jest.fn();
 jest.mock('@/shared/stores/profile/scanHistoryStore', () => ({
-  useScanHistoryStore: { getState: jest.fn(() => ({})) },
+  useScanHistoryStore: { getState: jest.fn(() => ({ addScan: mockAddScan })) },
+  isSensitiveScanInput: () => false,
 }));
 jest.mock('@/shared/stores/profile/sendReachabilityStore', () => ({
   useSendReachabilityStore: {
@@ -903,5 +905,48 @@ it('shows the NFC unfunded-unit explanation from the wallet', () => {
   expect(paramPopup).toHaveBeenCalledWith('nfc-error', {
     title: 'Currency unavailable',
     message,
+  });
+});
+
+describe('createSovranNotifications scan history', () => {
+  const { setTransactionAnnotation } = jest.requireMock(
+    '@/shared/stores/profile/transactionAnnotationStore'
+  ) as { setTransactionAnnotation: jest.Mock };
+  const TOKEN = 'cashuBo2FteBtodHRwczovL21pbnQuZXhhbXBsZS5jb20';
+  const resolved = (source: string, intentType: string, rawInput = TOKEN) => ({
+    rawInput,
+    parsedType: 'cashu',
+    intentType,
+    source,
+  });
+
+  beforeEach(() => {
+    mockAddScan.mockReset();
+    setTransactionAnnotation.mockReset();
+  });
+
+  it('keeps a token pasted from Search out of scan history and annotations', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('search', 'receiveToken'));
+    expect(mockAddScan).not.toHaveBeenCalled();
+    expect(setTransactionAnnotation).not.toHaveBeenCalled();
+  });
+
+  it('records an invoice paid from Search as a paste', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('search', 'meltLightningInvoice', 'lnbc1invoice'));
+    expect(mockAddScan).toHaveBeenCalledWith(
+      expect.objectContaining({ raw: 'lnbc1invoice', type: 'lightning', source: 'paste' })
+    );
+  });
+
+  it('still records a token scanned or pasted on the Send screen', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('clipboard', 'receiveToken'));
+    void notifications.onScanResolved?.(resolved('qr', 'receiveToken'));
+    expect(mockAddScan).toHaveBeenCalledTimes(2);
+    expect(mockAddScan).toHaveBeenCalledWith(
+      expect.objectContaining({ raw: TOKEN, type: 'ecash', source: 'paste' })
+    );
   });
 });

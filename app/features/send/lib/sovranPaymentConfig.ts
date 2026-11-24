@@ -511,6 +511,7 @@ export function createSovranNotifications(
       const scanType = typeMap[intentType] ?? 'unknown';
       const sourceMap: Record<string, 'qr' | 'nfc' | 'paste' | 'deeplink'> = {
         clipboard: 'paste',
+        search: 'paste',
         gallery: 'qr',
         qr: 'qr',
         nfc: 'nfc',
@@ -518,6 +519,9 @@ export function createSovranNotifications(
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
       if (isSensitiveScanInput(rawInput)) return;
+      // A token pasted into Search is money typed into a search box: it is
+      // claimed, never kept in plaintext scan history or annotations.
+      if (source === 'search' && scanType === 'ecash') return;
       useScanHistoryStore.getState().addScan({
         raw: rawInput,
         type: scanType,
