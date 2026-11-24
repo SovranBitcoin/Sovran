@@ -22,7 +22,7 @@ const groups = [
   </div>
   <div class="download-options-layout">
     <div class="download-platforms" aria-label="Download options">
-      {groups.map((group) => <section class="download-platform-row" aria-label={`${group.label} downloads`}>
+      {groups.map((group) => <section class="download-platform-row" data-platform-row={group.label.toLowerCase()} aria-label={`${group.label} downloads`}>
         <h3 class="download-platform-label">{group.label}</h3>
         <ul class="official-store-badges">
           {group.channels.map((channel) => <li class="store-card" data-channel={channel}>
@@ -49,7 +49,17 @@ const groups = [
 </section>
 <script>
   import { fetchAvailability, channels } from '../lib/releases';
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const detectedPlatform = /iPhone|iPad|iPod/i.test(ua) ? 'ios' : /Android/i.test(ua) ? 'android' : null;
   for (const root of document.querySelectorAll<HTMLElement>('[data-downloads]')) {
+    if (detectedPlatform) {
+      const container = root.querySelector<HTMLElement>('.download-platforms');
+      const matchingRow = container?.querySelector<HTMLElement>(`[data-platform-row="${detectedPlatform}"]`);
+      if (container && matchingRow) {
+        matchingRow.dataset.detectedPlatform = 'true';
+        container.prepend(matchingRow);
+      }
+    }
     const status = root.querySelector<HTMLElement>('[role="status"]')!;
     const retry = root.querySelector<HTMLButtonElement>('[data-retry]')!;
     async function refresh() {
