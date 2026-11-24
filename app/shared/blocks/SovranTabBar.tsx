@@ -9,8 +9,13 @@ import { PressScale } from '@/shared/ui/primitives/PressScale';
 import { Text } from '@/shared/ui/primitives/Text';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 
-/** Icon + one label line; tall enough that a scaled label never clips. */
-const SOVRAN_TAB_BAR_ROW_HEIGHT = 56;
+/**
+ * Icon + one label line. A minimum, not a fixed height: at large text sizes
+ * the row grows with its label instead of clipping it.
+ */
+const SOVRAN_TAB_BAR_ROW_MIN_HEIGHT = 56;
+/** Labels follow the person's text size up to 150%; past that the row would crowd. */
+const TAB_LABEL_MAX_FONT_SCALE = 1.5;
 /** Minimum bottom padding under the tab row when there's no home indicator. */
 const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 /** A whole tab is a big target: press it only slightly (Emil: 0.97 for cards). */
@@ -37,7 +42,7 @@ function TabButton({ focused, color, label, testID, onPress, onLongPress, icon }
       testID={testID}
       onPress={onPress}
       onLongPress={onLongPress}
-      className="h-full flex-1 items-center justify-center"
+      className="flex-1 items-center justify-center self-stretch py-1"
       activeOpacity={1}>
       <PressScale target={TAB_PRESS_SCALE}>
         <View className="items-center justify-center gap-0.5">
@@ -46,7 +51,7 @@ function TabButton({ focused, color, label, testID, onPress, onLongPress, icon }
             size={11}
             medium={focused}
             numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
+            maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE}
             color={color}
             accessible={false}>
             {label}
@@ -122,6 +127,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   row: {
-    height: SOVRAN_TAB_BAR_ROW_HEIGHT,
+    minHeight: SOVRAN_TAB_BAR_ROW_MIN_HEIGHT,
   },
 });

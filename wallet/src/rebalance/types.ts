@@ -22,6 +22,12 @@ export interface RebalanceTransfer {
    * before anything is paid.
    */
   sourceDebitCap?: number;
+  /**
+   * Deliver exactly `amount` or nothing: where the source balance, fees or
+   * proof selection would lower it, the transfer fails before anything is
+   * paid instead of moving less.
+   */
+  exactAmount?: boolean;
 }
 
 /** The recipient side: a prepared bolt11 mint operation whose invoice the melt pays. */
@@ -90,6 +96,11 @@ export interface RebalanceWalletPort {
   probeMeltFeeReserve(mintUrl: string, invoice: string): Promise<number>;
   createMintReceipt(mintUrl: string, amount: number): Promise<RebalanceMintReceipt>;
   getMintOperation(operationId: string): Promise<RebalanceMintSnapshot | null>;
+  /**
+   * Re-check a recipient operation with its mint and return its latest state.
+   * Optional: readers fall back to `getMintOperation`.
+   */
+  refreshMintOperation?(operationId: string): Promise<RebalanceMintSnapshot | null>;
   prepareMelt(mintUrl: string, invoice: string): Promise<RebalancePreparedMelt>;
   executeMelt(operationId: string): Promise<RebalanceMeltSnapshot | undefined>;
   refreshMelt(operationId: string): Promise<RebalanceMeltSnapshot>;
@@ -166,6 +177,8 @@ export interface RebalanceEventSink {
   legUpdated(legId: string, update: RebalanceLegUpdate): void;
   mintReceiptCreated(legId: string, receipt: RebalanceMintReceipt): void;
   meltPrepared(legId: string, melt: RebalancePreparedMelt): void;
+  /** A prepared melt was cancelled before it was executed: it never paid, and never will. */
+  meltReleased?(operationId: string): void;
   /** A middleman route is about to run: create one leg per hop and return their ids in order. */
   routeAttemptStarted(
     stepId: string,

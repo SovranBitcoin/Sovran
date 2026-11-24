@@ -17,20 +17,27 @@
 // stays in the engine, as a sequence of single legs.
 //
 // Differences from Coco v3 that callers must allow for, until it is adopted:
-// - the destination amount is the most delivered, not an exact amount: the
-//   engine lowers it to fit the source balance and fees, and the completed
-//   outcome reports what was delivered;
+// - by default the destination amount is the most delivered, not an exact
+//   amount: the engine lowers it to fit the source balance and fees, and the
+//   completed outcome reports what was delivered beside what was asked.
+//   `exactDestination` asks for Coco v3's rule: exactly that amount, or the
+//   leg fails before anything is paid;
+// - mint URLs are compared in Coco's canonical form (`canonicalMintUrl`), so
+//   `https://mint.x/` and `https://MINT.x` are one mint for the self-swap
+//   check and the one-leg-per-source lock;
 // - legs are remembered in memory, for the life of the port. A restart
 //   forgets them; Coco 2.0.0's own recovery settles the operations.
 // ---------------------------------------------------------------------------
 
-import { meltDidNotPay } from '../melt-outcome';
+import { meltDidNotPay, meltNeverSent } from '../melt-outcome';
 import { amountToNumber } from '../amount';
+import { canonicalMintUrl } from '../payment-request';
 import { isCleanReceiptFinalization, type RebalanceEngine } from './engine';
 import { classifyRebalanceError } from './errors';
 import type {
   RebalanceEventSink,
   RebalanceMintReceipt,
+  RebalanceMintSnapshot,
   RebalanceRunActivity,
   RebalanceTransferOutcome,
   RebalanceWalletPort,
@@ -48,6 +55,11 @@ export interface SingleLegTransferInput {
    * `destinationAmount`. Exceeding it fails the leg before anything is paid.
    */
   sourceDebitCap?: number;
+  /**
+   * Deliver exactly `destinationAmount` or fail before paying, as Coco v3's
+   * mint swap does. Without it the leg may deliver less (see the header).
+   */
+  exactDestination?: boolean;
   /** Coco v3 mint swaps are BOLT11 and sat only. */
   unit: string;
 }
@@ -55,12 +67,17 @@ export interface SingleLegTransferInput {
 type SingleLegFailureReason =
   | 'invalid_input'
   | 'source_debit_cap_exceeded'
+  | 'exact_destination_unavailable'
   | 'no_route'
   | 'other';
 
 export type SingleLegOutcome =
-  /** The destination issued; `destinationAmount` is what it issued. */
-  | { status: 'completed'; id: string; destinationAmount: number }
+  /**
+   * The destination issued; `destinationAmount` is what it issued and
+   * `requestedAmount` what was asked. They differ only without
+   * `exactDestination`.
+   */
+  | { status: 'completed'; id: string; destinationAmount: number; requestedAmount: number }
   /**
    * The source payment was sent and its outcome is unknown. Never sent again:
    * `refreshLeg` reads it back, and its mint is not drawn from meanwhile.
@@ -72,6 +89,12 @@ export type SingleLegOutcome =
   | { status: 'skipped'; id: string }
   /** Nothing was paid. */
   | { status: 'failed'; id: string; reason: SingleLegFailureReason; error: unknown }
+  /**
+   * The source paid, and the destination's mint operation ended failed
+   * instead of issuing. Money has left the source: never retried here, and
+   * Coco's mint recovery owns the paid quote.
+   */
+  | { status: 'destination_failed'; id: string; error: unknown }
   /** The run was stopped before the leg finished; see `pending` for a sent leg. */
   | { status: 'cancelled'; id: string }
   /**
@@ -107,6 +130,7 @@ export class SingleLegIntentMismatchError extends Error {
 
 interface LegRecord {
   intent: string;
+  requestedAmount: number;
   running?: Promise<SingleLegOutcome>;
   outcome?: SingleLegOutcome;
   /** Child operations: kept here, never returned. */
@@ -117,15 +141,17 @@ interface LegRecord {
 const SETTLED: ReadonlySet<SingleLegOutcome['status']> = new Set([
   'completed',
   'failed',
+  'destination_failed',
   'skipped',
 ]);
 
 function intentKey(input: SingleLegTransferInput): string {
   return JSON.stringify([
-    input.sourceMintUrl,
-    input.destinationMintUrl,
+    canonicalMintUrl(input.sourceMintUrl),
+    canonicalMintUrl(input.destinationMintUrl),
     input.destinationAmount,
     input.sourceDebitCap ?? null,
+    input.exactDestination ?? false,
     input.unit,
   ]);
 }
@@ -133,7 +159,9 @@ function intentKey(input: SingleLegTransferInput): string {
 function invalid(input: SingleLegTransferInput, unit: string): string | null {
   if (!input.id) return 'id is required';
   if (input.unit !== unit) return `unit must be ${unit}`;
-  if (input.sourceMintUrl === input.destinationMintUrl) return 'mints must differ';
+  if (canonicalMintUrl(input.sourceMintUrl) === canonicalMintUrl(input.destinationMintUrl)) {
+    return 'mints must differ';
+  }
   if (!Number.isSafeInteger(input.destinationAmount) || input.destinationAmount <= 0) {
     return 'destinationAmount must be a positive whole number of sats';
   }
@@ -150,6 +178,9 @@ function failureReason(error: unknown): SingleLegFailureReason {
   if (error instanceof Error && error.name === 'RebalanceSourceDebitCapError') {
     return 'source_debit_cap_exceeded';
   }
+  if (error instanceof Error && error.name === 'RebalanceExactAmountError') {
+    return 'exact_destination_unavailable';
+  }
   return classifyRebalanceError(error) === 'no_route' ? 'no_route' : 'other';
 }
 
@@ -164,6 +195,10 @@ function recordingSink(record: LegRecord): RebalanceEventSink {
     meltPrepared: (_legId, melt) => {
       record.meltOperationId = melt.id;
     },
+    // Cancelled before it was executed: nothing of it can pay.
+    meltReleased: (operationId) => {
+      if (record.meltOperationId === operationId) record.meltOperationId = undefined;
+    },
     // A direct-only leg never reaches the middleman router.
     routeAttemptStarted: () => ({ chainId: '', hopLegIds: [] }),
   };
@@ -177,11 +212,7 @@ function toLegOutcome(
 ): SingleLegOutcome {
   switch (outcome.status) {
     case 'done':
-      return {
-        status: 'completed',
-        id,
-        destinationAmount: amountToNumber(record.receipt?.amount),
-      };
+      return completed(id, record);
     case 'pending':
       record.meltOperationId = outcome.operationId;
       return { status: 'pending', id };
@@ -200,19 +231,41 @@ function toLegOutcome(
   }
 }
 
+function completed(id: string, record: LegRecord): SingleLegOutcome {
+  return {
+    status: 'completed',
+    id,
+    destinationAmount: amountToNumber(record.receipt?.amount),
+    requestedAmount: record.requestedAmount,
+  };
+}
+
+/** A recipient operation that ended without issuing: it never will. */
+function receiptFailed(
+  operation: RebalanceMintSnapshot | null,
+  receipt: RebalanceMintReceipt
+): operation is RebalanceMintSnapshot {
+  if (operation?.id !== receipt.id) return false;
+  return operation.state === 'failed' || (operation.state === 'finalized' && !!operation.error);
+}
+
 /**
  * The Coco 2.0.0 single-leg port: the rebalance engine's one-leg path, with
  * `wallet` for reading legs back.
  */
 export function createEngineSingleLegTransferPort(options: {
   engine: Pick<RebalanceEngine, 'executeTransfer'>;
-  wallet: Pick<RebalanceWalletPort, 'refreshMelt' | 'getMintOperation'>;
+  wallet: Pick<
+    RebalanceWalletPort,
+    'refreshMelt' | 'getMintOperation' | 'refreshMintOperation' | 'cancelPreparedMelt'
+  >;
   unit: string;
   /** Map an engine failure to a reason. */
   classifyFailure?: (error: unknown) => SingleLegFailureReason;
 }): SingleLegTransferPort {
   const { engine, wallet, unit } = options;
   const classify = options.classifyFailure ?? failureReason;
+  /** `sourceMintUrl` is canonical, as are the `sourceQueues` keys. */
   const legs = new Map<string, LegRecord & { sourceMintUrl: string }>();
   /**
    * The last leg queued on each source mint. Legs from one mint run one after
@@ -266,6 +319,15 @@ export function createEngineSingleLegTransferPort(options: {
       // The engine's one execute has returned, so a melt never sent or
       // settled unpaid proves nothing was paid.
       if (state !== undefined && meltDidNotPay(state)) {
+        if (meltNeverSent(state)) {
+          // Still holding the proofs it reserved: give them back first, or
+          // they stay reserved across restarts. Unreleased, it is read again.
+          try {
+            await wallet.cancelPreparedMelt(record.meltOperationId);
+          } catch {
+            return current;
+          }
+        }
         record.outcome = {
           status: 'failed',
           id,
@@ -278,20 +340,37 @@ export function createEngineSingleLegTransferPort(options: {
       record.outcome = { status: 'settling', id };
     }
     if (record.outcome?.status === 'settling' && record.receipt) {
-      try {
-        const operation = await wallet.getMintOperation(record.receipt.id);
-        if (isCleanReceiptFinalization(operation, record.receipt)) {
-          record.outcome = {
-            status: 'completed',
-            id,
-            destinationAmount: amountToNumber(record.receipt.amount),
-          };
-        }
-      } catch {
-        // Read again later.
+      const operation = await readMintOperation(record.receipt.id);
+      if (isCleanReceiptFinalization(operation, record.receipt)) {
+        record.outcome = completed(id, record);
+      } else if (receiptFailed(operation, record.receipt)) {
+        record.outcome = {
+          status: 'destination_failed',
+          id,
+          error: new Error(operation.error ?? `Mint operation ${operation.state}`),
+        };
       }
     }
     return record.outcome ?? current;
+  }
+
+  /**
+   * The recipient operation as its mint now reports it, when the wallet can
+   * re-check it; otherwise as last stored. Null when neither can be read.
+   */
+  async function readMintOperation(operationId: string): Promise<RebalanceMintSnapshot | null> {
+    if (wallet.refreshMintOperation) {
+      try {
+        return await wallet.refreshMintOperation(operationId);
+      } catch {
+        // The stored state below is still worth reading.
+      }
+    }
+    try {
+      return await wallet.getMintOperation(operationId);
+    } catch {
+      return null;
+    }
   }
 
   async function run(
@@ -311,6 +390,7 @@ export function createEngineSingleLegTransferPort(options: {
         amount: input.destinationAmount,
         directOnly: true,
         ...(input.sourceDebitCap === undefined ? {} : { sourceDebitCap: input.sourceDebitCap }),
+        ...(input.exactDestination ? { exactAmount: true } : {}),
       },
       { ...activity, sink: recordingSink(record) }
     );
@@ -334,19 +414,20 @@ export function createEngineSingleLegTransferPort(options: {
         if (SETTLED.has(status)) return record.outcome;
         // Cancelled or busy before anything was sent: run it again.
       }
-      record = record ?? { intent, sourceMintUrl: input.sourceMintUrl };
+      const sourceMintUrl = canonicalMintUrl(input.sourceMintUrl);
+      record = record ?? { intent, sourceMintUrl, requestedAmount: input.destinationAmount };
       // Registered before the first await, so a second call joins this one.
       legs.set(input.id, record);
       const leg = record;
       // The check and the outcome it guards happen inside the mint's queue.
       const attempt = async (): Promise<SingleLegOutcome> => {
-        const outcome = (await pendingFrom(input.sourceMintUrl, input.id))
+        const outcome = (await pendingFrom(sourceMintUrl, input.id))
           ? ({ status: 'busy', id: input.id } as const)
           : await run(input, leg, activity);
         leg.outcome = outcome;
         return outcome;
       };
-      leg.running = oneAtATimeFrom(input.sourceMintUrl, attempt).then(
+      leg.running = oneAtATimeFrom(sourceMintUrl, attempt).then(
         (outcome) => {
           leg.running = undefined;
           return outcome;

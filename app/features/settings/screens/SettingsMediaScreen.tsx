@@ -26,6 +26,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLifecycleLogger } from '@/shared/lib/logger';
+import { urlHostLabel } from '@/shared/lib/url';
 import { actionMenuPopup, popup } from '@/shared/lib/popup';
 import { checkBlobExists } from '@/shared/lib/nostr/media/blossomClient';
 import { deleteOwnedBlob } from '@/shared/lib/nostr/media/deleteOwnedBlob';
@@ -57,17 +58,10 @@ async function refreshOwnedBlobs(setRefreshing: (refreshing: boolean) => void): 
   }
 }
 
-function hostLabel(host: string): string {
-  try {
-    return new URL(host).host;
-  } catch {
-    return host;
-  }
-}
-
 /** A spelled-out status pill — clearer than a bare ✓/✗. */
 function statusInfo(
   state: BlobDeleteState,
+  checked: boolean,
   colors: StatusColors
 ): { label: string; color: string; spinner: boolean } {
   switch (state) {
@@ -78,12 +72,22 @@ function statusInfo(
     case 'delete-failed':
       return { label: "Couldn't delete", color: colors.danger, spinner: false };
     default:
-      return { label: 'Online', color: colors.muted, spinner: false };
+      // Online only once a refresh has seen it there; until then it is a
+      // record this phone keeps, not a claim about the server.
+      return { label: checked ? 'Online' : 'Saved', color: colors.muted, spinner: false };
   }
 }
 
-function StatusPill({ state, colors }: { state: BlobDeleteState; colors: StatusColors }) {
-  const { label, color, spinner } = statusInfo(state, colors);
+function StatusPill({
+  state,
+  checked,
+  colors,
+}: {
+  state: BlobDeleteState;
+  checked: boolean;
+  colors: StatusColors;
+}) {
+  const { label, color, spinner } = statusInfo(state, checked, colors);
   return (
     <HStack
       align="center"
@@ -120,7 +124,7 @@ function BlobRow({
       />
       <View style={styles.meta}>
         <Text size={13} numberOfLines={1} style={{ color: colors.foreground }}>
-          {hostLabel(blob.host)}
+          {urlHostLabel(blob.host)}
         </Text>
         <Text
           size={11}
@@ -129,7 +133,11 @@ function BlobRow({
           {blob.sha256.slice(0, 18)}…
         </Text>
       </View>
-      <StatusPill state={blob.deleteState} colors={colors} />
+      <StatusPill
+        state={blob.deleteState}
+        checked={blob.lastCheckedAt !== undefined}
+        colors={colors}
+      />
       {canDelete ? (
         <Pressable
           haptics
@@ -290,7 +298,8 @@ export const SettingsMediaScreen = () => {
 
   const byBlob = useOwnedMediaStore((s) => s.byBlob);
   const all = Object.values(byBlob).sort((a, b) => b.lastSeen - a.lastSeen);
-  const online = all.filter((b) => b.deleteState !== 'deleted');
+  // Kept on this phone, whatever the server now says; Refresh checks it.
+  const saved = all.filter((b) => b.deleteState !== 'deleted');
   const deleted = all.filter((b) => b.deleteState === 'deleted');
   const total = all.length;
   const avatars = all.filter((blob) => blob.purpose === 'avatar');
@@ -307,7 +316,7 @@ export const SettingsMediaScreen = () => {
         <Section title="Upload server">
           <Surface contentStyle={{ padding: pad }}>
             <ListRow
-              title={hostLabel(server)}
+              title={urlHostLabel(server)}
               subtitle="Profile pictures and post images are uploaded here. Location and camera metadata are removed first."
               wrapSubtitle
               trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
@@ -326,7 +335,7 @@ export const SettingsMediaScreen = () => {
               later. Refresh re-checks each image on its server.
             </Text>
             <Text size={11} className="text-foreground/50">
-              {total} total · {online.length} online · {deleted.length} deleted
+              {total} total · {saved.length} saved · {deleted.length} deleted
             </Text>
             <View className="flex-row">
               <Button
@@ -364,9 +373,16 @@ export const SettingsMediaScreen = () => {
 
 const styles = StyleSheet.create({
   row: { paddingVertical: 8 },
-  thumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(127,127,127,0.15)' },
+  thumb: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    borderRadius: 8,
+    backgroundColor: 'rgba(127,127,127,0.15)',
+  },
   meta: { flex: 1, minWidth: 0 },
   pill: {
+    flexShrink: 0,
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,

@@ -14,6 +14,9 @@ import { SearchTextInput } from './searchTextInput';
 export const GlassSearchBar = memo(function GlassSearchBar({
   width,
   height = 44,
+  // iOS search fields clear themselves; the owner's text is not needed here.
+  value: _value,
+  onClear: _onClear,
   ...field
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([

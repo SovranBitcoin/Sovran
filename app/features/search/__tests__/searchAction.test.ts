@@ -100,6 +100,29 @@ describe('classifySearchQuery: payment strings inside words', () => {
     expect(isRecordableSearch(result)).toBe(false);
   });
 
+  it.each([
+    ['a percent-encoded labelled token', `pay%20${INPUTS.cashuTokenV3}`],
+    ['a doubly encoded labelled token', `pay%2520${INPUTS.cashuTokenV3}`],
+    ['an encoded quoted invoice', `%22${INPUTS.bolt11WithAmount}%22`],
+    ['a labelled regtest invoice', 'invoice: lnbcrt10u1pjqxyzpp5qqqsyqcyq5rqwzqfqypqhp58yjmdan'],
+    ['an encoded regtest invoice', 'invoice%3A%20lnbcrt10u1pjqxyzpp5qqqsyqcyq5rqwzqfqypq'],
+    [
+      'an encoded private key',
+      'key%3A%20nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5',
+    ],
+  ])('never sends %s to the remote search or recent searches', (_name, input) => {
+    const result = classify(input);
+    expect(result.kind).toBe('sensitive');
+    expect(remoteSearchText(result, allOn)).toBe('');
+    expect(isRecordableSearch(result)).toBe(false);
+  });
+
+  it('still searches words with an ordinary percent sign', () => {
+    for (const words of ['100% sats', 'lnbc 50%']) {
+      expect(remoteSearchText(classify(words), allOn)).toBe(words);
+    }
+  });
+
   it('still searches words that only start like a payment string', () => {
     for (const words of ['lnbc meetup', 'cashu wallets', 'bunker hill', 'creq']) {
       expect(remoteSearchText(classify(words), allOn)).toBe(words);

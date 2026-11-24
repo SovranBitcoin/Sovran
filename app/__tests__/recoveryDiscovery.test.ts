@@ -81,6 +81,23 @@ describe('recovery discovery', () => {
     await expect(fetchDiscoveredMintUrls([], transport([row(url)]))).resolves.toEqual([]);
   });
 
+  it('keeps mints whose paths differ only in case as separate candidates', async () => {
+    const fetchMints = transport([
+      row('https://mint.example/Cashu'),
+      row('https://MINT.example/cashu/'),
+      row('https://mint.example/cashu'),
+      row('https://known.example/Bitcoin'),
+      row('https://known.example/bitcoin'),
+    ]);
+    await expect(
+      fetchDiscoveredMintUrls(['HTTPS://Known.Example/Bitcoin/'], fetchMints)
+    ).resolves.toEqual([
+      'https://mint.example/Cashu',
+      'https://mint.example/cashu',
+      'https://known.example/bitcoin',
+    ]);
+  });
+
   it('caps distinct admitted URLs after filtering', async () => {
     const mints = Array.from({ length: MAX_DISCOVERED_MINTS + 20 }, (_, i) =>
       row(`https://mint${i}.example`)

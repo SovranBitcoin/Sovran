@@ -94,3 +94,25 @@ it('reports a failed background check from the saved bookkeeping', async () => {
   await waitFor(() => expect(result.current.status).toBe('unchanged'));
   expect(result.current.errorMessage).toMatch(/Couldn't reach this mint/);
 });
+
+it.each(['https://constructor', 'https://__proto__'])(
+  'treats %s as a mint with no history yet, never an Object.prototype member',
+  async (url) => {
+    const { result } = renderHook(() => useMintChangeRevisions(url));
+    await waitFor(() => expect(checkMintInfoNow).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+    expect(result.current.status).toBe('waiting');
+    expect(result.current.revisions).toEqual([]);
+  }
+);
+
+it('marks a change whose details were too large to keep, so the page can say so', async () => {
+  const store = useMintHistoryStore.getState();
+  store.recordObservation(MINT, doc({ description: 'a'.repeat(10_000) }), 1_000);
+  store.recordObservation(MINT, doc({ description: 'b'.repeat(10_000) }), 2 * 3_600_000);
+  const { result } = renderHook(() => useMintChangeRevisions(MINT));
+  await waitFor(() => expect(result.current.status).toBe('changed'));
+  const [revision] = result.current.revisions;
+  expect(revision!.entry.oversized).toBe(true);
+  expect(revision!.phrases).toEqual([]);
+});

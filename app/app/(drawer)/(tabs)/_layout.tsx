@@ -44,7 +44,7 @@ const TAB_DEFS: readonly TabDef[] = [
     testID: 'tab-settings',
     sf: { default: 'gearshape', selected: 'gearshape.fill' },
     monicon: {
-      default: 'material-symbols:settings-rounded',
+      default: 'material-symbols:settings-outline-rounded',
       selected: 'material-symbols:settings-rounded',
     },
   },
@@ -54,7 +54,7 @@ const TAB_DEFS: readonly TabDef[] = [
     testID: 'tab-search',
     role: 'search',
     sf: { default: 'magnifyingglass', selected: 'magnifyingglass' },
-    monicon: { default: 'mingcute:search-3-line', selected: 'mingcute:search-3-line' },
+    monicon: { default: 'mingcute:search-3-line', selected: 'mingcute:search-3-fill' },
   },
 ];
 

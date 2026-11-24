@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
@@ -25,6 +25,12 @@ import { Text } from '@/shared/ui/primitives/Text';
  * unmounts while it waits is a block that shoves everything below it down the
  * moment it arrives.
  */
+
+/**
+ * From this text size the cards stack one per row: two side by side leave a
+ * large-text value too little width, and it would shrink to fit instead.
+ */
+const SINGLE_COLUMN_FONT_SCALE = 1.35;
 
 /** The low-contrast fill every whole-block skeleton in the app uses. */
 const SKELETON_FILL_ALPHA = 0.07;
@@ -67,9 +73,12 @@ export function StatsGrid({
   // The label tints are alpha over the foreground — not expressible as a
   // class, and every other dimension here is.
   const foreground = useThemeColor('foreground');
+  const { fontScale } = useWindowDimensions();
+  const perRow = fontScale >= SINGLE_COLUMN_FONT_SCALE ? 1 : 2;
 
   // Two per row, however many there are: four is 2x2, two is a single 2x1 row.
-  const rowStarts = stats.flatMap((_, index) => (index % 2 === 0 ? [index] : []));
+  // At large text sizes, one per row.
+  const rowStarts = stats.flatMap((_, index) => (index % perRow === 0 ? [index] : []));
 
   const renderGrid = (skeleton: boolean) => (
     // Negative gutter so the cards' own padding produces the gap between them
@@ -77,7 +86,7 @@ export function StatsGrid({
     <View className="-mx-1.5 w-full self-stretch">
       {rowStarts.map((rowStart) => (
         <View key={rowStart} className="w-full flex-row">
-          {stats.slice(rowStart, rowStart + 2).map((stat) => (
+          {stats.slice(rowStart, rowStart + perRow).map((stat) => (
             <View key={stat.label} className="flex-1 p-1.5">
               <View
                 className={
@@ -104,10 +113,15 @@ export function StatsGrid({
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.6}
-                    className="mb-0.5">
+                    className="mb-0.5 tabular-nums">
                     {skeleton ? stat.placeholder : stat.value}
                   </Text>
-                  <Text bold size={12} color={withAlpha(foreground, 0.5)} className="opacity-80">
+                  <Text
+                    bold
+                    size={12}
+                    color={withAlpha(foreground, 0.5)}
+                    numberOfLines={1}
+                    className="opacity-80">
                     {stat.description}
                   </Text>
                 </View>

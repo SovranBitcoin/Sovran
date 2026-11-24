@@ -26,6 +26,7 @@ import { useShallow } from 'zustand/shallow';
 
 import { toAccountUnit, type MintListItem } from 'wallet';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { selectMintAudit } from '@/features/mint/lib/auditInfo';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
@@ -75,7 +76,7 @@ export function resolveMintRows({
     ready ? (b ?? c) : (c ?? b);
 
   const rows = baseItems.map((base): MintRow => {
-    const cache = byMintUrl[normalizeMintUrlKey(base.mintUrl)];
+    const cache = ownEntry(byMintUrl, normalizeMintUrlKey(base.mintUrl));
     const metaState: MintRowMetaState = ready ? 'live' : cache ? 'cached' : 'cold';
     if (!cache) return { ...base, metaState };
 
@@ -155,7 +156,7 @@ export function useMintRowsWithCache({
     useShallow((s) => {
       const relevant: Record<string, MintMetadataEntry> = {};
       for (const key of mintKeys) {
-        const entry = s.byMintUrl[key];
+        const entry = ownEntry(s.byMintUrl, key);
         if (entry) relevant[key] = entry;
       }
       return relevant;

@@ -109,7 +109,9 @@ function RevisionSection({ revision }: { revision: MintChangeRevision }) {
         ))}
         {phrases.length === 0 ? (
           <Text size={fontSize.lg} style={[styles.sectionHead, { color: muted }]}>
-            Protocol details only
+            {entry.oversized
+              ? 'Details too large to record on this device'
+              : 'Protocol details only'}
           </Text>
         ) : null}
       </VStack>

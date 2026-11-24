@@ -19,8 +19,15 @@ export function isAllowedMintHost(hostname: string): boolean {
   return host.includes('.');
 }
 
+/**
+ * The identity two spellings of one mint share: scheme and host compared
+ * without case, the path as written (`/Cashu` and `/cashu` are different
+ * mints on a case-sensitive server), one trailing slash ignored.
+ */
 function normalizeMintUrl(url: string): string {
-  return url.replace(/\/$/, '').toLowerCase();
+  const trimmed = url.replace(/\/$/, '');
+  const match = /^([a-z][a-z0-9+.-]*:\/\/[^/?#]*)(.*)$/i.exec(trimmed);
+  return match ? match[1]!.toLowerCase() + match[2] : trimmed;
 }
 
 /**

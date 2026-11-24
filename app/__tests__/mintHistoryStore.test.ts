@@ -134,7 +134,47 @@ describe('recording', () => {
     expect(store().recordObservation(MINT, doc({ description: 'x'.repeat(40_000) }), 0)).toBe(
       'rejected'
     );
-    expect(store().byMintUrl[KEY]).toBeUndefined();
+    expect(store().byMintUrl[KEY]?.baseline).toBeUndefined();
+  });
+
+  it('backs off a mint whose answer is too large, so the sweep does not fetch it every minute', () => {
+    const big = doc({ description: 'x'.repeat(40_000) });
+    expect(store().recordObservation(MINT, big, 0)).toBe('rejected');
+    expect(entry()).toMatchObject({ consecutiveFailures: 1, revisions: [] });
+    expect(entry().baseline).toBeUndefined();
+    expect(entry().nextRetryAt).toBeGreaterThanOrEqual(4 * 60_000);
+    // A kept baseline is left as it was.
+    store().recordObservation(MINT, doc(), HOUR);
+    store().recordObservation(MINT, big, 2 * HOUR);
+    expect(entry()).toMatchObject({ baseline: doc(), consecutiveFailures: 1 });
+    expect(entry().nextRetryAt).toBeGreaterThan(2 * HOUR);
+  });
+});
+
+describe('prototype-shaped mint URLs', () => {
+  const PROTO = ['https://constructor', 'https://__proto__', 'https://hasOwnProperty'];
+
+  it.each(PROTO)(
+    'records a failure for %s as a real count, never through Object.prototype',
+    (url) => {
+      store().recordFailure(url, 0, () => 0.5);
+      const held = store().byMintUrl[normalizeMintUrlKey(url)]!;
+      expect(Object.hasOwn(store().byMintUrl, normalizeMintUrlKey(url))).toBe(true);
+      expect(held.consecutiveFailures).toBe(1);
+      expect(Number.isFinite(held.nextRetryAt)).toBe(true);
+      expect(Object.getPrototypeOf(store().byMintUrl)).toBe(Object.prototype);
+    }
+  );
+
+  it.each(PROTO)('records %s as a baseline, then a change', (url) => {
+    expect(store().recordObservation(url, doc(), 0)).toBe('baseline');
+    expect(store().recordObservation(url, doc({ version: 'v2' }), HOUR)).toBe('changed');
+    expect(store().byMintUrl[normalizeMintUrlKey(url)]!.revisions).toHaveLength(1);
+  });
+
+  it.each(PROTO)('does not invent an entry when %s is viewed before it was ever seen', (url) => {
+    store().markViewed(url, 0);
+    expect(Object.keys(store().byMintUrl)).toEqual([]);
   });
 });
 

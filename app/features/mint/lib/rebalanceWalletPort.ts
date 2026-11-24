@@ -45,6 +45,7 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     createMintReceipt: (mintUrl, amount) =>
       prepareMintQuote(manager, 'bolt11', mintUrl, amount, unit),
     getMintOperation: (operationId) => manager.ops.mint.get(operationId),
+    refreshMintOperation: (operationId) => manager.ops.mint.refresh(operationId),
     prepareMelt: (mintUrl, invoice) => prepareBolt11MeltQuote(manager, mintUrl, invoice),
     executeMelt: (operationId) => manager.ops.melt.execute(operationId),
     refreshMelt: (operationId) => manager.ops.melt.refresh(operationId),

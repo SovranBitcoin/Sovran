@@ -4,6 +4,7 @@ import {
   readMintAuditDetail,
   resetMintAuditDetailClock,
 } from '@/features/mint/lib/mintAuditDetail';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
 import { discoverMintsFromAuditors } from '@/shared/lib/cashu/auditors/discoverMints';
 
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
@@ -143,5 +144,20 @@ describe('Mint Info lazy auditor detail', () => {
     expect(urls.every((url) => url.includes('/api/search_mints'))).toBe(true);
     expect(urls.some((url) => url.includes('auditor.ucash.space'))).toBe(true);
     expect(urls.some((url) => url.includes('auditor.regtest.macadamia.cash'))).toBe(true);
+  });
+});
+
+describe('Delete All', () => {
+  it('forgets which mints were read, so a wiped install asks the auditors again', async () => {
+    await readMintAuditDetail(MINT, {
+      held: undefined,
+      disabledAuditors: [],
+      enabledAuditors: [],
+      signal: new AbortController().signal,
+      deps: deps(),
+    });
+    expect(mintAuditDetailDue(MINT, Date.now())).toBe(false);
+    fenceDataReset();
+    expect(mintAuditDetailDue(MINT, Date.now())).toBe(true);
   });
 });

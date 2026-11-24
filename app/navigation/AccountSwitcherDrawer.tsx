@@ -14,7 +14,8 @@
 
 import { useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
+import { useAnimatedReaction } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useDrawerProgress, type DrawerContentComponentProps } from 'expo-router/drawer';
 import { setStringAsync } from 'expo-clipboard';
 
@@ -86,7 +87,7 @@ function useCloseDrawerAndWait(navigation: DrawerNavigation) {
   useAnimatedReaction(
     () => progress.get() <= 0.001,
     (closed, wasClosed) => {
-      if (closed && wasClosed === false) runOnJS(flush)();
+      if (closed && wasClosed === false) scheduleOnRN(flush);
     }
   );
 
@@ -115,7 +116,7 @@ function AccountRow({
   locked,
   displayBtc,
   onPress,
-  onLongPress,
+  onOpenMenu,
 }: {
   profile: ProfileEntry;
   isActive: boolean;
@@ -123,15 +124,19 @@ function AccountRow({
   locked: boolean;
   displayBtc: number;
   onPress: (profile: ProfileEntry) => void;
-  onLongPress: (profile: ProfileEntry) => void;
+  /** Long press and the trailing button open the same account menu. */
+  onOpenMenu: (profile: ProfileEntry, name: string) => void;
 }) {
   const [muted, accent] = useThemeColor(['muted', 'accent'] as const);
-  // Cache only: a profile seen before shows its handle; nothing is fetched.
+  // Cache only: a profile seen before shows its name, picture and handle;
+  // nothing is fetched. The saved name and picture still come first.
   const { metadata } = useCachedNostrProfile(profile.pubkey);
   const name = resolveIdentityName({
     pubkey: profile.pubkey,
     overrideName: profile.cachedDisplayName,
+    nostrProfile: metadata,
   });
+  const picture = profile.cachedPicture ?? metadata?.picture;
   const secondary = accountSecondaryLine(profile.pubkey, metadata?.nip05);
   const balance = formatCachedBalance(profile.cachedBalanceSats, displayBtc);
   const dimmed = locked && !isPending;
@@ -146,16 +151,20 @@ function AccountRow({
       disabled={locked}
       activeOpacity={1}
       onPress={() => onPress(profile)}
-      onLongPress={() => onLongPress(profile)}>
+      onLongPress={() => onOpenMenu(profile, name)}>
       <PressScale target={locked ? 1 : PRESS_SCALE}>
-        <View className={`flex-row items-center gap-3 px-5 py-2.5 ${dimmed ? 'opacity-50' : ''}`}>
-          <Avatar
-            state={profile.cachedPicture ? 'image' : 'fallback'}
-            seed={profile.pubkey}
-            picture={profile.cachedPicture}
-            name={name}
-            size={44}
-          />
+        <View
+          className={`flex-row items-center gap-3 py-2.5 pl-5 pr-2 ${dimmed ? 'opacity-50' : ''}`}>
+          {/* Fixed-size pieces never shrink; the name column takes what is left. */}
+          <View className="shrink-0">
+            <Avatar
+              state={picture ? 'image' : 'fallback'}
+              seed={profile.pubkey}
+              picture={picture}
+              name={name}
+              size={44}
+            />
+          </View>
           <View className="min-w-0 flex-1 gap-0.5">
             <Text size={16} medium numberOfLines={1} accessible={false}>
               {name}
@@ -164,22 +173,39 @@ function AccountRow({
               {secondary}
             </Text>
           </View>
-          <Text
-            size={14}
-            medium
-            numberOfLines={1}
-            className="tabular-nums"
-            color={balance === UNKNOWN_BALANCE ? muted : undefined}
-            accessible={false}>
-            {balance}
-          </Text>
-          <View className="w-5 items-center">
+          {/* Capped, so a huge balance at large text cannot squeeze the name away. */}
+          <View className="max-w-[40%] shrink-0">
+            <Text
+              size={14}
+              medium
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              className="tabular-nums"
+              color={balance === UNKNOWN_BALANCE ? muted : undefined}
+              accessible={false}>
+              {balance}
+            </Text>
+          </View>
+          <View className="w-5 shrink-0 items-center">
             {isPending ? (
               <Spinner size={16} color={muted} />
             ) : isActive ? (
               <Icon name="fluent:checkmark-16-filled" size={18} color={accent} />
             ) : null}
           </View>
+          <Pressable
+            testID={`drawer-profile-options-${profile.accountIndex}`}
+            accessibilityRole="button"
+            accessibilityLabel="Account options"
+            accessibilityHint={`Copy, view or edit ${name}`}
+            accessibilityState={{ disabled: locked }}
+            disabled={locked}
+            hitSlop={8}
+            onPress={() => onOpenMenu(profile, name)}
+            className="h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <Icon name="tabler:dots" size={20} color={muted} />
+          </Pressable>
         </View>
       </PressScale>
     </Pressable>
@@ -214,7 +240,7 @@ function FooterAction({
       <PressScale target={locked ? 1 : PRESS_SCALE}>
         <View
           className={`flex-row items-center gap-3 px-5 py-3 ${locked && !pending ? 'opacity-50' : ''}`}>
-          <View className="bg-surface-secondary h-11 w-11 items-center justify-center rounded-full">
+          <View className="bg-surface-secondary h-11 w-11 shrink-0 items-center justify-center rounded-full">
             {pending ? (
               <Spinner size={16} color={muted} />
             ) : (
@@ -307,15 +333,11 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
     });
   };
 
-  const handleLongPress = async (profile: ProfileEntry) => {
+  const openAccountMenu = async (profile: ProfileEntry, name: string) => {
     if (lockRef.current) return;
     void EnhancedHaptics.navigateHaptic();
     const isActive = profile.accountIndex === activeAccountIndex;
     const npub = accountNpub(profile.pubkey);
-    const name = resolveIdentityName({
-      pubkey: profile.pubkey,
-      overrideName: profile.cachedDisplayName,
-    });
     await closeDrawerAndWait();
     actionMenuPopup({
       title: name,
@@ -387,7 +409,7 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
             locked={locked}
             displayBtc={displayBtc}
             onPress={(p) => void handleSwitch(p)}
-            onLongPress={(p) => void handleLongPress(p)}
+            onOpenMenu={(p, name) => void openAccountMenu(p, name)}
           />
         ))}
         <View className="pt-3">

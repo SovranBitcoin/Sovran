@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withSpring,
@@ -141,20 +142,23 @@ function AnimatedAvatar({
   size?: number;
   isLoading?: boolean;
 }) {
+  const reducedMotion = useReducedMotion();
+  // 0 → 1: the dot fades in from just under its size, never from nothing, and
+  // settles without overshoot. It sits absolutely, so nothing around it moves.
   const badgeAnim = useSharedValue(0);
   const badgeStyle = useAnimatedStyle(() => ({
     position: 'absolute',
     bottom: -2,
     right: -2,
     opacity: badgeAnim.get(),
-    transform: [{ scale: badgeAnim.get() }],
+    transform: [{ scale: 0.92 + 0.08 * badgeAnim.get() }],
   }));
 
   useEffect(() => {
-    if (status && !isLoading) {
-      badgeAnim.set(withDelay(80, withSpring(1, { damping: 14, stiffness: 260 })));
-    }
-  }, [status, isLoading, badgeAnim]);
+    if (!status || isLoading) return;
+    if (reducedMotion) badgeAnim.set(1);
+    else badgeAnim.set(withDelay(80, withSpring(1, { duration: 200, dampingRatio: 1 })));
+  }, [status, isLoading, badgeAnim, reducedMotion]);
 
   const badgeSize = size * 0.33;
 
@@ -643,20 +647,33 @@ export function MintInfoScreen() {
           {capabilityPills.length > 0 || (inputFees?.length ?? 0) > 0 ? (
             <Section title="What this mint supports">
               <View className="flex-row flex-wrap gap-2 px-1" testID="mint-info-capabilities">
+                {/* Foreground text on the neutral fill: readable in both themes. A
+                    fee is a fact about the mint, not a warning, so it reads the same. */}
                 {capabilityPills.map((label) => (
-                  <Badge key={label} variant="secondary" size={12}>
+                  <Badge key={label} variant="primary" size={12}>
                     {label}
                   </Badge>
                 ))}
                 {inputFees?.map((fee) => (
                   <Badge
                     key={`fee:${fee.unit}`}
-                    variant={fee.ppk > 0 ? 'warning' : 'success'}
+                    variant="primary"
                     icon="mdi:cash-multiple"
                     size={12}>
                     {formatInputFee(fee)}
                   </Badge>
-                ))}
+                )) ?? (
+                  // Holds the fee pill's place while the keysets load, so the
+                  // row does not reflow when it arrives.
+                  <View
+                    className="opacity-0"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants">
+                    <Badge variant="primary" icon="mdi:cash-multiple" size={12}>
+                      {formatInputFee({ unit: 'sat', ppk: 0 })}
+                    </Badge>
+                  </View>
+                )}
               </View>
             </Section>
           ) : null}

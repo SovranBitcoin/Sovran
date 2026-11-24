@@ -11,6 +11,8 @@ const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockGuardedBack = jest.fn();
 const paramsRef: { current: Record<string, string | string[] | undefined> } = { current: {} };
+/** When set, every `useLocalSearchParams()` call gets its own object, as Expo Router does. */
+let mockFreshParamsPerCall = false;
 const mockWarn = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -19,7 +21,8 @@ jest.mock('expo-router', () => ({
     replace: (...args: unknown[]) => mockReplace(...args),
     canGoBack: () => mockCanGoBack(),
   },
-  useLocalSearchParams: () => paramsRef.current,
+  useLocalSearchParams: () =>
+    mockFreshParamsPerCall ? { ...paramsRef.current } : paramsRef.current,
 }));
 
 // The guarded router dedupes repeated calls within 600ms, so a recovery
@@ -65,7 +68,17 @@ function Probe({
 }
 
 describe('useRouteParams', () => {
+  // Each test starts well past the previous one's coalescing window.
+  let clock = 0;
+  beforeAll(() => {
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
+  });
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
   beforeEach(() => {
+    clock += 10_000;
+    mockFreshParamsPerCall = false;
     mockBack.mockReset();
     mockReplace.mockReset();
     mockGuardedBack.mockReset();
@@ -142,5 +155,45 @@ describe('useRouteParams', () => {
     });
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('coalesces two hooks given distinct but equal params objects into one back()', () => {
+    mockFreshParamsPerCall = true;
+    paramsRef.current = { pubkey: 'not-hex' };
+    act(() => {
+      TestRenderer.create(
+        <>
+          <Probe options={{ where: 'wrapper.route' }} onResult={() => undefined} />
+          <Probe options={{ where: 'screen.route' }} onResult={() => undefined} />
+        </>
+      );
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('still recovers again for the same bad params once the window has passed', () => {
+    mockFreshParamsPerCall = true;
+    paramsRef.current = { pubkey: 'not-hex' };
+    act(() => {
+      TestRenderer.create(<Probe options={{ where: 'screen.route' }} onResult={() => undefined} />);
+    });
+    clock += 1_000;
+    act(() => {
+      TestRenderer.create(<Probe options={{ where: 'screen.route' }} onResult={() => undefined} />);
+    });
+    expect(mockBack).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not coalesce different bad params', () => {
+    mockFreshParamsPerCall = true;
+    paramsRef.current = { pubkey: 'not-hex' };
+    act(() => {
+      TestRenderer.create(<Probe options={{ where: 'a.route' }} onResult={() => undefined} />);
+    });
+    paramsRef.current = { pubkey: 'also-not-hex' };
+    act(() => {
+      TestRenderer.create(<Probe options={{ where: 'b.route' }} onResult={() => undefined} />);
+    });
+    expect(mockBack).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,3 +1,4 @@
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { fetchMintInfo, ApiHttpError, ApiParseError } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -51,7 +52,7 @@ export function cachedMintProbe(
   nowMs: number = Date.now()
 ): MintProbe | undefined {
   const key = normalizeMintUrlKey(mintUrl);
-  const entry = useMintMetadataStore.getState().byMintUrl[key];
+  const entry = ownEntry(useMintMetadataStore.getState().byMintUrl, key);
   if (!entry?.liveness || typeof entry.livenessAt !== 'number') return undefined;
   return nowMs - entry.livenessAt <= PROBE_TTL_MS ? { key, status: entry.liveness } : undefined;
 }

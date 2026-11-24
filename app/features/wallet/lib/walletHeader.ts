@@ -47,3 +47,11 @@ const SIDE =
 export function getHeaderTitleWidthFromWidth(windowWidth: number): number {
   return windowWidth - SIDE * 2;
 }
+
+/**
+ * A left-aligned title in a header with a left button and none on the right
+ * (the Search tab): the side the right button would take is the title's.
+ */
+export function getHeaderTitleWidthWithoutRight(windowWidth: number): number {
+  return windowWidth - SIDE - HEADER_LAYOUT.HORIZONTAL_PADDING;
+}

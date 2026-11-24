@@ -60,7 +60,9 @@ export type SearchListItem =
       reviewCount?: number;
     }
   | { type: 'geohash'; id: string; geohash: string }
-  | { type: 'tier'; id: string; tier: TierEntry };
+  | { type: 'tier'; id: string; tier: TierEntry }
+  /** The remote people search failed while other rows are on screen. */
+  | { type: 'people-error'; id: 'people-error' };
 
 /** A remote people-search row, after the kind-0 overlay. */
 export interface RemotePersonRow {
@@ -77,6 +79,12 @@ export interface SearchSectionsInput {
   discoveredMints: readonly MintSearchResult[];
   geohash: string | null;
   tiers: readonly TierEntry[];
+  /**
+   * The remote people search failed. With other rows on screen, People ends
+   * with an inline error and retry; with none, the list's own error state
+   * says so instead.
+   */
+  peopleSearchFailed?: boolean;
 }
 
 interface SearchSections {
@@ -202,11 +210,17 @@ export function buildSearchSections(input: SearchSectionsInput): SearchSections 
   const people = peopleRows(input);
   const mints = mintRows(input);
   const nearby = nearbyRows(input);
+  const anyRows = !!input.action || people.length + mints.length + nearby.length > 0;
+  // Local rows stay; the failure is said where its rows would have been.
+  const peopleSection: SearchListItem[] =
+    input.peopleSearchFailed && anyRows
+      ? [...people, { type: 'people-error', id: 'people-error' }]
+      : people;
   const items: SearchListItem[] = [
     ...(input.action
       ? [{ type: 'action' as const, id: 'action' as const, descriptor: input.action }]
       : []),
-    ...withHeader('people', people),
+    ...withHeader('people', peopleSection),
     ...withHeader('mints', mints),
     ...withHeader('nearby', nearby),
   ];

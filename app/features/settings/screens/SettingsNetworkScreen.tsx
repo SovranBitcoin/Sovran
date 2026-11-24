@@ -22,6 +22,7 @@ import { useRelayHealth } from '@/shared/hooks/useRelayHealth';
 import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
 import { type TierStatus } from '@/shared/lib/nostr/tierHealth';
 import { useLifecycleLogger } from '@/shared/lib/logger';
+import { urlHostLabel } from '@/shared/lib/url';
 import { backendConfig } from '@/shared/config/backend';
 import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -102,7 +103,12 @@ export function SettingsNetworkScreen() {
             {tiers.map((tier, index) => (
               <React.Fragment key={tier.id}>
                 {index > 0 ? <Separator className="mx-4" /> : null}
-                <ListGroup.Item className={tier.enabled ? undefined : 'opacity-40'}>
+                <SwitchRow
+                  testID={`settings-network-tier-${tier.id}`}
+                  label={`Use ${tier.name}`}
+                  hint={tier.description}
+                  selected={tier.enabled}
+                  onToggle={tier.onToggle}>
                   <ListGroup.ItemContent>
                     <View className="flex-row items-center gap-2">
                       <ListGroup.ItemTitle>{tier.name}</ListGroup.ItemTitle>
@@ -110,15 +116,7 @@ export function SettingsNetworkScreen() {
                     </View>
                     <ListGroup.ItemDescription>{tier.description}</ListGroup.ItemDescription>
                   </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Switch
-                      testID={`settings-network-tier-${tier.id}`}
-                      accessibilityLabel={`Use ${tier.name}`}
-                      isSelected={tier.enabled}
-                      onSelectedChange={tier.onToggle}
-                    />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
+                </SwitchRow>
                 {/* Per-host switches, only when there is a choice to make. The
                     tier switch above still wins: turning the tier off disables
                     every host regardless of its own state. */}
@@ -141,11 +139,11 @@ export function SettingsNetworkScreen() {
                             }
                           />
                           <Text size={13} numberOfLines={1} className="flex-1">
-                            {hostLabel(url)}
+                            {urlHostLabel(url)}
                           </Text>
                           <Switch
                             testID={`settings-network-primal-host-${url}`}
-                            accessibilityLabel={`Use ${hostLabel(url)}`}
+                            accessibilityLabel={`Use ${urlHostLabel(url)}`}
                             isSelected={hostEnabled}
                             isDisabled={!tier.enabled}
                             onSelectedChange={(next) => setPrimalHostEnabled(url, next)}
@@ -201,20 +199,17 @@ export function SettingsNetworkScreen() {
               return (
                 <React.Fragment key={auditor.id}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
-                  <ListGroup.Item className={enabled ? undefined : 'opacity-40'}>
+                  <SwitchRow
+                    testID={`settings-mint-auditor-${auditor.id}`}
+                    label={`Use ${auditor.name}`}
+                    hint={auditor.description}
+                    selected={enabled}
+                    onToggle={(next) => setMintAuditorEnabled(auditor.id, next)}>
                     <ListGroup.ItemContent>
                       <ListGroup.ItemTitle>{auditor.name}</ListGroup.ItemTitle>
                       <ListGroup.ItemDescription>{auditor.description}</ListGroup.ItemDescription>
                     </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Switch
-                        testID={`settings-mint-auditor-${auditor.id}`}
-                        accessibilityLabel={`Use ${auditor.name}`}
-                        isSelected={enabled}
-                        onSelectedChange={(next) => setMintAuditorEnabled(auditor.id, next)}
-                      />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
+                  </SwitchRow>
                 </React.Fragment>
               );
             })}
@@ -257,11 +252,50 @@ function StatusDot({ color }: { color: string }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />;
 }
 
-/** `wss://cache1.primal.net/v1` → `cache1.primal.net`, the part worth reading. */
-function hostLabel(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url.replace(/^wss?:\/\//, '');
-  }
+/**
+ * A settings row whose whole width toggles its switch, like the people-search
+ * row above and `SettingsToggleItem`: one target, read as one switch. Off rows
+ * are dimmed but stay tappable, since tapping is how they are turned back on.
+ */
+function SwitchRow({
+  testID,
+  label,
+  hint,
+  selected,
+  onToggle,
+  children,
+}: {
+  testID: string;
+  label: string;
+  hint: string;
+  selected: boolean;
+  onToggle: (next: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <PressableFeedback
+      animation={false}
+      testID={testID}
+      accessible
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ checked: selected }}
+      onPress={() => onToggle(!selected)}>
+      <PressableFeedback.Scale>
+        <ListGroup.Item disabled className={selected ? undefined : 'opacity-40'}>
+          {children}
+          <ListGroup.ItemSuffix>
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Switch isSelected={selected} />
+            </View>
+          </ListGroup.ItemSuffix>
+        </ListGroup.Item>
+      </PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
+  );
 }

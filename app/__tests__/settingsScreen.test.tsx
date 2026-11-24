@@ -40,7 +40,10 @@ jest.mock('@/shared/stores/profile/notificationPolicyStore', () => ({
     select({ policy: mockPolicy }),
 }));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
-jest.mock('@/shared/lib/url', () => ({ openExternalUrl: jest.fn() }));
+jest.mock('@/shared/lib/url', () => ({
+  openExternalUrl: jest.fn(),
+  urlHostLabel: jest.requireActual('@/shared/lib/url').urlHostLabel,
+}));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { exportDatabase: jest.fn() } }));
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
@@ -184,4 +187,18 @@ it('exposes profile switching as a checked switch and toggles in both directions
     toggle().props.onPress();
   });
   expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
+});
+
+it('renders with a malformed saved media server instead of crashing', () => {
+  const { useMediaServerStore } = jest.requireActual(
+    '@/shared/lib/nostr/media/mediaServerStore'
+  ) as typeof import('@/shared/lib/nostr/media/mediaServerStore');
+  const previous = useMediaServerStore.getState().server;
+  useMediaServerStore.setState({ server: 'blossom.example' });
+  try {
+    expect(() => render()).not.toThrow();
+    expect(JSON.stringify(tree.toJSON())).toContain('blossom.example');
+  } finally {
+    useMediaServerStore.setState({ server: previous });
+  }
 });

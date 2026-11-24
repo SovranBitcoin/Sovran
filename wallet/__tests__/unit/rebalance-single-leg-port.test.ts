@@ -78,6 +78,10 @@ function fakeWallet() {
       async (operationId: string): Promise<RebalanceMintSnapshot | null> =>
         receipts.get(operationId) ?? null
     ),
+    refreshMintOperation: vi.fn(
+      async (operationId: string): Promise<RebalanceMintSnapshot | null> =>
+        receipts.get(operationId) ?? null
+    ),
     prepareMelt: vi.fn(async (_mintUrl: string, invoice: string): Promise<RebalancePreparedMelt> => {
       const id = `melt-${++nextMelt}`;
       invoiceByMelt.set(id, invoice);
@@ -101,6 +105,7 @@ function fakeWallet() {
     port,
     payInvoice,
     invoiceByMelt,
+    receipts,
     setFeeReserve: (value: number) => {
       feeReserve = value;
     },
@@ -140,7 +145,12 @@ describe('single-leg transfer port', () => {
   it('completes one leg and returns only its own id', async () => {
     const { port, wallet } = setup();
     const outcome = await port.executeLeg(LEG);
-    expect(outcome).toEqual({ status: 'completed', id: 'leg-1', destinationAmount: 100 });
+    expect(outcome).toEqual({
+      status: 'completed',
+      id: 'leg-1',
+      destinationAmount: 100,
+      requestedAmount: 100,
+    });
     // Nothing about the mint quote or melt crosses the seam.
     expect(JSON.stringify(outcome)).not.toMatch(/quote|melt-/);
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
@@ -186,6 +196,7 @@ describe('single-leg transfer port', () => {
       status: 'completed',
       id: 'leg-1',
       destinationAmount: 100,
+      requestedAmount: 100,
     });
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
   });
@@ -395,6 +406,159 @@ describe('single-leg transfer port', () => {
     });
     await expect(port.executeLeg(LEG)).resolves.toEqual({ status: 'pending', id: 'leg-1' });
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('never executes a melt whose run was stopped while it was prepared, and gives its proofs back', async () => {
+    const { port, wallet } = setup();
+    let active = true;
+    const prepare = wallet.port.prepareMelt.getMockImplementation()!;
+    wallet.port.prepareMelt.mockImplementation(async (mintUrl: string, invoice: string) => {
+      const prepared = await prepare(mintUrl, invoice);
+      active = false;
+      return prepared;
+    });
+    await expect(port.executeLeg(LEG, { isActive: () => active })).resolves.toEqual({
+      status: 'cancelled',
+      id: 'leg-1',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledWith('melt-1');
+    // Released, so the same leg may run again.
+    wallet.port.prepareMelt.mockImplementation(prepare);
+    await expect(port.executeLeg(LEG)).resolves.toMatchObject({ status: 'completed' });
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a stopped leg pending when its prepared melt could not be released, then releases it on read back', async () => {
+    const { port, wallet } = setup();
+    let active = true;
+    const prepare = wallet.port.prepareMelt.getMockImplementation()!;
+    wallet.port.prepareMelt.mockImplementation(async (mintUrl: string, invoice: string) => {
+      const prepared = await prepare(mintUrl, invoice);
+      active = false;
+      return prepared;
+    });
+    wallet.port.cancelPreparedMelt.mockRejectedValueOnce(new Error('offline'));
+    await expect(port.executeLeg(LEG, { isActive: () => active })).resolves.toEqual({
+      status: 'pending',
+      id: 'leg-1',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+
+    wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'prepared' });
+    // Still unreleasable: still pending, never failed with its proofs reserved.
+    wallet.port.cancelPreparedMelt.mockRejectedValueOnce(new Error('offline'));
+    await expect(port.refreshLeg('leg-1')).resolves.toEqual({ status: 'pending', id: 'leg-1' });
+    await expect(port.refreshLeg('leg-1')).resolves.toMatchObject({ status: 'failed' });
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledTimes(3);
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenLastCalledWith('melt-1');
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+  });
+
+  it('treats spellings of one mint URL as one mint for the lock and the self-swap check', async () => {
+    const { port, wallet } = setup();
+    meltStaysPending(wallet);
+    await port.executeLeg(LEG);
+    for (const [id, sourceMintUrl] of [
+      ['leg-2', 'https://source.example/'],
+      ['leg-3', 'https://SOURCE.example'],
+      ['leg-4', 'https://source.example:443'],
+    ]) {
+      await expect(port.executeLeg({ ...LEG, id, sourceMintUrl })).resolves.toEqual({
+        status: 'busy',
+        id,
+      });
+    }
+    expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+    await expect(
+      port.executeLeg({ ...LEG, id: 'self', sourceMintUrl: 'https://Destination.example/' })
+    ).resolves.toMatchObject({ status: 'failed', reason: 'invalid_input' });
+  });
+
+  /** A leg whose melt paid while the destination had not issued yet. */
+  async function settlingLeg() {
+    const ctx = setup();
+    ctx.wallet.port.executeMelt.mockImplementation(async (operationId: string) => ({
+      id: operationId,
+      state: 'finalized',
+    }));
+    await expect(ctx.port.executeLeg(LEG)).resolves.toEqual({ status: 'settling', id: 'leg-1' });
+    return ctx;
+  }
+
+  it('re-checks a settling leg with the destination mint, not only the stored state', async () => {
+    const { port, wallet } = await settlingLeg();
+    // The stored row still says pending; only a re-check sees it issued.
+    wallet.port.refreshMintOperation.mockImplementation(async (operationId: string) => {
+      const receipt = wallet.receipts.get(operationId)!;
+      return { ...receipt, state: 'finalized' };
+    });
+    await expect(port.refreshLeg('leg-1')).resolves.toMatchObject({
+      status: 'completed',
+      destinationAmount: 100,
+    });
+    expect(wallet.port.refreshMintOperation).toHaveBeenCalled();
+  });
+
+  it('falls back to the stored mint operation when the re-check fails', async () => {
+    const { port, wallet } = await settlingLeg();
+    wallet.port.refreshMintOperation.mockRejectedValue(new Error('offline'));
+    await expect(port.refreshLeg('leg-1')).resolves.toEqual({ status: 'settling', id: 'leg-1' });
+    for (const receipt of wallet.receipts.values()) receipt.state = 'finalized';
+    await expect(port.refreshLeg('leg-1')).resolves.toMatchObject({ status: 'completed' });
+  });
+
+  it.each([
+    ['failed', { state: 'failed', error: 'quote expired' }],
+    ['finalized with an error', { state: 'finalized', error: 'outputs rejected' }],
+  ])('moves a settling leg out of settling when its mint operation ended %s', async (_n, end) => {
+    const { port, wallet } = await settlingLeg();
+    for (const receipt of wallet.receipts.values()) Object.assign(receipt, end);
+    const outcome = await port.refreshLeg('leg-1');
+    expect(outcome).toMatchObject({ status: 'destination_failed', id: 'leg-1' });
+    // Settled: a repeat reads nothing and pays nothing.
+    await expect(port.executeLeg(LEG)).resolves.toBe(outcome);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports what was asked beside what was delivered when the source only had less', async () => {
+    const { port, wallet } = setup();
+    const outcome = await port.executeLeg({ ...LEG, destinationAmount: 1000 });
+    expect(outcome).toMatchObject({ status: 'completed', requestedAmount: 1000 });
+    if (outcome.status !== 'completed') return;
+    expect(outcome.destinationAmount).toBeLessThan(1000);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('with exactDestination, fails before preparing when the source cannot cover the amount', async () => {
+    const { port, wallet } = setup();
+    await expect(
+      port.executeLeg({ ...LEG, destinationAmount: 1000, exactDestination: true })
+    ).resolves.toMatchObject({ status: 'failed', reason: 'exact_destination_unavailable' });
+    expect(wallet.port.createMintReceipt).not.toHaveBeenCalled();
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+  });
+
+  it('with exactDestination, releases a prepared melt the probed fees would shrink', async () => {
+    const { port, wallet } = setup();
+    wallet.port.probeMeltFeeReserve.mockResolvedValue(200);
+    const leg = { ...LEG, destinationAmount: 900, exactDestination: true };
+    await expect(port.executeLeg(leg)).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'exact_destination_unavailable',
+    });
+    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
+    expect(wallet.port.cancelPreparedMelt).toHaveBeenCalledWith('melt-1');
+  });
+
+  it('with exactDestination, pays an amount the source covers', async () => {
+    const { port } = setup();
+    await expect(port.executeLeg({ ...LEG, exactDestination: true })).resolves.toEqual({
+      status: 'completed',
+      id: 'leg-1',
+      destinationAmount: 100,
+      requestedAmount: 100,
+    });
   });
 
   it('knows nothing of an id it has not run', async () => {

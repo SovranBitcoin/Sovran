@@ -23,6 +23,7 @@ import type { Manager } from '@cashu/coco-core';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
 import { onDataReset } from '@/shared/lib/account/dataResetFence';
@@ -132,7 +133,7 @@ export function checkMintInfoNow(
 export function dueMintUrls(mintUrls: readonly string[], nowMs: number): string[] {
   const held = useMintHistoryStore.getState().byMintUrl;
   return mintUrls.filter((url) => {
-    const nextRetryAt = held[normalizeMintUrlKey(url)]?.nextRetryAt;
+    const nextRetryAt = ownEntry(held, normalizeMintUrlKey(url))?.nextRetryAt;
     return nextRetryAt === undefined || nextRetryAt <= nowMs;
   });
 }
@@ -215,7 +216,7 @@ export function startMintHistorySweep(options: SweepOptions): () => void {
     if (!alive()) return;
     const held = useMintHistoryStore.getState().byMintUrl;
     const nextAt = urls
-      .map((url) => held[normalizeMintUrlKey(url)]?.nextRetryAt)
+      .map((url) => ownEntry(held, normalizeMintUrlKey(url))?.nextRetryAt)
       .filter((at): at is number => typeof at === 'number');
     const sleep = nextAt.length ? Math.min(...nextAt) - now() : SWEEP_MAX_SLEEP_MS;
     schedule(Math.min(SWEEP_MAX_SLEEP_MS, Math.max(SWEEP_MIN_SLEEP_MS, sleep)));

@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import type { Entry } from '@/features/mint/lib/mintChanges/decode';
 import {
   buildMintChangeListItems,
@@ -61,13 +62,14 @@ function historyEntries(entry: MintHistoryEntry | undefined): Entry[] {
     hash: revision.id,
     patch: revision.patch,
     summary: [],
+    ...(revision.oversized ? { oversized: true } : {}),
   }));
 }
 
 export function useMintChangeRevisions(mintUrl: string | undefined) {
   const loaded = useStoreLoadLatched(useMintHistoryStore.persist);
   const key = mintUrl ? normalizeMintUrlKey(mintUrl) : '';
-  const entry = useMintHistoryStore((state) => (key ? state.byMintUrl[key] : undefined));
+  const entry = useMintHistoryStore((state) => (key ? ownEntry(state.byMintUrl, key) : undefined));
   const [isRefreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<{ key: string; message: string } | null>(null);
 
@@ -96,7 +98,7 @@ export function useMintChangeRevisions(mintUrl: string | undefined) {
       if (!ok || cancelled) return;
       const store = useMintHistoryStore.getState();
       store.markViewed(mintUrl);
-      if (!store.byMintUrl[normalizeMintUrlKey(mintUrl)]?.baseline) void refresh();
+      if (!ownEntry(store.byMintUrl, normalizeMintUrlKey(mintUrl))?.baseline) void refresh();
     });
     return () => {
       cancelled = true;

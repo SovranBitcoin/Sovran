@@ -85,8 +85,9 @@ export function useSearchAggregates(query: string): SearchAggregates {
       discoveredMints: text ? discovered : [],
       geohash: parseGeohashQuery(text),
       tiers: matchTiers(allTiers, lower),
+      peopleSearchFailed: remote.status === 'error',
     });
-  }, [kind, text, local.people, local.mints, remote.contactRows, discovered, tiers]);
+  }, [kind, text, local.people, local.mints, remote.contactRows, remote.status, discovered, tiers]);
 
   const peopleStatus = remote.status;
   const settled = peopleStatus !== 'loading' && peopleStatus !== 'revalidating';

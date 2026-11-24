@@ -74,6 +74,41 @@ describe('buildSearchSections', () => {
     ]);
   });
 
+  it('keeps local rows and says the people search failed under them', () => {
+    const { items, counts } = buildSearchSections({
+      ...EMPTY,
+      localPeople: [{ pubkey: pk(1), source: 'following', displayName: 'Al' }],
+      ownMints: [{ mintUrl: 'https://own.example' }],
+      peopleSearchFailed: true,
+    });
+    expect(items.map((item) => item.id)).toEqual([
+      'header:people',
+      `person:${pk(1)}`,
+      'people-error',
+      'header:mints',
+      'mint:own.example',
+    ]);
+    expect(counts.people).toBe(1);
+  });
+
+  it('shows the People header with only the error when other sections have rows', () => {
+    const { items } = buildSearchSections({
+      ...EMPTY,
+      ownMints: [{ mintUrl: 'https://own.example' }],
+      peopleSearchFailed: true,
+    });
+    expect(items.map((item) => item.id)).toEqual([
+      'header:people',
+      'people-error',
+      'header:mints',
+      'mint:own.example',
+    ]);
+  });
+
+  it('adds no inline error when nothing else is on screen: the list says it instead', () => {
+    expect(buildSearchSections({ ...EMPTY, peopleSearchFailed: true }).items).toEqual([]);
+  });
+
   it('streams remote people under local ones, without repeating a person', () => {
     const { items, counts } = buildSearchSections({
       ...EMPTY,

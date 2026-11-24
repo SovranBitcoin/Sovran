@@ -8,6 +8,8 @@ import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import { readMintAuditDetail } from '@/features/mint/lib/mintAuditDetail';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -97,9 +99,40 @@ it('shows loading for a cold audit group, then ready once discovery stamps it', 
   );
   const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
   expect(result.current.audit).toBe('loading');
+  // Asked once the saved settings and mint rows have loaded.
+  await waitFor(() => expect(getDiscoveredMintMetadata).toHaveBeenCalledTimes(1));
+  expect(result.current.audit).toBe('loading');
   await act(async () => finish());
   await waitFor(() => expect(result.current.audit).toBe('ready'));
   expect(getDiscoveredMintMetadata).toHaveBeenCalledTimes(1);
+});
+
+it('does not ask nagg for the audit when Delete All ran while the saved stores loaded', async () => {
+  let loadSettings!: () => void;
+  const rehydrated = new Promise<void>((resolve) => {
+    loadSettings = resolve;
+  });
+  // Settings are still loading when the page opens.
+  const hydrated = jest.spyOn(useSettingsStore.persist, 'hasHydrated').mockReturnValue(false);
+  const listeners: (() => void)[] = [];
+  const onFinish = jest
+    .spyOn(useSettingsStore.persist, 'onFinishHydration')
+    .mockImplementation((listener) => {
+      listeners.push(listener as () => void);
+      return () => {};
+    });
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  fenceDataReset();
+  hydrated.mockReturnValue(true);
+  await act(async () => {
+    loadSettings();
+    await rehydrated;
+    for (const listener of listeners) listener();
+  });
+  await waitFor(() => expect(result.current.audit).toBe('error'));
+  expect(getDiscoveredMintMetadata).not.toHaveBeenCalled();
+  hydrated.mockRestore();
+  onFinish.mockRestore();
 });
 
 it('reports error for an audit read that could not reach nagg, and retries on demand', async () => {

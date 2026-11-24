@@ -124,7 +124,12 @@ it('moves one leg with one mint quote and one melt, and returns only the leg id'
   const manager = createFakeManager();
   const port = portFor(manager);
   const outcome = await port.executeLeg(LEG);
-  expect(outcome).toEqual({ status: 'completed', id: 'leg-1', destinationAmount: 100 });
+  expect(outcome).toEqual({
+    status: 'completed',
+    id: 'leg-1',
+    destinationAmount: 100,
+    requestedAmount: 100,
+  });
   expect(JSON.stringify(outcome)).not.toMatch(/mint-op|melt-op|-q-/);
   expect(manager.ops.mint.prepare).toHaveBeenCalledTimes(1);
   expect(manager.ops.melt.execute).toHaveBeenCalledTimes(1);

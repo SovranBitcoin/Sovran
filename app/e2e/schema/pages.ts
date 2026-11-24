@@ -21,7 +21,7 @@ export const CANONICAL_PAGES = [
   'onboarding-carousel', // the four intro cards (occurrences 1-4)
   // shell
   'wallet', // wallet home (WalletScreen)
-  'drawer', // account switcher drawer (drawer-profile-switch-*, drawer-add-account)
+  'drawer', // account switcher drawer (drawer-profile-switch-*, drawer-profile-options-*, drawer-add-account)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)

@@ -23,6 +23,7 @@ import {
 } from 'wallet';
 
 import { hasFeature, type Feature } from '@/shared/config/features';
+import { percentDecodeFully } from '@/shared/lib/percentDecode';
 import { isSensitiveScanInput } from '@/shared/stores/profile/scanHistoryStore';
 
 export type SearchQueryKind =
@@ -59,19 +60,30 @@ export function classifySearchQuery(
     );
     if (descriptor.kind !== 'unsupported') return { kind: 'payment', descriptor };
   }
-  // Words to look up, unless one of them is a payment string.
-  if (PAYMENT_FRAGMENT_RE.test(query)) return { kind: 'sensitive' };
+  // Words to look up, unless one of them is a payment string, as typed or
+  // once percent-decoded (`pay%20cashuB…` from a copied link).
+  if (carriesPaymentFragment(query)) return { kind: 'sensitive' };
   return { kind: 'text', query };
 }
 
+function carriesPaymentFragment(query: string): boolean {
+  if (PAYMENT_FRAGMENT_RE.test(query)) return true;
+  if (!query.includes('%')) return false;
+  const { decoded, settled } = percentDecodeFully(query);
+  // Still changing after the bound: an encoding depth must not decide what leaves the phone.
+  if (!settled) return true;
+  return isSensitiveScanInput(decoded) || PAYMENT_FRAGMENT_RE.test(decoded);
+}
+
 /**
- * A word that is a bearer ecash token, a Lightning invoice, offer or LNURL,
+ * A word that is a bearer ecash token, a Lightning invoice (mainnet, testnet,
+ * signet or regtest `lnbcrt`), offer or LNURL,
  * or a payment request, wherever it sits in the query: after a label, a
  * space, a bracket or a quote. The run of characters after the prefix keeps
  * plain words such as "lnbc meetup" searchable.
  */
 const PAYMENT_FRAGMENT_RE =
-  /(?:^|[^a-z0-9])(?:cashu[ab]|crawb|creq[ab]|lnbc|lntb|lntbs|lnsb|lno1|lnurl1)[a-z0-9_\-+/=]{8,}/i;
+  /(?:^|[^a-z0-9])(?:cashu[ab]|crawb|creq[ab]|lnbcrt|lnbc|lntbs|lntb|lnsb|lno1|lnurl1)[a-z0-9_\-+/=]{8,}/i;
 
 /**
  * The text the remote people search may send for this query, or `''` when the

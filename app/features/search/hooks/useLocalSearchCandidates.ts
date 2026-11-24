@@ -11,6 +11,7 @@
 import { useMemo } from 'react';
 import { accountMintUrls } from 'wallet';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { useQuickPayPeople } from '@/features/send/hooks/useQuickPayPeople';
 import { useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -59,7 +60,7 @@ export function useLocalSearchCandidates(): {
   const mints = useMemo<LocalMintCandidate[]>(
     () =>
       accountMintUrls(walletContext).map((mintUrl) => {
-        const entry = byMintUrl[normalizeMintUrlKey(mintUrl)];
+        const entry = ownEntry(byMintUrl, normalizeMintUrlKey(mintUrl));
         return {
           mintUrl,
           displayName: entry?.displayName ?? null,

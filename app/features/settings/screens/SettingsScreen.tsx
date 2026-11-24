@@ -2,7 +2,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useRef, useCallback } from 'react';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Alert } from 'react-native';
-import { openExternalUrl } from '@/shared/lib/url';
+import { openExternalUrl, urlHostLabel } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
@@ -188,7 +188,7 @@ export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
   const shift = useShiftLogger('SettingsScreen');
   const mediaServer = useMediaServerStore((s) => s.server);
-  const mediaHost = new URL(mediaServer).host;
+  const mediaHost = urlHostLabel(mediaServer);
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);

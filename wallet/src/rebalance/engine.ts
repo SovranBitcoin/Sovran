@@ -30,6 +30,7 @@ import {
   classifyRebalanceError,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
+  RebalanceExactAmountError,
   RebalanceSourceDebitCapError,
 } from './errors';
 import { createChainSteps, insertStepsAfter } from './chain';
@@ -223,12 +224,17 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     }
   }
 
-  /** Release a prepared melt that will not run; a failure leaves it to Coco's recovery. */
-  async function cancelPrepared(operationId: string): Promise<void> {
+  /**
+   * Release a prepared melt that will not run; a failure leaves it to Coco's
+   * recovery. True once the melt is released.
+   */
+  async function cancelPrepared(operationId: string): Promise<boolean> {
     try {
       await wallet.cancelPreparedMelt(operationId);
+      return true;
     } catch (error) {
       log.warn('mint.rebalance.cancel_prepared_failed', { operationId, error: errField(error) });
+      return false;
     }
   }
 
@@ -318,6 +324,13 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       if (settled === 'finalized') run.unsettledMints.delete(mintUrl);
       return settled;
     };
+
+    // Stopped while the melt was being prepared: nothing has been sent, so it
+    // is never executed and the proofs it reserved go back.
+    if (!run.isActive()) {
+      if (await cancelPrepared(melt.id)) run.sink.meltReleased?.(melt.id);
+      return 'aborted';
+    }
 
     let result: Awaited<ReturnType<typeof wallet.executeMelt>>;
     try {
@@ -891,6 +904,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return { status: 'skipped' };
       }
 
+      if (step.exactAmount && decision.status === 'capped') {
+        // Nothing opened or paid: less than the exact amount would move.
+        return { status: 'failed', error: new RebalanceExactAmountError(originalAmount, decision.amount) };
+      }
+
       // Asked last, after every read above: an account switch during them
       // must open nothing.
       if (!mayOpenLeg(run)) return { status: 'aborted' };
@@ -1024,6 +1042,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         for (let attempt = 0; ; attempt++) {
           const melt: RebalancePreparedMelt = prepared ?? (await prepareForInvoice(invoice));
           prepared = melt;
+          if (step.exactAmount && transferAmount !== originalAmount) {
+            // Fees or proof selection lowered it after all; nothing is sent.
+            await cancelPrepared(melt.id);
+            throw new RebalanceExactAmountError(originalAmount, transferAmount);
+          }
           try {
             const settlement = await executeMeltOnce(run, melt, fromMintUrl, DIRECT_SETTLE_WAIT_MS);
             if (settlement === 'aborted' || !isActive()) return { status: 'aborted' };

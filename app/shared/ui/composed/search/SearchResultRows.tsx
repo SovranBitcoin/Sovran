@@ -71,6 +71,35 @@ function SearchUnavailable({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+/**
+ * The People section's last row when the remote search failed but other rows
+ * are on screen: the local matches stay, and this says what is missing.
+ */
+function PeopleSearchFailedRow({ onRetry }: { onRetry?: () => void }) {
+  const muted = useThemeColor('muted');
+  return (
+    <View
+      className="flex-row items-center gap-3 px-4 py-3"
+      testID="search-people-error"
+      accessibilityLiveRegion="polite">
+      <Text size={14} color={muted} className="min-w-0 flex-1">
+        {"Couldn't search for more people."}
+      </Text>
+      {onRetry ? (
+        <View className="shrink-0">
+          <Button
+            text="Try again"
+            size="compact"
+            variant="secondary"
+            onPress={onRetry}
+            testID="search-people-error-retry"
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const keyExtractor = (item: SearchListItem) => item.id;
 
 function searchResultItemType(item: SearchListItem): string {
@@ -295,6 +324,8 @@ export function SearchResultRows({
         return <MintRow mint={item} />;
       case 'person':
         return <PersonRow person={item} machine={machine} />;
+      case 'people-error':
+        return <PeopleSearchFailedRow onRetry={onRetry} />;
     }
   };
 

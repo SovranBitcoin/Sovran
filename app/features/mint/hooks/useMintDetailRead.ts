@@ -34,7 +34,8 @@ import {
   useMintMetadataStore,
 } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { onceLoaded, whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { dataResetGeneration } from '@/shared/lib/account/dataResetFence';
 
 export type MintDetailGroupStatus = 'loading' | 'ready' | 'empty' | 'error';
@@ -65,6 +66,19 @@ function groupStatus(hasData: boolean, state: GroupState, stale: boolean): MintD
 }
 
 async function runAuditRead(mintUrl: string, signal: AbortSignal): Promise<boolean> {
+  // Gated like the auditor detail reads below: which auditors may be asked is
+  // a saved setting, and the answer is written into saved mint rows.
+  const generation = dataResetGeneration();
+  const options = { orFailed: true };
+  const loaded = await Promise.all([
+    whenLoaded(useSettingsStore, options),
+    whenLoaded(useMintMetadataStore, options),
+    whenLoaded(useMintTestnutStore, options),
+  ]);
+  if (!loaded.every(Boolean) || signal.aborted || dataResetGeneration() !== generation) {
+    return false;
+  }
+  // Writes only while the same holds when the answer lands.
   await getDiscoveredMintMetadata(mintUrl, { signal });
   // The read never throws; a still-stale audit group after it returns means
   // nagg could not be reached (a confirmed "nothing known" stamps the group).

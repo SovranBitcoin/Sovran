@@ -5,7 +5,7 @@ import { DrawerActions } from 'expo-router/react-navigation';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { getHeaderTitleWidthFromWidth, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
+import { getHeaderTitleWidthWithoutRight, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 // --- Context ---
@@ -37,16 +37,19 @@ export const useSearchContext = () => {
 // (`SEARCH_DEBOUNCE_MS`). A debounce here would stack on top of that one.
 
 function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?: string }) {
-  const { clearKey, seedText, onSearchChange } = useSearchContext();
+  const { clearKey, seedText, searchQuery, onSearchChange, setQuery } = useSearchContext();
   const { width } = useWindowDimensions();
 
   return (
     <GlassSearchBar
       testID={testID}
-      width={getHeaderTitleWidthFromWidth(width)}
+      // The tab has no right header button, so the field runs to the edge.
+      width={getHeaderTitleWidthWithoutRight(width)}
       height={HEADER_LAYOUT.BUTTON_HEIGHT}
       clearKey={clearKey}
       seedText={seedText}
+      value={searchQuery}
+      onClear={() => setQuery('')}
       onChangeText={onSearchChange}
       placeholder={placeholder}
       keyboardType="web-search"
@@ -89,7 +92,11 @@ export function SearchLayout({ title, placeholder, searchTestID }: SearchLayoutP
 
   const androidField =
     Platform.OS === 'android'
-      ? { headerTitle: () => <SearchBarTitle placeholder={placeholder} testID={searchTestID} /> }
+      ? {
+          headerTitle: () => <SearchBarTitle placeholder={placeholder} testID={searchTestID} />,
+          // Starts after the profile button and takes the width a right button would.
+          headerTitleAlign: 'left' as const,
+        }
       : {};
 
   const screenOptions = buildExpoRouterHeaderOptions({

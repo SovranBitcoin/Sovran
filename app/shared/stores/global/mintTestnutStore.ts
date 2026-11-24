@@ -23,6 +23,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
@@ -124,7 +125,10 @@ export const useMintTestnutStore = create<MintTestnutState>({
 
 /** Synchronous, local-only verdict read for non-React callers. */
 export function isTestnutMint(mintUrl: string): boolean {
-  return useMintTestnutStore.getState().byMintUrl[normalizeMintUrlKey(mintUrl)]?.testnut === true;
+  return (
+    ownEntry(useMintTestnutStore.getState().byMintUrl, normalizeMintUrlKey(mintUrl))?.testnut ===
+    true
+  );
 }
 
 /**

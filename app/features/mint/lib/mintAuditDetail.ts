@@ -24,6 +24,7 @@ import {
   type AuditObservationUpdate,
 } from '@/shared/lib/cashu/auditors/observation';
 import { resolveEnabledAuditors, type CdkAuditorId } from '@/shared/lib/cashu/auditors/registry';
+import { onDataReset } from '@/shared/lib/account/dataResetFence';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 /** Opening the same mint again within this long reuses the last reads. */
@@ -32,10 +33,13 @@ export const MINT_AUDIT_DETAIL_TTL_MS = 10 * 60 * 1000;
 /** When each mint's detail was last read this session (not saved). */
 const lastReadAt = new Map<string, number>();
 
-/** For tests. */
+/** Forgets every read: on Delete All, and for tests. */
 export function resetMintAuditDetailClock(): void {
   lastReadAt.clear();
 }
+
+// A wiped install has read nothing: the next open asks the auditors again.
+onDataReset(resetMintAuditDetailClock);
 
 export function mintAuditDetailDue(mintUrl: string, nowMs: number): boolean {
   const at = lastReadAt.get(normalizeMintUrlKey(mintUrl));

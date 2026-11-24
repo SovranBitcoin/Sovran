@@ -13,6 +13,8 @@ import {
   UNKNOWN_BALANCE,
 } from '@/navigation/accountSwitcher';
 
+import { AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
+
 const mockState = {
   profiles: [
     { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1, cachedBalanceSats: 2100 },
@@ -63,8 +65,10 @@ jest.mock('@/shared/lib/popup', () => ({
 // The drawer reads as already closed, so a close-wait resolves at once.
 jest.mock('expo-router/drawer', () => ({ useDrawerProgress: () => ({ get: () => 0 }) }));
 jest.mock('react-native-reanimated', () => ({
-  runOnJS: (fn: unknown) => fn,
   useAnimatedReaction: () => undefined,
+}));
+jest.mock('react-native-worklets', () => ({
+  scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args),
 }));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { navigate: jest.fn(), push: jest.fn() },
@@ -72,15 +76,27 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: unknown) => (Array.isArray(token) ? token.map(() => 'black') : 'black'),
 }));
+const mockCachedMetadata: Record<string, { name?: string; picture?: string; nip05?: string }> = {};
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
-  useCachedNostrProfile: () => ({ metadata: undefined, isStale: false, isMissing: true }),
+  useCachedNostrProfile: (pubkey: string) => ({
+    metadata: mockCachedMetadata[pubkey],
+    isStale: false,
+    isMissing: !mockCachedMetadata[pubkey],
+  }),
 }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/lib/identity', () => ({
-  resolveIdentityName: ({ pubkey, overrideName }: { pubkey: string; overrideName?: string }) =>
-    overrideName ?? `name-${pubkey.slice(0, 1)}`,
+  resolveIdentityName: ({
+    pubkey,
+    overrideName,
+    nostrProfile,
+  }: {
+    pubkey: string;
+    overrideName?: string;
+    nostrProfile?: { name?: string };
+  }) => overrideName ?? nostrProfile?.name ?? `name-${pubkey.slice(0, 1)}`,
 }));
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
   EnhancedHaptics: { navigateHaptic: jest.fn(), buttonHaptic: jest.fn() },
@@ -88,7 +104,13 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
 jest.mock('@/shared/ui/primitives/PressScale', () => ({
   PressScale: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: () => null }));
+jest.mock('@/shared/ui/primitives/Avatar', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  return {
+    Avatar: ({ picture, seed }: { picture?: string; seed: string }) =>
+      createElement('View', { testID: `avatar:${seed.slice(0, 1)}:${picture ?? 'none'}` }),
+  };
+});
 // Plain host elements, so the test reads what the drawer decides: which rows,
 // what words, what a tap does. The Pressable keeps its handlers and state.
 jest.mock('@/shared/ui/primitives/Spinner', () => {
@@ -124,14 +146,13 @@ jest.mock('@/shared/ui/primitives/Pressable', () => {
   };
 });
 
-import { AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
-
 const navigation = { closeDrawer: jest.fn() };
 const renderDrawer = () => render(<AccountSwitcherDrawer navigation={navigation as never} />);
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockState.activeAccountIndex = 0;
+  for (const key of Object.keys(mockCachedMetadata)) delete mockCachedMetadata[key];
 });
 
 describe('account row wording', () => {
@@ -267,5 +288,34 @@ describe('AccountSwitcherDrawer', () => {
     const other = mockActionMenu.mock.calls[1][0].buttons.map((b: { text: string }) => b.text);
     expect(other).toEqual(['Copy npub', 'View profile']);
     expect(mockSwitch).not.toHaveBeenCalled();
+  });
+
+  it('opens the same account menu from the visible options button', async () => {
+    renderDrawer();
+    const button = screen.getByTestId('drawer-profile-options-1');
+    expect(button.props.accessibilityLabel).toBe('Account options');
+    expect(button.props.hitSlop).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.press(button);
+    });
+    const menu = mockActionMenu.mock.calls[0][0];
+    expect(menu.buttons.map((b: { text: string }) => b.text)).toEqual([
+      'Copy npub',
+      'View profile',
+    ]);
+    expect(mockSwitch).not.toHaveBeenCalled();
+  });
+
+  it('shows a cached profile name and picture when the account saved none', () => {
+    const other = mockState.profiles[2];
+    mockCachedMetadata[other!.pubkey] = {
+      name: 'Cached Name',
+      picture: 'https://pic.example/a.png',
+    };
+    renderDrawer();
+    expect(screen.getByText('Cached Name')).toBeTruthy();
+    expect(
+      screen.getByTestId(`avatar:${other!.pubkey.slice(0, 1)}:https://pic.example/a.png`)
+    ).toBeTruthy();
   });
 });

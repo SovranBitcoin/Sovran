@@ -142,3 +142,18 @@ export class RebalanceSourceDebitCapError extends Error {
     this.name = 'RebalanceSourceDebitCapError';
   }
 }
+
+/**
+ * A transfer that must deliver exactly its amount could only move less: the
+ * source balance, fees or proof selection lowered it. Raised before the melt
+ * is executed, so nothing was paid.
+ */
+export class RebalanceExactAmountError extends Error {
+  constructor(
+    readonly requested: number,
+    readonly available: number
+  ) {
+    super(`Only ${available} of the exact ${requested} can be delivered`);
+    this.name = 'RebalanceExactAmountError';
+  }
+}

@@ -24,6 +24,7 @@
  * the background go through `mintHistorySync`, which waits for this store's
  * load and checks the profile has not changed after every `await`.
  */
+import { ownEntry, setOwnEntry, withOwnEntry } from '@/shared/lib/ownEntry';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
@@ -232,14 +233,14 @@ function evict(byMintUrl: Record<string, MintHistoryEntry>, keep: string): void 
     delete byMintUrl[key];
     dropped += 1;
   }
-  const kept = byMintUrl[keep];
+  const kept = ownEntry(byMintUrl, keep);
   let trimmed = 0;
   if (kept && bytes > MAX_ROW_BYTES) {
     const revisions = [...kept.revisions];
     while (revisions.length > 0 && bytes > MAX_ROW_BYTES) {
       revisions.pop();
       trimmed += 1;
-      byMintUrl[keep] = { ...kept, revisions: [...revisions] };
+      setOwnEntry(byMintUrl, keep, { ...kept, revisions: [...revisions] });
       bytes = rowBytes(byMintUrl);
     }
   }
@@ -265,10 +266,13 @@ export const useMintHistoryStore = create<MintHistoryState>({
         if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return 'rejected';
         if (byteLength(info) > MAX_SNAPSHOT_BYTES) {
           storeLog.warn('store.mint_history.snapshot_too_large', { bytes: byteLength(info) });
+          // Counted as a failed check, so the sweep backs off instead of
+          // fetching the same oversized answer every minute.
+          get().recordFailure(mintUrl, nowMs);
           return 'rejected';
         }
         const hash = hashMintInfo(info);
-        const held = get().byMintUrl[key];
+        const held = ownEntry(get().byMintUrl, key);
 
         if (held?.baseline && held.hash === hash) {
           const due =
@@ -277,19 +281,16 @@ export const useMintHistoryStore = create<MintHistoryState>({
             nowMs - held.lastSeenAt >= SEEN_WRITE_THROTTLE_MS;
           if (!due) return 'unchanged';
           set((state) => {
-            const current = state.byMintUrl[key];
+            const current = ownEntry(state.byMintUrl, key);
             if (!current) return state;
             return {
-              byMintUrl: {
-                ...state.byMintUrl,
-                [key]: {
-                  ...current,
-                  lastSeenAt: nowMs,
-                  lastCheckedAt: nowMs,
-                  consecutiveFailures: 0,
-                  nextRetryAt: nowMs + RECHECK_AFTER_SUCCESS_MS,
-                },
-              },
+              byMintUrl: withOwnEntry(state.byMintUrl, key, {
+                ...current,
+                lastSeenAt: nowMs,
+                lastCheckedAt: nowMs,
+                consecutiveFailures: 0,
+                nextRetryAt: nowMs + RECHECK_AFTER_SUCCESS_MS,
+              }),
             };
           });
           return 'unchanged';
@@ -297,7 +298,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
 
         let outcome: MintObservationOutcome = 'baseline';
         set((state) => {
-          const current = state.byMintUrl[key] ?? blank(mintUrl);
+          const current = ownEntry(state.byMintUrl, key) ?? blank(mintUrl);
           const next: MintHistoryEntry = {
             ...current,
             baseline: info,
@@ -325,7 +326,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
             };
             next.revisions = [revision, ...current.revisions].slice(0, MAX_REVISIONS);
           }
-          const byMintUrl = { ...state.byMintUrl, [key]: next };
+          const byMintUrl = withOwnEntry(state.byMintUrl, key, next);
           evict(byMintUrl, key);
           return { byMintUrl };
         });
@@ -337,19 +338,16 @@ export const useMintHistoryStore = create<MintHistoryState>({
         const key = normalizeMintUrlKey(mintUrl);
         if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return;
         set((state) => {
-          const current = state.byMintUrl[key] ?? blank(mintUrl);
+          const current = ownEntry(state.byMintUrl, key) ?? blank(mintUrl);
           const failures = current.consecutiveFailures + 1;
-          const byMintUrl = {
-            ...state.byMintUrl,
-            // The baseline and its revisions stand: a mint that did not
-            // answer has not changed what it last said.
-            [key]: {
-              ...current,
-              lastCheckedAt: nowMs,
-              consecutiveFailures: failures,
-              nextRetryAt: nowMs + failureBackoffMs(failures, random),
-            },
-          };
+          // The baseline and its revisions stand: a mint that did not
+          // answer has not changed what it last said.
+          const byMintUrl = withOwnEntry(state.byMintUrl, key, {
+            ...current,
+            lastCheckedAt: nowMs,
+            consecutiveFailures: failures,
+            nextRetryAt: nowMs + failureBackoffMs(failures, random),
+          });
           evict(byMintUrl, key);
           return { byMintUrl };
         });
@@ -357,7 +355,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
 
       markViewed: (mintUrl, nowMs = Date.now()) => {
         const key = normalizeMintUrlKey(mintUrl);
-        const current = get().byMintUrl[key];
+        const current = ownEntry(get().byMintUrl, key);
         if (!current) return;
         if (
           current.lastViewedAt !== undefined &&
@@ -366,7 +364,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
           return;
         }
         set((state) => ({
-          byMintUrl: { ...state.byMintUrl, [key]: { ...current, lastViewedAt: nowMs } },
+          byMintUrl: withOwnEntry(state.byMintUrl, key, { ...current, lastViewedAt: nowMs }),
         }));
       },
 

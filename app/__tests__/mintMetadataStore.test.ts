@@ -340,3 +340,23 @@ it('lets discovery refresh a stale scored aggregate and clear an explicit zero c
   expect(store.getCached(MINT)).toMatchObject({ averageScore: null, reviewCount: 0 });
   expect(store.isStale(MINT, 'reviews')).toBe(false);
 });
+
+describe('mintMetadataStore with prototype-shaped mint URLs', () => {
+  it.each(['https://constructor', 'https://__proto__'])(
+    'knows nothing of %s before it is written, then keeps it as its own entry',
+    (url) => {
+      const store = useMintMetadataStore.getState();
+      expect(store.getCached(url)).toBeUndefined();
+      expect(store.isStale(url, 'reviews', 60)).toBe(true);
+      store.setLiveness(url, 'online', 'probe', 1_000);
+      store.setReviewsAggregate(url, 4, 2);
+      const row = { mintUrl: url, name: 'Proto' };
+      store.upsertFromDiscover([row as never]);
+      const entry = useMintMetadataStore.getState().getCached(url)!;
+      expect(entry).toMatchObject({ liveness: 'online', reviewCount: 2, displayName: 'Proto' });
+      expect(Object.getPrototypeOf(useMintMetadataStore.getState().byMintUrl)).toBe(
+        Object.prototype
+      );
+    }
+  );
+});

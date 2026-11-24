@@ -38,9 +38,18 @@ export interface UseRouteParamsOptions {
 // Coalesce multiple useRouteParams recovery dispatches for the same mounted
 // route params (e.g. a route wrapper and its mounted screen both validating
 // the same bad params) without swallowing a recovery back() after a user back().
+// Compared by value: Expo Router hands each hook call its own params object.
 const RECOVERY_COALESCE_WINDOW_MS = 50;
-let lastRecoveryRaw: unknown = null;
+let lastRecoveryKey: string | null = null;
 let lastRecoveryAt = -Infinity;
+
+function paramsKey(raw: unknown): string {
+  try {
+    return JSON.stringify(raw) ?? '';
+  } catch {
+    return '';
+  }
+}
 
 export function useRouteParams<S extends ZodType>(
   schema: S,
@@ -60,10 +69,11 @@ export function useRouteParams<S extends ZodType>(
     const policy = options.onInvalid ?? 'back';
     if (policy === 'back') {
       const now = Date.now();
-      if (raw === lastRecoveryRaw && now - lastRecoveryAt < RECOVERY_COALESCE_WINDOW_MS) {
+      const key = paramsKey(raw);
+      if (key === lastRecoveryKey && now - lastRecoveryAt < RECOVERY_COALESCE_WINDOW_MS) {
         return;
       }
-      lastRecoveryRaw = raw;
+      lastRecoveryKey = key;
       lastRecoveryAt = now;
       // Unguarded: the 600ms dedupe would swallow a recovery back() dispatched
       // right after the navigation that opened this route.
