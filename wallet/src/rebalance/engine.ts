@@ -30,6 +30,7 @@ import {
   classifyRebalanceError,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
+  RebalanceSourceDebitCapError,
 } from './errors';
 import { createChainSteps, insertStepsAfter } from './chain';
 import { defaultRebalanceClock } from './lock';
@@ -139,6 +140,37 @@ export interface RebalanceEngine {
       onRunFinished?: (result: RebalanceRunResult) => void;
     }
   ): Promise<RebalanceRunResult>;
+}
+
+/**
+ * The most a prepared melt can take from its source: the invoice, the mint's
+ * Lightning fee reserve and the input (swap) fee. Change can make the real
+ * debit lower, never higher.
+ */
+function preparedMeltDebit(melt: RebalancePreparedMelt, fallbackAmount: number): number {
+  const amount = melt.amount == null ? fallbackAmount : amountToNumber(melt.amount);
+  return amount + amountToNumber(melt.fee_reserve ?? 0) + amountToNumber(melt.swap_fee ?? 0);
+}
+
+/**
+ * Whether a recipient operation is a clean finalization of `expected`. Coco
+ * can finalize ALREADY_ISSUED with an error when proofs could not be restored;
+ * only a clean finalization of this exact receipt confirms it.
+ */
+export function isCleanReceiptFinalization(
+  operation: RebalanceMintSnapshot | null,
+  expected: RebalanceMintReceipt
+): boolean {
+  return (
+    operation?.id === expected.id &&
+    operation.mintUrl === expected.mintUrl &&
+    operation.quoteId === expected.quoteId &&
+    operation.method === expected.method &&
+    operation.unit === expected.unit &&
+    operation.amount.equals(expected.amount) &&
+    operation.state === 'finalized' &&
+    !operation.error
+  );
 }
 
 export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceEngine {
@@ -291,24 +323,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     return 'finalized';
   }
 
-  function isCleanFinalization(
-    operation: RebalanceMintSnapshot | null,
-    expected: RebalanceMintReceipt
-  ): boolean {
-    // Coco can finalize ALREADY_ISSUED with an error when proofs could not be
-    // restored. Only a clean finalization of this exact receipt confirms it.
-    return (
-      operation?.id === expected.id &&
-      operation.mintUrl === expected.mintUrl &&
-      operation.quoteId === expected.quoteId &&
-      operation.method === expected.method &&
-      operation.unit === expected.unit &&
-      operation.amount.equals(expected.amount) &&
-      operation.state === 'finalized' &&
-      !operation.error
-    );
-  }
-
   /** Wait for this transfer's own recipient operation, never an unrelated deposit. */
   async function waitForReceipt(
     expected: RebalanceMintReceipt,
@@ -329,13 +343,13 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         });
       }
       if (!isActive()) return false;
-      if (isCleanFinalization(operation, expected)) return true;
+      if (isCleanReceiptFinalization(operation, expected)) return true;
       await clock.sleep(Math.min(RECEIPT_POLL_MS, Math.max(0, deadline - clock.now())));
     }
     if (!isActive()) return false;
     // The receipt may have finalized during the last sleep.
     try {
-      return isCleanFinalization(await wallet.getMintOperation(expected.id), expected);
+      return isCleanReceiptFinalization(await wallet.getMintOperation(expected.id), expected);
     } catch {
       return false;
     }
@@ -430,7 +444,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       const { receipt } = entry;
       let arrived = false;
       try {
-        arrived = isCleanFinalization(await wallet.getMintOperation(receipt.id), receipt);
+        arrived = isCleanReceiptFinalization(await wallet.getMintOperation(receipt.id), receipt);
       } catch (error) {
         // Not known to have arrived is treated as not arrived.
         log.warn('mint.rebalance.recipient_operation_read_failed', {
@@ -938,6 +952,13 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       const prepareForInvoice = async (invoice: string) => {
         const prepared = await wallet.prepareMelt(fromMintUrl, invoice);
         sink.meltPrepared(id, prepared);
+        // Checked before execute: over the cap, nothing has been paid.
+        if (step.sourceDebitCap !== undefined) {
+          const debit = preparedMeltDebit(prepared, transferAmount);
+          if (debit > step.sourceDebitCap) {
+            throw new RebalanceSourceDebitCapError(prepared.id, debit, step.sourceDebitCap);
+          }
+        }
         return prepared;
       };
       const reissue = async (amount: number) => {
@@ -1005,7 +1026,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         }
       } catch (meltError) {
         if (!isActive()) return { status: 'aborted' };
-        if (classifyRebalanceError(meltError) !== 'no_route') throw meltError;
+        // A one-leg transfer leaves routing to its caller.
+        if (step.directOnly || classifyRebalanceError(meltError) !== 'no_route') throw meltError;
         const routed = await routeThroughMiddlemen(run, meltError, transferAmount);
         if (routed === 'aborted') return { status: 'aborted' };
         if (routed === 'settling') {

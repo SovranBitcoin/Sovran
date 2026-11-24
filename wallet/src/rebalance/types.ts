@@ -11,6 +11,17 @@ export interface RebalanceTransfer {
   chainId?: string;
   chainPath?: string[];
   chainHopIndex?: number;
+  /**
+   * One leg only: a melt Lightning finds no route for fails this transfer
+   * instead of being sent through middleman mints. The caller routes.
+   */
+  directOnly?: boolean;
+  /**
+   * Most the source may be debited, in sats: the invoice plus the mint's fee
+   * reserve and input fee of the prepared melt. Above it the transfer fails
+   * before anything is paid.
+   */
+  sourceDebitCap?: number;
 }
 
 /** The recipient side: a prepared bolt11 mint operation whose invoice the melt pays. */

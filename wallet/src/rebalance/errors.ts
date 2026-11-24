@@ -127,3 +127,18 @@ export class RebalanceRoutesExhaustedError extends Error {
     this.triedCount = triedCount;
   }
 }
+
+/**
+ * A prepared melt would debit the source more than the transfer allows. Raised
+ * before the melt is executed, so nothing was paid.
+ */
+export class RebalanceSourceDebitCapError extends Error {
+  constructor(
+    readonly operationId: string,
+    readonly debit: number,
+    readonly cap: number
+  ) {
+    super(`Source debit ${debit} exceeds the cap of ${cap}`);
+    this.name = 'RebalanceSourceDebitCapError';
+  }
+}

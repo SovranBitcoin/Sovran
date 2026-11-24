@@ -6,7 +6,8 @@
 // own proof-selection UX (round up/down suggestions, proof picker, etc.).
 //
 // Algorithms: greedy for divisible denominations, exhaustive (≤20 proofs),
-// bitset-DP (sum ≤2M), meet-in-the-middle (≤40 proofs, larger sums).
+// bitset-DP (sum ≤2M), meet-in-the-middle (≤40 proofs, or ≤40 bundles of
+// equal proofs, larger sums), topped up by greedy subsets past that.
 // ---------------------------------------------------------------------------
 
 import { errField, logger } from './logger';
@@ -327,6 +328,73 @@ function composeDivisibleDenominations(
   );
 }
 
+/**
+ * Merge equal proofs into binary-split bundles: `count` proofs of `value`
+ * become bundles of 1, 2, 4, … proofs (and the remainder), whose subset sums
+ * are exactly the sums of 0..count proofs. The reachable amounts do not
+ * change; a wallet holding thousands of proofs in a few denominations becomes
+ * a few dozen items, small enough to search completely.
+ */
+function mergeDenominations(coins: number[]): number[] {
+  const counts = new Map<number, number>();
+  for (const coin of coins) counts.set(coin, (counts.get(coin) ?? 0) + 1);
+  const bundles: number[] = [];
+  for (const [value, count] of counts) {
+    let remaining = count;
+    for (let size = 1; remaining > 0; size *= 2) {
+      const take = Math.min(size, remaining);
+      bundles.push(value * take);
+      remaining -= take;
+    }
+  }
+  return bundles;
+}
+
+/**
+ * Real subsets on both sides of `target` from every proof, largest first:
+ * the lower takes each proof that still fits, the upper is the complement of
+ * the lower subset for `total - target`. Not always the nearest, but always
+ * composable, so a search over a pruned proof set never reports no amount
+ * when one exists.
+ */
+function greedyBounds(
+  coins: number[],
+  target: number,
+  total: number,
+): { lower: number; upper: number } {
+  const sorted = [...coins].sort((a, b) => b - a);
+  const lowerSum = (limit: number) => {
+    let sum = 0;
+    for (const coin of sorted) if (coin <= limit - sum) sum += coin;
+    return sum;
+  };
+  return { lower: lowerSum(target), upper: total - lowerSum(total - target) };
+}
+
+function withGreedyBounds(
+  result: CompositionResult,
+  greedy: { lower: number; upper: number },
+  target: number,
+  startedAt: number,
+): CompositionResult {
+  const lowerCandidates = [result.nearestLower, greedy.lower].filter(
+    (value): value is number => value != null && value > 0 && value <= target,
+  );
+  const upperCandidates = [result.nearestUpper, greedy.upper].filter(
+    (value): value is number => value != null && value >= target,
+  );
+  const lower = lowerCandidates.length ? Math.max(...lowerCandidates) : null;
+  const upper = upperCandidates.length ? Math.min(...upperCandidates) : null;
+  return compositionResult(
+    result.exactMatch || lower === target || upper === target,
+    target,
+    lower,
+    upper,
+    result.strategy,
+    startedAt,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Public: Satoshi composition
 // ---------------------------------------------------------------------------
@@ -451,13 +519,26 @@ export function composeSatoshis(
     } else if (bitsetSafe) {
       reason = 'bitset-safe';
       result = bitsetDP(valid, target, t0);
+    } else if (valid.length <= MITM_LIMIT) {
+      reason = 'mitm-limit';
+      result = meetInTheMiddle(valid, target, t0);
     } else {
-      const selected =
-        valid.length <= MITM_LIMIT
-          ? valid
-          : prefilterCoins(valid, target, MITM_LIMIT);
-      reason = valid.length <= MITM_LIMIT ? 'mitm-limit' : 'mitm-prefiltered';
-      result = meetInTheMiddle(selected, target, t0);
+      // Too many proofs to search one by one. Bundled by denomination they
+      // may fit a complete search; otherwise a pruned search is topped up
+      // with greedy subsets of every proof.
+      const bundles = Number.isSafeInteger(totalSum) ? mergeDenominations(valid) : null;
+      if (bundles && bundles.length <= MITM_LIMIT) {
+        reason = 'mitm-merged-denominations';
+        result = meetInTheMiddle(bundles, target, t0);
+      } else {
+        reason = 'mitm-prefiltered';
+        result = withGreedyBounds(
+          meetInTheMiddle(prefilterCoins(valid, target, MITM_LIMIT), target, t0),
+          greedyBounds(valid, target, totalSum),
+          target,
+          t0,
+        );
+      }
     }
   } catch (err) {
     // Defense in depth: if the chosen strategy throws (e.g. bitset-DP hitting

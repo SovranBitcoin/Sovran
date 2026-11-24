@@ -150,6 +150,7 @@ export type {
 // re-preparation, reconciliation, error classification)
 export {
   createChainSteps,
+  createEngineSingleLegTransferPort,
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
@@ -164,6 +165,7 @@ export type {
   RebalanceRoutingInfo,
   RebalanceTransferOutcome,
   RebalanceWalletPort,
+  SingleLegTransferPort,
 } from "./rebalance";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
