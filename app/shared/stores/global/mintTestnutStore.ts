@@ -84,7 +84,7 @@ export const useMintTestnutStore = create<MintTestnutState>({
             const key = normalizeMintUrlKey(row.mintUrl);
             next[key] =
               row.probedAt == null
-                ? { ...(next[key] ?? { testnut: false }), checkedAt: now }
+                ? { ...(ownEntry(next, key) ?? { testnut: false }), checkedAt: now }
                 : { testnut: row.testnut, probedAt: row.probedAt, checkedAt: now };
           }
           evictIfOverCap(next);
@@ -101,7 +101,8 @@ export const useMintTestnutStore = create<MintTestnutState>({
             const key = normalizeMintUrlKey(mint.mintUrl);
             // checkedAt 0: the next background pass still asks nagg for the
             // probe time, and an LRU trim drops these seeds first.
-            next[key] = { ...next[key], checkedAt: next[key]?.checkedAt ?? 0, testnut: true };
+            const previous = ownEntry(next, key);
+            next[key] = { ...previous, checkedAt: previous?.checkedAt ?? 0, testnut: true };
           }
           evictIfOverCap(next);
           return { byMintUrl: next };

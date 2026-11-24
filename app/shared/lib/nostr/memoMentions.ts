@@ -1,4 +1,5 @@
 import * as nip19 from 'nostr-tools/nip19';
+import { isFixedHex } from '@/shared/lib/protocolIds';
 
 export type MemoMentionToken = {
   start: number;
@@ -79,7 +80,12 @@ function createMemoMentionDisplay(displayName: string, fallbackName: string): st
   return `@${normalized || fallbackName || 'user'}`;
 }
 
-export function createMemoMentionNprofile(pubkey: string, relays: readonly string[]): string {
+/** Null when `pubkey` is not 32-byte hex, which `nprofileEncode` would throw on. */
+export function createMemoMentionNprofile(
+  pubkey: string,
+  relays: readonly string[]
+): string | null {
+  if (!isFixedHex(pubkey, 32)) return null;
   return nip19.nprofileEncode({ pubkey, relays: uniqueRelayUrls(relays) });
 }
 

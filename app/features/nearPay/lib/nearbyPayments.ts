@@ -10,7 +10,7 @@ import {
   type BitchatBLEIdentityMaterial,
 } from 'bitchat-module';
 import type { DefaultOperationsConfig } from 'wallet/operations';
-import { classifyMeshToken, normalizeMintUrl } from 'wallet';
+import { classifyMeshToken, isEvenHex, normalizeMintUrl } from 'wallet';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from './nearbyPaymentStorage';
 import { createSecureVault } from '@/shared/lib/persist/secureVault';
 import { bitchatLog } from '@/shared/lib/logger';
@@ -29,13 +29,16 @@ import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { isPayableNearbyPeer } from './nearbyCapability';
 
 export const NEARBY_PAYMENT_PREFIX = 'sovran:payment:1:';
+// Every hex field the token encoder decodes must be even-length hex, or the
+// decoder throws "hex string expected" instead of refusing the payload.
+const evenHex = (max: number) => z.string().max(max).refine(isEvenHex, 'expected even-length hex');
 const wireProof = z.object({
-  id: z.string().min(1).max(128),
+  id: evenHex(128),
   secret: z.string().min(1).max(4096),
   C: z.string().regex(/^[0-9a-fA-F]{66}$/),
   amount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   witness: z.string().max(4096).optional(),
-  dleq: z.object({ e: z.string(), s: z.string(), r: z.string() }).optional(),
+  dleq: z.object({ e: evenHex(64), s: evenHex(64), r: evenHex(64) }).optional(),
 });
 const wirePayload = z.object({
   id: z.string().min(1).max(256),

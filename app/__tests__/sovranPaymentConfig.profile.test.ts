@@ -7,8 +7,17 @@ import type { Manager } from '@cashu/coco-core';
 import {
   createSovranHandlers,
   createSovranNotifications,
+  createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { paramPopup, sendMemoPopup } from '@/shared/lib/popup';
+import {
+  copyPopup,
+  copyTokenAsEmoji,
+  nfcSendFailedPopup,
+  paramPopup,
+  sendMemoPopup,
+} from '@/shared/lib/popup';
+import * as Clipboard from 'expo-clipboard';
+import { writeTokenToNFC } from '@/shared/lib/nfc';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { paymentLog } from '@/shared/lib/logger';
@@ -33,6 +42,9 @@ function paymentLogCalls(): unknown[][] {
 jest.mock('wallet', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   rawAnnotationKey: jest.fn((raw: string) => `raw:${raw}`),
+  // The real checked encoder, over this file's mocked cashu-ts encoder.
+  encodeTokenChecked: (token: unknown) =>
+    jest.requireActual('../../wallet/src/ecash').encodeTokenChecked(token),
 }));
 
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
@@ -948,5 +960,72 @@ describe('createSovranNotifications scan history', () => {
     expect(mockAddScan).toHaveBeenCalledWith(
       expect.objectContaining({ raw: TOKEN, type: 'ecash', source: 'paste' })
     );
+  });
+});
+
+describe('send token export actions', () => {
+  const validProof = {
+    id: '009a1f293253e41e',
+    amount: 2,
+    secret: 'secret',
+    C: `02${'ef'.repeat(32)}`,
+  };
+  function context(proofOverrides: Record<string, unknown> = {}, variantId?: string) {
+    const proofs = [{ ...validProof, ...proofOverrides }];
+    return {
+      entry: {
+        id: 'send-1',
+        type: 'send',
+        operationId: 'op-1',
+        token: { mint: 'https://mint.example', unit: 'sat', proofs },
+      },
+      manager: { ops: { send: { reclaim: jest.fn() } } },
+      ...(variantId ? { variantId } : {}),
+    };
+  }
+  const send = () => createSovranScreenActionHandlers().sendToken!;
+
+  beforeEach(() => {
+    jest.mocked(getEncodedToken).mockReset();
+    jest.mocked(getEncodedToken).mockReturnValue('cashuBencoded');
+    jest.mocked(writeTokenToNFC).mockReset();
+    jest.mocked(Clipboard.setStringAsync).mockReset();
+    jest.mocked(copyPopup).mockReset();
+    jest.mocked(copyTokenAsEmoji).mockReset();
+    jest.mocked(nfcSendFailedPopup).mockReset();
+  });
+
+  it('writes, copies and emoji-copies a well-formed token', async () => {
+    await send().nfc!(context() as never);
+    expect(writeTokenToNFC).toHaveBeenCalledWith('cashuBencoded');
+    await send().copy!(context() as never);
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('cashuBencoded');
+    expect(copyPopup).toHaveBeenCalledWith('token');
+    await send().copy!(context({}, 'emoji') as never);
+    expect(copyTokenAsEmoji).toHaveBeenCalledWith('cashuBencoded');
+  });
+
+  it.each([
+    ['id', 'error'],
+    ['id', 'false'],
+    ['id', '12345'],
+    ['C', '12345'],
+    ['dleq', { e: '12345', s: 'aa'.repeat(32), r: 'bb'.repeat(32) }],
+  ])('refuses a malformed %s before encoding, NFC or clipboard', async (key, value) => {
+    const nfcCtx = context({ [key]: value });
+    const before = JSON.stringify(nfcCtx.entry);
+    await expect(send().nfc!(nfcCtx as never)).resolves.toBeUndefined();
+    await expect(send().copy!(context({ [key]: value }) as never)).resolves.toBeUndefined();
+    await expect(
+      send().copy!(context({ [key]: value }, 'emoji') as never)
+    ).resolves.toBeUndefined();
+    expect(getEncodedToken).not.toHaveBeenCalled();
+    expect(writeTokenToNFC).not.toHaveBeenCalled();
+    expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
+    expect(copyTokenAsEmoji).not.toHaveBeenCalled();
+    expect(copyPopup).not.toHaveBeenCalled();
+    expect(nfcSendFailedPopup).toHaveBeenCalledTimes(1);
+    expect(nfcCtx.manager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(JSON.stringify(nfcCtx.entry)).toBe(before);
   });
 });

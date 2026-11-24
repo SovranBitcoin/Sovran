@@ -53,6 +53,7 @@ import { getMediaServer } from '@/shared/lib/nostr/media/mediaServerStore';
 import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
 import { actionMenuPopup, paramPopup, popup } from '@/shared/lib/popup';
 import { nostrLog } from '@/shared/lib/logger';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 const ImageUrlSchema = z.url().refine((value) => new URL(value).protocol === 'https:');
 const textValue = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -152,8 +153,22 @@ function HistoryChips({
   );
 }
 
+/** The saved profile's key cannot be encoded; the row is left untouched. */
+function ProfileUnavailable() {
+  return (
+    <Screen name="SettingsEditProfileScreen" contentPadding={16}>
+      <View testID="edit-profile-unavailable" accessibilityRole="alert" className="py-6">
+        <Text size={15} className="text-muted">
+          {"This profile can't be edited because its key couldn't be read."}
+        </Text>
+      </View>
+    </Screen>
+  );
+}
+
 export function SettingsEditProfileScreen() {
   const profile = useProfileStore(selectActiveProfile);
+  if (profile && !isNostrPubkeyHex(profile.pubkey)) return <ProfileUnavailable />;
   // Remount the draft and abort old I/O if identity changes while this route is open.
   return profile ? (
     <ProfileEditor

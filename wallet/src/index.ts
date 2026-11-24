@@ -196,9 +196,11 @@ export {
 export { describeDestination } from "./destination-descriptor";
 export {
   decodeEcashTokenMetadata,
+  encodeTokenChecked,
   isValidEcashToken,
   isWellFormedEcashToken,
 } from "./ecash";
+export { isEvenHex, isFixedHex } from "./hex";
 export {
   decodePaymentRequestInfo,
   lockableMintsFromRequest,

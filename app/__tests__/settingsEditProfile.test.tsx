@@ -426,3 +426,30 @@ it('does not re-save an unchanged identity while editing another field offline',
     expect.objectContaining({ patch: { name: 'New' } })
   );
 });
+
+describe('a saved profile whose pubkey is not 32-byte hex', () => {
+  const validPubkey = mockProfile.pubkey;
+  afterEach(() => {
+    mockProfile.pubkey = validPubkey;
+  });
+
+  it.each(['error', 'false', '12345'])(
+    'shows the unavailable state for %j without loading, publishing or throwing',
+    async (pubkey) => {
+      mockProfile.pubkey = pubkey;
+      await act(async () => {
+        renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+      });
+      expect(renderer.root.findAllByProps({ testID: 'edit-profile-save' })).toHaveLength(0);
+      expect(renderer.root.findAllByProps({ testID: 'edit-profile-unavailable' })).not.toHaveLength(
+        0
+      );
+      expect(JSON.stringify(renderer.toJSON())).toContain("This profile can't be edited");
+      expect(loadOwnProfileMetadata).not.toHaveBeenCalled();
+      expect(publishOwnProfileMetadata).not.toHaveBeenCalled();
+      expect(ingestOwnProfileMetadata).not.toHaveBeenCalled();
+      // The saved profile row is read, never rewritten.
+      expect(mockProfile.pubkey).toBe(pubkey);
+    }
+  );
+});

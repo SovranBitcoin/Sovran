@@ -31,7 +31,7 @@ import {
 } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
+import { cashuP2pkPubkeyFromNostrHex, isFixedHex } from '@/shared/lib/protocolIds';
 import { amountToNumber } from 'wallet/amount';
 import { rankAdvertisedMints } from '@/shared/lib/nutCreq';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
@@ -178,6 +178,12 @@ export function useNearbyDiscovery(): void {
 
   useEffect(() => {
     if (!identityMaterial || !profileScope) return;
+    // A malformed local Noise key declines nearby discovery instead of
+    // throwing out of this effect.
+    if (!isFixedHex(identityMaterial.noisePrivateKeyHex, 32)) {
+      bitchatLog.warn('bitchat.discovery.identity_unusable');
+      return;
+    }
     let disposed = false;
     const capabilities = new Map<string, VerifiedNearbyCapability>();
     const sent = new Map<string, { at: number; creq: string | null; fingerprint: string }>();

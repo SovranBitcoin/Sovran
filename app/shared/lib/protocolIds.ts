@@ -59,11 +59,22 @@ export function nostrPubkeyHexFromCashuP2pk(value: string): NostrPubkeyHex {
  * to a pubkey but a DIFFERENT thing; never validate one as the other's type. */
 export type NostrEventId = Brand<string, 'nostr.event.id'>;
 
+/**
+ * True iff `value` is exactly `byteLength` bytes of hex, either case. Check a
+ * value with this before a hex decoder (`hexToBytes`, `nip19.npubEncode`)
+ * sees it: those throw "hex string expected" on odd-length input. `wallet`
+ * exports the same predicate, since that package never imports the app.
+ */
+export function isFixedHex(value: unknown, byteLength: number): value is string {
+  return (
+    typeof value === 'string' && value.length === byteLength * 2 && /^[0-9a-fA-F]+$/.test(value)
+  );
+}
+
 // Shared case-tolerant 64-hex runtime check (reads must stay byte-compatible
 // with historically-accepted persisted data — sovran-data; NIP-01 says
 // lowercase, so CONSTRUCTION uses the strict regexes above instead).
-const isHex64 = (value: unknown): value is string =>
-  typeof value === 'string' && value.length === 64 && /^[0-9a-f]+$/i.test(value);
+const isHex64 = (value: unknown): value is string => isFixedHex(value, 32);
 
 /**
  * Case-TOLERANT guard for reads (persisted blobs, wire input) — deliberately

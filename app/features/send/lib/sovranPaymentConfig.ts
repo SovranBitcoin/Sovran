@@ -28,7 +28,7 @@ import { z } from 'zod';
 import { afterNextFrame } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
-import { getEncodedToken, type Token } from '@cashu/cashu-ts';
+import type { Token } from '@cashu/cashu-ts';
 import type { HistoryEntry, Manager, SendHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import {
   isSendTokenCancelled,
@@ -43,6 +43,7 @@ import {
   meltMethodForTarget,
   annotationKey,
   decodePaymentRequestInfo,
+  encodeTokenChecked,
   isWellFormedEcashToken,
   rawAnnotationKey,
 } from 'wallet';
@@ -926,8 +927,8 @@ interface CreateSovranHandlersConfig {
 
 /**
  * The spine of the cashu-ts `Token` a send history entry carries. Only the
- * fields that make it a token are checked here; the proofs pass through to
- * `getEncodedToken`, which owns their shape.
+ * fields that make it a token are checked here; the proofs' hex is checked
+ * by `encodeTokenChecked` on export.
  */
 const SendEntryTokenSchema = z.looseObject({ mint: z.string(), proofs: z.array(z.unknown()) });
 
@@ -948,14 +949,8 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
   }
   const token = sendEntryToken(parsed);
   if (!token) return null;
-  try {
-    return getEncodedToken(token);
-  } catch (err) {
-    paymentLog.warn('near_pay.token.extract_failed', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  return null;
+  const exported = exportSendToken(token, 'contact-dm');
+  return 'token' in exported ? exported.token : null;
 }
 
 /**
@@ -1588,6 +1583,27 @@ function mintQuoteCtx(ctx: ScreenActionContext): Ctx<MintHistoryEntry> {
 }
 
 /**
+ * A send entry's token, encoded for export. Malformed proof hex is refused
+ * here, so no NFC writer, clipboard or emoji picker is reached with it and
+ * the proofs and operation are left as they are.
+ */
+function exportSendToken(token: unknown, action: string): { token: string } | { error: Error } {
+  const encoded = encodeTokenChecked(token);
+  if (encoded.ok) return { token: encoded.token };
+  if (encoded.reason === 'malformed-proof') {
+    paymentLog.warn('payment.send_token.export.malformed', { action, field: encoded.field });
+    return { error: new Error(`Malformed token proof field ${encoded.field}`) };
+  }
+  paymentLog.warn('payment.send_token.export.failed', {
+    action,
+    error: encoded.error instanceof Error ? encoded.error.message : String(encoded.error),
+  });
+  return {
+    error: encoded.error instanceof Error ? encoded.error : new Error(String(encoded.error)),
+  };
+}
+
+/**
  * App-specific screen action overrides. Only actions that require platform
  * primitives not available in colada (NFC writer, emoji picker).
  * All other actions are handled by the built-in default handlers.
@@ -1603,8 +1619,13 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           return;
         }
 
+        const exported = exportSendToken(entry.token, 'nfc');
+        if ('error' in exported) {
+          nfcSendFailedPopup({ text: describeError(exported.error, 'app').text });
+          return;
+        }
         try {
-          await writeTokenToNFC(getEncodedToken(entry.token));
+          await writeTokenToNFC(exported.token);
           paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
@@ -1662,13 +1683,15 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         // index signature, so `rawCtx.variantId` is already typed as `unknown` —
         // narrow it directly without a cast.
         const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
+        const exported = exportSendToken(entry.token, variantId === 'emoji' ? 'emoji' : 'copy');
+        if ('error' in exported) return;
         if (variantId === 'emoji') {
-          void copyTokenAsEmoji(getEncodedToken(entry.token));
+          void copyTokenAsEmoji(exported.token);
           return;
         }
         // Default — text clipboard copy.
         try {
-          await Clipboard.setStringAsync(getEncodedToken(entry.token));
+          await Clipboard.setStringAsync(exported.token);
           copyPopup('token');
           paymentLog.info('payment.send_token.copy.text.success', { entryId: entry.id });
         } catch (e) {

@@ -7,9 +7,10 @@
 // import these instead of reaching for `@cashu/cashu-ts` directly.
 // ---------------------------------------------------------------------------
 
-import { getTokenMetadata } from "@cashu/cashu-ts";
+import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 
 import { amountToNumberOrUndefined } from "./amount";
+import { isEvenHex } from "./hex";
 import { logger } from "./logger";
 import { extractP2PKPubkey } from "./p2pk";
 
@@ -115,4 +116,58 @@ export function isWellFormedEcashToken(token: string): boolean {
 /** True when `token` decodes as a valid cashu token. */
 export function isValidEcashToken(token: string): boolean {
   return decodeEcashTokenMetadata(token) !== null;
+}
+
+type EncodableToken = Parameters<typeof getEncodedToken>[0];
+
+export type TokenEncodeResult =
+  | { ok: true; token: string }
+  /** A proof field a hex decoder would throw on; `field` names it. */
+  | { ok: false; reason: "malformed-proof"; field: string }
+  /** cashu-ts refused the token for its own reason. */
+  | { ok: false; reason: "encode-failed"; error: unknown };
+
+/**
+ * The first proof field that cashu-ts's V4 encoder would hex-decode and throw
+ * on, or null. Keyset ids, `C`, DLEQ `e`/`s`/`r` and the P2BK `p2pk_e` must be
+ * even-length hex. This checks only what the decoder needs, so a token that
+ * encodes today still encodes.
+ */
+function malformedProofField(token: unknown): string | null {
+  const proofs = (token as { proofs?: unknown } | null)?.proofs;
+  if (typeof token !== "object" || !Array.isArray(proofs)) return "proofs";
+  for (const [index, raw] of proofs.entries()) {
+    const at = `proofs[${index}]`;
+    if (typeof raw !== "object" || raw === null) return at;
+    const proof = raw as Record<string, unknown>;
+    if (!isEvenHex(proof.id)) return `${at}.id`;
+    if (!isEvenHex(proof.C)) return `${at}.C`;
+    if (proof.p2pk_e != null && !isEvenHex(proof.p2pk_e)) return `${at}.p2pk_e`;
+    if (proof.dleq != null) {
+      if (typeof proof.dleq !== "object") return `${at}.dleq`;
+      const dleq = proof.dleq as Record<string, unknown>;
+      if (!isEvenHex(dleq.e)) return `${at}.dleq.e`;
+      if (!isEvenHex(dleq.s)) return `${at}.dleq.s`;
+      if (dleq.r != null && !isEvenHex(dleq.r)) return `${at}.dleq.r`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Encode a structured token for export (copy, NFC, share) without throwing.
+ * Malformed proofs are refused before any hex decoder sees them, so callers
+ * can stop before touching a clipboard, radio or the proofs themselves.
+ */
+export function encodeTokenChecked(token: unknown): TokenEncodeResult {
+  const field = malformedProofField(token);
+  if (field) {
+    logger.warn("ecash.encodeTokenChecked.malformed", { field });
+    return { ok: false, reason: "malformed-proof", field };
+  }
+  try {
+    return { ok: true, token: getEncodedToken(token as EncodableToken) };
+  } catch (error) {
+    return { ok: false, reason: "encode-failed", error };
+  }
 }

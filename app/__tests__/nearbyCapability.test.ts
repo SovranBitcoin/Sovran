@@ -4,6 +4,7 @@ import { nprofileEncode } from 'nostr-tools/nip19';
 import { PaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
 import {
   createNearbyCapability,
+  NearbyIdentityError,
   nearbyNoiseIdentity,
   verifyNearbyCapability,
 } from '@/features/nearPay/lib/nearbyCapability';
@@ -70,4 +71,18 @@ describe('authenticated wallet capability', () => {
       verifyNearbyCapability(createNearbyCapability(key, noise, null, now), fingerprint, now)
     ).toMatchObject({ creq: null, nostrPubkeyHex: pubkey });
   });
+});
+describe('local Noise identity', () => {
+  it('derives a stable identity from a 32-byte secret key', () => {
+    expect(nearbyNoiseIdentity(noise)).toEqual(nearbyNoiseIdentity(noise.toUpperCase()));
+    expect(nearbyNoiseIdentity(noise).peerID).toHaveLength(16);
+  });
+  it.each(['error', 'false', '12345', '02'.repeat(31), ''])(
+    'declines a malformed secret key %j with a controlled error',
+    (hex) => {
+      expect(() => nearbyNoiseIdentity(hex)).toThrow(NearbyIdentityError);
+      expect(() => nearbyNoiseIdentity(hex)).not.toThrow(/hex string expected/);
+      expect(() => createNearbyCapability(key, hex, null, now)).toThrow(NearbyIdentityError);
+    }
+  );
 });

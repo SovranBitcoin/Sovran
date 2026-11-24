@@ -7,6 +7,7 @@ import { decode as decodeNostr } from 'nostr-tools/nip19';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import type { BLEPeer } from 'bitchat-module';
 import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
+import { isFixedHex } from '@/shared/lib/protocolIds';
 
 export const CAPABILITY_PREFIX = 'sovran:nearby:1:';
 const KIND = 21118;
@@ -35,7 +36,17 @@ export interface VerifiedNearbyCapability {
   expiresAt: number;
   issuedAt: number;
 }
+/** The local Noise secret key is not 32 bytes of hex; nearby payment is declined. */
+export class NearbyIdentityError extends Error {
+  override name = 'NearbyIdentityError';
+}
 export function nearbyNoiseIdentity(noisePrivateKeyHex: string) {
+  // Refuse before the hex decoder or X25519 throws a raw error into native code.
+  if (!isFixedHex(noisePrivateKeyHex, 32)) {
+    throw new NearbyIdentityError(
+      `nearby noise secret key is not 32-byte hex (len ${String(noisePrivateKeyHex).length})`
+    );
+  }
   const publicKey = x25519.getPublicKey(hexToBytes(noisePrivateKeyHex));
   const fingerprint = bytesToHex(sha256(publicKey));
   return { noiseKey: bytesToHex(publicKey), fingerprint, peerID: fingerprint.slice(0, 16) };
