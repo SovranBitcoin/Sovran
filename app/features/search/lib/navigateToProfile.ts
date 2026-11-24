@@ -1,9 +1,7 @@
 /**
- * @fileoverview `navigateToProfile` — unify contact-row press handling
- * across the Contacts tab and global search feed. Extracted from
- * `ContactListItem` so both call sites (ContactsScreen + SearchResultsList)
- * share the same pre-nav steps: dismiss the keyboard, emit the press log,
- * carry the optional mintUrl param through to the profile screen.
+ * @fileoverview `navigateToProfile` — one press handler for person rows in
+ * search (results and the recent-people strip): dismiss the keyboard, emit the
+ * press log, carry the optional mintUrl param through to the profile screen.
  */
 
 import { Keyboard } from 'react-native';

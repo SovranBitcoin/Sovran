@@ -30,7 +30,6 @@ import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
 import { useWalletTabFocusPublisher } from '@/features/wallet/hooks/useWalletTabFocusPublisher';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
-import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { toRealUnit } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -224,8 +223,6 @@ export function WalletScreen() {
     },
   };
 
-  // Keep BootEntrance and the wallet body mounted across the search toggle so
-  // the splash→QR morph never replays and closing search restores this screen.
   return (
     <BootEntrance>
       <LayoutDebugWrapper
@@ -292,8 +289,6 @@ export function WalletScreen() {
           </View>
         </Log>
       </LayoutDebugWrapper>
-      {/* No `topInset`: the overlay reads the navigator header height itself. */}
-      <SearchOverlay recentContext="wallet" />
     </BootEntrance>
   );
 }

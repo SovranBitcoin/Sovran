@@ -12,7 +12,7 @@ import { View, StyleSheet } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import type { AllSearchResult } from '@/features/contacts/hooks/useAllSearchResults';
+import type { AllSearchResult } from '@/features/search/hooks/useAllSearchResults';
 import {
   ContactRow,
   geohashIdentity,
@@ -20,7 +20,7 @@ import {
   nostrIdentity,
 } from '@/shared/ui/composed/ContactRow';
 import { FollowBadge } from '@/shared/ui/composed/FollowBadge';
-import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
+import { navigateToProfile } from '@/features/search/lib/navigateToProfile';
 import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { paymentLog, cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -87,9 +87,8 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
   );
 }
 
-/** Geohash location-tier row — shared by the search results and the Contacts
- * Groups tab; `source` is telemetry only. */
-export function TierRow({ tier, source }: { tier: TierEntry; source: 'search' | 'contacts' }) {
+/** Geohash location-tier row in the search results. */
+function TierRow({ tier }: { tier: TierEntry }) {
   return (
     <ContactRow
       identity={geohashIdentity(tier.geohash, {
@@ -103,7 +102,7 @@ export function TierRow({ tier, source }: { tier: TierEntry; source: 'search' | 
         paymentLog.info('contact.tier.press', {
           tier: tier.key,
           transport: tier.transport,
-          source,
+          source: 'search',
         });
         router.push({
           pathname: '/(user-flow)/geohashChat',
@@ -152,7 +151,7 @@ function renderSearchResult(item: AllSearchResult) {
     case 'geohash':
       return <GeohashJumpRow geohash={item.geohash} />;
     case 'tier':
-      return <TierRow tier={item.tier} source="search" />;
+      return <TierRow tier={item.tier} />;
     case 'mint':
       return <MintRow mint={item.mint} />;
     case 'contact':

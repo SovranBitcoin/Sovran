@@ -16,7 +16,7 @@
  * Blobs arrive from: the create hook (`recordBlobs` in publishComposed) and the
  * passive ingest seams (`ingestOwnMediaBlobs`, mirroring `ingestOwnContent`).
  * Deletion writes `deleteState` here but NEVER removes the entry, so the
- * settings "My media" page can show ✓ deleted / ✗ live and re-verify on demand.
+ * settings "Uploaded media" page can show ✓ deleted / ✗ live and re-verify on demand.
  */
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
@@ -197,6 +197,6 @@ export function ingestOwnMediaBlobs(
   }
 }
 
-/** All owned blobs, newest-seen first — backs the settings "My media" page. */
+/** All owned blobs, newest-seen first — backs the settings "Uploaded media" page. */
 export const selectOwnedBlobs = (state: OwnedMediaStore): OwnedBlobEntry[] =>
   Object.values(state.byBlob).sort((a, b) => b.lastSeen - a.lastSeen);

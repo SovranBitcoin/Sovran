@@ -22,7 +22,6 @@ export const FEATURES = [
   'nostr', // identity, profiles; every other Nostr module needs it
   'nostrSearch', // people / npub search
   'ecashMessages', // send ecash to a contact over NIP-17 DMs (the transport, a payment rail)
-  'contacts', // Contacts tab
   // Proximity
   'nfc', // tap to pay
   'nutDrop', // Bluetooth Nut Drop
@@ -37,7 +36,6 @@ const REQUIRES: Partial<Record<Feature, readonly Feature[]>> = {
   paymentRequests: ['ecash'],
   nostrSearch: ['nostr'],
   ecashMessages: ['nostr', 'ecash'],
-  contacts: ['nostr'],
   nfc: ['ecash'],
   nutDrop: ['ecash'],
 };
@@ -66,17 +64,16 @@ export const EDITIONS = {
   lightningOnly: only('lightning', 'bolt12'),
   onchainOnly: only('onchain'),
   ecashLightning: only('ecash', 'lightning', 'bolt12', 'paymentRequests', 'nfc', 'nutDrop'),
-  /** Everything except the social layer: no search, contacts or ecash messages. */
+  /** Everything except the social layer: no people search or ecash messages. */
   private: {
     ...all(true),
     nostr: false,
     nostrSearch: false,
     ecashMessages: false,
-    contacts: false,
   },
 } as const satisfies Record<string, FeatureSet>;
 
-export type Edition = keyof typeof EDITIONS;
+type Edition = keyof typeof EDITIONS;
 
 /** The edition a build ships when `EXPO_PUBLIC_SOVRAN_EDITION` is unset. */
 export const DEFAULT_EDITION: Edition = 'payments';

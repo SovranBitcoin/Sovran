@@ -4,7 +4,6 @@ import snapshot from './fixtures/publicDemoSnapshot.json';
 
 /** Public, reviewed snapshot. This identity is display-only, never a signer. */
 export const DEMO_VIEWER_PUBKEY = snapshot.viewerPubkey;
-export const DEMO_VIEWER_STATS = snapshot.profileStats;
 
 // Original public image bytes, bundled so screenshot runs do not depend on hosts.
 const pictures: Record<string, number> = {

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Aggregate search hook for the "All" pill in Contacts search.
+ * @fileoverview Aggregate people-and-places search behind the Search tab.
  *
  * Composes Nostr-profile contact hits (the facade's profile search via `useContactSearch`) with
  * location-tier matches and geohash jump cards, so a single query like
@@ -22,6 +22,12 @@ import type { SearchStatus } from '@/shared/ui/composed/search/searchListState';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
 
+/**
+ * Place matches use the location only once a query is typed, and only when the
+ * person already allowed it: opening Search never shows the location prompt.
+ */
+const LOCATION_TIER_OPTIONS = { requestPermission: false } as const;
+
 export type AllSearchResult =
   | { type: 'geohash'; id: string; geohash: string; score: number }
   | { type: 'tier'; id: string; tier: TierEntry; score: number }
@@ -41,8 +47,8 @@ interface UseAllSearchResultsResult {
   people: AllSearchResult[];
   /** Geohash-jump + tier rows only (for the Groups scope). */
   groups: AllSearchResult[];
-  /** Pubkeys behind the contact rows, for the Posts scope. */
-  postsAuthors: string[];
+  /** Real pubkeys behind the contact rows (placeholder rows excluded). */
+  peoplePubkeys: string[];
   loading: boolean;
   /** People-search read status (drives placeholders / no-results / error). */
   status: SearchStatus;
@@ -57,9 +63,12 @@ const SCORE_TIER_DISPLAYNAME = 80;
 
 export function useAllSearchResults(query: string): UseAllSearchResultsResult {
   // Contact hits + kind-0 overlay come from the shared owner; this hook adds the
-  // location/tier + geohash dimensions the wallet/feed "All" scope needs.
+  // location/tier + geohash dimensions the Search tab's "All" scope needs.
   const { contactRows, loading, status, retry } = useOverlaidContactSearch(query);
-  const { tiers } = useLocationTiers();
+  const { tiers } = useLocationTiers({
+    ...LOCATION_TIER_OPTIONS,
+    enabled: query.trim().length > 0,
+  });
 
   return useMemo(() => {
     const trimmed = query.trim();
@@ -90,15 +99,14 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
     const combined: AllSearchResult[] = [...groups, ...contactRows];
     combined.sort((a, b) => b.score - a.score);
 
-    // The authors the Posts scope fetches recent posts for, and the gate for
-    // showing the Posts tab.
-    const postsAuthors = contactRows.map((r) => r.pubkey);
+    // Gates the People scope tab on real matches.
+    const peoplePubkeys = contactRows.map((r) => r.pubkey);
 
     return {
       results: combined,
       people: contactRows,
       groups,
-      postsAuthors,
+      peoplePubkeys,
       loading,
       status,
       retry,

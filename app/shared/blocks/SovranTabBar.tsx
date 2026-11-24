@@ -1,85 +1,58 @@
-import { useCallback } from 'react';
 import { useReportTabBarHeight } from '@/shared/hooks/useScreenInsets';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { PressScale } from '@/shared/ui/primitives/PressScale';
+import { Text } from '@/shared/ui/primitives/Text';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 
-const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
+/** Icon + one label line; tall enough that a scaled label never clips. */
+const SOVRAN_TAB_BAR_ROW_HEIGHT = 56;
 /** Minimum bottom padding under the tab row when there's no home indicator. */
 const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
+/** A whole tab is a big target: press it only slightly (Emil: 0.97 for cards). */
+const TAB_PRESS_SCALE = 0.97;
 
 type TabBarIcon = NonNullable<BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']>;
 
 type TabButtonProps = {
   focused: boolean;
   color: string;
-  accessibilityLabel: string;
+  label: string;
   testID: string | undefined;
   onPress: () => void;
   onLongPress: () => void;
   icon: TabBarIcon | undefined;
 };
 
-function TabButton({
-  focused,
-  color,
-  accessibilityLabel,
-  testID,
-  onPress,
-  onLongPress,
-  icon,
-}: TabButtonProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const onPressIn = useCallback(() => {
-    scale.set(
-      withTiming(0.88, {
-        duration: 70,
-        easing: Easing.out(Easing.cubic),
-      })
-    );
-  }, [scale]);
-
-  const onPressOut = useCallback(() => {
-    scale.set(
-      withSpring(1, {
-        damping: 12,
-        stiffness: 380,
-        mass: 0.6,
-      })
-    );
-  }, [scale]);
-
+function TabButton({ focused, color, label, testID, onPress, onLongPress, icon }: TabButtonProps) {
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityState={focused ? { selected: true } : {}}
-      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={label}
       testID={testID}
       onPress={onPress}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
       onLongPress={onLongPress}
-      style={styles.tab}
-      activeOpacity={1}
-      hitSlop={8}>
-      <Animated.View style={[styles.tabInner, animatedStyle]}>
-        {icon ? icon({ focused, color, size: 26 }) : null}
-      </Animated.View>
+      className="h-full flex-1 items-center justify-center"
+      activeOpacity={1}>
+      <PressScale target={TAB_PRESS_SCALE}>
+        <View className="items-center justify-center gap-0.5">
+          {icon ? icon({ focused, color, size: 24 }) : null}
+          <Text
+            size={11}
+            medium={focused}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+            color={color}
+            accessible={false}>
+            {label}
+          </Text>
+        </View>
+      </PressScale>
     </Pressable>
   );
 }
@@ -96,12 +69,13 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
   return (
     <View
       onLayout={(event) => reportHeight?.(event.nativeEvent.layout.height)}
+      accessibilityRole="tablist"
       style={{
         backgroundColor: surface,
         paddingBottom: Math.max(insets.bottom, SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING),
       }}>
       <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-      <View style={styles.row}>
+      <View className="flex-row items-center px-2" style={styles.row}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const focused = state.index === index;
@@ -114,6 +88,7 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
               canPreventDefault: true,
             });
             if (!focused && !event.defaultPrevented) {
+              void EnhancedHaptics.navigateHaptic();
               navigation.navigate(route.name, route.params);
             }
           };
@@ -122,15 +97,14 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
             navigation.emit({ type: 'tabLongPress', target: route.key });
           };
 
-          const accessibilityLabel =
-            options.tabBarAccessibilityLabel ?? options.title ?? route.name;
+          const label = options.tabBarAccessibilityLabel ?? options.title ?? route.name;
 
           return (
             <TabButton
               key={route.key}
               focused={focused}
               color={color}
-              accessibilityLabel={accessibilityLabel}
+              label={label}
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}
@@ -148,21 +122,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   row: {
-    flexDirection: 'row',
     height: SOVRAN_TAB_BAR_ROW_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

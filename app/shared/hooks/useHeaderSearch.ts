@@ -5,8 +5,8 @@ import { log } from '@/shared/lib/logger';
 /**
  * Shared search toggle state machine for header search UIs.
  *
- * Used by `SearchLayout` and the mint add screen to provide a consistent
- * "search icon → search bar → X close" interaction pattern.
+ * Used by the mint add screen for its "search icon → search bar → X close"
+ * interaction.
  */
 export function useHeaderSearch() {
   const [isSearching, setIsSearching] = useState(false);

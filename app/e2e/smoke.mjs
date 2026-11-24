@@ -23,7 +23,7 @@ export const CORE_WALLET_SCREENS = [
   { page: 'receive', label: 'Receive Hub', url: 'sovran://receive' },
   { page: 'send', label: 'Send Hub', url: 'sovran://send' },
   { page: 'mint-add', label: 'Add / Discover Mints', url: 'sovran://add' },
-  { page: 'contacts', label: 'Contacts', url: 'sovran://contacts' },
+  { page: 'search', label: 'Search', url: 'sovran://search' },
   { page: 'transactions', label: 'Transactions', url: 'sovran://transactions' },
   { page: 'settings', label: 'Settings', url: 'sovran://settings' },
 ];

@@ -197,7 +197,7 @@ interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity =
+type Identity =
   NostrIdentity | MintIdentity | ProviderIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =

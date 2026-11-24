@@ -1,10 +1,9 @@
 /**
- * @fileoverview The one search experience, mounted by every surface.
+ * @fileoverview The one search experience, the body of the Search tab.
  *
- * Contacts, Feed, and Wallet mount this through `SearchOverlay` and get the
- * identical UX: one scope-tab row (All / People / Posts / Mints / Groups), an
- * "All" default that aggregates people + places + mints into one ranked list,
- * and a consistent empty-query recents view. A single `selectedScope` value
+ * One scope-tab row (All / People / Mints / Groups), an "All" default that
+ * aggregates people + places + mints into one ranked list, and an empty-query
+ * recents view. A single `selectedScope` value
  * drives the highlight, so two tabs can never read as selected at once.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -88,7 +87,7 @@ function ScopeBody({
   aggregates: SearchAggregates;
   searchQuery: string;
 }) {
-  // `key={scope}`: every branch below (bar Posts) returns the SAME component
+  // `key={scope}`: every branch below returns the SAME component
   // type at the SAME position, so React reconciles them as one element and the
   // FlashList underneath keeps its recycled cells and scroll offset across a
   // scope change. The rows for the new scope then only appear once a scroll
@@ -105,8 +104,6 @@ function ScopeBody({
           searchQuery={searchQuery}
         />
       );
-    case 'Posts':
-      return null;
     case 'Mints':
       return (
         <SearchResultRows

@@ -155,7 +155,6 @@ export const icons: string[] = [
   'mdi:store',
   'mdi:cash-multiple',
   'mdi:camera',
-  'mdi:tree',
   'mdi:currency-usd',
   'mdi:palette',
   'mdi:alert-circle',
@@ -254,7 +253,6 @@ export const icons: string[] = [
   'mdi:cloud-download-outline',
 
   // Drawer and bottom tab bar route icons — selected/unselected pairs
-  'mdi:account-group-outline',
   'mdi:robot-outline',
 
   // Nostr posting — composer, polls, relays, share, media states

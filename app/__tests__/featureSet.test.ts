@@ -17,7 +17,6 @@ import {
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { featureDetectors } from '@/shared/config/featureDetectors';
 import { disabledFeatureForRoute } from '@/shared/lib/nav/featureRoutes';
-import { orderTabs, visibleTabState } from '@/navigation/tabOrder';
 import { computeVisibleScopes } from '@/shared/ui/composed/search/scopes';
 
 describe('feature set', () => {
@@ -53,7 +52,6 @@ describe('feature set', () => {
     const set = resolveFeatureSet('full', { nostr: false });
     expect(set.nostrSearch).toBe(false);
     expect(set.ecashMessages).toBe(false);
-    expect(set.contacts).toBe(false);
     expect(set.ecash).toBe(true);
   });
 
@@ -104,12 +102,21 @@ describe('feature route guard', () => {
     expect(disabledFeatureForRoute(['(send-flow)', 'lightningSend'], enabled)).toBeNull();
   });
 
-  it('keeps wallet, contacts, and profile routes open in payments', () => {
+  it('keeps the wallet and profile routes open in payments', () => {
     const payments = resolveFeatureSet('payments');
     const on = (f: keyof typeof payments) => payments[f];
     expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'index'], on)).toBeNull();
-    expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'contacts'], on)).toBeNull();
     expect(disabledFeatureForRoute(['(user-flow)', 'profile'], on)).toBeNull();
+  });
+
+  it('keeps every tab open in every build, nostr or not', () => {
+    for (const edition of ['private', 'lightningOnly', 'onchainOnly'] as const) {
+      const set = resolveFeatureSet(edition);
+      const on = (f: keyof typeof set) => set[f];
+      for (const tab of ['index', 'settings', 'search']) {
+        expect(disabledFeatureForRoute(['(drawer)', '(tabs)', tab], on)).toBeNull();
+      }
+    }
   });
 
   it('keeps history viewable', () => {
@@ -117,47 +124,20 @@ describe('feature route guard', () => {
   });
 });
 
-describe('tab order', () => {
-  const tabs = [{ name: 'contacts', feature: 'contacts' }, { name: 'index' }] as const;
-  const names = (edition: Parameters<typeof resolveFeatureSet>[0]) => {
-    const set = resolveFeatureSet(edition);
-    return orderTabs(tabs, (f) => set[f]).map((tab) => tab.name);
-  };
-
-  it('keeps the declared order of the shipped tabs', () => {
-    expect(names('full')).toEqual(['contacts', 'index']);
-    expect(names('payments')).toEqual(['contacts', 'index']);
-  });
-
-  it('drops a tab whose module is off', () => {
-    expect(names('private')).toEqual(['index']);
-    expect(names('lightningOnly')).toEqual(['index']);
-  });
-
-  it('narrows navigator state to shipped tabs and remaps the focus', () => {
-    const routes = [{ name: 'index' }, { name: 'contacts' }, { name: 'ai' }, { name: 'feed' }];
-    const shown = new Set(['index', 'contacts']);
-    expect(visibleTabState({ index: 1, routes }, shown)).toEqual({
-      index: 1,
-      routes: [{ name: 'index' }, { name: 'contacts' }],
-    });
-    expect(visibleTabState({ index: 3, routes }, shown).index).toBe(-1);
-    const all = { index: 0, routes: routes.slice(0, 2) };
-    expect(visibleTabState(all, shown)).toBe(all);
-  });
-});
-
 describe('search scopes', () => {
-  const counts = { people: 1, posts: 1, mints: 1, groups: 1 };
+  const counts = { people: 1, mints: 1, groups: 1 };
 
-  it('offers Posts only with nostr', () => {
+  it('offers People only with people search', () => {
     const full = resolveFeatureSet('full');
     const noNostr = resolveFeatureSet('full', { nostr: false });
-    expect(computeVisibleScopes('', counts, (f) => full[f])).toContain('Posts');
-    expect(computeVisibleScopes('', counts, (f) => noNostr[f])).not.toContain('Posts');
-    expect(computeVisibleScopes('lon', counts, (f) => noNostr[f])).toEqual([
+    expect(computeVisibleScopes('', counts, (f) => full[f])).toEqual([
       'All',
       'People',
+      'Mints',
+      'Groups',
+    ]);
+    expect(computeVisibleScopes('lon', counts, (f) => noNostr[f])).toEqual([
+      'All',
       'Mints',
       'Groups',
     ]);

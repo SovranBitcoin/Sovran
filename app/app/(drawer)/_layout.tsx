@@ -52,7 +52,8 @@ export default function DrawerLayout() {
             borderCurve: 'continuous',
             boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
           },
-          swipeEdgeWidth: 128,
+          // A narrow edge, so swipes across the wallet's account carousel stay with it.
+          swipeEdgeWidth: 32,
           swipeMinDistance: 10,
         }}
         drawerContent={(props) => <DrawerContent {...props} />}>

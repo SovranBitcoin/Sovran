@@ -296,9 +296,9 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **NPC / Nostr settlement** — fall back to Lightning address or Nostr DM payment
 - [x] **Settlement tracking** — per-participant paid/owed status
 
-### Contacts
+### Search
 
-<!-- code: features/contacts/screens/ContactsScreen.tsx; features/contacts/hooks/useAllSearchResults.ts; features/contacts/lib/navigateToProfile.ts; features/payments/hooks/useContactSearch.ts; features/payments/hooks/useRecentContacts.ts; features/payments/hooks/useMintContacts.ts; shared/ui/composed/ContactRow.tsx; features/bitchat/hooks/useBLEPeers.ts; shared/stores/runtime/mockDataStore.ts -->
+<!-- code: features/search/screens/SearchScreen.tsx; features/search/hooks/useAllSearchResults.ts; features/search/lib/navigateToProfile.ts; features/payments/hooks/useContactSearch.ts; shared/ui/composed/ContactRow.tsx; features/bitchat/hooks/useBLEPeers.ts; shared/stores/runtime/mockDataStore.ts -->
 
 - [x] **Unified search** — name, NIP-05, npub, Lightning address all in one box
 - [x] **Reputation + followers on rows** — Vertex-backed credibility surfaced inline

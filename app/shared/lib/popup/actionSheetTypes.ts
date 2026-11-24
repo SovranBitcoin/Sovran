@@ -19,11 +19,6 @@ type ActionMenuSheetPayload = {
   onDismiss?: () => void;
 };
 
-export type ProfileSwitcherAction =
-  | { type: 'switch'; accountIndex: number }
-  | { type: 'create' }
-  | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
-
 type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
 };

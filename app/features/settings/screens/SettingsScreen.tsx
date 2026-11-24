@@ -346,9 +346,9 @@ export const SettingsScreen = () => {
                   <Separator className="mx-4" />
                   <SettingsListLinkItem
                     href="/(settings-flow)/media"
-                    title="My media"
+                    title="Uploaded media"
                     testID="settings-media-row"
-                    description={`Images you've posted · uploads via ${mediaHost}`}
+                    description={`Manage profile images and uploaded blobs · ${mediaHost}`}
                   />
                 </>
               )}
@@ -398,7 +398,6 @@ export const SettingsScreen = () => {
                   testID="settings-export-database-row"
                   onPress={handleExportDatabase}
                 />
-                <Separator className="mx-4" />
                 <Separator className="mx-4" />
                 <SettingsListLinkItem
                   href="/(settings-flow)/storage"

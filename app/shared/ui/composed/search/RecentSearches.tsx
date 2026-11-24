@@ -2,8 +2,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * @fileoverview Empty-query body for the unified search surface.
  *
- * Shown on every surface (Contacts, Feed, Wallet) the moment search is open but
- * nothing is typed, regardless of selected scope. Two consistent sections:
+ * Shown on the Search tab while nothing is typed, regardless of selected scope. Two consistent sections:
  *   1. Recent query chips — tap to re-run (per-surface, via `useRecentSearches`).
  *   2. Recent people strip — shared across surfaces (`recentPeopleStore`).
  * Followed by a prompt explaining what can be searched.

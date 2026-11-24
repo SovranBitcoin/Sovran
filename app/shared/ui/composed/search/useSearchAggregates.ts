@@ -3,9 +3,8 @@
  *
  * Composes the existing people/place search (`useAllSearchResults`) with the
  * server-backed mint search (`useMintSearch`) into one set of per-scope buckets
- * plus a flat, relevance-ranked "All" feed. Every search surface (Contacts,
- * Feed, Wallet) reads this one hook, so they all aggregate the same things and
- * stay in sync — no per-surface result wiring.
+ * plus a flat, relevance-ranked "All" feed. The Search tab reads this one hook,
+ * so every scope aggregates the same things — no per-scope result wiring.
  *
  * Mint search only fires once the query is long enough to be worth a network
  * round-trip; below that the Mints bucket is simply empty (and its tab hidden).
@@ -15,7 +14,7 @@ import { useMemo } from 'react';
 import {
   useAllSearchResults,
   type AllSearchResult,
-} from '@/features/contacts/hooks/useAllSearchResults';
+} from '@/features/search/hooks/useAllSearchResults';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import type { SearchStatus } from './searchListState';
 
@@ -37,10 +36,8 @@ export type SearchAggregates = {
   groups: AllSearchResult[];
   /** Mint rows (the Mints scope). */
   mints: AllSearchResult[];
-  /** Real pubkeys behind the people rows (the Posts scope fetches their posts). */
-  postsAuthors: string[];
   /** Per-scope counts, used to decide which scope tabs are visible. */
-  counts: { people: number; groups: number; mints: number; posts: number };
+  counts: { people: number; groups: number; mints: number };
   /** Combined loading (people OR mints) — drives the All scope skeletons. */
   loading: boolean;
   /** People search in flight — drives the People scope skeletons. */
@@ -58,7 +55,7 @@ export type SearchAggregates = {
 };
 
 export function useSearchAggregates(query: string): SearchAggregates {
-  const { results, people, groups, postsAuthors, loading, status, retry } =
+  const { results, people, groups, peoplePubkeys, loading, status, retry } =
     useAllSearchResults(query);
 
   const trimmed = query.trim();
@@ -96,15 +93,10 @@ export function useSearchAggregates(query: string): SearchAggregates {
       people,
       groups,
       mints,
-      postsAuthors,
       counts: {
-        // People/Posts gate on *real* matched authors (not the placeholder
-        // skeleton rows present mid-load), so their tabs don't flicker in and
-        // back out while a search is in flight.
-        people: postsAuthors.length,
+        people: peoplePubkeys.length,
         groups: groups.length,
         mints: mints.length,
-        posts: postsAuthors.length,
       },
       loading: loading || (mintEnabled && mintLoading),
       peopleLoading: loading,
@@ -120,7 +112,7 @@ export function useSearchAggregates(query: string): SearchAggregates {
       people,
       groups,
       mints,
-      postsAuthors,
+      peoplePubkeys,
       loading,
       mintEnabled,
       mintLoading,

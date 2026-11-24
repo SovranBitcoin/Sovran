@@ -28,9 +28,6 @@
     "features/nearPay/screens/NearPayScreen.tsx": [
       "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
-    "features/payments/hooks/useMintContacts.ts": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/receive/screens/OnchainReceiveScreen.tsx": [
       "Existing memoization could not be preserved"
     ],

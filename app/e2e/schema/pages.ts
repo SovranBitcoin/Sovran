@@ -21,8 +21,7 @@ export const CANONICAL_PAGES = [
   'onboarding-carousel', // the four intro cards (occurrences 1-4)
   // shell
   'wallet', // wallet home (WalletScreen)
-  'drawer', // profile drawer (drawer-profile-name)
-  'profile-switcher', // the picker sheet showing the drawer's profiles (profile-switcher)
+  'drawer', // account switcher drawer (drawer-profile-switch-*, drawer-add-account)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
@@ -51,10 +50,9 @@ export const CANONICAL_PAGES = [
   'emoji-picker', // an emoji grid with search, to copy a token as an emoji (emoji-picker, emoji-picker-search)
   'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
-  'search', // header search overlay with results (SearchOverlay)
-  'settings', // settings root screen ((settings-flow), SettingsScreen)
+  'search', // Search tab: people, mints and places (SearchScreen)
+  'settings', // Settings tab root ((tabs)/settings, SettingsScreen)
   'image-viewer', // fullscreen media overlay; no standalone route
-  'contacts', // contacts tab (ContactsScreen)
   'theme-preview', // per-unit wallpaper preview cards ((theme-flow)/preview)
   'gallery', // wallpaper album gallery ((theme-flow)/gallery)
   'transactions', // full transactions list ((transactions-flow)/transactions)

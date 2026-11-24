@@ -32,7 +32,7 @@ import { RelayListSettings } from '../components/RelayListSettings';
 import { MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
 
 const VERTEX_CREDITS_DESCRIPTION =
-  "Uses your Nostr identity's free Vertex credits directly over wss://relay.vertexlab.io to refresh reputation scores. Vertex sees which profiles you look up; your keys never leave the device.";
+  "Uses your Nostr identity's free Vertex credits, directly over wss://relay.vertexlab.io, to improve people search and look up profiles. Vertex sees which names you search for and which profiles you open; your keys never leave the device.";
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
@@ -158,22 +158,20 @@ export function SettingsNetworkScreen() {
           </ListGroup>
         </Section>
 
-        <Section title="Reputation">
+        <Section title="People search">
           <ListGroup variant="secondary">
             <PressableFeedback
               animation={false}
               testID="settings-vertex-credits-toggle"
               accessible
               accessibilityRole="switch"
-              accessibilityLabel="Refresh reputation with my Nostr credits"
+              accessibilityLabel="Use my Nostr credits for people search"
               accessibilityHint={VERTEX_CREDITS_DESCRIPTION}
               accessibilityState={{ checked: vertexCreditsEnabled }}
               onPress={() => setVertexCreditsEnabled(!vertexCreditsEnabled)}>
               <ListGroup.Item disabled>
                 <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>
-                    Refresh reputation with my Nostr credits
-                  </ListGroup.ItemTitle>
+                  <ListGroup.ItemTitle>Use my Nostr credits for people search</ListGroup.ItemTitle>
                   <ListGroup.ItemDescription>
                     {VERTEX_CREDITS_DESCRIPTION}
                   </ListGroup.ItemDescription>

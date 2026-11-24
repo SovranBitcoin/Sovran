@@ -185,7 +185,7 @@ function MediaSection({
 }
 
 /**
- * Settings → "My media": the durable owned-blob ledger, split by purpose
+ * Settings → "Uploaded media": the durable owned-blob ledger, split by purpose
  * with a status pill on each image. Refresh
  * HEAD-probes each URL to verify — disambiguating Primal's 404 ("gone" vs "not
  * owned"). Each still-online row can be deleted directly here (BUD-11), the
@@ -319,7 +319,7 @@ export const SettingsMediaScreen = () => {
         <View className="mb-4">
           <Surface contentStyle={{ padding: pad, gap: item }}>
             <Text bold size={16}>
-              My media
+              Uploaded media
             </Text>
             <Text size={12} className="text-foreground/70">
               Your profile pictures and post images, kept so a deletion can be retried or verified

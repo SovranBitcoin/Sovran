@@ -93,11 +93,16 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('testID={`receive-creq-p2pk-state:${p2pkStateValue.text}`}');
   });
 
-  it('pins the wallet header search toggle and input', () => {
-    const layout = read('shared/ui/composed/SearchLayout.tsx');
-    expect(layout).toContain('`${searchTestIDPrefix}-search-toggle`');
-    expect(layout).toContain('`${searchTestIDPrefix}-search-input`');
-    expect(read('app/(drawer)/(tabs)/index/_layout.tsx')).toContain('searchTestIDPrefix="wallet"');
+  it('pins the tab ids and the Search tab field', () => {
+    const tabs = read('app/(drawer)/(tabs)/_layout.tsx');
+    for (const id of ['tab-wallet', 'tab-settings', 'tab-search']) {
+      expect(tabs).toContain(`testID: '${id}',`);
+    }
+    // iOS 26 draws the Search item as the system search control.
+    expect(tabs).toContain("role: 'search',");
+    expect(read('shared/ui/composed/SearchLayout.tsx')).toContain('testID={searchTestID}');
+    expect(read('app/(drawer)/(tabs)/search/_layout.tsx')).toContain('searchTestID="search-input"');
+    expect(read('features/search/screens/SearchScreen.tsx')).toContain('testID="search-screen"');
     // Liquid-glass header buttons are accessible only WITH a label; the
     // HeaderIconButton must forward both identity props to HeaderGlassCircle.
     const header = read('navigation/nativeTabs.tsx');
@@ -190,21 +195,12 @@ describe('wallet surface e2e selectors', () => {
     );
   });
 
-  it('pins the fresh-user empty-state ids on ContactsScreen', () => {
-    expect(read('features/contacts/screens/ContactsScreen.tsx')).toContain(
-      'testID={`contacts-empty:${activeFilter.toLowerCase()}`}'
-    );
-  });
-
-  it('pins the drawer menu row ids', () => {
-    expect(read('navigation/DrawerContent.tsx')).toContain('testID={`drawer-menu-${id}`}');
-    // The rows themselves are data, filtered by the build's feature set.
-    const drawer = read('navigation/drawerMenu.ts');
-    // Row ids are the e2e selector suffixes (drawer-menu-wallet, …); renaming
-    // one breaks every scenario that opens that route from the drawer.
-    for (const id of ['wallet', 'contacts', 'settings']) {
-      expect(drawer).toContain(`id: '${id}',`);
-    }
+  it('pins the account switcher drawer ids', () => {
+    const drawer = read('navigation/AccountSwitcherDrawer.tsx');
+    // Keyed by the account's derivation index, its stable identity.
+    expect(drawer).toContain('testID={`drawer-profile-switch-${profile.accountIndex}`}');
+    expect(drawer).toContain('testID="drawer-add-account"');
+    expect(drawer).toContain('testID="drawer-import-account"');
   });
 
   it('pins the wallet wallpaper probe and gallery card AX identity', () => {

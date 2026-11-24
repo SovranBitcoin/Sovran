@@ -42,10 +42,14 @@ async function computeLocationTiers(ctx: {
   setTiers: Dispatch<SetStateAction<TierEntry[]>>;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  requestPermission: boolean;
 }): Promise<void> {
-  const { isCancelled, setTiers, setError, setLoading } = ctx;
+  const { isCancelled, setTiers, setError, setLoading, requestPermission } = ctx;
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    // Reading the permission never shows the system prompt; requesting can.
+    const { status } = requestPermission
+      ? await Location.requestForegroundPermissionsAsync()
+      : await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') {
       setError('Location permission not granted');
       setLoading(false);
@@ -110,12 +114,27 @@ async function computeLocationTiers(ctx: {
   }
 }
 
-export function useLocationTiers() {
+type UseLocationTiersOptions = {
+  /** Read the location only once this is true (e.g. once a query is typed). */
+  enabled?: boolean;
+  /**
+   * Ask for the location permission when it is not yet granted. Off, the hook
+   * uses the location only when the person already allowed it elsewhere, so
+   * the surface that mounts it never shows the system prompt.
+   */
+  requestPermission?: boolean;
+};
+
+export function useLocationTiers({
+  enabled = true,
+  requestPermission = true,
+}: UseLocationTiersOptions = {}) {
   const [tiers, setTiers] = useState<TierEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     void computeLocationTiers({
@@ -123,11 +142,12 @@ export function useLocationTiers() {
       setTiers,
       setError,
       setLoading,
+      requestPermission,
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled, requestPermission]);
 
   return { tiers, loading, error };
 }

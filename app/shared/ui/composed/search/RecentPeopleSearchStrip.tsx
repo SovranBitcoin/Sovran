@@ -14,7 +14,7 @@ import {
   useVisualScrollMetricsLogger,
   VISUAL_LOGGING_ENABLED,
 } from '@/shared/lib/contentShiftLog';
-import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
+import { navigateToProfile } from '@/features/search/lib/navigateToProfile';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';

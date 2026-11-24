@@ -1,7 +1,4 @@
 {
-  "app/(drawer)/(tabs)/_layout.tsx": {
-    "inline-style": 2
-  },
   "app/(drawer)/_layout.tsx": {
     "stylesheet-create": 1
   },
@@ -55,18 +52,6 @@
   },
   "features/composer/ui/PostProgressBar.tsx": {
     "stylesheet-create": 1
-  },
-  "features/contacts/components/ScreenContainer.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/contacts/components/SearchPostsList.tsx": {
-    "stylesheet-create": 1,
-    "content-container-style": 1
-  },
-  "features/contacts/screens/ContactsScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "content-container-style": 2
   },
   "features/feed/components/FeedTabButton.tsx": {
     "stylesheet-create": 1
@@ -642,16 +627,6 @@
   "features/whitenoise/screens/WhitenoiseSetupScreen.tsx": {
     "stylesheet-create": 1
   },
-  "navigation/DrawerContent.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3,
-    "stack-layout-props": 2,
-    "content-container-style": 1
-  },
-  "shared/blocks/DrawerProfileChrome.tsx": {
-    "inline-style": 8,
-    "stack-layout-props": 6
-  },
   "shared/blocks/NotFoundScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 2,
@@ -960,9 +935,6 @@
     "stylesheet-create": 1,
     "stack-layout-props": 4,
     "content-container-style": 1
-  },
-  "shared/ui/composed/search/SearchOverlay.tsx": {
-    "stylesheet-create": 1
   },
   "shared/ui/composed/search/SearchResultRows.tsx": {
     "stylesheet-create": 1,

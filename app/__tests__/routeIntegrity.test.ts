@@ -1,6 +1,6 @@
 /**
  * Every place that names a route must name one that exists under `app/app`.
- * A drawer row, native-harness alias or `Stack.Screen` left behind after its
+ * A tab, redirect, native-harness alias or `Stack.Screen` left behind after its
  * route file is deleted navigates to +not-found (or warns at layout mount),
  * and nothing else notices.
  */
@@ -14,7 +14,6 @@ jest.mock('wallet', () => ({
 
 import { MODAL_SCREENS } from '@/config/modalScreens';
 import { PAGE_ROUTES } from '@/e2e/schema/page-routes';
-import { drawerMenuItems } from '@/navigation/drawerMenu';
 
 const APP_DIR = join(__dirname, '..');
 const ROUTES_DIR = join(APP_DIR, 'app');
@@ -35,30 +34,28 @@ function pathExists(path: string): boolean {
   );
 }
 
-/** Every `MenuRoute` in the union, read from its declaration. */
-function menuRouteUnion(): string[] {
-  const source = readFileSync(join(APP_DIR, 'navigation', 'drawerMenu.ts'), 'utf8');
-  const declaration = source.match(/export type MenuRoute =([\s\S]*?);/);
-  if (!declaration) throw new Error('MenuRoute declaration not found');
-  const members = declaration[1].replace(/\/\/.*$/gm, '');
-  return [...members.matchAll(/'([^']+)'/g)].map((match) => match[1]);
-}
-
-/** Wallet is `(tabs)/index`, which expo-router collapses to the root path. */
-const WALLET_ROUTE_FILE = '(drawer)/(tabs)/index/index.tsx';
+const TABS_DIR = join(ROUTES_DIR, '(drawer)', '(tabs)');
 
 describe('route integrity', () => {
-  it('every MenuRoute and drawer row names an existing route', () => {
-    const routes = new Set([
-      ...menuRouteUnion(),
-      ...drawerMenuItems(() => true).map((i) => i.route),
-    ]);
-    expect(menuRouteUnion()).toContain('/(settings-flow)');
-    expect(routes.size).toBeGreaterThan(1);
-    const missing = [...routes].filter((route) =>
-      route === '/' ? !isFile(join(ROUTES_DIR, WALLET_ROUTE_FILE)) : !pathExists(route)
+  it('every tab is a folder with a stack and a root page, Search last', () => {
+    const layout = readFileSync(join(TABS_DIR, '_layout.tsx'), 'utf8');
+    const names = [...layout.matchAll(/^ {4}name: '([^']+)',$/gm)].map((match) => match[1]);
+    expect(names).toEqual(['index', 'settings', 'search']);
+    const missing = names.filter(
+      (name) =>
+        !isFile(join(TABS_DIR, name, '_layout.tsx')) || !isFile(join(TABS_DIR, name, 'index.tsx'))
     );
     expect(missing).toEqual([]);
+    // No folder is left behind as an undeclared tab (the old Contacts tab).
+    const folders = readdirSync(TABS_DIR).filter((entry) => isDir(join(TABS_DIR, entry)));
+    expect(folders.sort()).toEqual([...names].sort());
+  });
+
+  it('every Redirect names an existing route', () => {
+    const redirect = readFileSync(join(ROUTES_DIR, '(settings-flow)', 'index.tsx'), 'utf8');
+    const href = redirect.match(/<Redirect href="([^"]+)"/)?.[1];
+    expect(href).toBe('/(drawer)/(tabs)/settings');
+    expect(pathExists(href!)).toBe(true);
   });
 
   it('every PAGE_ROUTES alias is an existing route file', () => {

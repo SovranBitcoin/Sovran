@@ -11,17 +11,16 @@
 import { hasFeature, type Feature } from '@/shared/config/features';
 
 /** Stable scope identifiers shared across all surfaces. */
-export type SearchScopeId = 'All' | 'People' | 'Posts' | 'Mints' | 'Groups';
+export type SearchScopeId = 'All' | 'People' | 'Mints' | 'Groups';
 
 /** The full scope set, identical on every surface. Empty scopes are hidden. */
-export const ALL_SCOPES: readonly SearchScopeId[] = ['All', 'People', 'Posts', 'Mints', 'Groups'];
+export const ALL_SCOPES: readonly SearchScopeId[] = ['All', 'People', 'Mints', 'Groups'];
 
 /** The module a scope belongs to (ADR 0021); unlisted scopes always ship. */
-const SCOPE_FEATURE: Partial<Record<SearchScopeId, Feature>> = { Posts: 'nostr' };
+const SCOPE_FEATURE: Partial<Record<SearchScopeId, Feature>> = { People: 'nostrSearch' };
 
 export type SearchScopeCounts = {
   people: number;
-  posts: number;
   mints: number;
   groups: number;
 };
@@ -47,8 +46,6 @@ export function computeVisibleScopes(
         return true;
       case 'People':
         return counts.people > 0;
-      case 'Posts':
-        return counts.posts > 0;
       case 'Mints':
         return counts.mints > 0;
       case 'Groups':

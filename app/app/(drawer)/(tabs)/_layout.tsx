@@ -1,41 +1,36 @@
 import { Tabs } from 'expo-router';
 import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
-import { DynamicColorIOS, Platform, View } from 'react-native';
+import { View } from 'react-native';
 import type { SFSymbol } from 'expo-symbols';
 import Icon from 'assets/icons';
 import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
-import { hasFeature, type Feature } from '@/shared/config/features';
-import { orderTabs, visibleTabState } from '@/navigation/tabOrder';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 export const unstable_settings = {
   anchor: 'index',
 };
 
-type TabName = 'index' | 'contacts';
+type TabName = 'index' | 'settings' | 'search';
 
 type TabDef = {
   name: TabName;
   title: string;
-  testID?: string;
+  testID: string;
   /** SF Symbol pair for iOS 26+ liquid-glass NativeTabs. */
   sf: { default: SFSymbol; selected: SFSymbol };
   /** Monicon (Iconify) pair for the cross-platform JS tab bar. */
   monicon: { default: string; selected: string };
-  /** Module this tab belongs to; omitted tabs always ship. */
-  feature?: Feature;
+  /**
+   * iOS 26 system role. `search` makes the system draw the item as the
+   * separated search control that joins the tab's header search bar.
+   */
+  role?: 'search';
 };
 
-const ALL_TAB_DEFS: readonly TabDef[] = [
-  {
-    name: 'contacts',
-    feature: 'contacts',
-    testID: 'tab-contacts',
-    title: 'Contacts',
-    sf: { default: 'person.2', selected: 'person.2.fill' },
-    monicon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
-  },
+/** Every build ships all three tabs (ADR 0035), Search last. */
+const TAB_DEFS: readonly TabDef[] = [
   {
     name: 'index',
     title: 'Wallet',
@@ -43,60 +38,54 @@ const ALL_TAB_DEFS: readonly TabDef[] = [
     sf: { default: 'wallet.bifold', selected: 'wallet.bifold' },
     monicon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
   },
+  {
+    name: 'settings',
+    title: 'Settings',
+    testID: 'tab-settings',
+    sf: { default: 'gearshape', selected: 'gearshape.fill' },
+    monicon: {
+      default: 'material-symbols:settings-rounded',
+      selected: 'material-symbols:settings-rounded',
+    },
+  },
+  {
+    name: 'search',
+    title: 'Search',
+    testID: 'tab-search',
+    role: 'search',
+    sf: { default: 'magnifyingglass', selected: 'magnifyingglass' },
+    monicon: { default: 'mingcute:search-3-line', selected: 'mingcute:search-3-line' },
+  },
 ];
 
-const TAB_DEFS = orderTabs(ALL_TAB_DEFS, hasFeature);
-
-/** Tab folders this build does not ship; declared hidden so no bar renders them. */
-const HIDDEN_TAB_NAMES = ALL_TAB_DEFS.filter((tab) => !TAB_DEFS.includes(tab)).map(
-  (tab) => tab.name
-);
-const SHOWN_TAB_NAMES: ReadonlySet<string> = new Set(TAB_DEFS.map((tab) => tab.name));
-
-const NATIVE_TAB_PROPS = Object.fromEntries(
-  TAB_DEFS.map((tab) => [
-    tab.name,
-    {
-      tabBarItemTestID: tab.testID,
-      tabBarItemAccessibilityLabel: tab.title,
-    },
-  ])
-) as Record<
-  TabName,
-  { tabBarItemTestID: string | undefined; tabBarItemAccessibilityLabel: string }
->;
-
 export default function TabLayout() {
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+
   // iOS 26+ uses native liquid-glass tabs.
   if (isExpo55NativeTabsSupported()) {
     return (
       <TabBarInsetsProvider mode="native">
         <BackgroundProvider>
-          <View style={{ flex: 1 }}>
+          <View className="flex-1">
             <Expo55NativeTabs
-              labelVisibilityMode="unlabeled"
-              labelStyle={{
-                color: Platform.select({
-                  ios: DynamicColorIOS({
-                    dark: '#ECEDEE',
-                    light: '#11181C',
-                  }),
-                }),
-              }}
-              tintColor={Platform.select({
-                ios: DynamicColorIOS({
-                  dark: '#fff',
-                  light: '#0a7ea4',
-                }),
-              })}
+              labelStyle={{ default: { color: muted }, selected: { color: foreground } }}
+              iconColor={{ default: muted, selected: foreground }}
+              tintColor={foreground}
               disableTransparentOnScrollEdge>
               {TAB_DEFS.map((tab) => (
                 <Expo55NativeTabs.Trigger
                   disableAutomaticContentInsets
                   key={tab.name}
                   name={tab.name}
-                  unstable_nativeProps={NATIVE_TAB_PROPS[tab.name]}>
-                  <Expo55NativeTabs.Trigger.Label hidden />
+                  role={tab.role}
+                  unstable_nativeProps={{
+                    tabBarItemTestID: tab.testID,
+                    tabBarItemAccessibilityLabel: tab.title,
+                  }}>
+                  {/* A `role` item takes the system's own title. */}
+                  {tab.role ? null : (
+                    <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
+                  )}
                   <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
                 </Expo55NativeTabs.Trigger>
               ))}
@@ -107,17 +96,15 @@ export default function TabLayout() {
     );
   }
 
-  // Everything else (pre-iOS-26 + Android) uses the X-style custom JS tab bar.
+  // Everything else (pre-iOS-26 + Android) uses the custom JS tab bar.
   return (
     <TabBarInsetsProvider mode="docked">
       <BackgroundProvider>
-        <View style={{ flex: 1 }}>
+        <View className="flex-1">
           <Tabs
-            initialRouteName={TAB_DEFS[0]?.name === 'index' ? 'index' : undefined}
+            initialRouteName="index"
             screenOptions={{ headerShown: false }}
-            tabBar={(props) => (
-              <SovranTabBar {...props} state={visibleTabState(props.state, SHOWN_TAB_NAMES)} />
-            )}>
+            tabBar={(props) => <SovranTabBar {...props} />}>
             {TAB_DEFS.map((tab) => (
               <Tabs.Screen
                 key={tab.name}
@@ -126,19 +113,15 @@ export default function TabLayout() {
                   title: tab.title,
                   tabBarAccessibilityLabel: tab.title,
                   tabBarButtonTestID: tab.testID,
-                  tabBarShowLabel: false,
                   tabBarIcon: ({ focused, color }) => (
                     <Icon
                       name={focused ? tab.monicon.selected : tab.monicon.default}
                       color={color as string}
-                      size={26}
+                      size={24}
                     />
                   ),
                 }}
               />
-            ))}
-            {HIDDEN_TAB_NAMES.map((name) => (
-              <Tabs.Screen key={name} name={name} options={{ href: null }} />
             ))}
           </Tabs>
         </View>

@@ -1,10 +1,8 @@
 /**
  * Horizontal pill-tab row — the sub-tab bar that sits under a screen's
- * top-level `UnderlineTabs` (the contacts tab's All / Recent / Requests /
- * Mints row is the reference). Promoted from
- * `features/contacts/components/search` so other screens (e.g. the receive
- * QR display's Address / BOLT 12 switcher) share the exact same look and
- * press behavior instead of re-rolling segment controls.
+ * top-level `UnderlineTabs`. Shared so screens (e.g. the receive QR display's
+ * Address / BOLT 12 switcher) get the exact same look and press behavior
+ * instead of re-rolling segment controls.
  */
 
 import React, { useMemo, useRef, type RefObject } from 'react';

@@ -12,9 +12,8 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'backup-done': ['(prompt-flow)/backup-done.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
-  'profile-switcher': [], // The `picker` route showing profiles, entered from the drawer; no alias of its own.
-  contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
   wallet: ['(drawer)/(tabs)/index/index.tsx'],
+  search: ['(drawer)/(tabs)/search/index.tsx'],
   'transaction-filters': ['(filter-flow)/filters.tsx'],
   'map-detail': ['(map-flow)/detail.tsx'],
   map: ['(map-flow)/index.tsx'],
@@ -93,7 +92,8 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'settings-design-system-timeline': ['(settings-flow)/design-system-timeline.tsx'],
   'settings-design-system-wallet-controls': ['(settings-flow)/design-system-wallet-controls.tsx'],
   'settings-design-system': ['(settings-flow)/design-system.tsx'],
-  settings: ['(settings-flow)/index.tsx'],
+  // `(settings-flow)/index` redirects here.
+  settings: ['(drawer)/(tabs)/settings/index.tsx', '(settings-flow)/index.tsx'],
   'settings-keyring': ['(settings-flow)/keyring.tsx'],
   'settings-media': ['(settings-flow)/media.tsx'],
   'settings-moderation': ['(settings-flow)/moderation.tsx'],

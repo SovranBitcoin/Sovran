@@ -3,7 +3,7 @@
  *
  * Guards the single-selection invariant of the unified search surface. The old
  * Contacts bug had TWO independent selection states on screen at once — the
- * category 'All' pill and the People/Posts toggle — which could both highlight.
+ * category 'All' pill and the separate People toggle — which could both highlight.
  * The unified design collapses these into one `selectedScope` axis, so exactly
  * one tab can ever read as selected. These tests pin that property.
  */
@@ -16,7 +16,7 @@ import {
 
 // Scope selection is edition-independent; these cases run with every module on.
 const ALL_ON = () => true;
-const ZERO: SearchScopeCounts = { people: 0, posts: 0, mints: 0, groups: 0 };
+const ZERO: SearchScopeCounts = { people: 0, mints: 0, groups: 0 };
 
 describe('unified search scope selection', () => {
   it('shows the full scope row for an empty query', () => {
@@ -25,20 +25,19 @@ describe('unified search scope selection', () => {
 
   it('always includes All, and only non-empty scopes, for a query', () => {
     expect(computeVisibleScopes('lon', ZERO, ALL_ON)).toEqual(['All']);
-    expect(
-      computeVisibleScopes('lon', { people: 2, posts: 2, mints: 0, groups: 0 }, ALL_ON)
-    ).toEqual(['All', 'People', 'Posts']);
-    expect(
-      computeVisibleScopes('lon', { people: 0, posts: 0, mints: 1, groups: 3 }, ALL_ON)
-    ).toEqual(['All', 'Mints', 'Groups']);
+    expect(computeVisibleScopes('lon', { people: 2, mints: 0, groups: 0 }, ALL_ON)).toEqual([
+      'All',
+      'People',
+    ]);
+    expect(computeVisibleScopes('lon', { people: 0, mints: 1, groups: 3 }, ALL_ON)).toEqual([
+      'All',
+      'Mints',
+      'Groups',
+    ]);
   });
 
   it('keeps the selection inside the visible set, falling back to All', () => {
-    const visible = computeVisibleScopes(
-      'lon',
-      { people: 1, posts: 1, mints: 0, groups: 0 },
-      ALL_ON
-    );
+    const visible = computeVisibleScopes('lon', { people: 1, mints: 0, groups: 0 }, ALL_ON);
     expect(resolveSelectedScope(visible, 'People')).toBe('People');
     // Mints tab isn't visible for this query → fall back to All.
     expect(resolveSelectedScope(visible, 'Mints')).toBe('All');
@@ -47,10 +46,10 @@ describe('unified search scope selection', () => {
   it('never highlights more than one tab, for any query / counts / prior selection', () => {
     const countSets: SearchScopeCounts[] = [
       ZERO,
-      { people: 3, posts: 3, mints: 0, groups: 0 },
-      { people: 0, posts: 0, mints: 2, groups: 0 },
-      { people: 1, posts: 1, mints: 1, groups: 1 },
-      { people: 0, posts: 0, mints: 0, groups: 5 },
+      { people: 3, mints: 0, groups: 0 },
+      { people: 0, mints: 2, groups: 0 },
+      { people: 1, mints: 1, groups: 1 },
+      { people: 0, mints: 0, groups: 5 },
     ];
     for (const query of ['', 'lon', 'a']) {
       for (const counts of countSets) {

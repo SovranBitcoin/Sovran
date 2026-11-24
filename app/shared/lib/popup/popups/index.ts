@@ -7,10 +7,9 @@ import type { PopupTextSegment } from '../format';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export { openProfileSwitcher } from './actionSheets';
+export { openProfileImportMenu, type ProfileImportRequest } from './actionSheets';
 export { sendMemoPopup } from './sendMemoSheet';
 export { copyTokenAsEmoji } from './emojiPicker';
-export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export {
   paymentStatusPopup,

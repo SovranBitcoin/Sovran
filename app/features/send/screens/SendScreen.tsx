@@ -50,7 +50,7 @@ import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
-import { useOverlaidContactSearch } from '@/features/contacts/hooks/useOverlaidContactSearch';
+import { useOverlaidContactSearch } from '@/features/search/hooks/useOverlaidContactSearch';
 import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
@@ -147,11 +147,10 @@ export function SendScreen({ unit }: { unit: string }) {
     [freshPeers]
   );
 
-  // ── People search — the SAME canonical assembly wallet/feed use ───────────
+  // ── People search — the SAME canonical assembly the Search tab uses ───────
   // `useOverlaidContactSearch` wraps `useContactSearch` + the kind-0 overlay so
   // Send inherits identical results and per-result metrics, but WITHOUT
-  // `useAllSearchResults`' unconditional `useLocationTiers()` — no location
-  // permission prompt on a payment screen.
+  // `useAllSearchResults`' place matches, which read the location.
   const { contactRows, loading: searchLoading } = useOverlaidContactSearch(
     hasFeature('nostrSearch') ? query : ''
   );

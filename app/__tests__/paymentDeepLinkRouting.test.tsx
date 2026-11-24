@@ -230,4 +230,23 @@ describe('the native-intent rewrite before the router', () => {
     // Remote Login is gone (ADR 0035); the pairing secret must never reach navigation state.
     expect(rewriteSystemPath(url)).toBe('/');
   });
+
+  it.each([
+    'sovran://contacts',
+    'sovran:///contacts',
+    'sovran://contacts?tab=groups',
+    '/contacts',
+    '/contacts/',
+    '/(drawer)/(tabs)/contacts',
+    'https://sovran.money/contacts',
+  ])('opens Search for the removed Contacts tab link %s', (url) => {
+    expect(rewriteSystemPath(url)).toBe('/search');
+  });
+
+  it.each(['sovran://contactsx', '/user/contacts', 'sovran://search'])(
+    'leaves %s, which is not the Contacts tab, alone',
+    (url) => {
+      expect(rewriteSystemPath(url)).toBe(url);
+    }
+  );
 });

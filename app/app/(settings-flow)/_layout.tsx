@@ -11,14 +11,15 @@ import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
-const INDEX_OPTIONS = { title: 'Settings' };
+// Redirects to the Settings tab; no header flashes on the way.
+const INDEX_OPTIONS = { headerShown: false };
 const PROFILE_OPTIONS = { title: 'Profile' };
 const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
 const MODERATION_OPTIONS = { title: 'Moderation' };
-const MEDIA_OPTIONS = { title: 'My media' };
+const MEDIA_OPTIONS = { title: 'Uploaded media' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
 const DESIGN_SYSTEM_FOUNDATIONS_OPTIONS = { title: 'Foundations' };
 const DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS = { title: 'Wallet controls' };

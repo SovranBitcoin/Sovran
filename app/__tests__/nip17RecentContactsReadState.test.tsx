@@ -1,11 +1,7 @@
 /**
- * Contacts tab read states (hunch rule ui/read-states): the recent-contacts hook maps the
- * DM conversation read into rows + a status the screen gates on, and the
- * screen's gates are pinned at source level (the screen itself pulls in far
- * too many native providers to mount in Jest).
+ * Recent-contacts read states (hunch rule ui/read-states): the hook maps the DM
+ * conversation read into rows + a status a screen can gate on.
  */
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { renderHook } from '@testing-library/react-native';
 import { useNip17RecentContacts } from '@/features/payments/hooks/useNip17RecentContacts';
 import type { DmConversation } from '@/features/payments/hooks/useDmConversations';
@@ -34,8 +30,6 @@ jest.mock('@/features/payments/hooks/useDmConversations', () => ({
   useDmConversations: (...args: unknown[]) => mockUseDmConversations(...args),
 }));
 
-const read = (relativePath: string): string =>
-  readFileSync(join(__dirname, '..', relativePath), 'utf8');
 const PEER = 'a'.repeat(64);
 const keys = { pubkey: 'b'.repeat(64), privateKey: new Uint8Array(32) };
 
@@ -84,22 +78,5 @@ describe('useNip17RecentContacts read state', () => {
     expect(result.current.status).toBe('ready');
     expect(result.current.error).toBeNull();
     expect(mockUseDmConversations).toHaveBeenLastCalledWith(undefined, undefined, { live: false });
-  });
-});
-
-describe('ContactsScreen read-state gates (source contract)', () => {
-  const src = read('features/contacts/screens/ContactsScreen.tsx');
-
-  it('shows the spinner only on a cold start with no rows, and the retry only on a rowless error', () => {
-    expect(src).toContain("contactsStatus === 'loading' && dmConversations.length === 0");
-    expect(src).toContain("contactsStatus === 'error' && dmConversations.length === 0");
-    expect(src).toContain('testID="contacts-retry"');
-    expect(src).toContain('onPress={refreshContacts}');
-    // The old settle latch is gone: a refresh must never re-show the spinner.
-    expect(src).not.toContain('contactsLoadedOnce');
-  });
-
-  it('subscribes to live DM envelopes only while the tab is focused', () => {
-    expect(src).toContain('useNip17RecentContacts(nostrKeys, { live: isFocused })');
   });
 });

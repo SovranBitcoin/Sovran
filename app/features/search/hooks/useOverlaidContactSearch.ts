@@ -7,14 +7,13 @@
  * fallback gradient + abbreviated pubkey.
  *
  * This is the SINGLE owner of that overlay. Both `useAllSearchResults` (the
- * wallet/feed "All" search) and the Send modal consume it, so their People
+ * Search tab's "All" search) and the Send modal consume it, so their People
  * results and per-result metrics are identical — one implementation, two
  * consumers, no parallel copy.
  *
- * Unlike `useAllSearchResults`, it has NO location side-effect (that hook also
- * calls `useLocationTiers`, which requests foreground location on mount). So a
- * payment surface like Send can reuse the canonical people search without
- * acquiring a location permission it never uses.
+ * Unlike `useAllSearchResults`, it reads NO location (that hook also matches
+ * places through `useLocationTiers`). So a payment surface like Send can reuse
+ * the canonical people search without touching a location it never uses.
  */
 
 import { useMemo } from 'react';
