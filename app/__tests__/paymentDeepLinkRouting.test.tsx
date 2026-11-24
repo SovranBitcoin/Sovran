@@ -229,6 +229,8 @@ describe('the native-intent rewrite before the router', () => {
     'sovran://connect?uri=nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds3cr3t',
     'sovran://connect?%75ri=nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds3cr3t',
     'sovran://camera?uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
+    'sovran://camera?bad=%ZZ&uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
+    'sovran://camera?uri=bunker%253A%252F%252Fabc%253Fsecret%253Dsample',
   ])('sends the Remote Login link %s to the wallet, without its secret', (url) => {
     // Remote Login is gone (ADR 0035); the pairing secret must never reach navigation state.
     expect(rewriteSystemPath(url)).toBe('/');

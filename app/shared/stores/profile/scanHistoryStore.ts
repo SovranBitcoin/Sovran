@@ -132,18 +132,39 @@ const PersistedScanHistoryStore = z.object({
  * history or transaction annotations (e.g. NIP-46 pairing links with bearer
  * secrets, or raw Nostr private keys).
  */
-const SENSITIVE_SCAN_RE = /(?:^|\s|[?&=#/])(?:nostrconnect|bunker):\/\/|(?:^|\s|nostr:)nsec1[02-9ac-hj-np-z]+/i;
+const SENSITIVE_SCAN_RE =
+  /(?:^|\s|[?&=#/])(?:nostrconnect|bunker):\/\/|(?:^|\s|nostr:)nsec1[02-9ac-hj-np-z]+/i;
+
+/**
+ * Resilient multi-pass percent decoding: valid percent sequences still decode
+ * even if an unrelated malformed `%` escape appears elsewhere in the string.
+ */
+function resilientPercentDecode(value: string): string {
+  let current = value;
+  for (let pass = 0; pass < 3; pass += 1) {
+    if (!current.includes('%')) break;
+    const next = current.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run.replace(/%[0-9a-fA-F]{2}/g, (hex) => {
+          const code = Number.parseInt(hex.slice(1), 16);
+          return code < 0x80 ? String.fromCharCode(code) : hex;
+        });
+      }
+    });
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
 
 export function isSensitiveScanInput(raw: string): boolean {
   if (!raw) return false;
   if (SENSITIVE_SCAN_RE.test(raw)) return true;
   if (raw.includes('%')) {
-    try {
-      const decoded = decodeURIComponent(raw);
-      if (SENSITIVE_SCAN_RE.test(decoded)) return true;
-    } catch {
-      // Malformed percent-encoding: fall back to raw check above.
-    }
+    const decoded = resilientPercentDecode(raw);
+    if (decoded !== raw && SENSITIVE_SCAN_RE.test(decoded)) return true;
   }
   return false;
 }

@@ -35,10 +35,12 @@ export interface UseRouteParamsOptions {
  * `loggableIssues`) and dispatches `onInvalid` from a `useEffect`. Effects
  * are used so React strict-mode double-invokes never fight `router.back()`.
  */
-// Coalesce multiple useRouteParams recovery dispatches in the same commit
-// (e.g. a route wrapper and its mounted screen both validating the same bad
-// params) without interfering with a later recovery after a user back().
-let recoveryDispatchedInTurn = false;
+// Coalesce multiple useRouteParams recovery dispatches for the same mounted
+// route params (e.g. a route wrapper and its mounted screen both validating
+// the same bad params) without swallowing a recovery back() after a user back().
+const RECOVERY_COALESCE_WINDOW_MS = 50;
+let lastRecoveryRaw: unknown = null;
+let lastRecoveryAt = -Infinity;
 
 export function useRouteParams<S extends ZodType>(
   schema: S,
@@ -57,11 +59,12 @@ export function useRouteParams<S extends ZodType>(
     log.warn(`nav.${options.where}.invalid_params`, { issues });
     const policy = options.onInvalid ?? 'back';
     if (policy === 'back') {
-      if (recoveryDispatchedInTurn) return;
-      recoveryDispatchedInTurn = true;
-      queueMicrotask(() => {
-        recoveryDispatchedInTurn = false;
-      });
+      const now = Date.now();
+      if (raw === lastRecoveryRaw && now - lastRecoveryAt < RECOVERY_COALESCE_WINDOW_MS) {
+        return;
+      }
+      lastRecoveryRaw = raw;
+      lastRecoveryAt = now;
       // Unguarded: the 600ms dedupe would swallow a recovery back() dispatched
       // right after the navigation that opened this route.
       const rawRouter = guardedRouter.raw;
@@ -70,7 +73,7 @@ export function useRouteParams<S extends ZodType>(
     } else {
       policy(issues);
     }
-  }, [parsed, options.where, options.onInvalid]);
+  }, [parsed, raw, options.where, options.onInvalid]);
 
   return parsed.success ? parsed.data : null;
 }

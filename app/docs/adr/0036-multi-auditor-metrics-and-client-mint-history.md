@@ -22,5 +22,7 @@ source. Beneath it, pills show the mint's NUT capabilities and its `input_fee_pp
 Mint history moves to a profile-scoped `mint-history-store` on the phone. For each mint it
 keeps one canonical NUT-06 info document as a baseline and up to 20 revisions, each an
 invertible RFC 6902 diff, so any earlier version can be rebuilt. At most 64 mints are kept,
-least recently viewed dropped first. A passive background sweep records a revision when a
-mint's info changes; it adds no requests beyond the info fetches the app already makes.
+least recently viewed dropped first (wallet mints evicted last). Observations record on
+every direct `/v1/info` fetch and Coco refresh, plus a bounded passive background sweep on
+login/foreground (at most once per 24h per trusted mint, concurrency 3, exponential backoff
+on failure).
