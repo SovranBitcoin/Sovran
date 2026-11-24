@@ -14,8 +14,11 @@
  * wrote): `MAX_MINTS` mints, least recently viewed dropped first but the
  * wallet's own mints only after every other one; `MAX_REVISIONS` revisions; a
  * snapshot over `MAX_SNAPSHOT_BYTES` is not kept; a patch over
- * `MAX_PATCH_BYTES` is kept as an empty patch marked `oversized`; and the
- * whole row is held under `MAX_TOTAL_BYTES`, well inside Android's 2 MB row.
+ * `MAX_PATCH_BYTES`, or with a pointer the reader would refuse, is kept as an
+ * empty patch marked `oversized`; and the whole saved row is held under
+ * `MAX_ROW_BYTES`, well inside Android's 2 MB cursor window. Sizes are UTF-8
+ * bytes of the JSON text, which is what SQLite stores: a string's `.length`
+ * counts UTF-16 units and undercounts CJK and emoji up to threefold.
  *
  * Per profile: which mints a person looks at is theirs. Writers that run in
  * the background go through `mintHistorySync`, which waits for this store's
@@ -40,7 +43,14 @@ export const MAX_MINTS = 64;
 export const MAX_REVISIONS = 20;
 const MAX_SNAPSHOT_BYTES = 32_000;
 const MAX_PATCH_BYTES = 8_000;
-const MAX_TOTAL_BYTES = 1_000_000;
+/** The whole saved row, envelope included, in UTF-8 bytes. */
+const MAX_ROW_BYTES = 512 * 1024;
+/** The longest JSON pointer a saved patch op may carry; the reader holds the same bound. */
+const MAX_POINTER_LENGTH = 1024;
+/** The longest mint URL saved; the reader holds the same bound on the URL and its key. */
+const MAX_MINT_URL_LENGTH = 2048;
+/** The persist version this store writes (persistConfig's default). */
+const STORE_VERSION = 1;
 /** A check that finds the same document is saved at most this often. */
 export const SEEN_WRITE_THROTTLE_MS = 60 * 60 * 1000;
 /** A mint is checked again this long after a successful check. */
@@ -107,7 +117,7 @@ const Timestamp = z.number().int().nonnegative();
 
 const PersistedPatchOp = z.looseObject({
   op: z.string().max(16),
-  path: z.string().max(1024),
+  path: z.string().max(MAX_POINTER_LENGTH),
   value: z.unknown().optional(),
 });
 
@@ -121,7 +131,7 @@ const PersistedRevision = z.object({
 });
 
 const PersistedEntry = z.object({
-  mintUrl: z.string().max(2048),
+  mintUrl: z.string().max(MAX_MINT_URL_LENGTH),
   baseline: z.record(z.string(), z.unknown()).optional().catch(undefined),
   hash: z.string().max(128).optional().catch(undefined),
   firstSeenAt: Timestamp.optional().catch(undefined),
@@ -135,20 +145,55 @@ const PersistedEntry = z.object({
 });
 
 const PersistedMintHistoryStore = z.object({
-  byMintUrl: tolerantRecord(z.string().max(2048), PersistedEntry),
+  byMintUrl: tolerantRecord(z.string().max(MAX_MINT_URL_LENGTH), PersistedEntry),
 });
 
+/** UTF-8 bytes of `text`, without encoding it. A lone surrogate counts 3. */
+function utf8Bytes(text: string): number {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x80) bytes += 1;
+    else if (unit < 0x800) bytes += 2;
+    else if (
+      unit >= 0xd800 &&
+      unit <= 0xdbff &&
+      i + 1 < text.length &&
+      (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00
+    ) {
+      bytes += 4;
+      i += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/** UTF-8 bytes of `value` as JSON text; unserializable counts as too large. */
 const byteLength = (value: unknown): number => {
   try {
-    return JSON.stringify(value).length;
+    return utf8Bytes(JSON.stringify(value) ?? '');
   } catch {
     return Number.POSITIVE_INFINITY;
   }
 };
 
-/** A revision id: short, and different for every (from, to, when). */
+/** The saved row's size: what persist writes is `{ state, version }`. */
+const rowBytes = (byMintUrl: Record<string, MintHistoryEntry>) =>
+  byteLength({ state: { byMintUrl }, version: STORE_VERSION });
+
+/** A patch the reader would load as written: every op within its bounds. */
+const readable = (patch: readonly MintHistoryPatchOp[]) =>
+  patch.every((op) => op.op.length <= 16 && op.path.length <= MAX_POINTER_LENGTH);
+
+let revisionSequence = 0;
+
+/**
+ * A revision id: short, and different for every revision this process
+ * records, even two of the same (from, to) in one millisecond.
+ */
 function revisionId(fromHash: string | undefined, toHash: string, at: number): string {
-  return `${at.toString(36)}-${(fromHash ?? 'none').slice(0, 8)}-${toHash.slice(0, 12)}`;
+  revisionSequence = (revisionSequence + 1) % 36 ** 4;
+  return `${at.toString(36)}-${revisionSequence.toString(36)}-${(fromHash ?? 'none').slice(0, 8)}-${toHash.slice(0, 12)}`;
 }
 
 /** 5 minutes doubling to 24 hours, ±20%, so a fleet of phones does not retry in step. */
@@ -164,10 +209,17 @@ export function failureBackoffMs(consecutiveFailures: number, random: () => numb
 const recency = (entry: MintHistoryEntry) =>
   Math.max(entry.lastViewedAt ?? 0, entry.lastSeenAt ?? 0, entry.lastCheckedAt ?? 0);
 
-/** Drop untrusted mints, least recent first, then trusted ones, until within bounds. */
+/**
+ * Drop untrusted mints, least recent first, then trusted ones, then the kept
+ * mint's oldest revisions, until within bounds.
+ */
 function evict(byMintUrl: Record<string, MintHistoryEntry>, keep: string): void {
-  const over = () =>
-    Object.keys(byMintUrl).length > MAX_MINTS || byteLength(byMintUrl) > MAX_TOTAL_BYTES;
+  // Each entry's share of the row is `"key":{…}` plus a comma the last one
+  // does not have. Counted without the comma, the running size never falls
+  // below the row's real size, so it is measured once and then subtracted.
+  const share = (key: string) => byteLength(key) + byteLength(byMintUrl[key]) + 1;
+  let bytes = rowBytes(byMintUrl);
+  const over = () => Object.keys(byMintUrl).length > MAX_MINTS || bytes > MAX_ROW_BYTES;
   if (!over()) return;
   const order = Object.entries(byMintUrl)
     .filter(([key]) => key !== keep)
@@ -176,10 +228,24 @@ function evict(byMintUrl: Record<string, MintHistoryEntry>, keep: string): void 
   let dropped = 0;
   for (const key of order) {
     if (!over()) break;
+    bytes -= share(key);
     delete byMintUrl[key];
     dropped += 1;
   }
-  if (dropped > 0) storeLog.debug('store.mint_history.evicted', { dropped });
+  const kept = byMintUrl[keep];
+  let trimmed = 0;
+  if (kept && bytes > MAX_ROW_BYTES) {
+    const revisions = [...kept.revisions];
+    while (revisions.length > 0 && bytes > MAX_ROW_BYTES) {
+      revisions.pop();
+      trimmed += 1;
+      byMintUrl[keep] = { ...kept, revisions: [...revisions] };
+      bytes = rowBytes(byMintUrl);
+    }
+  }
+  if (dropped > 0 || trimmed > 0) {
+    storeLog.debug('store.mint_history.evicted', { dropped, trimmed });
+  }
 }
 
 function blank(mintUrl: string): MintHistoryEntry {
@@ -196,7 +262,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
 
       recordObservation: (mintUrl, info, nowMs = Date.now()) => {
         const key = normalizeMintUrlKey(mintUrl);
-        if (!key) return 'rejected';
+        if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return 'rejected';
         if (byteLength(info) > MAX_SNAPSHOT_BYTES) {
           storeLog.warn('store.mint_history.snapshot_too_large', { bytes: byteLength(info) });
           return 'rejected';
@@ -246,7 +312,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
           if (current.baseline && current.hash !== hash) {
             outcome = 'changed';
             const patch = diffMintInfo(current.baseline, info);
-            const oversized = byteLength(patch) > MAX_PATCH_BYTES;
+            const oversized = byteLength(patch) > MAX_PATCH_BYTES || !readable(patch);
             const revision: MintHistoryRevision = {
               id: revisionId(current.hash, hash, nowMs),
               at: nowMs,
@@ -269,7 +335,7 @@ export const useMintHistoryStore = create<MintHistoryState>({
 
       recordFailure: (mintUrl, nowMs = Date.now(), random = Math.random) => {
         const key = normalizeMintUrlKey(mintUrl);
-        if (!key) return;
+        if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return;
         set((state) => {
           const current = state.byMintUrl[key] ?? blank(mintUrl);
           const failures = current.consecutiveFailures + 1;

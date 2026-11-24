@@ -3,6 +3,8 @@ import {
   selectMintInfoStats,
   type MintInfoStats,
 } from '@/features/mint/lib/mintInfoStats';
+import { auditGroupFromDiscover } from '@/features/mint/lib/auditInfo';
+import { mergeAuditorEntries } from '@/shared/lib/cashu/auditors/discoverMints';
 import type { AuditObservation } from '@/shared/lib/cashu/auditors/observation';
 import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 
@@ -104,6 +106,17 @@ describe('Mint Info four-stat precedence', () => {
       source: 'saved',
     });
     expect(stats.uptime).toBeUndefined();
+  });
+
+  it('never shows a success rate blended from two auditors', () => {
+    const [row] = mergeAuditorEntries([
+      { source: 'nip87', mintUrl: 'https://blend.example', nMelts: 10, nErrors: 90 },
+      { source: 'mintradar', mintUrl: 'https://blend.example', nMints: 200 },
+    ]);
+    const stats = selectMintInfoStats(entry(undefined, auditGroupFromDiscover(row!)));
+    expect(stats.operations).not.toEqual(
+      expect.objectContaining({ okCount: 210, totalCount: 300 })
+    );
   });
 
   it('reads the saved directory 8333 reading before the legacy saved audit', () => {

@@ -215,6 +215,10 @@ describe('payment links opened with the app', () => {
   });
 });
 
+const PAIRING = 'bunker://abc?secret=sample';
+const encodedTimes = (value: string, times: number) =>
+  Array.from({ length: times }).reduce<string>((v) => encodeURIComponent(v), value);
+
 describe('the native-intent rewrite before the router', () => {
   it.each([`cashu:${TOKEN}`, `sovran://${TOKEN}`, 'lightning:lnbc10n1pexample', 'sovran://camera'])(
     'passes %s through unchanged',
@@ -231,6 +235,9 @@ describe('the native-intent rewrite before the router', () => {
     'sovran://camera?uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
     'sovran://camera?bad=%ZZ&uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
     'sovran://camera?uri=bunker%253A%252F%252Fabc%253Fsecret%253Dsample',
+    `sovran://camera?uri=${encodedTimes(PAIRING, 4)}`,
+    `sovran://camera?bad=%ZZ&uri=${encodedTimes(PAIRING, 6)}`,
+    `sovran://camera?uri=${encodedTimes(PAIRING, 40)}`,
   ])('sends the Remote Login link %s to the wallet, without its secret', (url) => {
     // Remote Login is gone (ADR 0035); the pairing secret must never reach navigation state.
     expect(rewriteSystemPath(url)).toBe('/');

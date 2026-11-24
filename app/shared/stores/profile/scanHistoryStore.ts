@@ -16,6 +16,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { percentDecodeFully } from '@/shared/lib/percentDecode';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -135,35 +136,13 @@ const PersistedScanHistoryStore = z.object({
 const SENSITIVE_SCAN_RE =
   /(?:^|\s|[?&=#/])(?:nostrconnect|bunker):\/\/|(?:^|\s|nostr:)nsec1[02-9ac-hj-np-z]+/i;
 
-/**
- * Resilient multi-pass percent decoding: valid percent sequences still decode
- * even if an unrelated malformed `%` escape appears elsewhere in the string.
- */
-function resilientPercentDecode(value: string): string {
-  let current = value;
-  for (let pass = 0; pass < 3; pass += 1) {
-    if (!current.includes('%')) break;
-    const next = current.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
-      try {
-        return decodeURIComponent(run);
-      } catch {
-        return run.replace(/%[0-9a-fA-F]{2}/g, (hex) => {
-          const code = Number.parseInt(hex.slice(1), 16);
-          return code < 0x80 ? String.fromCharCode(code) : hex;
-        });
-      }
-    });
-    if (next === current) break;
-    current = next;
-  }
-  return current;
-}
-
 export function isSensitiveScanInput(raw: string): boolean {
   if (!raw) return false;
   if (SENSITIVE_SCAN_RE.test(raw)) return true;
   if (raw.includes('%')) {
-    const decoded = resilientPercentDecode(raw);
+    const { decoded, settled } = percentDecodeFully(raw);
+    // Encoded deeper than the decoder follows: kept out of history unread.
+    if (!settled) return true;
     if (decoded !== raw && SENSITIVE_SCAN_RE.test(decoded)) return true;
   }
   return false;

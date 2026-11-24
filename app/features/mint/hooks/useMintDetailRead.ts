@@ -35,6 +35,7 @@ import {
 } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { dataResetGeneration } from '@/shared/lib/account/dataResetFence';
 
 export type MintDetailGroupStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -176,11 +177,14 @@ export function useMintDetailRead(
 
   // This page's own per-mint auditor reads, at most once per mint every few
   // minutes. Gated on the settings load: which auditors may be asked is the
-  // person's choice, and the in-code default would ask them all.
+  // person's choice, and the in-code default would ask them all. Their
+  // answers are written only once the saved mint rows have loaded (a write
+  // before that is saved over them) and only if Delete All has not run since.
   useEffect(() => {
     if (!mintUrl) return;
     const controller = new AbortController();
     const forced = attempt > 0;
+    const generation = dataResetGeneration();
     const run = (loaded: boolean) => {
       if (!loaded || controller.signal.aborted) return;
       if (!forced && !mintAuditDetailDue(mintUrl, Date.now())) {
@@ -196,7 +200,10 @@ export function useMintDetailRead(
         signal: controller.signal,
       }).then(({ updates, answered }) => {
         if (controller.signal.aborted) return;
-        useMintMetadataStore.getState().recordAuditObservations(mintUrl, updates);
+        onceLoaded(useMintMetadataStore, (metadataLoaded) => {
+          if (!metadataLoaded || dataResetGeneration() !== generation) return;
+          useMintMetadataStore.getState().recordAuditObservations(mintUrl, updates);
+        });
         setDetail({ fetching: false, failed: !answered, settled: true });
       });
     };

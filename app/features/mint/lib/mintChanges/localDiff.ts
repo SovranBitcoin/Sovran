@@ -16,6 +16,11 @@
  * by a `test` carrying the old value, pointers are escaped, and array members
  * are addressed by index (never `-`), so `invertPatch` can walk any revision
  * back without the document it was taken from.
+ *
+ * Bounded: lists are matched member by member only while the matching table
+ * stays within `MAX_LCS_CELLS`; a longer pair is replaced whole. `test` ops
+ * compare values regardless of key order, since replaying a patch re-adds
+ * keys at the end of an object.
  */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
@@ -150,7 +155,30 @@ const escapeToken = (token: string) => token.replace(/~/g, '~0').replace(/\//g, 
 const unescapeToken = (token: string) => token.replace(/~1/g, '/').replace(/~0/g, '~');
 const child = (path: string, token: string | number) => `${path}/${escapeToken(String(token))}`;
 
-const same = (a: Json | undefined, b: Json | undefined) => text(a) === text(b);
+/** Deep equality of JSON values, blind to object key order. */
+function same(a: Json | undefined, b: Json | undefined): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a)) {
+    return Array.isArray(b) && a.length === b.length && a.every((item, i) => same(item, b[i]));
+  }
+  if (isRecord(a)) {
+    if (!isRecord(b)) return false;
+    const ao = a as { [k: string]: Json };
+    const bo = b as { [k: string]: Json };
+    const keys = Object.keys(ao);
+    return (
+      keys.length === Object.keys(bo).length &&
+      keys.every((key) => Object.hasOwn(bo, key) && same(ao[key], bo[key]))
+    );
+  }
+  return false;
+}
+
+/**
+ * The largest list-matching table built: a mint's NUT-06 lists hold a few
+ * dozen entries, and two 15,000-entry lists would need 225M cells.
+ */
+const MAX_LCS_CELLS = 10_000;
 
 /** What makes two members of a list the same member, changed or not. */
 function identity(item: Json): string {
@@ -226,6 +254,10 @@ function diffObject(
 function diffArray(path: string, a: Json[], b: Json[], out: PatchOp[]): void {
   if (a.length === b.length && a.every((item, i) => identity(item) === identity(b[i]!))) {
     a.forEach((item, i) => diffValue(child(path, i), item, b[i]!, out));
+    return;
+  }
+  if (a.length * b.length > MAX_LCS_CELLS) {
+    out.push({ op: 'test', path, value: a }, { op: 'replace', path, value: b });
     return;
   }
   const pairs = matchLists(a, b);

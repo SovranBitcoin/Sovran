@@ -88,6 +88,16 @@ describe('recording', () => {
     expect(new Set(ids).size).toBe(2);
   });
 
+  it('gives A → B → A → B in the same millisecond a different id each time', () => {
+    store().recordObservation(MINT, doc(), 0);
+    store().recordObservation(MINT, doc({ version: 'v2' }), HOUR);
+    store().recordObservation(MINT, doc(), HOUR);
+    store().recordObservation(MINT, doc({ version: 'v2' }), HOUR);
+    const ids = entry().revisions.map((r) => r.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+  });
+
   it('keeps at most MAX_REVISIONS, newest first', () => {
     for (let i = 0; i <= MAX_REVISIONS + 5; i++) {
       store().recordObservation(MINT, doc({ version: `v${i}` }), i * HOUR);
@@ -149,6 +159,49 @@ describe('bounds', () => {
     const keys = Object.keys(store().byMintUrl);
     expect(keys).toContain(normalizeMintUrlKey(url(0)));
     expect(keys).not.toContain(normalizeMintUrlKey(url(1)));
+  });
+});
+
+describe('saved size', () => {
+  const utf8 = (text: string) => Buffer.byteLength(text, 'utf8');
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('holds the saved row under 512 KB of UTF-8, counting multi-byte text', async () => {
+    // 12,000 UTF-16 units but 28,000 UTF-8 bytes per mint: within the
+    // snapshot bound, and 40 of them are over 1 MB on disk.
+    const description = '中😀'.repeat(4_000);
+    const url = (i: number) => `https://cjk${i}.example`;
+    for (let i = 0; i < 40; i++) {
+      expect(store().recordObservation(url(i), doc({ description }), i * 1_000)).toBe('baseline');
+    }
+    await flush();
+    const blob = mockDisk.get('mint-history-store')!;
+    expect(utf8(blob)).toBeLessThanOrEqual(512 * 1024);
+    // The newest mint stays; the least recent ones went.
+    expect(store().byMintUrl[normalizeMintUrlKey(url(39))]).toBeDefined();
+    expect(store().byMintUrl[normalizeMintUrlKey(url(0))]).toBeUndefined();
+  });
+
+  it('drops a snapshot whose UTF-8 is over the bound even when its length is not', () => {
+    // 15,000 UTF-16 units, 35,000 UTF-8 bytes.
+    expect(store().recordObservation(MINT, doc({ description: '中😀'.repeat(5_000) }), 0)).toBe(
+      'rejected'
+    );
+  });
+
+  it('keeps no pointer the reader would refuse: a revision reloads as it was saved', async () => {
+    store().recordObservation(MINT, doc(), 0);
+    store().recordObservation(MINT, doc({ ['k'.repeat(1_100)]: 1 }), HOUR);
+    const [revision] = entry().revisions;
+    expect(revision).toMatchObject({ oversized: true, patch: [] });
+    const saved = JSON.parse(JSON.stringify(store().byMintUrl));
+    await flush();
+    const blob = mockDisk.get('mint-history-store')!;
+    useMintHistoryStore.setState({ byMintUrl: {} });
+    await flush();
+    mockDisk.set('mint-history-store', blob);
+    await useMintHistoryStore.persist.rehydrate();
+    expect(store().byMintUrl).toEqual(saved);
   });
 });
 

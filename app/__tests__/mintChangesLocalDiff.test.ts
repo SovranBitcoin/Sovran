@@ -248,3 +248,42 @@ describe('invertible RFC 6902 diff', () => {
     ).toThrow(/test failed/);
   });
 });
+
+describe('bounded list matching and order-blind tests', () => {
+  it('replaces a list too long to match member by member in one step', () => {
+    const before = Array.from({ length: 101 }, (_, i) => `m${i}`);
+    const after = ['new', ...before];
+    const a = canon(info({ extra: before }));
+    const b = canon(info({ extra: after }));
+    const patch = diffMintInfo(a, b);
+    expect(patch).toEqual([
+      { op: 'test', path: '/extra', value: before },
+      { op: 'replace', path: '/extra', value: after },
+    ]);
+    expect(applyMintInfoPatch(a, patch)).toEqual(b);
+    expect(applyMintInfoPatch(b, invertPatch(patch))).toEqual(a);
+  });
+
+  it('diffs two 15,000-member lists in milliseconds, not a 225M-cell table', () => {
+    const before = new Array<number>(15_000).fill(1);
+    const after = [0, ...new Array<number>(14_999).fill(1)];
+    const a = canon(info({ extra: before }));
+    const b = canon(info({ extra: after }));
+    const started = Date.now();
+    const patch = diffMintInfo(a, b);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(applyMintInfoPatch(a, patch)).toEqual(b);
+    expect(applyMintInfoPatch(b, invertPatch(patch))).toEqual(a);
+  });
+
+  it('walks back over an object whose keys came back in a different order', () => {
+    const v0 = canon(info({ extra: 0 }));
+    const v1 = canon(info({ extra: { a: 1, z: 1 } }));
+    const v2 = canon(info({ extra: { z: 1 } }));
+    const p1 = diffMintInfo(v0, v1);
+    const p2 = diffMintInfo(v1, v2);
+    // Re-adding `a` puts it after `z`: the same object, in another key order.
+    const back1 = applyMintInfoPatch(v2, invertPatch(p2));
+    expect(applyMintInfoPatch(back1, invertPatch(p1))).toEqual(v0);
+  });
+});

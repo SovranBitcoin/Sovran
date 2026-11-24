@@ -420,6 +420,22 @@ describe('deleteAllProfiles — a wipe that does not finish', () => {
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
   });
 
+  it('fences every in-flight writer before it clears storage', async () => {
+    mockSecureReset(async () => async () => true);
+    const { deleteAllProfiles, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    const { dataResetGeneration } =
+      require('@/shared/lib/account/dataResetFence') as typeof import('@/shared/lib/account/dataResetFence');
+    const before = dataResetGeneration();
+    let atClear: number | undefined;
+    jest.spyOn(AsyncStorage, 'clear').mockImplementation(async () => {
+      atClear = dataResetGeneration();
+    });
+
+    expect(await deleteAllProfiles()).toBe(true);
+    expect(atClear).toBe(before + 1);
+  });
+
   it('holds the app when the wipe finishes but the restart does not happen', async () => {
     mockSecureReset(async () => async () => true);
     const { deleteAllProfiles, switchToExistingProfile, mockRestart } = setup();

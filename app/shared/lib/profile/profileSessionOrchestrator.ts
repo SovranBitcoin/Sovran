@@ -45,6 +45,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -625,8 +626,10 @@ export async function deleteAllProfiles(): Promise<boolean> {
     }
 
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything.
-    // Query caches first, so an in-flight read that completes after this
-    // point is rejected by its generation guard instead of re-writing a key.
+    // Query caches and the data reset fence first, so an in-flight read that
+    // completes after this point (a query, a mint-history check, an auditor
+    // reading) is rejected by its generation guard instead of re-writing a key.
+    fenceDataReset();
     clearAllQueryCaches();
     await AsyncStorage.clear();
 

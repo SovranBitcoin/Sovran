@@ -13,6 +13,11 @@
  *   success or after a 5 min .. 24 h jittered backoff on failure, and again
  *   when the app comes to the foreground or the network comes back. It never
  *   blocks startup and stops on a profile switch.
+ *
+ * Fenced: every write checks both the profile it started for and the session
+ * generation, which moves on every sweep stop (a profile switch, a provider
+ * remount) and on Delete All. An answer for A that lands after A → B → A, or
+ * after Delete All has cleared storage, writes nothing.
  */
 import type { Manager } from '@cashu/coco-core';
 import { AppState } from 'react-native';
@@ -20,6 +25,7 @@ import * as Network from 'expo-network';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
+import { onDataReset } from '@/shared/lib/account/dataResetFence';
 import { storeLog } from '@/shared/lib/logger';
 import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -40,34 +46,55 @@ const SWEEP_MAX_SLEEP_MS = 24 * 60 * 60 * 1000;
 
 type ObservationResult = MintObservationOutcome | 'skipped';
 
+type MintCheckResult = { ok: true } | { ok: false; error: Error };
+
+const inflight = new Map<string, Promise<MintCheckResult>>();
+
+/** Moves on every stop and every Delete All; a write from an older one is dropped. */
+let syncGeneration = 0;
+
+/** Starts a new session: writes begun before it are dropped, running checks are forgotten. */
+function resetMintHistorySync(): void {
+  syncGeneration += 1;
+  inflight.clear();
+}
+onDataReset(resetMintHistorySync);
+
+/** The current session generation, for a caller that starts a request before it observes. */
+export function mintHistoryGeneration(): number {
+  return syncGeneration;
+}
+
+/** Whether a write begun for `owner` in `generation` may still land. */
+const current = (owner: string, generation: number) =>
+  generation === syncGeneration && activePubkey() === owner;
+
 /**
- * Record what a mint said in answer to `/v1/info`. `owner` is the profile the
- * request was made for (the active one when it started); the answer is dropped
- * if another profile is active by the time it can be written.
+ * Record what a mint said in answer to `/v1/info`. `owner` and `generation`
+ * are the profile and session the request was made in (the current ones when
+ * it started); the answer is dropped if either has changed by the time it can
+ * be written.
  */
 export async function observeMintInfoResponse(
   mintUrl: string,
   rawInfo: unknown,
-  options: { owner?: string; nowMs?: number } = {}
+  options: { owner?: string; generation?: number; nowMs?: number } = {}
 ): Promise<ObservationResult> {
   const owner = options.owner ?? activePubkey();
   if (!owner) return 'skipped';
+  const generation = options.generation ?? syncGeneration;
   const info = canonicalizeMintInfo(rawInfo);
   if (!info) return 'skipped';
   const loaded = await whenLoaded(useMintHistoryStore);
-  if (!loaded || activePubkey() !== owner) return 'skipped';
+  if (!loaded || !current(owner, generation)) return 'skipped';
   return useMintHistoryStore.getState().recordObservation(mintUrl, info, options.nowMs);
 }
 
-async function recordFailure(mintUrl: string, owner: string): Promise<void> {
+async function recordFailure(mintUrl: string, owner: string, generation: number): Promise<void> {
   const loaded = await whenLoaded(useMintHistoryStore);
-  if (!loaded || activePubkey() !== owner) return;
+  if (!loaded || !current(owner, generation)) return;
   useMintHistoryStore.getState().recordFailure(mintUrl);
 }
-
-type MintCheckResult = { ok: true } | { ok: false; error: Error };
-
-const inflight = new Map<string, Promise<MintCheckResult>>();
 
 /**
  * Ask a mint for its info now. A check already running for the same mint and
@@ -85,10 +112,11 @@ export function checkMintInfoNow(
   const running = inflight.get(slot);
   if (running) return running;
   const fetcher = options.fetch ?? fetchMintInfo;
+  const generation = syncGeneration;
   const promise = (async (): Promise<MintCheckResult> => {
     const result = await fetcher(mintUrl, { signal: options.signal });
     if (result.isOk()) return { ok: true };
-    if (!options.signal?.aborted) await recordFailure(mintUrl, owner);
+    if (!options.signal?.aborted) await recordFailure(mintUrl, owner, generation);
     return { ok: false, error: result.error };
   })().finally(() => {
     if (inflight.get(slot) === promise) inflight.delete(slot);
@@ -97,12 +125,15 @@ export function checkMintInfoNow(
   return promise;
 }
 
-/** Mints the sweep should ask now: never checked, or past their next check. */
+/**
+ * Mints the sweep should ask now: never checked, or past their next check. A
+ * mint that has never answered waits out its failure backoff like any other.
+ */
 export function dueMintUrls(mintUrls: readonly string[], nowMs: number): string[] {
   const held = useMintHistoryStore.getState().byMintUrl;
   return mintUrls.filter((url) => {
-    const entry = held[normalizeMintUrlKey(url)];
-    return !entry?.baseline || (entry.nextRetryAt ?? 0) <= nowMs;
+    const nextRetryAt = held[normalizeMintUrlKey(url)]?.nextRetryAt;
+    return nextRetryAt === undefined || nextRetryAt <= nowMs;
   });
 }
 
@@ -220,6 +251,7 @@ export function startMintHistorySweep(options: SweepOptions): () => void {
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    resetMintHistorySync();
     controller.abort();
     if (timer) clearTimeout(timer);
     stopResume();

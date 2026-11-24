@@ -279,6 +279,35 @@ describe('multi-auditor merging and fault tolerance', () => {
     expect(merged[1].hasAudit).toBe(true);
   });
 
+  it("never pairs one auditor's counts with another's", () => {
+    // One directory knows 10 melts and 90 errors, another 200 mints. Blended,
+    // they read as 70% success, which neither auditor reported.
+    const merged = mergeAuditorEntries([
+      { source: 'nip87', mintUrl: 'https://blend.example', nMelts: 10, nErrors: 90 },
+      { source: 'mintradar', mintUrl: 'https://blend.example', nMints: 200 },
+    ]);
+    const counts = (row: (typeof merged)[number]) => [row.nMints, row.nMelts, row.nErrors];
+    expect(counts(merged[0]!)).not.toEqual([200, 10, 90]);
+    expect([
+      [undefined, 10, 90],
+      [200, undefined, undefined],
+    ]).toContainEqual(counts(merged[0]!));
+  });
+
+  it("takes one auditor's complete counts whole, with that auditor named", () => {
+    const merged = mergeAuditorEntries([
+      { source: 'mintradar', mintUrl: 'https://whole.example', nMints: 200 },
+      {
+        source: 'cashu-audit',
+        mintUrl: 'https://whole.example',
+        nMints: 50,
+        nMelts: 40,
+        nErrors: 10,
+      },
+    ]);
+    expect(merged[0]).toMatchObject({ nMints: 50, nMelts: 40, nErrors: 10, auditSource: '8333' });
+  });
+
   it('succeeds when one auditor throws and others respond', async () => {
     const res = await discoverMintsFromAuditors({
       adapters: {

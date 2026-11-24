@@ -16,6 +16,8 @@
  * unchanged.
  */
 
+import { percentDecodeFully } from '@/shared/lib/percentDecode';
+
 const PAIRING_SCHEME_RE = /^(?:nostrconnect|bunker):\/\//i;
 /** Any decoded query/fragment carrying a NIP-46 pairing URI payload. */
 const EMBEDDED_PAIRING_URI_RE = /(?:^|[?&=#/])(?:nostrconnect|bunker):\/\//i;
@@ -29,35 +31,13 @@ const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
 const CONTACTS_ROUTE_RE =
   /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?(?:\((?:drawer|tabs)\)\/)*contacts(?:[/?#].*)?$/i;
 
-/**
- * Resiliently percent-decode valid UTF-8 / ASCII percent-escape runs even when
- * an unrelated malformed `%` sequence appears elsewhere in the URL, repeating
- * up to 3 passes to catch double- or triple-encoded pairing payloads.
- */
-function resilientPercentDecode(value: string): string {
-  let current = value;
-  for (let pass = 0; pass < 3; pass += 1) {
-    if (!current.includes('%')) break;
-    const next = current.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
-      try {
-        return decodeURIComponent(run);
-      } catch {
-        return run.replace(/%[0-9a-fA-F]{2}/g, (hex) => {
-          const code = Number.parseInt(hex.slice(1), 16);
-          return code < 0x80 ? String.fromCharCode(code) : hex;
-        });
-      }
-    });
-    if (next === current) break;
-    current = next;
-  }
-  return current;
-}
-
 function carriesPairingSecret(path: string): boolean {
   if (PAIRING_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return true;
   if (EMBEDDED_PAIRING_URI_RE.test(path)) return true;
-  const decoded = resilientPercentDecode(path);
+  const { decoded, settled } = percentDecodeFully(path);
+  // Encoded deeper than the decoder follows: nothing here needs that, so it
+  // is treated as hiding a pairing link.
+  if (!settled) return true;
   if (decoded !== path) {
     if (
       PAIRING_SCHEME_RE.test(decoded) ||

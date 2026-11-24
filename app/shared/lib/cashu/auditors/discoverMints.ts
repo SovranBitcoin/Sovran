@@ -47,6 +47,33 @@ function rankScore(mint: DiscoverMint): number {
   return (smoothed / 5) * swapFactor * healthPenalty;
 }
 
+/**
+ * One auditor's operation counts with the name the saved row gives it. The
+ * counts and the name travel together: a row never holds one auditor's mints
+ * beside another's melts or errors.
+ */
+type AuditCounts = Pick<DiscoverMint, 'nMints' | 'nMelts' | 'nErrors' | 'auditSource'>;
+
+const count = (value: number | undefined) =>
+  value !== undefined ? Math.max(0, Math.round(value)) : undefined;
+
+function auditCounts(entry: AuditorMintEntry): AuditCounts {
+  return {
+    nMints: count(entry.nMints),
+    nMelts: count(entry.nMelts),
+    nErrors: count(entry.nErrors),
+    auditSource:
+      entry.source === 'cashu-audit' ? '8333' : entry.source === 'ucash' ? 'ucash' : undefined,
+  };
+}
+
+/** Complete sets first (a rate needs all three), then the one with more operations. */
+function countsRank(counts: AuditCounts): [number, number] {
+  const { nMints, nMelts, nErrors } = counts;
+  const complete = nMints !== undefined && nMelts !== undefined && nErrors !== undefined;
+  return [complete ? 1 : 0, (nMints ?? 0) + (nMelts ?? 0) + (nErrors ?? 0)];
+}
+
 function isAuditSource(source: MintAuditorId): boolean {
   return (
     source === 'mintradar' ||
@@ -87,9 +114,7 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
         state: entry.state,
         status: entry.status,
         testnut: entry.testnut,
-        nMints: entry.nMints !== undefined ? Math.max(0, Math.round(entry.nMints)) : undefined,
-        nMelts: entry.nMelts !== undefined ? Math.max(0, Math.round(entry.nMelts)) : undefined,
-        nErrors: entry.nErrors !== undefined ? Math.max(0, Math.round(entry.nErrors)) : undefined,
+        ...auditCounts(entry),
         reviewCount,
         averageScore,
         ...(entry.observation
@@ -131,16 +156,12 @@ export function mergeAuditorEntries(entries: readonly AuditorMintEntry[]): Disco
       if (!existing.state && entry.state) existing.state = entry.state;
     }
 
-    // Prefer the richer swap count record.
-    const existingSwaps = (existing.nMints ?? 0) + (existing.nMelts ?? 0) + (existing.nErrors ?? 0);
-    const entrySwaps = (entry.nMints ?? 0) + (entry.nMelts ?? 0) + (entry.nErrors ?? 0);
-    if (entrySwaps > existingSwaps) {
-      existing.nMints =
-        entry.nMints !== undefined ? Math.max(0, Math.round(entry.nMints)) : existing.nMints;
-      existing.nMelts =
-        entry.nMelts !== undefined ? Math.max(0, Math.round(entry.nMelts)) : existing.nMelts;
-      existing.nErrors =
-        entry.nErrors !== undefined ? Math.max(0, Math.round(entry.nErrors)) : existing.nErrors;
+    // Prefer the richer count record, taken whole from one auditor.
+    const counts = auditCounts(entry);
+    const [entryComplete, entryOps] = countsRank(counts);
+    const [heldComplete, heldOps] = countsRank(existing);
+    if (entryComplete > heldComplete || (entryComplete === heldComplete && entryOps > heldOps)) {
+      Object.assign(existing, counts);
     }
 
     // Prefer the review directory with more reviews.

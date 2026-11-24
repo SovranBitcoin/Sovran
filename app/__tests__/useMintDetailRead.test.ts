@@ -223,3 +223,60 @@ it('records the per-mint auditor reads and shows the stats they carry', async ()
     expect.objectContaining({ disabledAuditors: [], enabledAuditors: [] })
   );
 });
+
+it('waits for the saved mint rows to load before recording auditor readings', async () => {
+  const reading = {
+    source: 'ucash' as const,
+    observedAt: 1,
+    uptime: { pct: 100, window: '24h' as const, checks: 25 },
+  };
+  jest.mocked(readMintAuditDetail).mockResolvedValue({ updates: [reading], answered: true });
+  let finish!: () => void;
+  const loaded = jest.spyOn(useMintMetadataStore.persist, 'hasHydrated').mockReturnValue(false);
+  const listen = jest
+    .spyOn(useMintMetadataStore.persist, 'onFinishHydration')
+    .mockImplementation((listener) => {
+      finish = () => listener(useMintMetadataStore.getState());
+      return () => {};
+    });
+  const record = jest.spyOn(store(), 'recordAuditObservations');
+  try {
+    renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+    await waitFor(() => expect(readMintAuditDetail).toHaveBeenCalled());
+    await act(async () => {});
+    // Written now, the empty in-memory store would be saved over the rows on disk.
+    expect(record).not.toHaveBeenCalled();
+    loaded.mockReturnValue(true);
+    act(() => finish());
+    await waitFor(() => expect(record).toHaveBeenCalledWith(MINT, [reading]));
+  } finally {
+    loaded.mockRestore();
+    listen.mockRestore();
+    record.mockRestore();
+  }
+});
+
+it('drops auditor readings that land after Delete All', async () => {
+  const { fenceDataReset } = jest.requireActual<
+    typeof import('@/shared/lib/account/dataResetFence')
+  >('@/shared/lib/account/dataResetFence');
+  let answer!: (value: Awaited<ReturnType<typeof readMintAuditDetail>>) => void;
+  jest.mocked(readMintAuditDetail).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+  );
+  const record = jest.spyOn(store(), 'recordAuditObservations');
+  try {
+    renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+    await waitFor(() => expect(readMintAuditDetail).toHaveBeenCalled());
+    fenceDataReset();
+    await act(async () =>
+      answer({ updates: [{ source: 'ucash', observedAt: 1 }], answered: true })
+    );
+    expect(record).not.toHaveBeenCalled();
+  } finally {
+    record.mockRestore();
+  }
+});

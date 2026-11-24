@@ -45,6 +45,9 @@ const SWAP_GROUP_A0 = {
 };
 
 const MINIBITS = 'https://mint.minibits.cash/Bitcoin';
+// shared/lib/url.ts `normalizeMintUrlKey`: the key the 0.1.4 stores read and
+// write a mint's row under. The earlier fixtures' full-URL row stays beside it.
+const MINIBITS_KEY = 'mint.minibits.cash/Bitcoin';
 const METADATA = disk['mint-metadata-store'] as {
   state: { byMintUrl: Record<string, object> };
   version: number;
@@ -70,7 +73,7 @@ const OBSERVATIONS = {
 };
 
 // shared/stores/profile/mintHistoryStore.ts: a mint seen twice, one revision.
-const MINT_HISTORY_KEY = 'https://mint.minibits.cash/Bitcoin';
+const MINT_HISTORY_KEY = MINIBITS_KEY;
 const MINT_HISTORY = {
   mintUrl: MINIBITS,
   baseline: { name: 'Minibits mint', pubkey: '03c2', version: 'cdk-mintd/0.18.3' },
@@ -208,7 +211,7 @@ export const fixture: ReleaseFixture = {
     'mint-metadata-store': withState('mint-metadata-store', {
       byMintUrl: {
         ...METADATA.state.byMintUrl,
-        [MINIBITS]: { ...METADATA.state.byMintUrl[MINIBITS], auditObservations: OBSERVATIONS },
+        [MINIBITS_KEY]: { ...METADATA.state.byMintUrl[MINIBITS], auditObservations: OBSERVATIONS },
       },
     }),
     // shared/stores/global/pricelistStore.ts: serverUpdatedAt
@@ -310,7 +313,7 @@ export const fixture: ReleaseFixture = {
       {
         what: "each auditor's reading of a mint",
         store: 'mint-metadata-store',
-        path: ['byMintUrl', MINIBITS, 'auditObservations'],
+        path: ['byMintUrl', MINIBITS_KEY, 'auditObservations'],
         equals: OBSERVATIONS,
       },
       {

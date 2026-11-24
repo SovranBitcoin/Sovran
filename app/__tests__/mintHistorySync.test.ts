@@ -27,11 +27,13 @@ import { err, ok } from 'neverthrow';
 import {
   checkMintInfoNow,
   dueMintUrls,
+  mintHistoryGeneration,
   observeMintInfoResponse,
   startMintHistorySweep,
   SWEEP_CONCURRENCY,
 } from '@/features/mint/lib/mintHistorySync';
 import { profileSwitchServices } from '@/shared/lib/account/accountRegistry';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useMintHistoryStore } from '@/shared/stores/profile/mintHistoryStore';
 
@@ -199,10 +201,95 @@ describe('background sweep', () => {
     stop();
   });
 
+  it('waits out the backoff of a mint that failed its first check', () => {
+    const now = 1_000_000;
+    useMintHistoryStore.getState().recordFailure(MINT, now, () => 0.5);
+    expect(held()?.baseline).toBeUndefined();
+    expect(dueMintUrls([MINT], now + 60_000)).toEqual([]);
+    expect(dueMintUrls([MINT], now + 5 * 60_000)).toEqual([MINT]);
+  });
+
   it('treats a mint with no baseline, or past its retry time, as due', async () => {
     await observeMintInfoResponse(MINT, raw());
     const now = Date.now();
     expect(dueMintUrls([MINT, 'https://new.example'], now)).toEqual(['https://new.example']);
     expect(dueMintUrls([MINT], now + 25 * 3_600_000)).toEqual([MINT]);
+  });
+});
+
+describe('session fence', () => {
+  /** Holds the store "loading" until the returned function is called. */
+  function holdLoad() {
+    let finish!: () => void;
+    const loaded = jest.spyOn(useMintHistoryStore.persist, 'hasHydrated').mockReturnValue(false);
+    const listen = jest
+      .spyOn(useMintHistoryStore.persist, 'onFinishHydration')
+      .mockImplementation((listener) => {
+        finish = () => listener(useMintHistoryStore.getState());
+        return () => {};
+      });
+    return () => {
+      loaded.mockReturnValue(true);
+      finish();
+      loaded.mockRestore();
+      listen.mockRestore();
+    };
+  }
+  const sweep = () =>
+    startMintHistorySweep({
+      trustedMintUrls: async () => [],
+      check: jest.fn(),
+      subscribeResume: () => () => {},
+      startDelayMs: 60_000,
+    });
+
+  it('drops an answer for A that lands after A → B → A', async () => {
+    const release = holdLoad();
+    const pending = observeMintInfoResponse(MINT, raw());
+    await Promise.resolve();
+    sweep()(); // switch away from A
+    mockActive = B;
+    sweep()(); // and back
+    mockActive = A;
+    release();
+    expect(await pending).toBe('skipped');
+    expect(held()).toBeUndefined();
+  });
+
+  it('forgets a running check on stop, and its failure writes nothing', async () => {
+    const answers: ((value: unknown) => void)[] = [];
+    const fetch = jest.fn(() => new Promise((r) => answers.push(r)));
+    const first = checkMintInfoNow(MINT, { fetch: fetch as never });
+    sweep()();
+    const second = checkMintInfoNow(MINT, { fetch: fetch as never });
+    expect(second).not.toBe(first);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    answers[0]!(err(new Error('offline')));
+    await first;
+    expect(held()).toBeUndefined();
+    answers[1]!(ok({}));
+    await second;
+  });
+
+  it('drops an answer whose request began in an earlier session, as fetchMintInfo passes it', async () => {
+    const began = mintHistoryGeneration();
+    sweep()();
+    expect(mintHistoryGeneration()).toBe(began + 1);
+    fenceDataReset();
+    expect(mintHistoryGeneration()).toBe(began + 2);
+    expect(await observeMintInfoResponse(MINT, raw(), { owner: A, generation: began })).toBe(
+      'skipped'
+    );
+    expect(held()).toBeUndefined();
+  });
+
+  it('drops an answer that lands after Delete All', async () => {
+    const release = holdLoad();
+    const pending = observeMintInfoResponse(MINT, raw());
+    await Promise.resolve();
+    fenceDataReset();
+    release();
+    expect(await pending).toBe('skipped');
+    expect(held()).toBeUndefined();
   });
 });

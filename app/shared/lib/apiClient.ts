@@ -740,12 +740,15 @@ export const fetchMintInfo = async (
 ): Promise<Result<GetInfoResponse, Error>> => {
   const base = httpsMintBase(mintUrl);
   if (base.isErr()) return err(base.error);
-  // The profile the request is made for: an answer that lands after a switch
-  // is not recorded under the next profile's history.
+  // The profile and session the request is made in: an answer that lands
+  // after a switch (even A → B → A) or Delete All is not recorded.
   const { activePubkey } = require('@/shared/stores/global/profileStore') as {
     activePubkey: typeof import('@/shared/stores/global/profileStore').activePubkey;
   };
   const owner = activePubkey();
+  const { mintHistoryGeneration, observeMintInfoResponse } =
+    require('@/features/mint/lib/mintHistorySync') as typeof import('@/features/mint/lib/mintHistorySync');
+  const generation = mintHistoryGeneration();
   const result = await fetchJson(
     `${base.value}v1/info`,
     parseMintInfo,
@@ -755,14 +758,13 @@ export const fetchMintInfo = async (
   );
   if (result.isOk() && owner) {
     // Every validated `/v1/info` answer is a mint-history observation.
-    const { observeMintInfoResponse } = require('@/features/mint/lib/mintHistorySync') as {
-      observeMintInfoResponse: typeof import('@/features/mint/lib/mintHistorySync').observeMintInfoResponse;
-    };
-    void observeMintInfoResponse(mintUrl, result.value, { owner }).catch((error: unknown) => {
-      apiLog.warn('api.mint_history_observe_failed', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-    });
+    void observeMintInfoResponse(mintUrl, result.value, { owner, generation }).catch(
+      (error: unknown) => {
+        apiLog.warn('api.mint_history_observe_failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    );
   }
   return result;
 };
