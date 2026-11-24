@@ -2,21 +2,12 @@ import type { Feature } from '@/shared/config/features';
 
 type FeatureTab = { name: string; feature?: Feature };
 
-/**
- * The tabs a build ships, in bar order (ADR 0021). With the feed present the
- * declared order stands, so Feed leads. Without it the wallet leads: the
- * first tab is where the app lands on launch.
- */
+/** The tabs a build ships, in their declared bar order (ADR 0021). */
 export function orderTabs<T extends FeatureTab>(
   tabs: readonly T[],
   enabled: (feature: Feature) => boolean
 ): T[] {
-  const shipped = tabs.filter((tab) => !tab.feature || enabled(tab.feature));
-  if (enabled('feed')) return shipped;
-  return [
-    ...shipped.filter((tab) => tab.name === 'index'),
-    ...shipped.filter((tab) => tab.name !== 'index'),
-  ];
+  return tabs.filter((tab) => !tab.feature || enabled(tab.feature));
 }
 
 type TabState = { index: number; routes: readonly { name: string }[] };

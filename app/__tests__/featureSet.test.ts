@@ -32,16 +32,15 @@ describe('feature set', () => {
     expect(FEATURES.every((feature) => set[feature])).toBe(true);
   });
 
-  it('trims payments to exactly AI and DM pages', () => {
+  it('ships every module in payments', () => {
     const set = resolveFeatureSet('payments');
-    expect(FEATURES.filter((feature) => !set[feature])).toEqual(['directMessages', 'ai']);
+    expect(FEATURES.filter((feature) => !set[feature])).toEqual([]);
   });
 
-  it('redeems message ecash at account scope, independent of the DM pages', () => {
-    // Hiding conversations is only safe because ecash sent as a message is
-    // redeemed by a provider that mounts with `ecashMessages`, not with
-    // `directMessages`. If that mount is ever gated on the DM pages, an edition
-    // without them would accept money nobody can claim.
+  it('redeems message ecash at account scope, with no DM pages', () => {
+    // No build ships conversation pages, so ecash sent as a message is only
+    // claimed because a provider mounts with `ecashMessages`. If that mount is
+    // ever gated on anything else, money could arrive that nobody claims.
     const layout = readFileSync(
       join(__dirname, '..', 'shared', 'providers', 'AccountProviders.tsx'),
       'utf8'
@@ -50,22 +49,11 @@ describe('feature set', () => {
     expect(resolveFeatureSet('payments').ecashMessages).toBe(true);
   });
 
-  it('keeps ecash-over-DM delivery when DM pages are off', () => {
-    const set = resolveFeatureSet('full', { directMessages: false });
-    expect(set.directMessages).toBe(false);
-    expect(set.ecashMessages).toBe(true);
-  });
-
-  it('drops DM pages with nostr', () => {
-    expect(resolveFeatureSet('full', { nostr: false }).directMessages).toBe(false);
-    expect(resolveFeatureSet('private').directMessages).toBe(false);
-  });
-
   it('drops dependants of a disabled module', () => {
     const set = resolveFeatureSet('full', { nostr: false });
     expect(set.nostrSearch).toBe(false);
     expect(set.ecashMessages).toBe(false);
-    expect(set.feed).toBe(false);
+    expect(set.contacts).toBe(false);
     expect(set.ecash).toBe(true);
   });
 
@@ -134,25 +122,19 @@ describe('feature route guard', () => {
 });
 
 describe('tab order', () => {
-  const tabs = [
-    { name: 'feed', feature: 'feed' },
-    { name: 'contacts', feature: 'contacts' },
-    { name: 'index' },
-    { name: 'notifications', feature: 'feed' },
-    { name: 'ai', feature: 'ai' },
-  ] as const;
+  const tabs = [{ name: 'contacts', feature: 'contacts' }, { name: 'index' }] as const;
   const names = (edition: Parameters<typeof resolveFeatureSet>[0]) => {
     const set = resolveFeatureSet(edition);
     return orderTabs(tabs, (f) => set[f]).map((tab) => tab.name);
   };
 
-  it('keeps the declared order with the feed', () => {
-    expect(names('full')).toEqual(['feed', 'contacts', 'index', 'notifications', 'ai']);
-    expect(names('payments')).toEqual(['feed', 'contacts', 'index', 'notifications']);
+  it('keeps the declared order of the shipped tabs', () => {
+    expect(names('full')).toEqual(['contacts', 'index']);
+    expect(names('payments')).toEqual(['contacts', 'index']);
   });
 
-  it('leads with the wallet when the feed is absent', () => {
-    expect(names('private')).toEqual(['index', 'ai']);
+  it('drops a tab whose module is off', () => {
+    expect(names('private')).toEqual(['index']);
     expect(names('lightningOnly')).toEqual(['index']);
   });
 
@@ -172,12 +154,12 @@ describe('tab order', () => {
 describe('search scopes', () => {
   const counts = { people: 1, posts: 1, mints: 1, groups: 1 };
 
-  it('offers Posts only with the feed', () => {
+  it('offers Posts only with nostr', () => {
     const full = resolveFeatureSet('full');
-    const noFeed = resolveFeatureSet('full', { feed: false });
+    const noNostr = resolveFeatureSet('full', { nostr: false });
     expect(computeVisibleScopes('', counts, (f) => full[f])).toContain('Posts');
-    expect(computeVisibleScopes('', counts, (f) => noFeed[f])).not.toContain('Posts');
-    expect(computeVisibleScopes('lon', counts, (f) => noFeed[f])).toEqual([
+    expect(computeVisibleScopes('', counts, (f) => noNostr[f])).not.toContain('Posts');
+    expect(computeVisibleScopes('lon', counts, (f) => noNostr[f])).toEqual([
       'All',
       'People',
       'Mints',

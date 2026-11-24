@@ -1,13 +1,11 @@
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
-import { shouldCensorDm } from '@/shared/lib/nostr/moderationHelpers';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
 import { Button } from '@/shared/ui/primitives/Button';
-import { Text as UiText } from '@/shared/ui/primitives/Text';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
@@ -18,7 +16,6 @@ import { useMintContacts, type MintContact } from '@/features/payments/hooks/use
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import {
   countRowRender,
@@ -40,7 +37,6 @@ import { TierRow } from '@/shared/ui/composed/search/SearchResultRows';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
-import { hasFeature } from '@/shared/config/features';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
@@ -164,8 +160,6 @@ export const ContactsScreen = () => {
   const mintsWithProfile = displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey));
 
   const blockedPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
-  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
-  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
   const rawListData: ContactsListItem[] = buildContactsListData(
     activeFilter,
     displayContacts,
@@ -221,7 +215,6 @@ export const ContactsScreen = () => {
       profilesMap,
       currentListData,
       blockedPeople,
-      filterWords,
       locationTiers,
     },
     paymentLog
@@ -265,29 +258,8 @@ export const ContactsScreen = () => {
     countRowRender('ContactsScreen', contactsListItemKey(item, index), ROW_LOG_OPTIONS);
 
     const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-    // Message previews make the row a conversation; without DM pages the row
-    // is a person and shows their profile line instead.
-    const showsDmPreview = hasFeature('directMessages');
-    const previewLoading =
-      showsDmPreview && item.type === 'contact' && item.previewLoading === true;
-    const rawMessage =
-      showsDmPreview && typeof item.dmEvent?.content === 'string'
-        ? item.dmEvent.content
-        : undefined;
-    const lastMessage =
-      rawMessage &&
-      item.dmEvent?.isOwn !== true &&
-      shouldCensorDm(rawMessage, filterEnabled, filterWords)
-        ? '[censored]'
-        : rawMessage;
-    // Relative date of the last message so it's obvious how long ago it was.
-    const lastMessageAt =
-      item.type === 'contact' &&
-      typeof item.timestamp === 'number' &&
-      item.timestamp > 0 &&
-      (lastMessage || previewLoading)
-        ? formatRelativeUnixSeconds(item.timestamp)
-        : undefined;
+    // No build ships DM conversation pages, so a row is a person and shows
+    // their profile line, never a last-message preview.
     const protocolLabel =
       item.type === 'contact' && item.protocol === 'nip04' ? 'NIP-04' : undefined;
     // Don't drive the avatar's loading skeleton off "profile is missing":
@@ -319,27 +291,14 @@ export const ContactsScreen = () => {
       identity.push(nostrIdentity(item.pubkey, profile, { isLoadingProfile }));
     }
 
-    // Replies mode: a last-message preview takes the subtitle slot and
-    // suppresses metadata — the pill row would read as noise next to a
-    // human sentence.
     return (
       <ContactRow
         identity={identity}
-        subtitle={
-          previewLoading ? (
-            <UiText loading placeholder="Decrypting the last message" size={13} />
-          ) : (
-            lastMessage
-          )
-        }
-        hideMetadata={!!lastMessage || previewLoading}
         titleTrailing={
-          protocolLabel || lastMessageAt || sourceBadge ? (
+          protocolLabel || sourceBadge ? (
             <View style={styles.titleTrailingRow}>
-              {protocolLabel || lastMessageAt ? (
-                <Text style={{ fontSize: 12, color: muted }}>
-                  {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
-                </Text>
+              {protocolLabel ? (
+                <Text style={{ fontSize: 12, color: muted }}>{protocolLabel}</Text>
               ) : null}
               {sourceBadge}
             </View>

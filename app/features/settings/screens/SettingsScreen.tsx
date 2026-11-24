@@ -365,10 +365,6 @@ export const SettingsScreen = () => {
                     title="Moderation"
                     description="Blocked people and private-message word filter"
                   />
-                </>
-              )}
-              {hasFeature('feed') && (
-                <>
                   <Separator className="mx-4" />
                   <SettingsListLinkItem
                     href="/(settings-flow)/media"

@@ -31,6 +31,8 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
     back: () => mockBack(),
+    // Invalid params recover through the unguarded router.
+    raw: { back: () => mockBack(), canGoBack: () => true },
   },
 }));
 jest.mock('@/features/transactions', () => ({

@@ -13,36 +13,14 @@ const rows = (edition: Edition) => {
 
 describe('drawer menu', () => {
   it('lists every row in the full edition', () => {
-    expect(rows('full')).toEqual([
-      'feed',
-      'wallet',
-      'contacts',
-      'notifications',
-      'ai',
-      'remote-login',
-      'settings',
-    ]);
+    expect(rows('full')).toEqual(['wallet', 'contacts', 'remote-login', 'settings']);
   });
 
-  it('drops only the AI row in payments', () => {
-    expect(rows('payments')).toEqual([
-      'feed',
-      'wallet',
-      'contacts',
-      'notifications',
-      'remote-login',
-      'settings',
-    ]);
+  it('lists the same rows in payments', () => {
+    expect(rows('payments')).toEqual(['wallet', 'contacts', 'remote-login', 'settings']);
   });
 
   it('keeps only rows with a destination when nostr is off', () => {
     expect(rows('lightningOnly')).toEqual(['wallet', 'settings']);
-  });
-
-  it('never lists a row whose tab the build does not ship', () => {
-    const set = resolveFeatureSet('payments');
-    for (const item of drawerMenuItems((feature) => set[feature])) {
-      expect(item.route).not.toMatch(/\/ai$/);
-    }
   });
 });

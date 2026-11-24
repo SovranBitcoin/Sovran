@@ -156,6 +156,3 @@ export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPa
 
   return out;
 }
-
-/** Kinds the own-events sync subscribes to. */
-export const OWN_EVENT_KINDS = [Metadata, ShortTextNote, Contacts, EventDeletion, Repost, Reaction];

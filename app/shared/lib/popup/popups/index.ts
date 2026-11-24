@@ -35,7 +35,7 @@ type PopupSpec = {
   icon?: PopupIcon;
   type?: 'success' | 'error' | 'warning' | 'info';
   variant?: 'toast' | 'sheet';
-  buttons?: { text: string; page?: string; onPress?: () => void }[];
+  buttons?: { text: string; onPress?: () => void }[];
   buttonLayout?: 'row' | 'stack';
 };
 

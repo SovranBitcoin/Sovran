@@ -601,8 +601,7 @@ describe('createSovranHandlers profile routing', () => {
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
-  it('delivers to the contact but ends on the wallet when the build has no DM pages', async () => {
-    mockHasFeature.mockImplementation((feature) => feature !== 'directMessages');
+  it('delivers to the contact and ends on the wallet, with no DM page to open', async () => {
     const recipientPubkey = 'cd'.repeat(32);
     const bearerToken = 'cashuA-contact-token-no-dm-pages';
     useContactSendStore
@@ -631,8 +630,8 @@ describe('createSovranHandlers profile routing', () => {
     // The rail is unchanged: the token still travels over the DM transport.
     expect(deliverContactEcashDm).toHaveBeenCalledWith({ recipientPubkey, token: bearerToken });
     expect(useContactSendStore.getState().active).toBeNull();
-    // Only the ending differs: the flow closes onto the wallet and nothing is
-    // pushed on top. `dismissAll` would stop at the send chooser.
+    // The flow closes onto the wallet and nothing is pushed on top.
+    // `dismissAll` would stop at the send chooser.
     expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(mockDismissAll).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();

@@ -279,7 +279,9 @@ describe('a payment machine tap over the adapter', () => {
     return { machine };
   }
 
-  it('does not cancel a newer read when an older tap fails to write', async () => {
+  it('an older tap refuses to write into a newer read, and leaves its session open', async () => {
+    // F238 (aadc6c739): once a newer tap owns the reader, the older tap's
+    // bearer token must never reach the newer terminal's tag.
     mockTag.current = terminalWith(REQUEST);
     let created!: () => void;
     const { machine } = tapMachine(async () => {
@@ -297,11 +299,10 @@ describe('a payment machine tap over the adapter', () => {
     await waitFor(() => native.requestTechnology.mock.calls.length === 2);
     const cancelsBeforeWrite = native.cancelTechnologyRequest.mock.calls.length;
 
-    mockTag.current.failUpdateAt = 0;
     created();
     await tapA;
 
-    expect(mockTag.current.log.some((line) => line.startsWith('UPDATE'))).toBe(true);
+    expect(mockTag.current.log.some((line) => line.startsWith('UPDATE'))).toBe(false);
     expect(native.cancelTechnologyRequest.mock.calls.length).toBe(cancelsBeforeWrite);
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import type { ZodType, infer as zInfer } from 'zod';
 import { loggableIssues } from '@sovranbitcoin/schemas';
 import { log } from '@/shared/lib/logger';
@@ -12,7 +12,8 @@ export interface UseRouteParamsOptions {
   where: string;
   /**
    * Behaviour when the params fail validation. Defaults to `'back'`, which
-   * dispatches `router.back()` from a stable effect. Pass a callback to
+   * goes back from a stable effect, or replaces with the wallet (`/`) when
+   * there is nothing to go back to (a cold-start deep link). Pass a callback to
    * handle the failure manually (e.g. show a toast and navigate elsewhere);
    * the callback is fired exactly once per invalid render.
    */
@@ -51,7 +52,11 @@ export function useRouteParams<S extends ZodType>(
     log.warn(`nav.${options.where}.invalid_params`, { issues });
     const policy = options.onInvalid ?? 'back';
     if (policy === 'back') {
-      router.back();
+      // Unguarded: the 600ms dedupe would swallow a recovery back() dispatched
+      // right after the navigation that opened this route.
+      const rawRouter = guardedRouter.raw;
+      if (rawRouter.canGoBack()) rawRouter.back();
+      else rawRouter.replace('/');
     } else {
       policy(issues);
     }

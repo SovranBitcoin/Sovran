@@ -145,19 +145,13 @@ afterEach(() => {
 });
 
 describe('useOwnEventsSync', () => {
-  it('asks for the newest profile and follow list with no window, and a year of the rest, live', () => {
+  it('asks only for the newest profile and follow list, with no window, live', () => {
     jest.spyOn(Date, 'now').mockReturnValue(T * 1000);
     const { unmount } = mount();
 
     expect(mockSubscribeFilters.at(-1)).toEqual([
       { authors: [A], kinds: [0], limit: 1 },
       { authors: [A], kinds: [3], limit: 1 },
-      {
-        authors: [A],
-        kinds: [1, 5, 6, 7],
-        since: T - 365 * 24 * 60 * 60,
-        limit: 5000,
-      },
     ]);
     unmount();
   });
@@ -355,20 +349,28 @@ describe('useOwnEventsSync', () => {
     const aFilters = mockSubscribeFilters.at(-1);
     // The active account has moved to B; the keys still hold A's.
     useProfileStore.setState({ activeAccountIndex: 1 });
-    deliver(rerender, [likeEvent(id(80), 'target-6'), profileEvent(id(81), T, 'Alice')]);
-    expect(liked('target-6')).toBeUndefined();
+    const follows = {
+      id: id(80),
+      kind: 3,
+      pubkey: A,
+      content: '',
+      tags: [['p', B]],
+      created_at: T,
+    };
+    deliver(rerender, [follows, profileEvent(id(81), T, 'Alice')]);
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([]);
 
     // The keys follow to B: A's subscription is replaced before A's events were written.
     activate(B, 1);
     act(() => rerender());
-    expect(liked('target-6')).toBeUndefined();
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([]);
 
     // Back to A: its new subscription asks the same filters, so the relay
     // delivers the same events again and they are written then.
     activate(A, 0);
     act(() => rerender());
     expect(mockSubscribeFilters.at(-1)).toEqual(aFilters);
-    expect(liked('target-6')).toBe(id(80));
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([['p', B]]);
     expect(latestProfileId()).toBe(id(81));
     unmount();
   });

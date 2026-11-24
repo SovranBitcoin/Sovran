@@ -24,7 +24,7 @@ const mockRouter = {
   dismissAll: jest.fn(),
   dismissTo: jest.fn(),
   canGoBack: jest.fn(() => true),
-  raw: { back: jest.fn() },
+  raw: { back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
 };
 const mockManagerHolder: { current: unknown } = { current: null };
 const mockCalls: string[] = [];

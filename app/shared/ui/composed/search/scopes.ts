@@ -17,7 +17,7 @@ export type SearchScopeId = 'All' | 'People' | 'Posts' | 'Mints' | 'Groups';
 export const ALL_SCOPES: readonly SearchScopeId[] = ['All', 'People', 'Posts', 'Mints', 'Groups'];
 
 /** The module a scope belongs to (ADR 0021); unlisted scopes always ship. */
-const SCOPE_FEATURE: Partial<Record<SearchScopeId, Feature>> = { Posts: 'feed' };
+const SCOPE_FEATURE: Partial<Record<SearchScopeId, Feature>> = { Posts: 'nostr' };
 
 export type SearchScopeCounts = {
   people: number;

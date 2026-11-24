@@ -13,7 +13,6 @@ import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button as HerouiButton, useToast } from 'heroui-native';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import {
@@ -429,7 +428,7 @@ function SheetContent({
 // run `button.onPress` twice and `close()` twice (or run the navigation twice
 // before close lands), which double-stacks the destination on the back stack.
 type SheetActionButtonProps = {
-  button: { text: string; page?: string; onPress?: () => void | Promise<void>; testID?: string };
+  button: { text: string; onPress?: () => void | Promise<void>; testID?: string };
   variant: 'primary' | 'tertiary';
   feedbackVariant: 'scale' | undefined;
   /** In a row layout each button takes an equal share of the width. */
@@ -448,17 +447,13 @@ function SheetActionButton({
   const className = row ? `${baseClassName ?? ''} flex-1`.trim() : baseClassName;
   const labelClassName = getSheetButtonLabelClassName(variant);
   const handlePress = useSingleFlight(async () => {
-    if (button.onPress) {
-      await button.onPress();
-    } else if (button.page) {
-      router.navigate(`/${button.page}` as never);
-    }
+    if (button.onPress) await button.onPress();
     close();
   });
 
   return (
     <HerouiButton
-      testID={button.testID ?? (button.page ? `popup-sheet-action-${button.page}` : undefined)}
+      testID={button.testID}
       variant={variant}
       className={className}
       feedbackVariant={feedbackVariant}

@@ -200,17 +200,9 @@ describe('wallet surface e2e selectors', () => {
     expect(read('navigation/DrawerContent.tsx')).toContain('testID={`drawer-menu-${id}`}');
     // The rows themselves are data, filtered by the build's feature set.
     const drawer = read('navigation/drawerMenu.ts');
-    // Row ids are the e2e selector suffixes (drawer-menu-feed, …); renaming
+    // Row ids are the e2e selector suffixes (drawer-menu-wallet, …); renaming
     // one breaks every scenario that opens that route from the drawer.
-    for (const id of [
-      'feed',
-      'wallet',
-      'contacts',
-      'notifications',
-      'ai',
-      'remote-login',
-      'settings',
-    ]) {
+    for (const id of ['wallet', 'contacts', 'remote-login', 'settings']) {
       expect(drawer).toContain(`id: '${id}',`);
     }
   });

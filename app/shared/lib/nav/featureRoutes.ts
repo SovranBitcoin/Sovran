@@ -28,7 +28,6 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   geohashChat: 'nutDrop',
   profile: 'nostr',
   claimUsername: 'nostr',
-  aiRequest: 'ai',
 };
 
 /** Whole route groups that belong to one module. */

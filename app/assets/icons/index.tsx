@@ -126,11 +126,8 @@ export const icons: string[] = [
   'ic:round-star',
   'humbleicons:url',
   'mdi:menu',
-  'mingcute:home-4-fill',
-  'mingcute:home-4-line',
   'mdi:bell',
   'mdi:bell-off-outline',
-  'mdi:bell-outline',
 
   // Mint-update glyphs (Notifications → Mints, and the Mint updates screen).
   // Passed dynamically per change kind, so the scanner can't follow them.

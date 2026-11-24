@@ -7,12 +7,31 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { useRouteParams, type UseRouteParamsOptions } from '@/shared/lib/nav/useRouteParams';
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
+const mockGuardedBack = jest.fn();
 const paramsRef: { current: Record<string, string | string[] | undefined> } = { current: {} };
 const mockWarn = jest.fn();
 
 jest.mock('expo-router', () => ({
-  router: { back: (...args: unknown[]) => mockBack(...args) },
+  router: {
+    back: (...args: unknown[]) => mockBack(...args),
+    replace: (...args: unknown[]) => mockReplace(...args),
+    canGoBack: () => mockCanGoBack(),
+  },
   useLocalSearchParams: () => paramsRef.current,
+}));
+
+// The guarded router dedupes repeated calls within 600ms, so a recovery
+// `back()` dispatched right after the navigation that opened the bad route
+// would be swallowed. Recovery must never go through it.
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: {
+    back: (...args: unknown[]) => mockGuardedBack(...args),
+    replace: jest.fn(),
+    canGoBack: () => true,
+    raw: jest.requireMock<{ router: unknown }>('expo-router').router,
+  },
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -48,6 +67,10 @@ function Probe({
 describe('useRouteParams', () => {
   beforeEach(() => {
     mockBack.mockReset();
+    mockReplace.mockReset();
+    mockGuardedBack.mockReset();
+    mockCanGoBack.mockReset();
+    mockCanGoBack.mockReturnValue(true);
     mockWarn.mockReset();
   });
 
@@ -70,11 +93,28 @@ describe('useRouteParams', () => {
     });
     expect(onResult).toHaveBeenCalledWith(null);
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockGuardedBack).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockWarn).toHaveBeenCalledTimes(1);
     const [event, payload] = mockWarn.mock.calls[0] as [string, { issues: unknown[] }];
     expect(event).toBe('nav.test.route.invalid_params');
     expect(Array.isArray(payload.issues)).toBe(true);
     expect(payload.issues.length).toBeGreaterThan(0);
+  });
+
+  it('recovers to the wallet when a cold-start deep link has invalid params', () => {
+    // Opened straight from a link: there is nothing to go back to, so a
+    // back() would leave the blank route on screen.
+    paramsRef.current = { pubkey: 'not-hex' };
+    mockCanGoBack.mockReturnValue(false);
+    const onResult = jest.fn();
+    act(() => {
+      TestRenderer.create(<Probe options={{ where: 'test.route' }} onResult={onResult} />);
+    });
+    expect(onResult).toHaveBeenCalledWith(null);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockGuardedBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('invokes a custom onInvalid callback and skips router.back', () => {
@@ -87,5 +127,6 @@ describe('useRouteParams', () => {
     });
     expect(onInvalid).toHaveBeenCalledTimes(1);
     expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

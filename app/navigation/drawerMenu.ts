@@ -4,16 +4,10 @@
 import { hasFeature, type Feature } from '@/shared/config/features';
 
 export type MenuRoute =
-  | '/(drawer)/(tabs)/feed'
   // Wallet is the `(tabs)/index` folder, which expo-router collapses to an
   // empty path segment — so its canonical route is the app root `/`, not
   // `/(drawer)/(tabs)/index` (that path resolves to +not-found at runtime).
-  | '/'
-  | '/(drawer)/(tabs)/contacts'
-  | '/(drawer)/(tabs)/notifications'
-  | '/(drawer)/(tabs)/ai'
-  | '/(signer-flow)'
-  | '/(settings-flow)';
+  '/' | '/(drawer)/(tabs)/contacts' | '/(signer-flow)' | '/(settings-flow)';
 
 export type MenuIconPair = {
   default: string;
@@ -34,14 +28,6 @@ type MenuItem = {
 
 const ALL_MENU_ITEMS: readonly MenuItem[] = [
   {
-    id: 'feed',
-    feature: 'feed',
-    icon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
-    label: 'Feed',
-    route: '/(drawer)/(tabs)/feed',
-    activeSegments: ['(drawer)', '(tabs)', 'feed'],
-  },
-  {
     id: 'wallet',
     icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
     label: 'Wallet',
@@ -55,22 +41,6 @@ const ALL_MENU_ITEMS: readonly MenuItem[] = [
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
-  },
-  {
-    id: 'notifications',
-    feature: 'feed',
-    icon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
-    label: 'Notifications',
-    route: '/(drawer)/(tabs)/notifications',
-    activeSegments: ['(drawer)', '(tabs)', 'notifications'],
-  },
-  {
-    id: 'ai',
-    feature: 'ai',
-    icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
-    label: 'AI',
-    route: '/(drawer)/(tabs)/ai',
-    activeSegments: ['(drawer)', '(tabs)', 'ai'],
   },
   {
     id: 'remote-login',

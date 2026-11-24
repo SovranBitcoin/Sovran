@@ -13,7 +13,6 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const INDEX_OPTIONS = { title: 'Settings' };
 const PROFILE_OPTIONS = { title: 'Profile' };
-const NOTIFICATION_POLICY_OPTIONS = { title: 'Notifications' };
 const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
@@ -48,7 +47,6 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-      <Stack.Screen name="notification-policy" options={NOTIFICATION_POLICY_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />
       <Stack.Screen name="keyring" options={KEYRING_OPTIONS} />
