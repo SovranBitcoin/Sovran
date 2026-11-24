@@ -142,73 +142,76 @@ function AccountRow({
   const dimmed = locked && !isPending;
 
   return (
-    <Pressable
-      testID={`drawer-profile-switch-${profile.accountIndex}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${name}, ${balance === UNKNOWN_BALANCE ? 'balance unknown' : balance}`}
-      accessibilityHint={isActive ? 'Current account' : 'Switches to this account'}
-      accessibilityState={{ selected: isActive, disabled: locked, busy: isPending }}
-      disabled={locked}
-      activeOpacity={1}
-      onPress={() => onPress(profile)}
-      onLongPress={() => onOpenMenu(profile, name)}>
-      <PressScale target={locked ? 1 : PRESS_SCALE}>
-        <View
-          className={`flex-row items-center gap-3 py-2.5 pl-5 pr-2 ${dimmed ? 'opacity-50' : ''}`}>
-          {/* Fixed-size pieces never shrink; the name column takes what is left. */}
-          <View className="shrink-0">
-            <Avatar
-              state={picture ? 'image' : 'fallback'}
-              seed={profile.pubkey}
-              picture={picture}
-              name={name}
-              size={44}
-            />
+    <View className={`flex-row items-center pr-2 ${dimmed ? 'opacity-50' : ''}`}>
+      <Pressable
+        testID={`drawer-profile-switch-${profile.accountIndex}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${name}, ${balance === UNKNOWN_BALANCE ? 'balance unknown' : balance}`}
+        accessibilityHint={isActive ? 'Current account' : 'Switches to this account'}
+        accessibilityState={{ selected: isActive, disabled: locked, busy: isPending }}
+        disabled={locked}
+        activeOpacity={1}
+        onPress={() => onPress(profile)}
+        onLongPress={() => onOpenMenu(profile, name)}
+        className="min-w-0 flex-1">
+        <PressScale target={locked ? 1 : PRESS_SCALE}>
+          <View className="flex-row items-center gap-3 py-2.5 pl-5 pr-2">
+            {/* Fixed-size pieces never shrink; the name column takes what is left. */}
+            <View className="shrink-0">
+              <Avatar
+                state={picture ? 'image' : 'fallback'}
+                seed={profile.pubkey}
+                picture={picture}
+                name={name}
+                size={44}
+              />
+            </View>
+            <View className="min-w-0 flex-1 gap-0.5">
+              <Text size={16} medium numberOfLines={1} accessible={false}>
+                {name}
+              </Text>
+              <Text size={13} color={muted} numberOfLines={1} accessible={false}>
+                {secondary}
+              </Text>
+            </View>
+            {/* Capped, so a huge balance at large text cannot squeeze the name away. */}
+            <View className="max-w-[40%] shrink-0">
+              <Text
+                size={14}
+                medium
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                className="tabular-nums"
+                color={balance === UNKNOWN_BALANCE ? muted : undefined}
+                accessible={false}>
+                {balance}
+              </Text>
+            </View>
+            <View className="w-5 shrink-0 items-center">
+              {isPending ? (
+                <Spinner size={16} color={muted} />
+              ) : isActive ? (
+                <Icon name="fluent:checkmark-16-filled" size={18} color={accent} />
+              ) : null}
+            </View>
           </View>
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text size={16} medium numberOfLines={1} accessible={false}>
-              {name}
-            </Text>
-            <Text size={13} color={muted} numberOfLines={1} accessible={false}>
-              {secondary}
-            </Text>
-          </View>
-          {/* Capped, so a huge balance at large text cannot squeeze the name away. */}
-          <View className="max-w-[40%] shrink-0">
-            <Text
-              size={14}
-              medium
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-              className="tabular-nums"
-              color={balance === UNKNOWN_BALANCE ? muted : undefined}
-              accessible={false}>
-              {balance}
-            </Text>
-          </View>
-          <View className="w-5 shrink-0 items-center">
-            {isPending ? (
-              <Spinner size={16} color={muted} />
-            ) : isActive ? (
-              <Icon name="fluent:checkmark-16-filled" size={18} color={accent} />
-            ) : null}
-          </View>
-          <Pressable
-            testID={`drawer-profile-options-${profile.accountIndex}`}
-            accessibilityRole="button"
-            accessibilityLabel="Account options"
-            accessibilityHint={`Copy, view or edit ${name}`}
-            accessibilityState={{ disabled: locked }}
-            disabled={locked}
-            hitSlop={8}
-            onPress={() => onOpenMenu(profile, name)}
-            className="h-9 w-9 shrink-0 items-center justify-center rounded-full">
-            <Icon name="tabler:dots" size={20} color={muted} />
-          </Pressable>
-        </View>
-      </PressScale>
-    </Pressable>
+        </PressScale>
+      </Pressable>
+      {/* Sibling button so VoiceOver/TalkBack reaches Account options independently. */}
+      <Pressable
+        testID={`drawer-profile-options-${profile.accountIndex}`}
+        accessibilityRole="button"
+        accessibilityLabel="Account options"
+        accessibilityHint={`Copy, view or edit ${name}`}
+        accessibilityState={{ disabled: locked }}
+        disabled={locked}
+        hitSlop={8}
+        onPress={() => onOpenMenu(profile, name)}
+        className="h-9 w-9 shrink-0 items-center justify-center rounded-full">
+        <Icon name="tabler:dots" size={20} color={muted} />
+      </Pressable>
+    </View>
   );
 }
 

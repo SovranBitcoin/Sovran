@@ -67,6 +67,12 @@ export async function getDiscoveredMintMetadata(
 
   const t0 = Date.now();
   const generation = dataResetGeneration();
+  // Wait for settings before querying auditors so disabled auditors are never called.
+  await whenLoaded(useSettingsStore, { orFailed: true, timeoutMs: WRITE_LOAD_WAIT_MS });
+  if (controls?.signal?.aborted || dataResetGeneration() !== generation) {
+    readEvents.superseded({ readId, surface: 'mintAudit', keyHash, gen: 0, reason: 'abort' });
+    return cached;
+  }
   readEvents.request({
     readId,
     surface: 'mintAudit',

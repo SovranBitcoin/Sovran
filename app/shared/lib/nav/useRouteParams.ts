@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, usePathname } from 'expo-router';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import type { ZodType, infer as zInfer } from 'zod';
 import { loggableIssues } from '@sovranbitcoin/schemas';
@@ -43,11 +43,23 @@ const RECOVERY_COALESCE_WINDOW_MS = 50;
 let lastRecoveryKey: string | null = null;
 let lastRecoveryAt = -Infinity;
 
-function paramsKey(raw: unknown): string {
+function canonicalizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeValue);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(value as Record<string, unknown>).sort()) {
+      out[k] = canonicalizeValue((value as Record<string, unknown>)[k]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function paramsKey(pathname: string, raw: unknown): string {
   try {
-    return JSON.stringify(raw) ?? '';
+    return `${pathname}\0${JSON.stringify(canonicalizeValue(raw)) ?? ''}`;
   } catch {
-    return '';
+    return pathname;
   }
 }
 
@@ -56,6 +68,7 @@ export function useRouteParams<S extends ZodType>(
   options: UseRouteParamsOptions
 ): zInfer<S> | null {
   const raw = useLocalSearchParams();
+  const pathname = typeof usePathname === 'function' ? usePathname() : '';
   const parsed = useMemo(() => schema.safeParse(raw), [schema, raw]);
 
   useEffect(() => {
@@ -69,7 +82,7 @@ export function useRouteParams<S extends ZodType>(
     const policy = options.onInvalid ?? 'back';
     if (policy === 'back') {
       const now = Date.now();
-      const key = paramsKey(raw);
+      const key = paramsKey(pathname, raw);
       if (key === lastRecoveryKey && now - lastRecoveryAt < RECOVERY_COALESCE_WINDOW_MS) {
         return;
       }
@@ -83,7 +96,7 @@ export function useRouteParams<S extends ZodType>(
     } else {
       policy(issues);
     }
-  }, [parsed, raw, options.where, options.onInvalid]);
+  }, [parsed, pathname, raw, options.where, options.onInvalid]);
 
   return parsed.success ? parsed.data : null;
 }
