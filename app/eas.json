@@ -30,6 +30,16 @@
         "credentialsSource": "remote"
       },
       "autoIncrement": true
+    },
+    "zapstore": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "zapstore"
+      },
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote"
+      }
     }
   },
   "submit": {

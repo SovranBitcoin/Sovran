@@ -9,13 +9,18 @@ module.exports = ({ config }) => {
     process.env.EXPO_PUBLIC_ENV ||
     'production';
   const isDevelopment = buildProfile === 'development' || buildProfile === 'preview';
+  const isZapstore = buildProfile === 'zapstore';
+  const iosBundleId = isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin';
+  const androidPackage = isDevelopment
+    ? 'com.sovranbitcoin.dev'
+    : isZapstore
+      ? 'com.sovranbitcoin.zapstore'
+      : 'com.sovranbitcoin';
 
   // Debug logging to verify bundle identifier selection
   if (process.env.EAS_BUILD_PROFILE || process.env.APP_VARIANT) {
-    console.log(`[app.config.js] Build profile: ${buildProfile}, isDevelopment: ${isDevelopment}`);
-    console.log(
-      `[app.config.js] Bundle identifier will be: ${isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin'}`
-    );
+    console.log(`[app.config.js] Build profile: ${buildProfile}, isDevelopment: ${isDevelopment}, isZapstore: ${isZapstore}`);
+    console.log(`[app.config.js] iOS bundle: ${iosBundleId}, Android package: ${androidPackage}`);
   }
 
   const appIcon = './assets/brand/generated/symbol/black-on-light/1024x1024.png';
@@ -69,7 +74,7 @@ module.exports = ({ config }) => {
     ],
     ios: {
       ...config.ios,
-      bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
+      bundleIdentifier: iosBundleId,
     },
     android: {
       ...config.android,
@@ -84,7 +89,7 @@ module.exports = ({ config }) => {
         ...config.android?.adaptiveIcon,
         foregroundImage: adaptiveIcon,
       },
-      package: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
+      package: androidPackage,
     },
   };
 };
