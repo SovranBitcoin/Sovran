@@ -177,6 +177,16 @@ describe('ToastHost', () => {
     expect(r.toJSON()).toBeNull();
   });
 
+  it('fires onHide for active toasts when ToastHost unmounts (account switch)', () => {
+    const r = mountHost();
+    const onHide = jest.fn();
+    showNamed('swap-progress', { durationMs: 'persistent', onHide });
+    expect(onHide).not.toHaveBeenCalled();
+    act(() => r.unmount());
+    renderer = undefined;
+    expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the overlay non-modal on iOS and stacks above sheets on Android', () => {
     const prevOS = Platform.OS;
     try {

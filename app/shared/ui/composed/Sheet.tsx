@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
+  BackHandler,
   Platform,
   StyleSheet,
   useWindowDimensions,
@@ -153,6 +154,16 @@ export function Sheet({
     }
   }, [open, laidOut, progress, drag]);
 
+  // Android hardware Back closes a dismissable sheet and never pops the route underneath.
+  useEffect(() => {
+    if (!open || Platform.OS !== 'android') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (dismissable) onDismissRequest();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [open, dismissable, onDismissRequest]);
+
   const pan = Gesture.Pan()
     .enabled(dismissable && open)
     .activeOffsetY([-8, 8])
@@ -161,9 +172,9 @@ export function Sheet({
       if (scroll.offset.get() > 0) return;
       drag.set(Math.max(0, event.translationY));
     })
-    .onEnd((event) => {
+    .onEnd((event, success) => {
       const far = drag.get() > measured.get() * DISMISS_SHARE;
-      if (drag.get() > 0 && (far || event.velocityY > DISMISS_VELOCITY)) {
+      if (success && drag.get() > 0 && (far || event.velocityY > DISMISS_VELOCITY)) {
         scheduleOnRN(onDismissRequest);
       } else {
         drag.set(withSpring(0, OPEN_SPRING));
@@ -184,7 +195,11 @@ export function Sheet({
   const fixedHeight = height ? (window.height * parseFloat(height)) / 100 : undefined;
   return (
     <OverlayWindow modal zIndex={1000}>
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none" accessible={false}>
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents="box-none"
+        accessible={false}
+        accessibilityViewIsModal={open}>
         <Animated.View
           style={[StyleSheet.absoluteFill, { backgroundColor: scrimColor }, scrimStyle]}>
           <Pressable

@@ -55,6 +55,7 @@ export function Switch({
       accessibilityState={{ checked: isSelected, disabled: isDisabled }}
       disabled={isDisabled}
       activeOpacity={1}
+      hitSlop={{ top: 10, bottom: 10 }}
       onPress={() => onSelectedChange?.(!isSelected)}
       style={{ opacity: isDisabled ? 0.5 : 1 }}>
       <Animated.View

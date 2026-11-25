@@ -113,6 +113,19 @@ describe('Slider gesture safety', () => {
     expect(onChange).toHaveBeenLastCalledWith(50);
     expect(onChangeEnd).toHaveBeenLastCalledWith(50);
   });
+
+  it('ignores accessibility increment/decrement when disabled', () => {
+    const { onChange, onChangeEnd } = mountSlider({ isDisabled: true });
+    const host = renderer!.root.findAll(
+      (node) => node.props.testID === 'fee-slider' && typeof node.props.onAccessibilityAction === 'function'
+    )[0]!;
+    expect(host.props.accessibilityActions).toEqual([]);
+    act(() => {
+      host.props.onAccessibilityAction({ nativeEvent: { actionName: 'increment' } });
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onChangeEnd).not.toHaveBeenCalled();
+  });
 });
 
 describe('Switch accessibility label', () => {

@@ -48,7 +48,14 @@ preloadNfcSupported();
 // otherwise React Navigation tears down and remounts the header's left button
 // (re-parsing its SVG icon) on every root re-render.
 const CloseButton = React.memo(function CloseButton() {
-  return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
+  return (
+    <ScreenHeaderAction
+      icon="material-symbols:close-rounded"
+      accessibilityLabel="Close screen"
+      testID="flow-header-close"
+      onPress={() => router.back()}
+    />
+  );
 });
 
 // A pushed Android route leaves with Back; same chrome as every header action.

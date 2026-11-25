@@ -88,7 +88,25 @@ jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => {
     },
   };
 });
-jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => ({ NfcTapContent: () => null }));
+jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    NfcTapContent: ({
+      setFooterConfig,
+      close,
+    }: {
+      setFooterConfig: (cfg: {
+        buttons: { text: string; testID: string; onPress: () => void }[];
+      }) => void;
+      close: () => void;
+    }) => {
+      ReactActual.useEffect(() => {
+        setFooterConfig({ buttons: [{ text: 'Close', testID: 'nfc-close', onPress: close }] });
+      }, [setFooterConfig, close]);
+      return ReactActual.createElement('NfcTapContent');
+    },
+  };
+});
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({ SendMemoContent: () => null }));
 jest.mock('@/shared/ui/composed/ToastHost', () => ({ ToastHost: () => null }));
 jest.mock('@/shared/ui/composed/TouchIndicator', () => ({
@@ -311,5 +329,13 @@ describe('PopupHost presentation', () => {
     act(() => usePopupStore.getState().open({ message: 'torn down' }));
     act(() => usePopupStore.getState().destroySheet());
     expect(sheets(r)).toHaveLength(0);
+  });
+
+  it('keeps a custom sheet footer registered in its mount effect (Android NFC Close button)', () => {
+    const r = mountHost();
+    act(() =>
+      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: undefined } as never)
+    );
+    expect(r.root.findAll((node) => node.props.testID === 'nfc-close').length).toBeGreaterThan(0);
   });
 });

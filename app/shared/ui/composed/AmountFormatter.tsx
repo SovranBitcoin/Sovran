@@ -145,6 +145,9 @@ export function AmountFormatter({
             <View>
               <RNText
                 allowFontScaling={false}
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
                 // The native roll lays digits out at tabular widths.
                 className={animated ? 'tabular-nums' : undefined}
                 style={[

@@ -88,6 +88,12 @@ export function tokenizeAmount(text: string, options: AmountSlotOptions = {}): A
   }
 
   let fracDigitsLeft = 0;
+  const sepCounts = new Map<string, number>();
+  const uniqueSepKey = (base: string): string => {
+    const seen = sepCounts.get(base) ?? 0;
+    sepCounts.set(base, seen + 1);
+    return seen === 0 ? base : `${base}-${seen}`;
+  };
   chars.forEach((char, i) => {
     if (i < firstDigit) {
       slots.push({ kind: 'static', key: `pre-${firstDigit - 1 - i}`, char });
@@ -98,7 +104,7 @@ export function tokenizeAmount(text: string, options: AmountSlotOptions = {}): A
       if (index !== undefined) {
         slots.push({ kind: 'digit', key: `int-${index}`, char, digit: Number(char) });
       } else {
-        slots.push({ kind: 'static', key: `isep-${intRightOf.get(i)}`, char });
+        slots.push({ kind: 'static', key: uniqueSepKey(`isep-${intRightOf.get(i)}`), char });
       }
     } else if (i === point) {
       slots.push({ kind: 'static', key: 'point', char });
@@ -106,7 +112,7 @@ export function tokenizeAmount(text: string, options: AmountSlotOptions = {}): A
       slots.push({ kind: 'digit', key: `frac-${fracDigitsLeft}`, char, digit: Number(char) });
       fracDigitsLeft++;
     } else {
-      slots.push({ kind: 'static', key: `fsep-${fracDigitsLeft}`, char });
+      slots.push({ kind: 'static', key: uniqueSepKey(`fsep-${fracDigitsLeft}`), char });
     }
   });
   return slots;

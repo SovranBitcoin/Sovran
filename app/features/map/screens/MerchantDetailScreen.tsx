@@ -145,7 +145,7 @@ export function MerchantDetailScreen() {
     'surface',
   ] as const);
   const headerHeight = useHeaderHeight();
-  const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.detail' });
   const placeId = params?.placeId;
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
     useShallow((s) => ({

@@ -39,7 +39,7 @@ const ParamsSchema = z.object({
 export function BackgroundScreen() {
   useLifecycleLogger('BackgroundScreen');
 
-  const params = useRouteParams(ParamsSchema, { where: 'theme-flow.background' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.background' });
   const unitId = params?.unitId ?? 'sat';
 
   const { width: screenWidth, height: windowHeight } = useWindowDimensions();

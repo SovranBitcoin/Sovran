@@ -83,7 +83,11 @@ export function ToastHost() {
     const records = live.current;
     return () => {
       registerToast(null);
-      records.forEach(({ timer }) => clearTimeout(timer));
+      for (const { entry, timer } of [...records.values()]) {
+        clearTimeout(timer);
+        entry.onHide?.();
+      }
+      records.clear();
     };
   }, []);
 

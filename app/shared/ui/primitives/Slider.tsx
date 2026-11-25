@@ -114,6 +114,7 @@ export function Slider({
   const gesture = Gesture.Exclusive(pan, tap);
 
   const adjust = (direction: 1 | -1) => {
+    if (isDisabled) return;
     const next = snap(value + direction * step, minValue, maxValue, step);
     onChange?.(next);
     onChangeEnd?.(next);
@@ -128,10 +129,11 @@ export function Slider({
         accessibilityLabel={accessibilityLabel}
         accessibilityValue={{ min: minValue, max: maxValue, now: value }}
         accessibilityState={{ disabled: isDisabled }}
-        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        accessibilityActions={isDisabled ? [] : [{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(event) =>
           adjust(event.nativeEvent.actionName === 'increment' ? 1 : -1)
         }
+        hitSlop={{ top: 12, bottom: 12 }}
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         className={isDisabled ? 'opacity-disabled w-full' : 'w-full'}>
         <View className="bg-default h-5 w-full justify-center rounded-xl">

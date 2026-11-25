@@ -104,7 +104,7 @@ export function FiltersScreen() {
     ),
   ];
 
-  const params = useRouteParams(FilterSheetParamsSchema, { where: 'filter-flow.filters' });
+  const params = useRouteParams(FilterSheetParamsSchema, { where: 'app.filters' });
 
   const [draft, setDraft] = useState(() => filtersFromSheetParams(params));
   const change = (changes: Partial<TransactionFilters>) =>

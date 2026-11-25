@@ -302,6 +302,12 @@ enum AmountSlots {
 
         var out: [AmountSlot] = []
         var fracLeft = 0
+        var sepCounts: [String: Int] = [:]
+        func uniqueSepKey(_ base: String) -> String {
+            let seen = sepCounts[base] ?? 0
+            sepCounts[base] = seen + 1
+            return seen == 0 ? base : "\(base)-\(seen)"
+        }
         for (i, c) in chars.enumerated() {
             if i < first {
                 out.append(AmountSlot(id: "pre-\(first - 1 - i)", char: c, digit: nil))
@@ -311,7 +317,7 @@ enum AmountSlots {
                 if let n = intIndex[i] {
                     out.append(AmountSlot(id: "int-\(n)", char: c, digit: Int(c)))
                 } else {
-                    out.append(AmountSlot(id: "isep-\(intRight[i] ?? 0)", char: c, digit: nil))
+                    out.append(AmountSlot(id: uniqueSepKey("isep-\(intRight[i] ?? 0)"), char: c, digit: nil))
                 }
             } else if i == point {
                 out.append(AmountSlot(id: "point", char: c, digit: nil))
@@ -319,7 +325,7 @@ enum AmountSlots {
                 out.append(AmountSlot(id: "frac-\(fracLeft)", char: c, digit: Int(c)))
                 fracLeft += 1
             } else {
-                out.append(AmountSlot(id: "fsep-\(fracLeft)", char: c, digit: nil))
+                out.append(AmountSlot(id: uniqueSepKey("fsep-\(fracLeft)"), char: c, digit: nil))
             }
         }
         return out

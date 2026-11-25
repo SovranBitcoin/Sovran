@@ -78,8 +78,8 @@ describe('tokenizeAmount', () => {
     expect(tokenizeAmount('≈ —').every((s) => s.kind === 'static')).toBe(true);
   });
 
-  it('gives every slot a unique key', () => {
-    for (const text of ['₿ 1,234,567', '$1,234.56', '0.00012500 BTC', '- 1 sats']) {
+  it('gives every slot a unique key, including adjacent separators', () => {
+    for (const text of ['₿ 1,234,567', '$1,234.56', '0.00012500 BTC', '- 1 sats', '1,,000.0--5']) {
       const k = tokenizeAmount(text).map((s) => s.key);
       expect(new Set(k).size).toBe(k.length);
     }

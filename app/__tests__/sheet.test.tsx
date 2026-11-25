@@ -141,6 +141,47 @@ describe('Sheet', () => {
     expect(detector.props.gesture.handlers.enabled).toBe(false);
   });
 
+  it('does not dismiss when a drag is cancelled (success === false)', () => {
+    const onDismissRequest = jest.fn();
+    const r = mount({ onDismissRequest });
+    layOut(r, 400);
+    const detector = r.root.findAll(
+      (node) => String(node.type) === 'GestureDetector' && node.props.gesture.kind === 'pan'
+    )[0]!;
+    act(() => {
+      detector.props.gesture.handlers.onUpdate({ translationY: 200 });
+      detector.props.gesture.handlers.onEnd({ velocityY: 1200 }, false);
+    });
+    expect(onDismissRequest).not.toHaveBeenCalled();
+  });
+
+  it('consumes Android hardware Back while open and closes when dismissable', () => {
+    const { BackHandler, Platform } = require('react-native');
+    const prevOS = Platform.OS;
+    let backCallback: (() => boolean) | undefined;
+    const remove = jest.fn();
+    const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, cb) => {
+      backCallback = cb as () => boolean;
+      return { remove };
+    });
+    try {
+      Platform.OS = 'android';
+      const onDismissRequest = jest.fn();
+      const r = mount({ onDismissRequest, dismissable: true });
+      expect(backCallback).toBeDefined();
+      expect(backCallback!()).toBe(true);
+      expect(onDismissRequest).toHaveBeenCalledTimes(1);
+
+      onDismissRequest.mockClear();
+      act(() => r.update(draw({ onDismissRequest, dismissable: false })));
+      expect(backCallback!()).toBe(true);
+      expect(onDismissRequest).not.toHaveBeenCalled();
+    } finally {
+      Platform.OS = prevOS;
+      spy.mockRestore();
+    }
+  });
+
   it('draws its footer', () => {
     const r = mount({ footer: <Text testID="footer">Continue</Text> });
     expect(panel(r).findAllByProps({ testID: 'footer' }).length).toBeGreaterThan(0);

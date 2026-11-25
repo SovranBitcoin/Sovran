@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Log, log } from '@/shared/lib/logger';
 import { TouchIndicatorLayer } from '@/shared/ui/composed/TouchIndicator';
 import { Keyboard, Text as RNText, View } from 'react-native';
@@ -303,10 +303,31 @@ function SheetPopup() {
   const payload = shown?.payload ?? null;
   const isCustom = isCustomSheetPayload(payload);
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
-  const [customFooterConfig, setCustomFooterConfig] = useState<CustomSheetFooterConfig | null>(
-    null
+  // Keyed by `shown.seq` so switching to a new sheet clears the previous sheet's
+  // footer synchronously without a parent effect overwriting a child's mount effect
+  // (e.g. NfcTapContent registering its Close button on mount).
+  const [customFooterState, setCustomFooterState] = useState<{
+    seq: number;
+    config: CustomSheetFooterConfig | null;
+  } | null>(null);
+  const customFooterConfig =
+    shown && customFooterState?.seq === shown.seq ? customFooterState.config : null;
+  const shownSeq = shown?.seq;
+  const setCustomFooterConfig = useCallback(
+    (config: CustomSheetFooterConfig | null) => {
+      if (shownSeq == null) return;
+      setCustomFooterState({ seq: shownSeq, config });
+    },
+    [shownSeq]
   );
-  useEffect(() => setCustomFooterConfig(null), [shown?.seq]);
+  // Close bound to this instance's request: a button that opens a follow-on
+  // sheet (the onchain chooser → "Network fee") still closes after onPress,
+  // and that stale close must not tear the new sheet down. Memoized on
+  // `shownSeq` so custom bodies (e.g. NfcTapContent) that depend on `close`
+  // in their footer effect never re-fire in a loop.
+  const scopedClose = useCallback(() => {
+    if (shownSeq != null) close(shownSeq);
+  }, [close, shownSeq]);
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   useEffect(() => {
@@ -373,10 +394,6 @@ function SheetPopup() {
     ? CUSTOM_SHEET_CONTENT[payload.sheetId]
     : null;
   const instanceOpen = isOpen && shown.seq === openSeq;
-  // Close bound to this instance's request: a button that opens a follow-on
-  // sheet (the onchain chooser → "Network fee") still closes after onPress,
-  // and that stale close must not tear the new sheet down.
-  const scopedClose = () => close(shown.seq);
 
   return (
     <Sheet
