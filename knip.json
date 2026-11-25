@@ -27,8 +27,7 @@
       "ignore": ["modules/**", "targets/**"],
       "ignoreDependencies": [
         "buffer",
-        "expo-screen-corner-radius",
-        "react-native-fast-squircle"
+        "expo-screen-corner-radius"
       ],
       "ignoreBinaries": ["eas", "gh"]
     },

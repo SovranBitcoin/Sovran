@@ -25,7 +25,7 @@ import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 import { parseP2PKSecretInput } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
-import QRCode from 'react-native-qrcode-svg';
+import { QrMatrix } from '@/shared/ui/primitives/QrMatrix';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -110,7 +110,7 @@ const CurrentKeyItem: React.FC<{
           }}>
           {/* QR pinned to dark-on-white regardless of theme — scanners are
               strict and an inverted (light-on-dark) render is unreliable. */}
-          <QRCode
+          <QrMatrix
             value={activeData}
             size={120}
             color={INVARIANT_BLACK}

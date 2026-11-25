@@ -3,8 +3,8 @@
  * FiatCurrencyPill — the two pills stack in the same balance column); older
  * iOS → the CapsuleButton fallback, which tiers itself (blur/flat) and opens
  * the global bottom-sheet menu. Android imports a separate index that omits
- * the liquid variant, keeping `liquid-glass-menu`, `expo-glass-effect`, and
- * `@react-native-menu/menu` off the Android graph.
+ * the liquid variant, keeping `liquid-glass-menu` off the
+ * Android graph.
  */
 import { createElement } from 'react';
 

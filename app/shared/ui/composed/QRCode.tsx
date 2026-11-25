@@ -16,7 +16,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions } from 'react-native';
-import EQRCode from 'react-native-qrcode-svg';
+import { QrMatrix } from '@/shared/ui/primitives/QrMatrix';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
@@ -138,7 +138,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   // swap the flat gradient for `Surface` — the same blur + corner-glow
   // frame the Receive Address row uses on this screen, so the QR sits in
   // matching chrome instead of floating on a flat white block. The inner
-  // `EQRCode` still paints an opaque white square at `qrSize` (the strict
+  // `QrMatrix` still paints an opaque white square at `qrSize` (the strict
   // scanner quiet zone), so only the 16 px ring around the modules picks up
   // the card material — that's the visible frame we wanted.
   const scheme = useColorScheme();
@@ -209,7 +209,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     // as on-card instead of floating on a hard white block. Dark mode
     // keeps a pure-white fill since the surrounding `LinearGradient` IS
     // the white card.
-    <EQRCode
+    <QrMatrix
       color={QR_DARK}
       backgroundColor={useBlurCard ? 'transparent' : QR_LIGHT}
       value={qrData}

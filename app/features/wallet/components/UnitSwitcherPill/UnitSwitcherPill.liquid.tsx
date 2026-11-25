@@ -9,23 +9,19 @@
  * "USD", …) — matching FiatCurrencyPill; the menu rows keep their SF sign
  * glyphs.
  *
- * Fallback (no glass-button morph available): an expo-glass-effect GlassView
- * capsule (also a real RN view, so it scrolls) wearing a native iOS menu via
- * @react-native-menu/menu's MenuView. Native menu + correct scroll, just no
- * glass morph.
+ * Without the glass-button module (the liquid tier but no `LiquidGlassMenu`)
+ * it renders the CapsuleButton fallback, whose accounts open in the app's own
+ * picker sheet.
  *
- * Tap opens the menu on both paths; with one available unit the pill greys
- * out and ignores touches, matching the fallback tiers.
+ * Tap opens the menu; with one available unit the pill greys out and ignores
+ * touches, matching the fallback tiers.
  */
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
-import { GlassView } from 'expo-glass-effect';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { withAlpha } from '@/shared/lib/color';
 
-import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -38,10 +34,16 @@ import {
   useUnitSwitcherPill,
   type UnitSwitcherPillProps,
 } from './useUnitSwitcherPill';
+import { UnitSwitcherPillFallback } from './UnitSwitcherPill.fallback';
 
 const MENU_TITLE = 'Wallet accounts';
 
 export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.ReactElement {
+  if (!LiquidGlassMenu.isSupported) return <UnitSwitcherPillFallback {...props} />;
+  return <UnitSwitcherPillGlass {...props} />;
+}
+
+function UnitSwitcherPillGlass(props: UnitSwitcherPillProps): React.ReactElement {
   const { unit, shownUnit, availableOptions, canSwitch, handleSelectUnit, textSize } =
     useUnitSwitcherPill(props);
   const colorScheme = useColorScheme();
@@ -50,72 +52,32 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
   const label = pillLabel(shownUnit);
 
   // iOS 26: native glass button that morphs into its UIMenu and scrolls.
-  if (LiquidGlassMenu.isSupported) {
-    // Native view needs an explicit frame — same sizing model as
-    // useFiatCurrencyPill's iosWidth.
-    const width = Math.max(72, Math.round(label.length * (textSize * 0.62) + 28));
-    return (
-      <View
-        style={canSwitch ? undefined : styles.disabledSlot}
-        pointerEvents={canSwitch ? 'auto' : 'none'}>
-        <LiquidGlassMenu
-          testID="wallet-unit-switcher"
-          accessible
-          accessibilityLabel="Switch wallet account"
-          style={{ width, height: PILL_HEIGHT }}
-          label={label}
-          labelColor={textColor}
-          labelSize={textSize}
-          tint={withAlpha(INVARIANT_WHITE, 0.15)}
-          colorScheme={colorScheme}
-          menuTitle={MENU_TITLE}
-          actions={availableOptions.map((option) => ({
-            id: option.unit,
-            title: option.label,
-            image: unitSfSymbol(option.unit),
-            selected: option.unit === unit,
-          }))}
-          onSelectAction={({ nativeEvent }) => handleSelectUnit(nativeEvent.id as ActiveUnit)}
-        />
-      </View>
-    );
-  }
-
-  // Fallback: GlassView pill + native UIMenu via MenuView (scrolls, no morph).
-  const actions: MenuAction[] = availableOptions.map((option) => ({
-    id: option.unit,
-    title: option.label,
-    image: unitSfSymbol(option.unit),
-    state: option.unit === unit ? ('on' as const) : ('off' as const),
-  }));
-
-  const pill = (
-    <GlassView
-      glassEffectStyle="regular"
-      // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
-      // touches with the wrapping MenuView, making taps flaky. Keep the glass
-      // decorative; the menu owns the tap.
-      tintColor={withAlpha(INVARIANT_WHITE, 0.15)}
-      style={styles.glassPill}>
-      <Text overpass size={textSize} bold color={textColor} style={styles.pillText}>
-        {label}
-      </Text>
-    </GlassView>
-  );
-
+  // Native view needs an explicit frame — same sizing model as
+  // useFiatCurrencyPill's iosWidth.
+  const width = Math.max(72, Math.round(label.length * (textSize * 0.62) + 28));
   return (
     <View
-      testID="wallet-unit-switcher"
-      accessible
-      accessibilityLabel="Switch wallet account"
       style={canSwitch ? undefined : styles.disabledSlot}
       pointerEvents={canSwitch ? 'auto' : 'none'}>
-      <MenuView
-        title={MENU_TITLE}
-        actions={actions}
-        onPressAction={({ nativeEvent }) => handleSelectUnit(nativeEvent.event as ActiveUnit)}>
-        {pill}
-      </MenuView>
+      <LiquidGlassMenu
+        testID="wallet-unit-switcher"
+        accessible
+        accessibilityLabel="Switch wallet account"
+        style={{ width, height: PILL_HEIGHT }}
+        label={label}
+        labelColor={textColor}
+        labelSize={textSize}
+        tint={withAlpha(INVARIANT_WHITE, 0.15)}
+        colorScheme={colorScheme}
+        menuTitle={MENU_TITLE}
+        actions={availableOptions.map((option) => ({
+          id: option.unit,
+          title: option.label,
+          image: unitSfSymbol(option.unit),
+          selected: option.unit === unit,
+        }))}
+        onSelectAction={({ nativeEvent }) => handleSelectUnit(nativeEvent.id as ActiveUnit)}
+      />
     </View>
   );
 }
@@ -123,16 +85,5 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
 const styles = StyleSheet.create({
   disabledSlot: {
     opacity: 0.4,
-  },
-  glassPill: {
-    borderRadius: 999,
-    overflow: 'hidden',
-    minHeight: PILL_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-  },
-  pillText: {
-    letterSpacing: 0.3,
   },
 });

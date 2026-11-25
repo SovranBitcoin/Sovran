@@ -7,10 +7,10 @@
  * `.glass()` button morphs into its menu — reproducing the Liquid Glass
  * context-menu animation the old SwiftUI Menu had, without the scroll-pin.
  *
- * Fallback (no glass-button morph available): an expo-glass-effect GlassView
- * capsule (also a real RN view, so it scrolls) wearing a native iOS menu via
- * @react-native-menu/menu's MenuView. Native menu + correct scroll, just no
- * glass morph.
+ * Without the glass-button module the currency menu comes from the flat
+ * variant (the same pill the other styles draw). A pill with no currency
+ * menu is an expo-glass-effect GlassView capsule (a real RN view, so it
+ * scrolls) whose tap fires `onPress`.
  *
  * Tap/long-press contract mirrors the blur + android variants: when an `onPress`
  * toggle exists, a tap fires it and a long-press opens the menu; with no
@@ -21,7 +21,6 @@ import { accountUnitLabel, FIAT_UNITS } from 'wallet';
 
 import { unitSfSymbol } from '@/shared/lib/cashu/unitPresentation';
 import React from 'react';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { GlassView } from 'expo-glass-effect';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { withAlpha } from '@/shared/lib/color';
@@ -32,9 +31,17 @@ import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
+import { FiatCurrencyPillFlat } from './FiatCurrencyPill.flat';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
+  if (props.enableCurrencyMenu !== false && !LiquidGlassMenu.isSupported) {
+    return <FiatCurrencyPillFlat {...props} />;
+  }
+  return <FiatCurrencyPillGlass {...props} />;
+}
+
+function FiatCurrencyPillGlass(props: FiatCurrencyPillProps): React.ReactElement {
   const {
     text,
     iosHeight,
@@ -80,14 +87,6 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     );
   }
 
-  // Fallback: GlassView pill + native UIMenu via MenuView (scrolls, no morph).
-  const actions: MenuAction[] = FIAT_UNITS.map((unit) => ({
-    id: unit,
-    title: accountUnitLabel(unit),
-    image: unitSfSymbol(unit),
-    state: displayCurrency === unit ? ('on' as const) : ('off' as const),
-  }));
-
   const pill = (
     <GlassView
       glassEffectStyle="regular"
@@ -95,8 +94,8 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
       accessible={!!accessibilityLabel}
       accessibilityLabel={accessibilityLabel}
       // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
-      // touches with the wrapping Pressable/MenuView, making taps flaky. Keep
-      // the glass decorative; the pressable/menu owns the tap.
+      // touches with the wrapping Pressable, making taps flaky. Keep the glass
+      // decorative; the pressable owns the tap.
       tintColor={withAlpha(INVARIANT_WHITE, 0.15)}
       style={{
         borderRadius: 999,
@@ -112,23 +111,10 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     </GlassView>
   );
 
-  if (!enableCurrencyMenu) {
-    return (
-      <Pressable onPress={onPress} disabled={!onPress}>
-        {pill}
-      </Pressable>
-    );
-  }
-
+  // No currency menu: the glass pill is a plain toggle.
   return (
-    <MenuView
-      title="Display currency"
-      actions={actions}
-      shouldOpenOnLongPress={menuOpensOnLongPress}
-      onPressAction={({ nativeEvent }) =>
-        handleSelectCurrency(nativeEvent.event as DisplayCurrency)
-      }>
-      {onPress ? <Pressable onPress={onPress}>{pill}</Pressable> : pill}
-    </MenuView>
+    <Pressable onPress={onPress} disabled={!onPress}>
+      {pill}
+    </Pressable>
   );
 }

@@ -240,9 +240,9 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Theme & visual
 
-<!-- code: shared/lib/themeEngine.ts; shared/lib/colorExtraction.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/lib/theme/backgroundBlur.ts; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
+<!-- code: shared/lib/themeEngine.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/lib/theme/backgroundBlur.ts; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
 
-- [x] **Wallpaper-driven theming** — theme tints are derived from the user's chosen wallpaper via `react-native-image-colors`
+- [x] **Wallpaper-driven theming** — theme tints come from the static palette stored with the user's chosen wallpaper
 - [x] **Nostr wallpaper sharing** — wallpapers are published and discovered through Nostr; download-then-apply so themes never flip before the asset is ready
 - [x] **Hardened wallpaper pipeline** — remote thumbnail validation, per-URI palette fallback, and catalog/sprite/theme diagnostics with render-count + image-decode perf logs; the wallpaper background is memoized and skips the motion sensor on solid-colour themes
 - [x] **Light & dark theme** — full light theme parity across chrome and content

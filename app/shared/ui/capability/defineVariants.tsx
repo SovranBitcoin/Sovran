@@ -37,7 +37,7 @@
  *
  *  - `index.ios.ts` / `index.android.ts` are BUNDLE entries. Their job is to
  *    keep a variant's native dependency (`@expo/ui/swift-ui`, `expo-blur`,
- *    `@react-native-menu/menu`, …) off the other platform's Metro graph.
+ *    `liquid-glass-menu`, …) off the other platform's Metro graph.
  *  - Do NOT add a plain `index.ts` alongside them just to make the component
  *    resolvable from node. Jest runs `jest-expo/node` (`defaultPlatform: node`),
  *    so it would resolve that file in preference to both platform entries —

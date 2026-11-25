@@ -1,21 +1,10 @@
 import { useEffect, useId, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import {
-  BlurMask,
-  Canvas,
-  Circle,
-  FillType,
-  Group,
-  Path as SkiaPath,
-  RadialGradient,
-  Skia,
-  vec,
-} from '@shopify/react-native-skia';
 import Animated, {
   cancelAnimation,
   Easing,
+  useAnimatedProps,
   useAnimatedStyle,
-  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
@@ -23,7 +12,19 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import Svg, { Defs, Path, Text, TextPath } from 'react-native-svg';
+import Svg, {
+  Circle,
+  ClipPath,
+  Defs,
+  FeGaussianBlur,
+  Filter,
+  G,
+  Path,
+  RadialGradient,
+  Stop,
+  Text,
+  TextPath,
+} from 'react-native-svg';
 
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import { generateTierRingTheme, type TierRingBlob } from '@/shared/lib/avatarGradient';
@@ -76,7 +77,7 @@ interface ProfileTierRingProps {
 /**
  * The tier ring around a profile avatar, built from three references:
  * Primal's legend avatars (a thin two-tone metal band plus a coloured glow),
- * the Skia "glow border" pattern (a blurred copy of the band under a sharp
+ * the "glow border" pattern (a blurred copy of the band under a sharp
  * one), and the CSS soap-bubble recipe (a film whose colours move around the
  * circumference, a specular kiss at the upper left, a thin refractive rim).
  *
@@ -108,14 +109,9 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const labelRadius = ringRadius;
   const labelArcLength = (labelRadius * LABEL_SPAN * Math.PI) / 180;
   const theme = useMemo(() => (tier ? generateTierRingTheme(tier, seed) : null), [tier, seed]);
-  // The blobs are clipped to the band.
-  const band = useMemo(() => {
-    const path = Skia.Path.Make();
-    path.addCircle(center, center, ringRadius + bandWidth / 2);
-    path.addCircle(center, center, ringRadius - bandWidth / 2);
-    path.setFillType(FillType.EvenOdd);
-    return path;
-  }, [bandWidth, center, ringRadius]);
+  // The blobs are clipped to the band: an annulus, two circles filled even-odd.
+  const band = `${circlePath(center, ringRadius + bandWidth / 2)} ${circlePath(center, ringRadius - bandWidth / 2)}`;
+  const id = (name: string) => `${uid}-${name}`;
 
   // The tier is rarely known on the first frame (counts and score land after
   // the header). When it resolves the ring fades and scales in while the film
@@ -172,93 +168,6 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
     <View style={{ width: outer, height: outer }} testID="profile-tier-ring">
       {theme && tier ? (
         <Animated.View style={[StyleSheet.absoluteFill, entrance]} pointerEvents="none">
-          <Canvas
-            style={{
-              position: 'absolute',
-              left: -bleed,
-              top: -bleed,
-              width: canvas,
-              height: canvas,
-            }}
-            pointerEvents="none">
-            {/* glow: the band and its blobs, wide and blurred, under everything */}
-            <Group opacity={0.55}>
-              <Circle
-                cx={center}
-                cy={center}
-                r={ringRadius}
-                style="stroke"
-                strokeWidth={GLOW_STROKE * scale}
-                color={theme.glow}>
-                <BlurMask blur={GLOW_BLUR * scale} style="normal" />
-              </Circle>
-              {theme.blobs.map((blob, index) => (
-                <FilmBlob
-                  key={index}
-                  blob={blob}
-                  clock={clock}
-                  center={center}
-                  ringRadius={ringRadius}
-                  bandWidth={bandWidth}
-                  blur={GLOW_BLUR * scale}
-                />
-              ))}
-            </Group>
-            {/* the band, and the blobs drifting through it */}
-            <Circle
-              cx={center}
-              cy={center}
-              r={ringRadius}
-              style="stroke"
-              strokeWidth={bandWidth}
-              color={theme.base}
-            />
-            <Group clip={band}>
-              {theme.blobs.map((blob, index) => (
-                <FilmBlob
-                  key={index}
-                  blob={blob}
-                  clock={clock}
-                  center={center}
-                  ringRadius={ringRadius}
-                  bandWidth={bandWidth}
-                />
-              ))}
-            </Group>
-            {/* bevel: lit from the upper left, shaded lower right */}
-            <SkiaPath
-              path={light}
-              style="stroke"
-              strokeWidth={1.6 * scale}
-              strokeCap="round"
-              color="rgba(255,255,255,0.78)">
-              <BlurMask blur={0.9 * scale} style="normal" />
-            </SkiaPath>
-            <SkiaPath
-              path={shade}
-              style="stroke"
-              strokeWidth={1.6 * scale}
-              strokeCap="round"
-              color="rgba(0,0,0,0.32)">
-              <BlurMask blur={1.1 * scale} style="normal" />
-            </SkiaPath>
-            {/* specular kisses */}
-            <Circle cx={kiss.x} cy={kiss.y} r={2 * scale} color="rgba(255,255,255,0.95)">
-              <BlurMask blur={1.3 * scale} style="normal" />
-            </Circle>
-            <Circle cx={kiss2.x} cy={kiss2.y} r={1.1 * scale} color="rgba(255,255,255,0.5)">
-              <BlurMask blur={1 * scale} style="normal" />
-            </Circle>
-            {/* thin refractive rim on the inside edge */}
-            <Circle
-              cx={center}
-              cy={center}
-              r={ringRadius - (STROKE / 2 - 0.5) * scale}
-              style="stroke"
-              strokeWidth={0.8 * scale}
-              color="rgba(255,255,255,0.28)"
-            />
-          </Canvas>
           <Svg
             style={{
               position: 'absolute',
@@ -273,8 +182,112 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
             pointerEvents="none"
             accessibilityLabel={`${PROFILE_TIER_LABEL[tier]} tier`}>
             <Defs>
-              <Path id={`${uid}-label-path`} d={labelPath} />
+              <Path id={id('label-path')} d={labelPath} />
+              <ClipPath id={id('band')}>
+                <Path d={band} clipRule="evenodd" />
+              </ClipPath>
+              <BlurFilter id={id('blur-glow')} size={canvas} blur={GLOW_BLUR * scale} />
+              <BlurFilter id={id('blur-light')} size={canvas} blur={0.9 * scale} />
+              <BlurFilter id={id('blur-shade')} size={canvas} blur={1.1 * scale} />
+              <BlurFilter id={id('blur-kiss')} size={canvas} blur={1.3 * scale} />
+              <BlurFilter id={id('blur-kiss2')} size={canvas} blur={1 * scale} />
+              {theme.blobs.map((blob, index) => (
+                // objectBoundingBox (the default) centres each gradient on its
+                // own moving circle, so the colour travels with the blob.
+                <RadialGradient key={index} id={id(`blob-${index}`)} cx="50%" cy="50%" r="50%">
+                  <Stop offset={0} stopColor={blob.color} />
+                  <Stop offset={0.3} stopColor={blob.color} />
+                  <Stop offset={1} stopColor={blob.color} stopOpacity={0} />
+                </RadialGradient>
+              ))}
             </Defs>
+            {/* glow: the band and its blobs, wide and blurred, under everything */}
+            <G opacity={0.55}>
+              <Circle
+                cx={center}
+                cy={center}
+                r={ringRadius}
+                fill="none"
+                strokeWidth={GLOW_STROKE * scale}
+                stroke={theme.glow}
+                filter={`url(#${id('blur-glow')})`}
+              />
+              {theme.blobs.map((blob, index) => (
+                <FilmBlob
+                  key={index}
+                  blob={blob}
+                  fill={`url(#${id(`blob-${index}`)})`}
+                  clock={clock}
+                  center={center}
+                  ringRadius={ringRadius}
+                  bandWidth={bandWidth}
+                  filter={`url(#${id('blur-glow')})`}
+                />
+              ))}
+            </G>
+            {/* the band, and the blobs drifting through it */}
+            <Circle
+              cx={center}
+              cy={center}
+              r={ringRadius}
+              fill="none"
+              strokeWidth={bandWidth}
+              stroke={theme.base}
+            />
+            <G clipPath={`url(#${id('band')})`}>
+              {theme.blobs.map((blob, index) => (
+                <FilmBlob
+                  key={index}
+                  blob={blob}
+                  fill={`url(#${id(`blob-${index}`)})`}
+                  clock={clock}
+                  center={center}
+                  ringRadius={ringRadius}
+                  bandWidth={bandWidth}
+                />
+              ))}
+            </G>
+            {/* bevel: lit from the upper left, shaded lower right */}
+            <Path
+              d={light}
+              fill="none"
+              strokeWidth={1.6 * scale}
+              strokeLinecap="round"
+              stroke="rgba(255,255,255,0.78)"
+              filter={`url(#${id('blur-light')})`}
+            />
+            <Path
+              d={shade}
+              fill="none"
+              strokeWidth={1.6 * scale}
+              strokeLinecap="round"
+              stroke="rgba(0,0,0,0.32)"
+              filter={`url(#${id('blur-shade')})`}
+            />
+            {/* specular kisses */}
+            <Circle
+              cx={kiss.x}
+              cy={kiss.y}
+              r={2 * scale}
+              fill="rgba(255,255,255,0.95)"
+              filter={`url(#${id('blur-kiss')})`}
+            />
+            <Circle
+              cx={kiss2.x}
+              cy={kiss2.y}
+              r={1.1 * scale}
+              fill="rgba(255,255,255,0.5)"
+              filter={`url(#${id('blur-kiss2')})`}
+            />
+            {/* thin refractive rim on the inside edge */}
+            <Circle
+              cx={center}
+              cy={center}
+              r={ringRadius - (STROKE / 2 - 0.5) * scale}
+              fill="none"
+              strokeWidth={0.8 * scale}
+              stroke="rgba(255,255,255,0.28)"
+            />
             {/* engraved: a dark copy offset toward the light (up-left, i.e. toward
                 the centre on this arc), a light face on top — the cut edge shows
                 as the dark sliver along the letters' upper-left */}
@@ -287,7 +300,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               alignmentBaseline="central"
               dx={-0.45 * scale}
               dy={-0.7 * scale}>
-              <TextPath href={`#${uid}-label-path`} startOffset={labelArcLength / 2}>
+              <TextPath href={`#${id('label-path')}`} startOffset={labelArcLength / 2}>
                 {PROFILE_TIER_LABEL[tier]}
               </TextPath>
             </Text>
@@ -298,7 +311,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               letterSpacing={1.3 * scale}
               textAnchor="middle"
               alignmentBaseline="central">
-              <TextPath href={`#${uid}-label-path`} startOffset={labelArcLength / 2}>
+              <TextPath href={`#${id('label-path')}`} startOffset={labelArcLength / 2}>
                 {PROFILE_TIER_LABEL[tier]}
               </TextPath>
             </Text>
@@ -319,53 +332,66 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   );
 }
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+/** A Gaussian blur over the whole canvas (so a wide glow is never cropped). */
+function BlurFilter({ id, size, blur }: { id: string; size: number; blur: number }) {
+  return (
+    <Filter id={id} filterUnits="userSpaceOnUse" x={0} y={0} width={size} height={size}>
+      <FeGaussianBlur stdDeviation={blur} />
+    </Filter>
+  );
+}
+
 /**
  * One blob of colour drifting around the band: its centre rides the ring's
  * centre line at `angle + turns·clock + wobble·sin(…)`, and its radius
  * breathes. Every term is a whole number of cycles per loop, so the loop
- * wraps without a jump. Values are derived on the UI thread; Skia reads
- * shared values directly.
+ * wraps without a jump. Position and radius are computed on the UI thread.
  */
 function FilmBlob({
   blob,
+  fill,
   clock,
   center,
   ringRadius,
   bandWidth,
-  blur,
+  filter,
 }: {
   blob: TierRingBlob;
+  fill: string;
   clock: SharedValue<number>;
   center: number;
   ringRadius: number;
   bandWidth: number;
-  blur?: number;
+  filter?: string;
 }) {
-  const c = useDerivedValue(() => {
+  const animatedProps = useAnimatedProps(() => {
     const t = clock.value;
     const angle =
       blob.angle + blob.turns * TAU * t + blob.wobble * Math.sin(TAU * blob.wobbleCycles * t);
-    return vec(center + ringRadius * Math.cos(angle), center + ringRadius * Math.sin(angle));
+    return {
+      cx: center + ringRadius * Math.cos(angle),
+      cy: center + ringRadius * Math.sin(angle),
+      r:
+        blob.radius * bandWidth * (1 + BREATH * Math.sin(TAU * blob.breathCycles * t + blob.phase)),
+    };
   });
-  const r = useDerivedValue(
-    () =>
-      blob.radius *
-      bandWidth *
-      (1 + BREATH * Math.sin(TAU * blob.breathCycles * clock.value + blob.phase))
-  );
+  // Translucent with a long, gentle falloff: the colour diffuses into the
+  // band rather than sitting on it as a spot.
   return (
-    // Translucent with a long, gentle falloff: the colour diffuses into the
-    // band rather than sitting on it as a spot.
-    <Circle c={c} r={r} opacity={BLOB_OPACITY}>
-      <RadialGradient
-        c={c}
-        r={r}
-        colors={[blob.color, blob.color, 'transparent']}
-        positions={[0, 0.3, 1]}
-      />
-      {blur !== undefined ? <BlurMask blur={blur} style="normal" /> : null}
-    </Circle>
+    <AnimatedCircle
+      animatedProps={animatedProps}
+      fill={fill}
+      opacity={BLOB_OPACITY}
+      filter={filter}
+    />
   );
+}
+
+/** A full circle as two half arcs, for compound (even-odd) paths. */
+function circlePath(c: number, r: number): string {
+  return `M ${c - r} ${c} A ${r} ${r} 0 1 0 ${c + r} ${c} A ${r} ${r} 0 1 0 ${c - r} ${c} Z`;
 }
 
 function arc(cx: number, cy: number, r: number, fromDeg: number, toDeg: number): string {

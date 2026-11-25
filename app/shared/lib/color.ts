@@ -207,29 +207,3 @@ export function blend(base: string, accent: string, amount: number): string {
     b: a.b * (1 - amount) + b.b * amount,
   });
 }
-
-/**
- * Pick a readable companion colour for `hex`: lighten it when it is dark,
- * darken it when it is light, and fall back to lightening when darkening would
- * not move far enough to be visible.
- */
-export function getContrastColors(
-  hex: string,
-  amount = 0.3
-): { contrastColor: string; borderColor: string } {
-  const base = luminance(hex);
-
-  if (base < 0.3) {
-    const lightened = lighten(hex, amount);
-    return { contrastColor: lightened, borderColor: lightened };
-  }
-
-  const darkened = darken(hex, amount);
-
-  if (Math.abs(base - luminance(darkened)) < 0.1) {
-    const lightened = lighten(hex, amount);
-    return { contrastColor: lightened, borderColor: lightened };
-  }
-
-  return { contrastColor: darkened, borderColor: hex };
-}

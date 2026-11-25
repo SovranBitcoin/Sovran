@@ -63,7 +63,6 @@ jest.mock('@/shared/lib/nav/profileRoutes', () => ({}));
 jest.mock('@/shared/lib/nav/mintInfoRoutes', () => ({}));
 jest.mock('@/shared/blocks/OperatorRunsSection', () => ({ OperatorRunsSection: () => null }));
 jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({}));
-jest.mock('@/shared/lib/colorExtraction', () => ({}));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({}));
 jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({}));

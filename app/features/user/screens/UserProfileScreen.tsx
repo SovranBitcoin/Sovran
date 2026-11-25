@@ -75,7 +75,7 @@ import { ProfileBody } from '@/features/user/components/ProfileBody';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getContrastColors, withAlpha } from '@/shared/lib/color';
+import { withAlpha } from '@/shared/lib/color';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { buildProfileHref, useProfileEntry } from '@/shared/lib/nav/profileRoutes';
 import { buildMintInfoHref, getProfileMintInfoUrl } from '@/shared/lib/nav/mintInfoRoutes';
@@ -86,7 +86,6 @@ import {
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
-import { useDominantColor } from '@/shared/lib/colorExtraction';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -173,12 +172,6 @@ function safeNpubEncode(pubkey: string): string {
   } catch {
     return '';
   }
-}
-
-/** [base, contrast] gradient pair for a header color extracted from an image. */
-function gradientPair(base: string): readonly [string, string] {
-  const { contrastColor } = getContrastColors(base, 0.3);
-  return [base, contrastColor] as const;
 }
 
 interface ProfileInfoItem {
@@ -650,7 +643,6 @@ function BannerWithAvatar({
   const [avatarSettled, setAvatarSettled] = useState(false);
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
-  const fallbackIndex = pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0;
   const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
   // Mirror Avatar's state model for the banner:
@@ -661,35 +653,17 @@ function BannerWithAvatar({
   // `isResolving` (not just isLoading) gates the fallback so a seeded
   // name-only record revalidating in the background never flashes the seeded
   // gradient before the real banner arrives — always placeholder → final.
-  const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
-  const bannerColors = useDominantColor(
-    !pictureUrl && hasBannerImage ? bannerUrl : undefined,
-    fallbackIndex
-  );
-
+  // The header always draws the pubkey-seeded palette; it no longer samples
+  // colours out of the avatar or banner image.
   const bannerState: 'loading' | 'image' | 'fallback' = hasBannerImage
     ? bannerStatus === 'loaded'
       ? 'image'
       : 'loading'
-    : isLoading || isResolving || (!!pictureUrl && !pfpColors.hasLoaded)
+    : isLoading || isResolving
       ? 'loading'
       : 'fallback';
 
   const bannerGradientTheme = generateSeededGradient(`${pubkey || 'default'}`);
-
-  const gradientSource =
-    pictureUrl && pfpColors.hasExtractedColors
-      ? 'pfp'
-      : hasBannerImage && bannerColors.hasExtractedColors
-        ? 'banner'
-        : 'seeded';
-
-  const imageGradientColors =
-    gradientSource === 'pfp'
-      ? gradientPair(pfpColors.baseColor)
-      : gradientSource === 'banner'
-        ? gradientPair(bannerColors.baseColor)
-        : null;
 
   useEffect(() => {
     setBannerStatus('loading');
@@ -789,51 +763,7 @@ function BannerWithAvatar({
               recyclingKey={bannerUrl}
               onError={() => setBannerStatus('failed')}
             />
-            {imageGradientColors ? (
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { backgroundColor: withAlpha(imageGradientColors[0], 0.05) },
-                  ]}
-                />
-                <LinearGradient
-                  colors={[withAlpha(imageGradientColors[0], 0.28), 'transparent']}
-                  locations={[0, 0.8]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={[
-                    withAlpha(imageGradientColors[1], 0.2),
-                    'transparent',
-                    withAlpha(imageGradientColors[0], 0.18),
-                  ]}
-                  locations={[0, 0.55, 1]}
-                  start={{ x: 1, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.06)', 'transparent']}
-                  locations={[0, 0.7]}
-                  start={{ x: 0.5, y: 0 }}
-                  end={{ x: 0.5, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </View>
-            ) : null}
           </>
-        ) : imageGradientColors ? (
-          <View style={StyleSheet.absoluteFill}>
-            <LinearGradient
-              colors={imageGradientColors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
         ) : (
           seededGradientFill
         )}

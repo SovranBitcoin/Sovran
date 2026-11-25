@@ -98,7 +98,6 @@ jest.mock('@/shared/ui/composed/Section', () => ({
 jest.mock('@/shared/ui/composed/UnderlineTabs', () => ({ UnderlineTabs: () => null }));
 jest.mock('@/shared/blocks/status', () => ({ LoadingIndicator: () => null }));
 jest.mock('@/shared/lib/e2e/E2EAccessibilityProbe', () => ({ E2EAccessibilityProbe: () => null }));
-jest.mock('react-native-qrcode-svg', () => ({ __esModule: true, default: () => null }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/hooks/useThemeColor', () => {
   const { INVARIANT_BLACK } = jest.requireActual<typeof import('@/shared/lib/brandColors')>(
