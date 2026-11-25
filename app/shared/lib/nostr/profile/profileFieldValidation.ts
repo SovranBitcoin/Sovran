@@ -7,7 +7,7 @@ import { LightningAddress } from '@sovranbitcoin/schemas';
  *
  * - LUD-16 (Lightning address): `<username>@<domain>`, username `a-z0-9-_.`,
  *   resolved at `https://<domain>/.well-known/lnurlp/<username>`.
- * - NIP-05 (Nostr address): `<local-part>@<domain>`, local part `a-z0-9-_.`
+ * - NIP-05 (shown as "Verified name"): `<local-part>@<domain>`, local part `a-z0-9-_.`
  *   (case-insensitive, stored lowercase); `_@<domain>` is the root name and a
  *   bare domain is shorthand for it.
  *
@@ -42,7 +42,7 @@ export function checkNip05(input: string): ProfileFieldCheck {
   const parsed = parseNip05Identifier(value);
   return parsed
     ? { ok: true, value: parsed.identifier }
-    : { ok: false, message: 'Enter a Nostr address like name@domain.com.' };
+    : { ok: false, message: 'Enter a verified name like you@domain.com.' };
 }
 
 export const ABOUT_MAX_LENGTH = 500;

@@ -1,11 +1,32 @@
 import type { RequestControls } from 'wallet';
 
+import { dataResetGeneration } from '@/shared/lib/account/dataResetFence';
 import { discoverMint } from '@/shared/lib/apiClient';
 import { cacheOperatorStats } from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+
+/** How long a discovery answer waits for the stores it writes to load. */
+const WRITE_LOAD_WAIT_MS = 10_000;
+
+/**
+ * Whether a discovery answer may be written: every store it touches has
+ * loaded (a write before that is saved over), and Delete All has not run
+ * since the read started (it would write the deleted install's data back).
+ */
+async function mayWriteDiscovery(generation: number): Promise<boolean> {
+  const options = { orFailed: true, timeoutMs: WRITE_LOAD_WAIT_MS };
+  const loaded = await Promise.all([
+    whenLoaded(useSettingsStore, options),
+    whenLoaded(useMintMetadataStore, options),
+    whenLoaded(useMintTestnutStore, options),
+  ]);
+  return loaded.every(Boolean) && dataResetGeneration() === generation;
+}
 
 /**
  * Host-scoped display metadata for one mint (audit state + operation counts,
@@ -45,6 +66,13 @@ export async function getDiscoveredMintMetadata(
   }
 
   const t0 = Date.now();
+  const generation = dataResetGeneration();
+  // Wait for settings before querying auditors so disabled auditors are never called.
+  await whenLoaded(useSettingsStore, { orFailed: true, timeoutMs: WRITE_LOAD_WAIT_MS });
+  if (controls?.signal?.aborted || dataResetGeneration() !== generation) {
+    readEvents.superseded({ readId, surface: 'mintAudit', keyHash, gen: 0, reason: 'abort' });
+    return cached;
+  }
   readEvents.request({
     readId,
     surface: 'mintAudit',
@@ -64,6 +92,10 @@ export async function getDiscoveredMintMetadata(
     return cached;
   }
   if (result.isOk() && result.value) {
+    if (!(await mayWriteDiscovery(generation)) || controls?.signal?.aborted) {
+      readEvents.superseded({ readId, surface: 'mintAudit', keyHash, gen: 0, reason: 'abort' });
+      return useMintMetadataStore.getState().getCached(mintUrl);
+    }
     useMintMetadataStore.getState().upsertFromDiscover([result.value]);
     // The operator's reach and reputation go to the single owner as well, so
     // the profile page and any other row for the same person agree with this

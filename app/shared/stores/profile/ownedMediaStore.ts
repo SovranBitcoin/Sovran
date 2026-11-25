@@ -16,13 +16,13 @@
  * Blobs arrive from: the create hook (`recordBlobs` in publishComposed) and the
  * passive ingest seams (`ingestOwnMediaBlobs`, mirroring `ingestOwnContent`).
  * Deletion writes `deleteState` here but NEVER removes the entry, so the
- * settings "My media" page can show ✓ deleted / ✗ live and re-verify on demand.
+ * settings "Uploaded media" page can show ✓ deleted / ✗ live and re-verify on demand.
  */
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { extractOwnedBlobs, type OwnedBlob } from '@/shared/lib/nostr/media/ownedBlobs';
@@ -30,14 +30,14 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /** `deleted` is the only ✓ state; everything else renders ✗ on the media page. */
-export type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
+type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
 
 /** Ledger key: a blob is identified by the host it lives on AND its content hash. */
 function blobKey(host: string, sha256: string): string {
   return `${host}|${sha256}`;
 }
 
-export interface OwnedBlobEntry {
+interface OwnedBlobEntry {
   sha256: string;
   url: string;
   host: string;
@@ -197,6 +197,6 @@ export function ingestOwnMediaBlobs(
   }
 }
 
-/** All owned blobs, newest-seen first — backs the settings "My media" page. */
+/** All owned blobs, newest-seen first — backs the settings "Uploaded media" page. */
 export const selectOwnedBlobs = (state: OwnedMediaStore): OwnedBlobEntry[] =>
   Object.values(state.byBlob).sort((a, b) => b.lastSeen - a.lastSeen);

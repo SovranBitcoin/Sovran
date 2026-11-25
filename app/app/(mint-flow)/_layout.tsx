@@ -22,9 +22,6 @@ const DISTRIBUTION_OPTIONS = { title: 'Balance split' };
 const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
 // Statically shown: DmChatHeader swaps header content only. A false→true
 // visibility flip on mount remounts the screen in a loop inside modals
-// (blank DM thread) — keep in sync with config/modalScreens.ts.
-const USER_MESSAGES_OPTIONS = { headerShown: true };
-
 export default function MintFlowLayout() {
   return (
     <AndroidSheetFlowStack flow="(mint-flow)">
@@ -34,7 +31,6 @@ export default function MintFlowLayout() {
       <Stack.Screen name="history" options={HISTORY_OPTIONS} />
       <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
       <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
-      <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
     </AndroidSheetFlowStack>
   );
 }

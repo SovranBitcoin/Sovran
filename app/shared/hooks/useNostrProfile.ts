@@ -2,20 +2,15 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { readEvents, readKeyHash, newReadId, readErrorType } from '@/shared/lib/read/readLog';
+import { readEvents, readKeyHash, newReadId } from '@/shared/lib/read/readLog';
 
 import { aggregateValue, type facade } from 'nostr';
 
-import {
-  fetchNostrProfile,
-  parseNostrProfileFor,
-  type NostrProfileFull,
-} from '@/shared/lib/apiClient';
+import { parseNostrProfileFor, type NostrProfileFull } from '@/shared/lib/apiClient';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
-import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
+import { tryNpubEncode } from '@/shared/lib/nostr/nostrBech32';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
-import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {
   cacheProfileStats,
   fetchFollowingCountViaFacade,
@@ -283,56 +278,6 @@ export function useNostrProfile(
       }));
     };
 
-    // Only nagg supplies reputation + top followers; honor tier settings and
-    // preserve the existing Primal/relay fallback when nagg is unavailable.
-    if (getNostrTierConfig().nagg.enabled) {
-      const result = await fetchNostrProfile(pubkey, { signal });
-      if (signal.aborted) return;
-      if (result.isOk()) {
-        recordDebugTiers([pubkey], 'nagg');
-        settle(result.value);
-        done('nagg', false);
-        // The single owner learns the header so the next open seeds it.
-        cacheProfileStats(pubkey, {
-          followers: result.value.followers,
-          follows: result.value.follows,
-          joinedAtSec: result.value.created_at,
-          score: result.value.score,
-          rank: result.value.rank,
-          vertexFetchedAt: result.value.vertexFetchedAt,
-        });
-        // nagg without the nostr module answers a valid envelope with no
-        // aggregates; the other sources fill the counts in parallel with the
-        // reputation refresh.
-        const counting = fillCounts(result.value);
-        const refreshed = await refreshVertex({
-          kind: 'profile',
-          target: pubkey,
-          stale: refreshReputationRef.current && isVertexProfileStale(result.value.vertexFetchedAt),
-          ndk,
-          signal,
-        });
-        if (!signal.aborted && refreshed) {
-          const parsed = parseNostrProfileFor(pubkey)(refreshed);
-          if (parsed.isOk()) {
-            settle(parsed.value);
-            cacheProfileStats(pubkey, {
-              score: parsed.value.score,
-              rank: parsed.value.rank,
-              vertexFetchedAt: parsed.value.vertexFetchedAt,
-            });
-          }
-        }
-        await counting;
-        return;
-      }
-      log.warn('feed.profile.fetch.nagg_failed_fallback', {
-        readId,
-        pubkey: keyHash,
-        errorType: readErrorType(result.error),
-      });
-    }
-
     const stats = await fetchProfileStatsViaFacade(pubkey, { signal, readId });
     if (signal.aborted) return;
     let counting: Promise<void> = Promise.resolve();
@@ -409,7 +354,6 @@ export function useNostrProfile(
     if (!refreshReputation || !pubkey) return;
     const data = dataRef.current;
     if (!data || !isVertexProfileStale(data.vertexFetchedAt)) return;
-    if (!getNostrTierConfig().nagg.enabled) return;
     const controller = new AbortController();
     void refreshVertex({
       kind: 'profile',

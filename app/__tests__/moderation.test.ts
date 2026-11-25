@@ -8,8 +8,8 @@ import {
   reportTags,
   shouldCensorDm,
   type MuteList,
-} from '../features/feed/lib/moderation';
-import type { FeedEvent, FeedItem } from '../features/feed/components/nostr/feedTypes';
+} from '../shared/lib/nostr/moderationHelpers';
+import type { FeedEvent, FeedItem } from '../shared/lib/nostr/nostrEventTypes';
 import {
   asNostrPubkeyHex,
   NostrEventIdSchema,

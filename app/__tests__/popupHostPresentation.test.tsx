@@ -80,12 +80,6 @@ jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
   return { NfcTapContent: () => ReactActual.createElement('NfcTapContent') };
 });
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({ SendMemoContent: () => null }));
-jest.mock('@/features/nostrSigner/components/SignerApprovalSheetContent', () => ({
-  SignerApprovalSheetContent: () => null,
-}));
-jest.mock('@/features/nostrSigner/components/SignerConnectSheetContent', () => ({
-  SignerConnectSheetContent: () => null,
-}));
 jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children, ...props }: { children?: React.ReactNode }) => {
@@ -186,6 +180,16 @@ describe('PopupHost presentation', () => {
       usePopupStore.getState().close();
     });
     jest.useRealTimers();
+  });
+
+  // Gorhom's default `accessible` would fold the sheet into one element and
+  // hide its controls; the host opts out explicitly (no package patch).
+  it('keeps the sheet out of the accessibility tree so its controls stay reachable', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+    });
+    act(() => usePopupStore.getState().open({ message: 'reachable' }));
+    expect(content(renderer!).props.accessible).toBe(false);
   });
 
   it('mounts each open() nonce as a fresh instance that is already open at gorhom index 0', () => {

@@ -89,7 +89,8 @@ export function MintDistributionScreen() {
       ? 'SAT'
       : normUnit.toUpperCase();
 
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
+  // Seeded from the route so the first frame is already on its tab.
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(() => routeCurrency ?? 'SAT');
 
   // Narrow the selector to the per-unit slice. Returning the whole `distributions`
   // record made any write to any unit re-render this screen even though only the
@@ -111,9 +112,11 @@ export function MintDistributionScreen() {
   const supportedUnitsByMint = Object.fromEntries(
     trustedMints.map((mint) => [
       mint.mintUrl,
+      // A mint whose info has not loaded offers no unit yet — assuming sats
+      // would put it in the SAT split it may not be able to issue into.
       (mint.mintInfo
         ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
-        : ['sat']
+        : []
       ).map((unit) => toAccountUnit(unit, isTestnutMint(mint.mintUrl))),
     ])
   ) as Record<string, string[]>;
@@ -126,13 +129,6 @@ export function MintDistributionScreen() {
   const commonUnits = ACCOUNT_UNITS.map((unit) => unit.toUpperCase()).filter((c) => units.has(c));
   const availableCurrencies = commonUnits.length > 0 ? commonUnits : ['SAT'];
 
-  useEffect(() => {
-    if (!routeCurrency) return;
-    if (!availableCurrencies.includes(routeCurrency)) return;
-    // Only override if we're still at the default; don't clobber user-driven changes.
-    setSelectedCurrency((prev) => (prev === 'SAT' ? routeCurrency : prev));
-  }, [routeCurrency, availableCurrencies]);
-
   const mintsForCurrency = trustedMints.filter((mint) =>
     (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(
       (unit) => unit.toUpperCase() === selectedCurrency
@@ -140,12 +136,17 @@ export function MintDistributionScreen() {
   );
 
   const mintUrls = mintsForCurrency.map((m) => m.mintUrl);
+  // Until every trusted mint's units are known, the split's membership is not:
+  // initialising now would prune a still-loading mint's saved share (70/30
+  // would become 100/0 and stay that way once its info arrives).
+  const membershipPending = trustedMints.some((mint) => !mint.mintInfo);
 
   useEffect(() => {
+    if (membershipPending) return;
     if (mintUrls.length > 0) {
       initializeDistribution(selectedCurrency, mintUrls);
     }
-  }, [selectedCurrency, mintUrls, initializeDistribution]);
+  }, [membershipPending, selectedCurrency, mintUrls, initializeDistribution]);
 
   // "Split evenly" mode: ON keeps every enabled mint at an equal share (the
   // sliders are read-only), OFF frees the sliders for a custom split. Not
@@ -156,12 +157,12 @@ export function MintDistributionScreen() {
   const [splitEvenly, setSplitEvenly] = useState(false);
   const seededSplitEvenlyFor = useRef<string | null>(null);
   useEffect(() => {
-    if (mintUrls.length === 0) return;
+    if (membershipPending || mintUrls.length === 0) return;
     if (seededSplitEvenlyFor.current === selectedCurrency) return;
     seededSplitEvenlyFor.current = selectedCurrency;
     const stored = useMintDistributionStore.getState().getDistribution(selectedCurrency);
     setSplitEvenly(isEvenSplit(stored, mintUrls));
-  }, [selectedCurrency, mintUrls]);
+  }, [membershipPending, selectedCurrency, mintUrls]);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -188,6 +189,7 @@ export function MintDistributionScreen() {
   }, [trustedMints, getMintInfo]);
 
   const handleDistributionChange = (mintUrl: string, bp: number) => {
+    if (membershipPending) return;
     log.debug('mint.distribution.change', {
       ...mintUrlLogFields(mintUrl),
       basisPoints: bp,
@@ -198,6 +200,7 @@ export function MintDistributionScreen() {
   };
 
   const handleSplitEvenlyToggle = (next: boolean) => {
+    if (membershipPending) return;
     log.info('mint.distribution.split_evenly.toggle', {
       enabled: next,
       currency: selectedCurrency,
@@ -212,6 +215,7 @@ export function MintDistributionScreen() {
   };
 
   const handleToggleMint = (mintUrl: string, enabled: boolean) => {
+    if (membershipPending) return;
     log.info('mint.distribution.toggle', {
       ...mintUrlLogFields(mintUrl),
       enabled,
@@ -326,6 +330,7 @@ export function MintDistributionScreen() {
                   <ListGroup.ItemSuffix>
                     <HeroSwitch
                       isSelected={splitEvenly}
+                      isDisabled={membershipPending}
                       onSelectedChange={handleSplitEvenlyToggle}
                       aria-label="Split evenly"
                       testID="mint-distribution-split-evenly"
@@ -339,7 +344,7 @@ export function MintDistributionScreen() {
               mintUrls={mintUrls}
               mintInfoMap={mintInfoMap}
               distribution={distribution}
-              slidersDisabled={splitEvenly}
+              slidersDisabled={splitEvenly || membershipPending}
               onDistributionChange={handleDistributionChange}
               onToggleMint={handleToggleMint}
             />

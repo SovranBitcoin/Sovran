@@ -1,18 +1,17 @@
 import { facade, NaggIdentitiesSchema, type NaggIdentity } from 'nostr';
-import { cacheIdentities } from '@/shared/lib/nostr/identityCache';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import {
   combineSignals,
-  createNostrMintEnrichment,
   isAbortError,
   timeoutSignal,
   type MintReviewRecommendation,
   type MintReviewsSummary,
   type RequestControls,
 } from 'wallet';
-import { ok, err, Result, ResultAsync } from 'neverthrow';
+import { ok, err, Result } from 'neverthrow';
 import * as nip19 from 'nostr-tools/nip19';
 import { z } from 'zod';
+import { FIAT_UNITS } from 'wallet/units';
 import { apiLog } from './logger';
 import {
   CatalogResponse,
@@ -20,16 +19,13 @@ import {
   NostrProfileFull as NostrProfileFullStrict,
   TopFollower as TopFollowerStrict,
   loggableIssues,
-  parseWith,
   type MintRecommendation as SchemaMintRecommendation,
   type MintSearchResult,
   type NostrTier,
   type ParseError,
 } from '@sovranbitcoin/schemas';
-import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
-import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
-import { NaggAiProvidersSchema, serverProviders } from '@/shared/lib/routstr/providers';
+import { AuditObservationsSchema } from '@/shared/lib/cashu/auditors/observation';
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -115,6 +111,8 @@ const DiscoverMint = z.looseObject({
   // nagg's unpaid-quote probe saw the mint mark a never-paid quote as paid: a
   // fake payment backend. The row's units are then testnut account units.
   testnut: z.boolean().optional().catch(undefined),
+  /** Each auditor's own typed reading of the mint, by source (additive, tolerant). */
+  auditObservations: AuditObservationsSchema.optional().catch(undefined),
   /** nagg's own `/v1/info` probe, on the provider directory's terms: `unknown`
    *  when never probed or older than its max age, `checkedAt` omitted while
    *  unknown, `latencyMs` from the last successful probe. Feedback, not a gate. */
@@ -177,21 +175,6 @@ export const DiscoverMintsResponse = z.object({
 });
 export type DiscoverMintsResponse = z.infer<typeof DiscoverMintsResponse>;
 
-const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
-
-/**
- * Default per-request budget. React Native's `fetch` has no native timeout;
- * a request that never settles wedges the screen's loading state until the
- * OS reaps the socket — minutes on cellular. Every helper enforces this
- * unless the caller passes a tighter signal. The wallet endpoints sit
- * behind sovran.money so use a tighter budget than colada's
- * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
- */
-const mintReviewsEnrichment = createNostrMintEnrichment({
-  appViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
-  appViewVersion: 'v1',
-  timeoutMs: DEFAULT_TIMEOUT_MS,
-});
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
 export type { MintSearchResult, NostrProfileFullType as NostrProfileFull };
@@ -227,10 +210,6 @@ function toError(e: FetchOrParseError): Error {
   if (e instanceof Error) return e;
   if ((e as ParseError).type === 'schema/zod') return new ApiParseError(e as ParseError);
   return new Error('unknown error');
-}
-
-function toUnknownError(e: unknown): Error {
-  return e instanceof Error ? e : new Error(typeof e === 'string' ? e : 'Unknown error');
 }
 
 function normalizeMintReviewsSummary(
@@ -469,38 +448,127 @@ export const parseNostrProfileFor =
   (pubkey: string) =>
   (input: unknown): Result<NostrProfileFullType, ParseError> =>
     parseProfileEnvelopeFor(pubkey)(input).map((r) => r.profile);
-// nagg also returns minVersion, which @sovranbitcoin/schemas 2.2.0 strips.
-// Remove this extension after the shared schema includes it and the app upgrades.
-const NaggLatestVersionResponse = LatestVersionResponse.extend({
-  minVersion: z.string().max(32).optional(),
-});
-const parseLatestVersion = parseWith(NaggLatestVersionResponse, 'app/latest-version');
-// Move this shape into @sovranbitcoin/schemas in its next release and deprecate
-// PricelistWsMessage there. Remove the local schema once the app upgrades.
-const NaggRatesResponse = z.looseObject({
-  rates: z.record(
-    z.string(),
-    z.object({
-      price: z.number().positive(),
-      at: z.number().int(),
-      samples: z.number().int().optional(),
-      sources: z.array(z.string()).optional(),
-      confidence: z.string().optional(),
-    })
-  ),
-  updatedAt: z.number().int(),
-  degraded: z.boolean().optional(),
-});
-const parseRates = parseWith(NaggRatesResponse, 'app/rates');
-export const fetchBtcRates = (controls: RequestControls = {}) =>
-  fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
+// BTC prices: Coinbase first, Mempool.space when Coinbase cannot answer.
+// Both are fixed public GETs with no headers or body, so nothing about the
+// wallet or account travels with them. A snapshot is accepted only when it
+// prices EVERY fiat unit the wallet supports; a partial one is a failure, so
+// the cache is never half-refreshed from one provider.
+export const COINBASE_BTC_RATES_URL = 'https://api.coinbase.com/v2/exchange-rates?currency=BTC';
+export const MEMPOOL_BTC_PRICES_URL = 'https://mempool.space/api/v1/prices';
+/** Per-provider ceiling: the fallback must still answer quickly. */
+const PRICE_PROVIDER_TIMEOUT_MS = 3_000;
+/** Mempool's `time` must be no older than the cache's staleness budget… */
+const MEMPOOL_MAX_AGE_SECONDS = 2 * 60 * 60;
+/** …and no further ahead than ordinary clock skew. */
+const MEMPOOL_MAX_SKEW_SECONDS = 5 * 60;
+const PRICE_CODES = FIAT_UNITS.map((unit) => unit.toUpperCase());
+/** A plain positive decimal as Coinbase writes it: no sign, exponent or padding. */
+const DECIMAL_RATE = /^\d+(?:\.\d+)?$/;
 
-const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
-const parseAiProviders = parseWith(NaggAiProvidersSchema, 'app/ai-providers');
-const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
-const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
-const parseMintInfos = parseWith(MintInfoResponse, 'nostr/mint/info');
-const parseCatalog = parseWith(CatalogResponse, 'app/wallpapers');
+const CoinbaseRatesEnvelope = z.looseObject({
+  data: z.looseObject({
+    currency: z.literal('BTC'),
+    rates: z.record(z.string(), z.string()),
+  }),
+});
+
+const MempoolPrices = z.looseObject({
+  time: z.number().int().positive(),
+  ...Object.fromEntries(PRICE_CODES.map((code) => [code, z.number().positive().finite()])),
+});
+
+interface BtcRatesResponse {
+  rates: Record<string, { price: number; at: number }>;
+  updatedAt: number;
+  degraded?: boolean;
+  /** Which provider answered. */
+  source: 'coinbase' | 'mempool';
+}
+
+const incomplete = (where: string, path: string[], message: string): ParseError => ({
+  type: 'schema/zod',
+  where,
+  issues: [{ code: 'custom', path, message }],
+});
+
+const parseCoinbaseRates = (input: unknown): Result<BtcRatesResponse, ParseError> => {
+  const parsed = CoinbaseRatesEnvelope.safeParse(input);
+  if (!parsed.success) {
+    return err({
+      type: 'schema/zod',
+      where: 'coinbase/exchange-rates',
+      issues: parsed.error.issues,
+    });
+  }
+  const nowSec = Math.floor(Date.now() / 1000);
+  const rates: Record<string, { price: number; at: number }> = {};
+  for (const code of PRICE_CODES) {
+    const raw = Object.hasOwn(parsed.data.data.rates, code)
+      ? parsed.data.data.rates[code]
+      : undefined;
+    const price = raw !== undefined && DECIMAL_RATE.test(raw) ? Number(raw) : Number.NaN;
+    if (!Number.isFinite(price) || price <= 0) {
+      return err(
+        incomplete('coinbase/exchange-rates', ['data', 'rates', code], 'missing or invalid rate')
+      );
+    }
+    rates[code] = { price, at: nowSec };
+  }
+  return ok({ rates, updatedAt: nowSec, source: 'coinbase' });
+};
+
+const parseMempoolPrices = (input: unknown): Result<BtcRatesResponse, ParseError> => {
+  const parsed = MempoolPrices.safeParse(input);
+  if (!parsed.success) {
+    return err({ type: 'schema/zod', where: 'mempool/prices', issues: parsed.error.issues });
+  }
+  const time = parsed.data.time;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (time < nowSec - MEMPOOL_MAX_AGE_SECONDS || time > nowSec + MEMPOOL_MAX_SKEW_SECONDS) {
+    return err(incomplete('mempool/prices', ['time'], 'outside the accepted window'));
+  }
+  const prices = parsed.data as Record<string, unknown>;
+  const rates: Record<string, { price: number; at: number }> = {};
+  for (const code of PRICE_CODES) rates[code] = { price: prices[code] as number, at: time };
+  return ok({ rates, updatedAt: time, source: 'mempool' });
+};
+
+/**
+ * Complete BTC prices for every supported fiat unit. Coinbase answers first;
+ * any HTTP, network, timeout, JSON or schema failure falls through to
+ * Mempool.space, unless the caller aborted. Each request gets its own
+ * three-second ceiling and the caller's signal. When both fail, Coinbase's
+ * error is returned, so the feed backs off on the primary provider's status.
+ */
+export const fetchBtcRates = async (
+  controls: RequestControls = {}
+): Promise<Result<BtcRatesResponse, Error>> => {
+  const providerControls = {
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs ?? PRICE_PROVIDER_TIMEOUT_MS,
+  };
+  const primary = await fetchJson(
+    COINBASE_BTC_RATES_URL,
+    parseCoinbaseRates,
+    'coinbase/exchange-rates',
+    undefined,
+    providerControls
+  );
+  if (primary.isOk() || controls.signal?.aborted) return primary;
+  apiLog.warn('api.btc_rates.fallback', {
+    from: 'coinbase',
+    to: 'mempool',
+    status: primary.error instanceof ApiHttpError ? primary.error.status : null,
+  });
+  const fallback = await fetchJson(
+    MEMPOOL_BTC_PRICES_URL,
+    parseMempoolPrices,
+    'mempool/prices',
+    undefined,
+    providerControls
+  );
+  return fallback.isOk() ? fallback : primary;
+};
 
 /**
  * Defensive guard for arbitrary `/v1/info` responses. The full contract
@@ -532,85 +600,87 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
 // ---------------------------------------------------------------------------
 
 /**
- * nagg mint discovery: one app-view call returning every known mint with audit
- * state, supported units, review + favourite aggregates, and the operator's
- * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
- * the app no longer needs separate mint search + per-mint
- * review/profile fan-outs for discovery.
+ * Multi-auditor mint discovery: merges results from all enabled auditors
+ * (Nostr NIP-87, MintRadar, Cashu Auditor, IMF.gg) respecting per-auditor
+ * settings in `settingsStore.disabledMintAuditors`.
  */
-export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
-    parseDiscoverMints,
-    'nostr/mint/discover',
-    undefined,
-    { signal }
-  ).then((result) => result.map(withIdentitiesCached));
+export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) => {
+  const { discoverMintsFromAuditors } = require('@/shared/lib/cashu/auditors/discoverMints') as {
+    discoverMintsFromAuditors: typeof import('@/shared/lib/cashu/auditors/discoverMints').discoverMintsFromAuditors;
+  };
+  const { useSettingsStore } = require('@/shared/stores/global/settingsStore') as {
+    useSettingsStore: typeof import('@/shared/stores/global/settingsStore').useSettingsStore;
+  };
+  const settings = useSettingsStore.getState();
+  return discoverMintsFromAuditors({
+    disabledAuditors: settings.disabledMintAuditors,
+    enabledAuditors: settings.enabledMintAuditors,
+    limit,
+    signal,
+  });
+};
 
-/** Hand a response's `identities` to the single owner and pass it on unchanged. */
-function withIdentitiesCached<T extends { identities?: Record<string, NaggIdentity> }>(
-  response: T
-): T {
-  cacheIdentities(response.identities);
-  return response;
-}
-
-/**
- * nagg mint-info changelog: what every tracked mint changed about its own NUT-06
- * document, newest first. One call covers the whole ecosystem (nagg caps `limit`
- * at 500 and the entire recorded history is well under that), so callers filter
- * the response down to the mints they care about rather than asking per mint.
- */
-export const fetchMintChanges = ({
-  limit = 500,
-  signal,
-}: { limit?: number; signal?: AbortSignal } = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/changes?limit=${limit}`,
-    parseMintChanges,
-    'nostr/mint/changes',
-    undefined,
-    { signal }
-  );
-
-/** nagg caps one `/nostr/mint/info` request at this many mints. */
+/** Batch cap for direct NUT-06 `/v1/info` probes. */
 export const MINT_INFO_MAX_URLS = 50;
 
 /**
- * nagg's stored info + testnut verdict for up to `MINT_INFO_MAX_URLS` of the
- * wallet's own mints, one row per mint echoing the requested URL. Nagg fails
- * the whole request rather than answer without verdicts, so an Ok result is
- * safe to cache.
+ * Resolve mint testnut verdicts via enabled auditors (MintRadar `isTest`)
+ * while preserving any existing saved verdicts so a plain `/v1/info` probe
+ * never overwrites a known test mint as a real mainnet mint.
  */
-export const fetchMintInfos = (mintUrls: readonly string[], controls?: RequestControls) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/info?${mintUrls
-      .map((url) => `u=${encodeURIComponent(url)}`)
-      .join('&')}`,
-    parseMintInfos,
-    'nostr/mint/info',
-    undefined,
-    controls
-  ).then((result) => result.map(withIdentitiesCached).map(({ mints }) => mints));
+export const fetchMintInfos = async (
+  mintUrls: readonly string[],
+  controls?: RequestControls
+): Promise<Result<z.infer<typeof MintInfoResponse>['mints'], Error>> => {
+  const { normalizeMintUrlKey } = require('@/shared/lib/url') as {
+    normalizeMintUrlKey: typeof import('@/shared/lib/url').normalizeMintUrlKey;
+  };
+  const { useMintTestnutStore } = require('@/shared/stores/global/mintTestnutStore') as {
+    useMintTestnutStore: typeof import('@/shared/stores/global/mintTestnutStore').useMintTestnutStore;
+  };
+  const discovered = await discoverMints({ signal: controls?.signal });
+  if (discovered.isErr()) return err(discovered.error);
+  const byKey = new Map(
+    discovered.value.mints.map((m) => [normalizeMintUrlKey(m.mintUrl), m] as const)
+  );
+  const existing = useMintTestnutStore.getState().byMintUrl;
+  const nowSec = Math.floor(Date.now() / 1000);
 
-/** A normalized single-mint lookup; unknown mints return no row. */
-export const discoverMint = async (mintUrl: string, controls?: RequestControls) =>
-  (
-    await fetchJson(
-      `${SCORE_API_BASE_URL}/nostr/mint/discover?mint=${encodeURIComponent(mintUrl)}`,
-      parseDiscoverMints,
-      'nostr/mint/discover',
-      undefined,
-      controls
-    )
-  )
-    .map(withIdentitiesCached)
-    .map(({ mints }) => mints[0]);
+  return ok(
+    mintUrls.map((mintUrl) => {
+      const key = normalizeMintUrlKey(mintUrl);
+      const found = byKey.get(key);
+      const saved = existing[key];
+      // Only trust an explicit auditor verdict; never downgrade a saved testnut.
+      const hasAuditedVerdict = found?.hasAudit === true && typeof found.testnut === 'boolean';
+      const testnut =
+        saved?.testnut === true ? true : hasAuditedVerdict ? (found.testnut as boolean) : false;
+      return {
+        mintUrl,
+        testnut,
+        known: Boolean(found),
+        ...(hasAuditedVerdict ? { probedAt: nowSec } : {}),
+        ...(found?.operatorPubkey ? { operatorPubkey: found.operatorPubkey } : {}),
+      };
+    })
+  );
+};
+
+/** Single-mint discovery lookup across enabled public auditors. */
+export const discoverMint = async (
+  mintUrl: string,
+  controls?: RequestControls
+): Promise<Result<DiscoverMint | undefined, Error>> => {
+  const { normalizeMintUrlKey } = require('@/shared/lib/url') as {
+    normalizeMintUrlKey: typeof import('@/shared/lib/url').normalizeMintUrlKey;
+  };
+  const target = normalizeMintUrlKey(mintUrl);
+  const res = await discoverMints({ signal: controls?.signal });
+  return res.map(({ mints }) => mints.find((m) => normalizeMintUrlKey(m.mintUrl) === target));
+};
 
 /**
- * Reviews for one mint from nagg's REST app-view. Screens read through
- * `fetchMintReviews` (shared/lib/nostr), which prefers the tiered facade and
- * falls back to this when no data layer is configured.
+ * Reviews for one mint directly via the Nostr data layer (Primal → relays).
  */
 export const reviewMint = async ({
   mintUrl,
@@ -619,101 +689,90 @@ export const reviewMint = async ({
   mintUrl: string;
   signal?: AbortSignal;
 }): Promise<Result<MintReviewsResponseType, Error>> => {
-  const result = await ResultAsync.fromThrowable<[], MintReviewsSummary | undefined, Error>(
-    () => mintReviewsEnrichment.fetchMintReviews(mintUrl, { signal }),
-    toUnknownError
-  )();
-  return result.map((summary) => normalizeMintReviewsSummary(mintUrl, summary));
+  const { buildNostrDataLayer } = require('@/shared/lib/nostr/buildNostrDataLayer') as {
+    buildNostrDataLayer: typeof import('@/shared/lib/nostr/buildNostrDataLayer').buildNostrDataLayer;
+  };
+  const layer = buildNostrDataLayer();
+  if (!layer) return ok(normalizeMintReviewsSummary(mintUrl, undefined));
+  const res = await layer.getMintReviews({ mintUrl, signal });
+  if (res.isErr()) return err(new Error(res.error.message));
+  return ok(
+    normalizeMintReviewsSummary(mintUrl, {
+      mintUrl,
+      reviews: res.value.reviews.map((r) => ({
+        id: r.eventId,
+        pubkey: r.reviewerPubkey,
+        content: r.content,
+        rating: r.score ?? undefined,
+        created_at: r.createdAtSec,
+      })),
+      averageScore: res.value.averageScore ?? 0,
+      reviewCount: res.value.reviews.length,
+    } as unknown as MintReviewsSummary)
+  );
 };
 
-export const getLatestVersion = ({
-  storage,
-  signal,
-}: {
+/** App updates are delivered by the platform store (App Store, Play Store, Zapstore). */
+export const getLatestVersion = (_args: {
   storage: { version: string };
   signal?: AbortSignal;
-}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/app/latest-version`,
-    parseLatestVersion,
-    'app/latest-version',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storage }),
-    },
-    { signal }
-  );
+}): Promise<Result<z.infer<typeof LatestVersionResponse> & { minVersion?: string }, Error>> =>
+  Promise.resolve(err(new Error('App updates are delivered through your app store')));
 
 /**
- * nagg-served AI model lineup (see `shared/lib/routstr/lineup.ts` for the
- * schema and precedence rules). Served by nagg, so a
- * nagg deploy can retune the AI tab on shipped builds.
+ * Fetch a Nostr profile directly via the Nostr data layer (Primal → relays).
  */
-export const getAiLineup = (controls: RequestControls = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/app/ai-lineup`,
-    parseAiLineup,
-    'app/ai-lineup',
-    undefined,
-    controls
-  );
-
-/**
- * nagg's provider directory: every AI provider it has discovered, with the
- * accepted mints, the operator's key and a health probe it has already run.
- *
- * The picker's first paint. The app's own discovery (Nostr sweep + per-node
- * directory reads + `/v1/info` probes) still runs behind it and corrects it —
- * see `resolveProviderStatus` — but it no longer decides whether the list is
- * empty for the first few seconds. Same budget as every other nagg call: a
- * directory that has not answered inside `DEFAULT_TIMEOUT_MS` is a directory
- * the user is not waiting for.
- */
-export const getAiProviders = async (controls: RequestControls = {}) =>
-  (
-    await fetchJson(
-      `${SCORE_API_BASE_URL}/app/ai-providers`,
-      parseAiProviders,
-      'app/ai-providers',
-      undefined,
-      controls
-    )
-  )
-    .map(withIdentitiesCached)
-    .map(serverProviders);
-
-export const fetchNostrProfile = (
+export const fetchNostrProfile = async (
   pubkey: string,
   controls: RequestControls & { signedVertexRequest?: facade.SignedVertexRequest } = {}
-) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}${controls.signedVertexRequest ? `&svr=${facade.encodeSignedVertexRequest(controls.signedVertexRequest)}` : ''}`,
-    parseProfileEnvelopeFor(pubkey),
-    'nostr/profile',
-    controls.signedVertexRequest ? { cache: 'no-store' } : undefined,
-    {
-      ...controls,
-      timeoutMs: controls.timeoutMs ?? (controls.signedVertexRequest ? 20_000 : DEFAULT_TIMEOUT_MS),
-    }
-  ).then((result) => result.map(withIdentitiesCached).map(({ profile }) => profile));
+): Promise<Result<NostrProfileFullType, Error>> => {
+  const { buildNostrDataLayer } = require('@/shared/lib/nostr/buildNostrDataLayer') as {
+    buildNostrDataLayer: typeof import('@/shared/lib/nostr/buildNostrDataLayer').buildNostrDataLayer;
+  };
+  const layer = buildNostrDataLayer();
+  if (!layer) return err(new Error('Nostr data layer unavailable'));
+  const [profilesRes, statsRes] = await Promise.all([
+    layer.getProfiles({ pubkeys: [pubkey], signal: controls.signal }),
+    layer.getProfileStats({ pubkey, signal: controls.signal }),
+  ]);
+  const meta = profilesRes.isOk() ? profilesRes.value.profiles[pubkey] : undefined;
+  const stats = statsRes.isOk() ? statsRes.value : undefined;
+  if (!meta && !stats) {
+    return err(new Error('Profile not found on enabled Nostr tiers'));
+  }
+  let npub = '';
+  try {
+    npub = nip19.npubEncode(pubkey);
+  } catch {
+    npub = pubkey;
+  }
+  const profile: NostrProfileFullType = {
+    pubkey,
+    npub,
+    rank: 0,
+    fromCache: false,
+    score: null,
+    created_at: stats?.joinedAtSec ?? null,
+    topFollowers: [],
+    name: meta?.name ?? '',
+    displayName: meta?.displayName ?? meta?.name ?? '',
+    about: meta?.about ?? '',
+    picture: meta?.picture ?? '',
+    banner: meta?.banner ?? '',
+    nip05: meta?.nip05 ?? '',
+    lud16: meta?.lud16 ?? '',
+    website: meta?.website ?? '',
+    followers: stats?.followersCount,
+    follows: stats?.followingCount,
+  };
+  return ok(profile);
+};
 
-/**
- * Fetches nagg's app-module wallpaper catalog using the shared Zod schema.
- * This route does not require nagg's optional Nostr module. wallpaperSync
- * retains the persisted last catalog when the request or parsing fails.
- * Unknown top-level fields are silently dropped (Postel's Law); a malformed
- * envelope is coerced into an `Error` with the parse-issue count for the
- * UI layer and the detail is logged via `loggableIssues`.
- */
-export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
-  fetchJson(
-    `${SCORE_API_BASE_URL}/app/wallpapers`,
-    parseCatalog,
-    'app/wallpapers',
-    undefined,
-    controls
-  );
+/** Wallpapers are bundled locally; remote catalog fetching is disabled. */
+export const fetchWallpaperCatalog = (
+  _controls: RequestControls = {}
+): Promise<Result<z.infer<typeof CatalogResponse>, Error>> =>
+  Promise.resolve(err(new Error('Remote wallpaper catalog disabled')));
 
 // ---------------------------------------------------------------------------
 // Mint `/v1/info` — upstream Cashu shape, owned by `@cashu/cashu-ts`.
@@ -724,34 +783,98 @@ export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
 // share the canonical `fetchJson` scaffolding.
 // ---------------------------------------------------------------------------
 
-export const fetchMintInfo = (
-  mintUrl: string,
-  controls: RequestControls = {}
-): Promise<Result<GetInfoResponse, Error>> => {
-  // Defence-in-depth: this is the one helper that dials arbitrary
-  // user-supplied hosts. Callers normalize the URL, but a stray `http://`
-  // or `file://` would otherwise sail through to `fetch`. Reject anything
-  // that isn't `https:` here so the policy is enforced at the boundary
-  // regardless of which call site forgot to validate.
+/**
+ * The `https:` base of a mint, with its trailing slash. Defence-in-depth: the
+ * helpers below dial arbitrary user-supplied hosts, and callers normalize the
+ * URL, but a stray `http://` or `file://` would otherwise sail through to
+ * `fetch`, so the policy is enforced here regardless of which call site forgot.
+ */
+function httpsMintBase(mintUrl: string): Result<string, Error> {
   let parsed: URL;
   try {
     parsed = new URL(mintUrl);
   } catch {
-    return Promise.resolve(err(new Error('Invalid mint URL')));
+    return err(new Error('Invalid mint URL'));
   }
   if (parsed.protocol !== 'https:') {
     apiLog.warn('api.mint_info_scheme_rejected', {
       host: parsed.host,
       protocol: parsed.protocol,
     });
-    return Promise.resolve(err(new Error(`Mint URL must use https: (got ${parsed.protocol})`)));
+    return err(new Error(`Mint URL must use https: (got ${parsed.protocol})`));
   }
+  return ok(mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`);
+}
 
-  const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
-  return fetchJson(
-    `${normalizedUrl}v1/info`,
+export const fetchMintInfo = async (
+  mintUrl: string,
+  controls: RequestControls = {}
+): Promise<Result<GetInfoResponse, Error>> => {
+  const base = httpsMintBase(mintUrl);
+  if (base.isErr()) return err(base.error);
+  // The profile and session the request is made in: an answer that lands
+  // after a switch (even A → B → A) or Delete All is not recorded.
+  const { activePubkey } = require('@/shared/stores/global/profileStore') as {
+    activePubkey: typeof import('@/shared/stores/global/profileStore').activePubkey;
+  };
+  const owner = activePubkey();
+  const { mintHistoryGeneration, observeMintInfoResponse } =
+    require('@/features/mint/lib/mintHistorySync') as typeof import('@/features/mint/lib/mintHistorySync');
+  const generation = mintHistoryGeneration();
+  const result = await fetchJson(
+    `${base.value}v1/info`,
     parseMintInfo,
     'cashu/mint/info',
+    { headers: { Accept: 'application/json' } },
+    controls
+  );
+  if (result.isOk() && owner) {
+    // Every validated `/v1/info` answer is a mint-history observation.
+    void observeMintInfoResponse(mintUrl, result.value, { owner, generation }).catch(
+      (error: unknown) => {
+        apiLog.warn('api.mint_history_observe_failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    );
+  }
+  return result;
+};
+
+// NUT-02 `/v1/keysets`: only the fields Mint Info reads (unit, active, fee).
+const MintKeysetsResponse = z.looseObject({
+  keysets: z
+    .array(
+      z.looseObject({
+        id: z.string().max(128),
+        unit: z.string().max(32),
+        active: z.boolean(),
+        input_fee_ppk: z.number().int().nonnegative().optional().catch(undefined),
+      })
+    )
+    .max(256),
+});
+type MintKeysetsResponse = z.infer<typeof MintKeysetsResponse>;
+
+const parseMintKeysets = (input: unknown): Result<MintKeysetsResponse, ParseError> => {
+  const r = MintKeysetsResponse.safeParse(input);
+  if (!r.success) {
+    return err({ type: 'schema/zod', where: 'cashu/mint/keysets', issues: r.error.issues });
+  }
+  return ok(r.data);
+};
+
+/** A mint's keysets straight from the mint, for one it is not in the wallet yet. */
+export const fetchMintKeysets = (
+  mintUrl: string,
+  controls: RequestControls = {}
+): Promise<Result<MintKeysetsResponse, Error>> => {
+  const base = httpsMintBase(mintUrl);
+  if (base.isErr()) return Promise.resolve(err(base.error));
+  return fetchJson(
+    `${base.value}v1/keysets`,
+    parseMintKeysets,
+    'cashu/mint/keysets',
     { headers: { Accept: 'application/json' } },
     controls
   );

@@ -723,6 +723,33 @@ describe("what an NFC tap leaves behind when it ends", () => {
         expect(adapter.releaseSession).not.toHaveBeenCalled();
         expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
       });
+
+      it("never writes tap A's token into tap B's tag session when a newer NFC read starts mid-send (F238)", async () => {
+        const created = deferred();
+        const executeNfcSend = vi.fn(async () => {
+          await created.promise;
+          return { token: "cashuB-a", operationId: "op-a", historyEntry: "{}" };
+        });
+        const rollbackSend = vi.fn(async () => ({ kind: "reclaimed" as const }));
+        const { tm, adapter } = setup({
+          operations: { executeNfcSend, rollbackSend },
+        });
+        // Tap A starts and pauses while creating its token.
+        const tapA = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+        await vi.waitFor(() => expect(executeNfcSend).toHaveBeenCalledTimes(1));
+
+        // Tap B starts a newer NFC read while Tap A is still in flight (no reset).
+        // Tap B's hardware read takes over the NFC tag session (bumping nfcRead).
+        const tapB = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+        await tapB;
+
+        // Now Tap A's send resolves. It no longer owns the NFC session, so it
+        // must NOT call adapter.writeToken with Tap A's token and must reclaim op-a.
+        created.resolve();
+        await tapA;
+        expect(adapter.writeToken).not.toHaveBeenCalled();
+        expect(rollbackSend).toHaveBeenCalledWith("op-a");
+      });
     });
   });
 });

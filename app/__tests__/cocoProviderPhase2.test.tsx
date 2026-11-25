@@ -92,16 +92,14 @@ jest.mock('@/shared/lib/routstr/reclaim', () => ({
     mockCalls.push('routstrReclaim');
   },
 }));
-jest.mock('@/shared/lib/routstr/sdk/client', () => ({
-  sweepUnsettledPayments: async () => {
-    mockCalls.push('routstrSdkSweep');
-  },
-}));
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({
   reportCocoApiFailure: (...args: unknown[]) => mockReport(...args),
 }));
 jest.mock('@/shared/lib/mintTestnutRefresh', () => ({
   attachMintTestnutToManager: () => () => undefined,
+}));
+jest.mock('@/features/mint/lib/mintHistorySync', () => ({
+  attachMintHistoryToManager: () => () => undefined,
 }));
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   attachMintMetadataToManager: () => () => undefined,
@@ -131,7 +129,6 @@ const FULL_ORDER = [
   'receiveRecovery',
   'paymentRequestRecovery',
   'routstrPaymentRecovery',
-  'routstrSdkSweep',
   'routstrReclaim',
   'legacyClaim',
 ];

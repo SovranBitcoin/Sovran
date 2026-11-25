@@ -1,33 +1,23 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedStyle,
-  type SharedValue,
-} from 'react-native-reanimated';
+import { createContext, useContext, useState } from 'react';
+import { Platform, useWindowDimensions } from 'react-native';
 import { Stack, useNavigation } from 'expo-router';
 import { DrawerActions } from 'expo-router/react-navigation';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
-import { supportsLiquidGlass } from '@/shared/lib/version';
-import { buildExpoRouterHeaderOptions, HeaderIconButton } from '@/navigation/nativeTabs';
+import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { getHeaderTitleWidthFromWidth, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
+import { getHeaderTitleWidthWithoutRight, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
-import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 
 // --- Context ---
 
 type SearchContextValue = {
-  isSearching: boolean;
+  /** Field hint, shared by the iOS header bar and the Android title field. */
+  placeholder: string;
   searchQuery: string;
   clearKey: number;
-  /** Text the search input remounts with — pairs with `clearKey` to seed it. */
+  /** Text the search input is seeded with whenever `clearKey` changes. */
   seedText: string;
   onSearchChange: (query: string) => void;
-  onOpenSearch: () => void;
-  onCloseSearch: () => void;
   /** Programmatically run a query (e.g. tapping a recent-search chip). */
   setQuery: (query: string) => void;
 };
@@ -40,59 +30,29 @@ export const useSearchContext = () => {
   return ctx;
 };
 
-// --- Header components (read state from context, identity-stable) ---
+// --- Android header field (iOS uses the native header search bar) ---
+
+// The field emits every keystroke, like iOS's native bar: local results answer
+// at once, and the remote people search keeps the only pause
+// (`SEARCH_DEBOUNCE_MS`). A debounce here would stack on top of that one.
 
 function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?: string }) {
-  const { clearKey, seedText, onSearchChange } = useSearchContext();
+  const { clearKey, seedText, searchQuery, onSearchChange, setQuery } = useSearchContext();
   const { width } = useWindowDimensions();
-  const searchBarWidth = getHeaderTitleWidthFromWidth(width);
 
   return (
-    <RNView style={liquidTitleBiasStyle}>
-      <GlassSearchBar
-        testID={testID}
-        width={searchBarWidth}
-        // Match the mint selector pill exactly — the search bar swaps into
-        // the same title slot, and a shorter field reads as a jarring jump.
-        height={HEADER_LAYOUT.BUTTON_HEIGHT}
-        clearKey={clearKey}
-        seedText={seedText}
-        onChangeText={onSearchChange}
-        placeholder={placeholder}
-        keyboardType="web-search"
-        debounceMs={300}
-        autoFocus
-      />
-    </RNView>
-  );
-}
-
-// Measured on device (320pt window): UIKit places a fitting custom
-// titleView at +2pt right of true center on iOS 26 even with perfectly
-// symmetric bar items (probe data: left gap 16 / right gap 12). The bias is
-// additive, so it can't be fixed with width math — compensate the title
-// content by the same constant. Tune here if a different device class
-// measures a different bias.
-const LIQUID_TITLE_BIAS_PX = -2;
-const liquidTitleBiasStyle = supportsLiquidGlass()
-  ? { transform: [{ translateX: LIQUID_TITLE_BIAS_PX }] }
-  : null;
-
-function SearchHeaderRight({ testID }: { testID?: string }) {
-  const { isSearching, onOpenSearch, onCloseSearch } = useSearchContext();
-  const iconColor = useThemeColor('foreground');
-
-  // HeaderIconButton (not IconSymbol directly): expo-symbols renders NOTHING
-  // on Android for string symbol names, which left this button an invisible
-  // tap target there.
-  return (
-    <HeaderIconButton
-      icon={isSearching ? 'xmark' : 'magnifyingglass'}
-      size={20}
-      color={iconColor}
-      onPress={isSearching ? onCloseSearch : onOpenSearch}
+    <GlassSearchBar
       testID={testID}
-      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}
+      // The tab has no right header button, so the field runs to the edge.
+      width={getHeaderTitleWidthWithoutRight(width)}
+      height={HEADER_LAYOUT.BUTTON_HEIGHT}
+      clearKey={clearKey}
+      seedText={seedText}
+      value={searchQuery}
+      onClear={() => setQuery('')}
+      onChangeText={onSearchChange}
+      placeholder={placeholder}
+      keyboardType="web-search"
     />
   );
 }
@@ -102,135 +62,73 @@ function SearchHeaderRight({ testID }: { testID?: string }) {
 type SearchLayoutProps = {
   title: string;
   placeholder: string;
-  /**
-   * Custom header title shown when NOT searching (the Wallet passes its
-   * `MintSelector`). When searching, the `GlassSearchBar` always takes over.
-   * Omitted → React Navigation renders the native `title` string.
-   */
-  renderIdleTitle?: () => ReactNode;
-  /**
-   * Transparent header + content, for a tab that paints its own background
-   * (the Wallet's wallpaper). Feed/Contacts paint their surface and gradient
-   * through Screen.
-   */
-  transparent?: boolean;
-  /**
-   * With `transparent`: the page's scroll offset. The header fades a scrim of
-   * the canvas colour in over `scrimDistance` px of scroll, so the wallpaper
-   * shows through at rest and content never runs under the controls.
-   */
-  scrimScrollY?: SharedValue<number>;
-  scrimDistance?: number;
-  /**
-   * Per-tab e2e id prefix: `<prefix>-search-toggle` on the header button and
-   * `<prefix>-search-input` on the search bar (the Wallet passes "wallet").
-   */
-  searchTestIDPrefix?: string;
+  /** e2e id of the search field. */
+  searchTestID?: string;
 };
 
 /**
- * The searchable-tab navigator. It is a route layout, not a screen: the Wallet,
- * Feed and Contacts tabs' `_layout.tsx` files render it as their default
- * export, so its `<Stack>` is the file-based stack for that tab.
+ * The Search tab's navigator. It is a route layout, not a screen: the tab's
+ * `_layout.tsx` renders it as its default export, so its `<Stack>` is the
+ * file-based stack for that tab.
+ *
+ * The field is always in the header. On iOS the page mounts the native
+ * `Stack.SearchBar`, which iOS 26 joins to the tab bar's `role="search"` item;
+ * on Android this layout puts the shared glass field in the title slot.
  */
-/** A canvas-coloured header fade whose opacity follows the page's scroll. */
-function HeaderScrim({
-  scrollY,
-  distance,
-  color,
-}: {
-  scrollY: SharedValue<number>;
-  distance: number;
-  color: string;
-}) {
-  const style = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, distance], [0, 1], Extrapolation.CLAMP),
-  }));
-  return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-      <HeaderGradient backgroundColor={color} anchor={0.82} />
-    </Animated.View>
-  );
-}
-
-export function SearchLayout({
-  title,
-  placeholder,
-  renderIdleTitle,
-  transparent = false,
-  scrimScrollY,
-  scrimDistance = 24,
-  searchTestIDPrefix,
-}: SearchLayoutProps) {
-  const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
+export function SearchLayout({ title, placeholder, searchTestID }: SearchLayoutProps) {
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
-  const search = useHeaderSearch();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [clearKey, setClearKey] = useState(0);
+  const [seedText, setSeedText] = useState('');
+  const setQuery = (query: string) => {
+    setSearchQuery(query);
+    setSeedText(query);
+    setClearKey((prev) => prev + 1);
+  };
 
   const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
-
-  // Only render custom headerTitle when searching (shows GlassSearchBar).
-  // When not searching, let React Navigation render the native title
-  // so it picks up the correct tintColor / Liquid Glass styling.
-  const searchBarTitle = () => (
-    <SearchBarTitle
-      placeholder={placeholder}
-      testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-input` : undefined}
-    />
-  );
-  const headerRight = () => (
-    <SearchHeaderRight
-      testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-toggle` : undefined}
-    />
-  );
   const headerLeft = () => <HeaderProfileButton onPress={openDrawer} />;
 
+  const androidField =
+    Platform.OS === 'android'
+      ? {
+          headerTitle: () => <SearchBarTitle placeholder={placeholder} testID={searchTestID} />,
+          // Starts after the profile button and takes the width a right button would.
+          headerTitleAlign: 'left' as const,
+        }
+      : {};
+
   const screenOptions = buildExpoRouterHeaderOptions({
-    iconColor,
+    iconColor: foreground,
     headerLeft,
-    headerRight,
     options: {
       title,
-      // Without this, the native bar inherits the locked dark
-      // `userInterfaceStyle` and renders the title white — invisible on
-      // the light theme's `surface` background.
-      headerTitleStyle: { color: iconColor },
-      headerTintColor: iconColor,
-      headerTransparent: true,
+      headerTitleStyle: { color: foreground },
+      headerTintColor: foreground,
+      // Opaque: the results start below the header instead of under it.
+      headerTransparent: false,
       headerShadowVisible: false,
-      headerBlurEffect: 'none',
-      headerStyle: { backgroundColor: 'transparent' },
-      headerBackground: scrimScrollY
-        ? () => <HeaderScrim scrollY={scrimScrollY} distance={scrimDistance} color={surface} />
-        : () => null,
-      // GlassSearchBar wins while searching; otherwise an optional custom
-      // idle title (Wallet's MintSelector), else the native `title`.
-      ...(search.isSearching
-        ? { headerTitle: searchBarTitle }
-        : renderIdleTitle
-          ? {
-              headerTitle: () => <RNView style={liquidTitleBiasStyle}>{renderIdleTitle()}</RNView>,
-            }
-          : {}),
+      headerStyle: { backgroundColor: surface },
+      // iOS draws the scroll-edge (large) appearance separately; without this it
+      // is transparent and the black window behind the stack shows through.
+      headerLargeStyle: { backgroundColor: surface },
+      ...androidField,
     },
   });
 
   const contextValue: SearchContextValue = {
-    isSearching: search.isSearching,
-    searchQuery: search.searchQuery,
-    clearKey: search.clearKey,
-    seedText: search.seedText,
-    onSearchChange: search.onSearchChange,
-    onOpenSearch: search.onOpenSearch,
-    onCloseSearch: search.onCloseSearch,
-    setQuery: search.setQuery,
+    placeholder,
+    searchQuery,
+    clearKey,
+    seedText,
+    onSearchChange: setSearchQuery,
+    setQuery,
   };
 
   return (
     <SearchContext.Provider value={contextValue}>
-      <Stack
-        screenOptions={{
-          contentStyle: { backgroundColor: transparent ? 'transparent' : surface },
-        }}>
+      <Stack screenOptions={{ contentStyle: { backgroundColor: surface } }}>
         <Stack.Screen name="index" options={screenOptions} />
       </Stack>
     </SearchContext.Provider>

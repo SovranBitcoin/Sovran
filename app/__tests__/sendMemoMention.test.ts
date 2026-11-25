@@ -12,7 +12,7 @@ import * as nip19 from 'nostr-tools/nip19';
 
 const PUBKEY = '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d';
 const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol'];
-const NPROFILE = createMemoMentionNprofile(PUBKEY, RELAYS);
+const NPROFILE = createMemoMentionNprofile(PUBKEY, RELAYS)!;
 
 describe('send memo mention helpers', () => {
   describe('findActiveMemoMention', () => {
@@ -51,6 +51,15 @@ describe('send memo mention helpers', () => {
         relays: RELAYS,
       });
     });
+  });
+
+  describe('createMemoMentionNprofile with a malformed pubkey', () => {
+    it.each(['error', 'false', '12345', PUBKEY.slice(1), `${PUBKEY}0`])(
+      'returns null for %j instead of throwing',
+      (pubkey) => {
+        expect(createMemoMentionNprofile(pubkey, RELAYS)).toBeNull();
+      }
+    );
   });
 
   describe('insertMemoMentionProfile', () => {

@@ -95,8 +95,8 @@ Re-sending an already-signed event is correct and is not this concern — see `n
 
 ## Where this repo produces entropy
 
-`app/shared/lib/nostr/secureStorage.ts` (BIP-39 mnemonic), `app/features/nostrSigner/lib/bunkerSecrets.ts`
-(NIP-46), `app/shared/lib/nostr/nip17.ts` (gift-wrap keys and timestamp jitter),
+`app/shared/lib/nostr/secureStorage.ts` (BIP-39 mnemonic), `app/shared/lib/nostr/nip17.ts` (gift-wrap
+keys and timestamp jitter),
 `wallet/src/payment-request-receive.ts` (request ids). Proof secrets and blinding factors belong to
 the installed Coco packages, not to this repository.
 

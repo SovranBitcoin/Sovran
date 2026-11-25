@@ -7,7 +7,7 @@ import type { SelectableCheckProps } from './types';
 /**
  * Selection mark for "is this option selected?" UI. Two styles:
  *
- *  - `circle` (default) — filled brand-accent circle with a white check.
+ *  - `circle` (default) — filled brand-accent circle with an `accent-foreground` check.
  *    Used by in-app pickers like the split-bill participant list.
  *  - `square` — native-feeling square checkbox with palette variants.
  *    Used by onboarding terms, settings toggles, and any surface that

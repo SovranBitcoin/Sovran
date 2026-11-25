@@ -78,7 +78,11 @@ jest.mock('@sovranbitcoin/schemas', () => ({
 jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+  apiLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+  log: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
   mintUrlLogFields: jest.fn(() => ({ mintHost: 'mint.example', mintHash: 'mock-hash' })),
+  redactError: (e: unknown) => e,
   useLifecycleLogger: jest.fn(),
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
@@ -177,6 +181,12 @@ jest.mock('heroui-native', () => {
     Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
   };
 });
+
+const mockReclaimRoutstrBalances = jest.fn();
+jest.mock('@/shared/lib/routstr/reclaim', () => ({
+  reclaimRoutstrBalances: () => mockReclaimRoutstrBalances(),
+  recoverPendingPayments: jest.fn(async () => 0),
+}));
 
 describe('SettingsRecoveryScreen gate confirmation', () => {
   beforeEach(() => {
@@ -463,5 +473,45 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       releaseFirst();
       await first!;
     });
+  });
+});
+
+describe('SettingsRecoveryScreen AI leftovers', () => {
+  const { useRoutstrStore } = jest.requireActual<
+    typeof import('@/shared/stores/profile/routstrStore')
+  >('@/shared/stores/profile/routstrStore');
+  const before = useRoutstrStore.getState();
+  afterEach(() => {
+    useRoutstrStore.setState(before, true);
+  });
+
+  it('shows a note instead of an unhandled rejection when collecting fails', async () => {
+    useRoutstrStore.setState({
+      pendingPayments: {
+        'payment-a': {
+          encoded: 'cashuB-test',
+          nodeBaseUrl: 'https://node.example',
+          operationId: 'op-a',
+          startedAt: 1,
+        },
+      },
+    });
+    mockReclaimRoutstrBalances.mockRejectedValueOnce(new Error('node exploded'));
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen />);
+    });
+    const button = () => renderer!.root.findByProps({ testID: 'recovery-reclaim-ai' });
+    await act(async () => {
+      await expect(button().props.onPress()).resolves.toBeUndefined();
+    });
+    const texts = renderer!.root
+      .findAll((node) => node.type === ('MockText' as unknown))
+      .map((node) => node.props.children);
+    expect(texts).toContain(
+      "Couldn't check AI nodes. Your credentials are kept — try again later."
+    );
+    expect(button().props.disabled).toBe(false);
+    await act(async () => renderer!.unmount());
   });
 });

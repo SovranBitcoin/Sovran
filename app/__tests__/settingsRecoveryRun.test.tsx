@@ -71,6 +71,9 @@ jest.mock('@sovranbitcoin/schemas', () => ({
 jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+  apiLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+  log: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
   mintUrlLogFields: jest.fn(() => ({ mintHost: 'mint.example', mintHash: 'mock-hash' })),
   redactError: (e: unknown) => e,
   useLifecycleLogger: jest.fn(),

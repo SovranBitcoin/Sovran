@@ -962,6 +962,19 @@ export function createPaymentMachine(
   }
 
   /**
+   * Writes a tap's token to its tag session only while that tap still owns
+   * the latest NFC read. A newer read replaced the hardware session, so an
+   * older tap must never write its bearer ecash into the newer terminal.
+   */
+  async function writeNfcToken(tap: NfcTap, token: string): Promise<void> {
+    if (tap.read !== nfcRead) {
+      logger.warn("machine.nfc.write.skipped", { reason: "newerRead" });
+      throw new Error("NFC tag session was replaced by a newer read");
+    }
+    await tap.adapter.writeToken(token);
+  }
+
+  /**
    * Lets go of a tap's tag session, once. A newer read took the session
    * over, so a tap whose read is no longer the latest leaves it alone.
    */
@@ -1902,8 +1915,9 @@ export function createPaymentMachine(
                   executeNfcSend: operations.executeNfcSend,
                   rollbackSend: operations.rollbackSend,
                   nfcAdapter: {
-                    writeToken: (token) => nfcTap.adapter.writeToken(token),
+                    writeToken: (token) => writeNfcToken(nfcTap, token),
                     releaseSession: () => releaseNfcSession(nfcTap),
+                    ownsSession: () => nfcTap.read === nfcRead,
                   },
                   context: flowCtx,
                   onProgress: (progress) => {

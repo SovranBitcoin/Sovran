@@ -1,6 +1,7 @@
 import * as nip19 from 'nostr-tools/nip19';
 
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { truncateMiddle } from '@/shared/lib/strings';
 
 type MintInfoContactInput = {
@@ -58,7 +59,8 @@ export function resolveMintInfoNostrContactPubkey(
   const fromContact = getMintInfoNostrContactPubkey(contactRows);
   if (fromContact) return fromContact;
   const hasNostrRow = contactRows.some((row) => row.isNostr);
-  return hasNostrRow && discoveredOperatorPubkey ? discoveredOperatorPubkey : undefined;
+  if (!hasNostrRow || !discoveredOperatorPubkey) return undefined;
+  return extractMintNostrPubkey({ contact: [{ method: 'nostr', info: discoveredOperatorPubkey }] });
 }
 
 export function formatMintInfoNostrFallback(info: string, pubkey?: string): string {
@@ -66,10 +68,18 @@ export function formatMintInfoNostrFallback(info: string, pubkey?: string): stri
   if (nip19.NostrTypeGuard.isNPub(trimmed)) {
     return truncateMiddle(trimmed);
   }
-  if (pubkey) {
+  if (pubkey && isNostrPubkeyHex(pubkey)) {
     return truncateMiddle(nip19.npubEncode(pubkey));
   }
   return truncateMiddle(trimmed);
+}
+
+/** Full npub string copied to the clipboard when tapping a mint's Nostr contact. */
+export function getMintInfoNostrCopyValue(info: string, pubkey?: string): string {
+  if (pubkey && isNostrPubkeyHex(pubkey)) {
+    return nip19.npubEncode(pubkey);
+  }
+  return info.trim();
 }
 
 export function getMintInfoNostrDisplayName(

@@ -3,10 +3,22 @@ import { useMintImport } from '@/features/mint/hooks/useMintImport';
 
 const mockManager = { mint: { addMint: jest.fn() }, wallet: { restore: jest.fn() } };
 let mockCurrentManager = mockManager;
+let mockSelectedMint: string | undefined;
+const mockSetSelectedMint = jest.fn((mintUrl: string) => {
+  mockSelectedMint = mintUrl;
+});
 jest.mock('@/shared/lib/cashu/manager', () => ({
   CocoManager: {
     getInstance: () => mockCurrentManager,
     isInitialized: () => true,
+  },
+}));
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: {
+    getState: () => ({
+      selectedMint: mockSelectedMint,
+      setSelectedMint: mockSetSelectedMint,
+    }),
   },
 }));
 jest.mock('@/shared/lib/logger', () => ({
@@ -23,6 +35,8 @@ function deferred() {
 }
 beforeEach(() => {
   mockCurrentManager = mockManager;
+  mockSelectedMint = undefined;
+  mockSetSelectedMint.mockClear();
   mockManager.mint.addMint.mockReset().mockResolvedValue(undefined);
   mockManager.wallet.restore.mockReset().mockResolvedValue(undefined);
 });
@@ -124,4 +138,19 @@ test('finishes an initiated import without navigating or starting a new screen a
     await completion;
   });
   expect(mockManager.wallet.restore).toHaveBeenCalledWith('https://mint.example');
+});
+
+test('selects the first added mint when none is selected and keeps an existing selection', async () => {
+  const { result } = renderHook(useMintImport);
+  await act(async () => {
+    await result.current.start(['first.example', 'second.example']);
+  });
+  expect(mockSetSelectedMint).toHaveBeenCalledTimes(1);
+  expect(mockSetSelectedMint).toHaveBeenCalledWith('https://first.example');
+
+  mockSetSelectedMint.mockClear();
+  await act(async () => {
+    await result.current.start(['third.example']);
+  });
+  expect(mockSetSelectedMint).not.toHaveBeenCalled();
 });

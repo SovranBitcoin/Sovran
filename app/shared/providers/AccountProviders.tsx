@@ -3,7 +3,7 @@
  *
  * `AccountScopedProviders` is mounted with `key={account-<index>}`, so changing
  * the active account unmounts every provider here and mounts a fresh set:
- * keys, relay pool, signer, Whitenoise, the wallet core and everything under
+ * keys, relay pool, Whitenoise, the wallet core and everything under
  * them. What lives outside React is not replaced by that remount; it is listed
  * in `shared/lib/account/accountRegistry.ts`.
  *
@@ -23,16 +23,15 @@ import { useInitializationReset } from '@/shared/providers/InitializationProvide
 import { compose } from '@/shared/lib/utils';
 import { NostrKeysProvider } from '@/shared/providers/NostrKeysProvider';
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
-import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hasFeature } from '@/shared/config/features';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
-import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useRegisterKeyDerivation } from '@/shared/hooks/useRegisterKeyDerivation';
+import { clearLegacyPairingIntent } from '@/shared/lib/profile/legacyNip46Cleanup';
 import {
   clearTransitionGuardOnStartup,
   registerTransitionControls,
@@ -59,11 +58,6 @@ export function AccountScopedProviders({
       compose([
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
-        // NIP-46 signer service — stays cold (no sockets) until the user has
-        // ≥1 connected app or an in-flight pairing. Must sit directly after
-        // NostrNDKProvider: it gates on its isInitialized flag.
-        NostrSignerProvider,
-        [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
         SovranColadaProvider,
@@ -178,10 +172,14 @@ export function KeyDerivationRegistrar() {
   return null;
 }
 
-/** Clears the AsyncStorage transition guard on app startup (if leftover from a previous restart). */
+/**
+ * Clears the AsyncStorage transition guard on app startup (if leftover from a
+ * previous restart), and any Remote Login pairing link an older build left.
+ */
 export function TransitionGuardCleanup() {
   useEffect(() => {
     void clearTransitionGuardOnStartup();
+    void clearLegacyPairingIntent();
     // Once per run, well after startup: how full AsyncStorage is. Android caps
     // it, and a full database fails saves with nothing on screen to show for it.
     const timer = setTimeout(() => void reportAsyncStorageUsage(), STORAGE_USAGE_REPORT_DELAY_MS);

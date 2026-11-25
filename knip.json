@@ -10,30 +10,18 @@
     "app/codereview/log-doctor/test-dsl/cashu-decode.ts": ["exports"],
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
     "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
-    "app/shared/lib/routstr/sdk/walletAdapter.ts": ["exports"],
     "scripts/lib/phone-frame.mjs": ["exports"],
     "wallet/__tests__/**": ["exports", "types"]
   },
   "workspaces": {
-    "harness": {
-      "entry": ["src/discover-upgrade.ts"],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
-    },
     "app": {
       "entry": [
         "shim.js",
         "polyfills.js",
         "metro.config.js",
-        "shared/lib/routstr/sdk/zlibShim.ts",
         "app/**/*.{ts,tsx}",
         "plugins/*.js",
         "scripts/*.{js,ts}",
-        "e2e/viewer/server.ts",
-        "e2e/viewer/src/main.ts",
-        "e2e/audit/fresh-matrix-cli.ts",
-        "e2e/capture/refresh.ts",
-        "e2e/capture/status.ts",
-        "e2e/stories/bound.ts",
         "shared/stores/runtime/mockDataStore.ts"
       ],
       "project": ["**/*.{ts,tsx,js,jsx}"],

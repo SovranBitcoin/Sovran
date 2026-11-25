@@ -10,7 +10,6 @@
 // melt-operation mapping) used as built-in defaults by useScreenActions.
 // ---------------------------------------------------------------------------
 
-import { getEncodedToken } from "@cashu/cashu-ts";
 
 import { amountToNumberOrUndefined, type AmountLike } from "../amount";
 import { createAmountActionManager } from "../amount-actions/createManager";
@@ -33,6 +32,7 @@ import {
   resolveEntryState,
 } from "../history/states";
 import { defaultDetectors } from "../detectors";
+import { encodeTokenChecked, type TokenEncodeResult } from "../ecash";
 import { FormattedString } from "../formatting/FormattedString";
 import { FormattedTimestamp } from "../formatting/FormattedTimestamp";
 import { errField, logger } from "../logger";
@@ -452,17 +452,12 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
   sendToken: (entry) => {
     const token = entry.token;
     if (!token) return null;
-    try {
-      return {
-        text: getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
-        target: "token",
-      };
-    } catch (e) {
-      logger.warn("screenActionManager.clipboard.tokenEncodeFailed", {
-        error: errField(e),
-      });
-      return null;
-    }
+    const encoded = encodeTokenChecked(token);
+    if (encoded.ok) return { text: encoded.token, target: "token" };
+    logger.warn("screenActionManager.clipboard.tokenEncodeFailed", {
+      error: tokenEncodeFailure(encoded),
+    });
+    return null;
   },
   mintQuote: (entry) => {
     const pr = entry.paymentRequest;
@@ -559,6 +554,14 @@ async function builtinShareHandler(
 
 type EntryRecord = Record<string, unknown>;
 
+function tokenEncodeFailure(
+  result: Exclude<TokenEncodeResult, { ok: true }>,
+): string {
+  return result.reason === "malformed-proof"
+    ? `malformed proof field ${result.field}`
+    : errField(result.error);
+}
+
 function getStringField(
   entry: EntryRecord | null | undefined,
   key: string,
@@ -591,13 +594,11 @@ function getReceiveTokenString(
 ): string | undefined {
   const token = entry?.token;
   if (token) {
-    try {
-      return getEncodedToken(token as Parameters<typeof getEncodedToken>[0]);
-    } catch (e) {
-      logger.warn("screenActionManager.getReceiveTokenString.failed", {
-        error: errField(e),
-      });
-    }
+    const encoded = encodeTokenChecked(token);
+    if (encoded.ok) return encoded.token;
+    logger.warn("screenActionManager.getReceiveTokenString.failed", {
+      error: tokenEncodeFailure(encoded),
+    });
   }
   return getStringField(getMetadata(entry), "rawToken");
 }
@@ -843,15 +844,12 @@ export function decorateEntry(
   let tokenString: FormattedString | null = null;
   const token = raw.token;
   if (token) {
-    try {
-      tokenString = new FormattedString(
-        getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
-        "middle",
-        language,
-      );
-    } catch (e) {
+    const encoded = encodeTokenChecked(token);
+    if (encoded.ok) {
+      tokenString = new FormattedString(encoded.token, "middle", language);
+    } else {
       logger.warn("buildEntryContent.tokenEncodeFailed", {
-        error: errField(e),
+        error: tokenEncodeFailure(encoded),
       });
     }
   }

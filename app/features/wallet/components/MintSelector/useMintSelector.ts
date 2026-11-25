@@ -7,8 +7,10 @@ import { useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from 'wallet/amount';
+import { toRealUnit } from 'wallet';
 import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 
 export interface MintSelectorProps {
   /** Stable identifier forwarded to the interactive platform pill. */
@@ -29,12 +31,27 @@ export interface MintSelectorProps {
   contentHeight?: number;
 }
 
+/**
+ * - `pending`: no mint is selected yet, and the wallet may still pick one (its
+ *   mints are loading, or this session's default-mint setup has not finished).
+ * - `loading`: a mint is selected and its details have not arrived.
+ * - `ready`: everything shown is real, including "no mint yet".
+ */
+type MintSelectorStatus = 'pending' | 'loading' | 'ready';
+
+/** What the pill says once a wallet has settled with no mints at all. */
+export const ADD_MINT_LABEL = 'Add a mint';
+
 interface MintSelectorShared {
   mintUrl: string | undefined;
   mintName: string | undefined;
   mintIconUrl: string | undefined;
   balance: number;
+  status: MintSelectorStatus;
+  /** The pill shows its skeleton: `pending` or `loading`. */
   isLoading: boolean;
+  /** Replaces the name and balance for a settled wallet with no mints. */
+  ctaLabel: string | undefined;
   unit: string;
   onRequestMintList: (() => void) | undefined;
 }
@@ -48,13 +65,39 @@ export function useMintSelector({
   const { balances: liveBalances } = useBalanceContext();
 
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
-  const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const mockMode = useSettingsStore((state) => state.mockMode);
-  const balance = mintUrl
-    ? mockMode
-      ? getMockMintBalance(mintUrl, unit)
-      : amountToNumber(liveBalances.byMint[mintUrl]?.total)
-    : 0;
+  const defaultMintsSettled = useDefaultMintSetupStore((state) => state.settled);
+  const realUnit = toRealUnit(unit);
+  const balanceFor = (url: string) =>
+    mockMode
+      ? getMockMintBalance(url, unit)
+      : amountToNumber(liveBalances.byMintAndUnit?.[url]?.[realUnit]?.total);
+
+  // If the caller didn't pin a mint and the stored selection is missing or no
+  // longer trusted, show the highest-balance trusted mint (or first trusted
+  // mint) rather than an empty "no current mint" pill.
+  const fallbackMintUrl = useMemo(() => {
+    if (selectedMintUrl || mints.length === 0) return undefined;
+    if (storedSelectedMint && mints.some((m) => m.mintUrl === storedSelectedMint)) return undefined;
+    let best = mints[0].mintUrl;
+    let bestBalance = mockMode
+      ? getMockMintBalance(best, unit)
+      : amountToNumber(liveBalances.byMintAndUnit?.[best]?.[realUnit]?.total);
+    for (let i = 1; i < mints.length; i += 1) {
+      const candidate = mints[i].mintUrl;
+      const candidateBalance = mockMode
+        ? getMockMintBalance(candidate, unit)
+        : amountToNumber(liveBalances.byMintAndUnit?.[candidate]?.[realUnit]?.total);
+      if (candidateBalance > bestBalance) {
+        best = candidate;
+        bestBalance = candidateBalance;
+      }
+    }
+    return best;
+  }, [selectedMintUrl, mints, storedSelectedMint, mockMode, unit, liveBalances, realUnit]);
+
+  const mintUrl = selectedMintUrl ?? fallbackMintUrl ?? storedSelectedMint;
+  const balance = mintUrl ? balanceFor(mintUrl) : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]
@@ -68,10 +111,15 @@ export function useMintSelector({
 
   const mintName = mintUrl ? getMintDisplayName(mintUrl, { name: mintInfo?.name }) : undefined;
   const mintIconUrl = mintInfo?.icon_url;
-  // Only show skeleton when we have a selected mint but its data hasn't loaded yet.
-  // Don't show skeleton when no mint is selected (fresh install) or mints are still loading
-  // with no selection — in those cases the component shows a "Select Mint" placeholder.
-  const isLoading = Boolean(mintUrl && !mintData && isMintsLoading);
+  const status = mintSelectorStatus({
+    mintUrl,
+    hasMintData: !!mintData,
+    isMintsLoading,
+    defaultMintsSettled,
+  });
+  const isLoading = status !== 'ready';
+  // Settled with no trusted mints at all: never an empty name over "0 sats".
+  const ctaLabel = status === 'ready' && !mintUrl ? ADD_MINT_LABEL : undefined;
 
   useEffect(() => {
     walletLog.debug('mintSelector.state', {
@@ -85,12 +133,13 @@ export function useMintSelector({
       balance,
       unit,
       isMintsLoading,
-      isLoading,
+      defaultMintsSettled,
+      status,
       hasRequestMintList: !!onRequestMintList,
     });
   }, [
     balance,
-    isLoading,
+    defaultMintsSettled,
     isMintsLoading,
     mintData,
     mintIconUrl,
@@ -99,6 +148,7 @@ export function useMintSelector({
     mints.length,
     onRequestMintList,
     selectedMintUrl,
+    status,
     storedSelectedMint,
     unit,
   ]);
@@ -108,8 +158,30 @@ export function useMintSelector({
     mintName,
     mintIconUrl,
     balance,
+    status,
     isLoading,
+    ctaLabel,
     unit,
     onRequestMintList,
   };
+}
+
+/**
+ * Which of the three states the pill is in. Pure, so the new-account path
+ * (nothing selected while the default mint is still being added) is pinned
+ * without a wallet.
+ */
+export function mintSelectorStatus({
+  mintUrl,
+  hasMintData,
+  isMintsLoading,
+  defaultMintsSettled,
+}: {
+  mintUrl: string | undefined;
+  hasMintData: boolean;
+  isMintsLoading: boolean;
+  defaultMintsSettled: boolean;
+}): MintSelectorStatus {
+  if (!mintUrl) return isMintsLoading || !defaultMintsSettled ? 'pending' : 'ready';
+  return !hasMintData && isMintsLoading ? 'loading' : 'ready';
 }

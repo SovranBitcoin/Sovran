@@ -37,16 +37,35 @@ function namesFromPlacemark(
   };
 }
 
+/**
+ * The Bluetooth mesh row. It needs no location: it is shown whether or not the
+ * person allowed it, and whether or not a fix arrives.
+ */
+export const BLUETOOTH_TIER_ENTRY: TierEntry = {
+  key: BLUETOOTH_TIER.key,
+  label: BLUETOOTH_TIER.label,
+  precision: 0,
+  geohash: 'mesh',
+  transport: 'ble',
+  icon: BLUETOOTH_TIER.icon,
+};
+
 async function computeLocationTiers(ctx: {
   isCancelled: () => boolean;
   setTiers: Dispatch<SetStateAction<TierEntry[]>>;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  requestPermission: boolean;
 }): Promise<void> {
-  const { isCancelled, setTiers, setError, setLoading } = ctx;
+  const { isCancelled, setTiers, setError, setLoading, requestPermission } = ctx;
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    // Reading the permission never shows the system prompt; requesting can.
+    const { status } = requestPermission
+      ? await Location.requestForegroundPermissionsAsync()
+      : await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') {
+      // Place rows need the location; the Bluetooth row does not.
+      setTiers([BLUETOOTH_TIER_ENTRY]);
       setError('Location permission not granted');
       setLoading(false);
       return;
@@ -54,20 +73,14 @@ async function computeLocationTiers(ctx: {
 
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
+      // A caller that may not ask for the permission may not ask Android to
+      // turn on location accuracy either.
+      ...(requestPermission ? {} : { mayShowUserSettingsDialog: false }),
     });
 
     if (isCancelled()) return;
 
     const { latitude, longitude } = location.coords;
-
-    const bluetoothEntry: TierEntry = {
-      key: BLUETOOTH_TIER.key,
-      label: BLUETOOTH_TIER.label,
-      precision: 0,
-      geohash: 'mesh',
-      transport: 'ble',
-      icon: BLUETOOTH_TIER.icon,
-    };
 
     const locationEntries: TierEntry[] = LOCATION_TIERS.map((tier) => ({
       key: tier.key,
@@ -78,7 +91,7 @@ async function computeLocationTiers(ctx: {
       icon: tier.icon,
     }));
 
-    setTiers([bluetoothEntry, ...locationEntries]);
+    setTiers([BLUETOOTH_TIER_ENTRY, ...locationEntries]);
     setError(null);
 
     // Reverse geocode after the tiers are on screen so we don't block the
@@ -103,6 +116,8 @@ async function computeLocationTiers(ctx: {
     }
   } catch (e) {
     if (!isCancelled()) {
+      // No fix (GPS off, timeout): the Bluetooth row still works.
+      setTiers((prev) => (prev.length > 0 ? prev : [BLUETOOTH_TIER_ENTRY]));
       setError(e instanceof Error ? e.message : 'Failed to get location');
     }
   } finally {
@@ -110,12 +125,27 @@ async function computeLocationTiers(ctx: {
   }
 }
 
-export function useLocationTiers() {
+type UseLocationTiersOptions = {
+  /** Read the location only once this is true (e.g. once a query is typed). */
+  enabled?: boolean;
+  /**
+   * Ask for the location permission when it is not yet granted. Off, the hook
+   * uses the location only when the person already allowed it elsewhere, so
+   * the surface that mounts it never shows the system prompt.
+   */
+  requestPermission?: boolean;
+};
+
+export function useLocationTiers({
+  enabled = true,
+  requestPermission = true,
+}: UseLocationTiersOptions = {}) {
   const [tiers, setTiers] = useState<TierEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     void computeLocationTiers({
@@ -123,11 +153,12 @@ export function useLocationTiers() {
       setTiers,
       setError,
       setLoading,
+      requestPermission,
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled, requestPermission]);
 
   return { tiers, loading, error };
 }

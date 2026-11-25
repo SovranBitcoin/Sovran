@@ -215,6 +215,10 @@ describe('payment links opened with the app', () => {
   });
 });
 
+const PAIRING = 'bunker://abc?secret=sample';
+const encodedTimes = (value: string, times: number) =>
+  Array.from({ length: times }).reduce<string>((v) => encodeURIComponent(v), value);
+
 describe('the native-intent rewrite before the router', () => {
   it.each([`cashu:${TOKEN}`, `sovran://${TOKEN}`, 'lightning:lnbc10n1pexample', 'sovran://camera'])(
     'passes %s through unchanged',
@@ -223,10 +227,38 @@ describe('the native-intent rewrite before the router', () => {
     }
   );
 
-  it('sends a nostrconnect link to the signer connect route with a ticket, not the link', () => {
-    const rewritten = rewriteSystemPath('nostrconnect://abc?secret=s3cr3t&relay=wss://r');
-
-    expect(rewritten).toMatch(/^\/\(signer-flow\)\/connect\?ticket=/);
-    expect(rewritten).not.toContain('s3cr3t');
+  it.each([
+    'nostrconnect://abc?secret=s3cr3t&relay=wss://r',
+    'bunker://abc?secret=s3cr3t&relay=wss://r',
+    'sovran://connect?uri=nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds3cr3t',
+    'sovran://connect?%75ri=nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds3cr3t',
+    'sovran://camera?uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
+    'sovran://camera?bad=%ZZ&uri=bunker%3A%2F%2Fabc%3Fsecret%3Dsample',
+    'sovran://camera?uri=bunker%253A%252F%252Fabc%253Fsecret%253Dsample',
+    `sovran://camera?uri=${encodedTimes(PAIRING, 4)}`,
+    `sovran://camera?bad=%ZZ&uri=${encodedTimes(PAIRING, 6)}`,
+    `sovran://camera?uri=${encodedTimes(PAIRING, 40)}`,
+  ])('sends the Remote Login link %s to the wallet, without its secret', (url) => {
+    // Remote Login is gone (ADR 0035); the pairing secret must never reach navigation state.
+    expect(rewriteSystemPath(url)).toBe('/');
   });
+
+  it.each([
+    'sovran://contacts',
+    'sovran:///contacts',
+    'sovran://contacts?tab=groups',
+    '/contacts',
+    '/contacts/',
+    '/(drawer)/(tabs)/contacts',
+    'https://sovran.money/contacts',
+  ])('opens Search for the removed Contacts tab link %s', (url) => {
+    expect(rewriteSystemPath(url)).toBe('/search');
+  });
+
+  it.each(['sovran://contactsx', '/user/contacts', 'sovran://search'])(
+    'leaves %s, which is not the Contacts tab, alone',
+    (url) => {
+      expect(rewriteSystemPath(url)).toBe(url);
+    }
+  );
 });

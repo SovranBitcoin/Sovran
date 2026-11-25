@@ -27,6 +27,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, redactError } from '@/shared/lib/logger';
 import { ListRow } from '@/shared/ui/composed/ListRow';
+import type { ContactSendTarget } from '@/features/send/lib/startContactSend';
 
 const ROW_ICON = 52;
 
@@ -54,26 +55,21 @@ function decodeNpubHex(value: string): string | undefined {
   }
 }
 
-interface ContactSendTarget {
-  pubkey: string;
-  displayName: string | null;
-  picture: string | null;
-  nip05: string | null;
-  lud16: string | null;
-}
-
 interface DetectedActionRowProps {
   descriptor: DestinationDescriptor;
   /** Route protocol kinds through `machine.scan(raw)` (same as input submit). */
   onExecute: () => void;
   /** Route a resolved payable identity through the existing contact-send seam. */
   onStartContactSend: (target: ContactSendTarget) => void;
+  /** e2e id prefix; the row's id is `<prefix>-<kind>`. */
+  testIDPrefix?: string;
 }
 
 export function DetectedActionRow({
   descriptor,
   onExecute,
   onStartContactSend,
+  testIDPrefix = 'send-detected',
 }: DetectedActionRowProps) {
   const iconColor = useThemeColor('foreground');
   const ref = descriptor.recipient?.ref;
@@ -138,7 +134,7 @@ export function DetectedActionRow({
         title={title}
         subtitle={subtitle}
         accessibilityLabel={title}
-        testID={`send-detected-${descriptor.kind}`}
+        testID={`${testIDPrefix}-${descriptor.kind}`}
         onPress={() => {
           if (personPubkey) {
             paymentLog.info('send.detected.contact', { kind: descriptor.kind });
@@ -164,7 +160,7 @@ export function DetectedActionRow({
       title={descriptor.label}
       subtitle={truncateMiddle(descriptor.raw)}
       accessibilityLabel={descriptor.label}
-      testID={`send-detected-${descriptor.kind}`}
+      testID={`${testIDPrefix}-${descriptor.kind}`}
       onPress={onExecute}
     />
   );

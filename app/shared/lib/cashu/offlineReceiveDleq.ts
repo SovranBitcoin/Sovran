@@ -7,6 +7,8 @@ import {
   type Proof,
 } from '@cashu/cashu-ts';
 
+import { isEvenHex } from 'wallet';
+
 import { getWallet } from '@/shared/lib/cashu/managerInternals';
 
 type OfflineReceiveDleqFailure =
@@ -57,7 +59,9 @@ function requireOfflineReceiveProofsDleq(
       );
     }
 
-    if (!keyset.keys[proof.amount.toString()]) {
+    // A saved key that is not even-length hex cannot be checked; treat it as
+    // absent rather than hand it to the curve decoder.
+    if (!isEvenHex(keyset.keys[proof.amount.toString()])) {
       fail(
         'missing-amount-key',
         'This token cannot be verified offline because its amount key is not saved.'

@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { facade } from 'nostr';
 import { ok } from 'neverthrow';
-import { DEMO_FEED, DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
+import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 import { useProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 
 let mockMode = false;
@@ -94,7 +94,7 @@ it('updates when an observed contact is evicted by an unrelated write', () => {
 });
 
 it('overlays demo authors without caching them and restores live names when disabled', () => {
-  const pubkey = DEMO_FEED[0].pubkey;
+  const pubkey = [...DEMO_PROFILES.keys()][0];
   mockStore.set(pubkey, { name: 'Live author', seenAt: 1 });
   const { result, rerender } = renderHook(() => useProfile(pubkey));
   expect(result.current.profile?.name).toBe('Live author');

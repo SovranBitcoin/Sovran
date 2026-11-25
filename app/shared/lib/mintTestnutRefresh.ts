@@ -9,6 +9,7 @@
 import type { Manager } from '@cashu/coco-core';
 import { AppState } from 'react-native';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { fetchMintInfos, MINT_INFO_MAX_URLS } from '@/shared/lib/apiClient';
 import { storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -35,7 +36,7 @@ let inflight: Promise<void> | null = null;
 let lastFailureAt = 0;
 
 export function needsCheck(mintUrl: string, now: number): boolean {
-  const entry = useMintTestnutStore.getState().byMintUrl[normalizeMintUrlKey(mintUrl)];
+  const entry = ownEntry(useMintTestnutStore.getState().byMintUrl, normalizeMintUrlKey(mintUrl));
   if (!entry) return true;
   // An answered verdict holds for a day; an unanswered one is re-asked soon.
   const ttl = entry.probedAt == null ? UNPROBED_RECHECK_MS : RECHECK_MS;

@@ -1,16 +1,14 @@
 /**
  * @jest-environment node
  *
- * Two pickers that open the picker sheet from inside a component: the
- * underline tabs' "More" overflow, and a signer permission's Allow / Ask /
- * Block. Each asks for the right rows, marks the current one, and acts on
- * the pick.
+ * A picker that opens the picker sheet from inside a component: the
+ * underline tabs' "More" overflow. It asks for the right rows, marks the
+ * current one, and acts on the pick.
  */
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { PermissionSwitchRow } from '@/features/nostrSigner/components/PermissionKeyRows';
 import type { PickerRequest } from '@/shared/lib/picker/types';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 
@@ -95,35 +93,5 @@ describe('UnderlineTabs overflow', () => {
       { testID: 'underline-tab-C-menu', selected: true },
     ]);
     expect(handleTabPress).toHaveBeenCalledWith('B', 1);
-  });
-});
-
-describe('PermissionSwitchRow', () => {
-  it('offers Allow, Ask and Block, Allow disabled with its reason when it needs approval', async () => {
-    const onChange = jest.fn();
-    const tree = render(
-      <PermissionSwitchRow
-        label="Sign notes"
-        state="ask"
-        allowEligible={false}
-        onChange={onChange}
-        testID="perm"
-      />
-    );
-    mockPickOption.mockResolvedValueOnce('block');
-    await act(async () => {
-      tree.root.findByType('PressableFeedback' as never).props.onLongPress();
-    });
-    const options = lastRequest().options!;
-    expect(lastRequest().title).toBe('Sign notes');
-    expect(options.map((option) => option.testID)).toEqual([
-      'signer-permission-allow',
-      'signer-permission-ask',
-      'signer-permission-block',
-    ]);
-    expect(options[0]).toMatchObject({ disabled: true, reason: 'Always requires approval' });
-    expect(options[1].selected).toBe(true);
-    expect(options[2].isCaution).toBe(true);
-    expect(onChange).toHaveBeenCalledWith('block');
   });
 });

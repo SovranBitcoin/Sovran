@@ -1,4 +1,5 @@
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 
 const mockSelection: { selectedMint?: string } = {};
 const mockSetSelectedMint = jest.fn((url: string) => {
@@ -35,6 +36,7 @@ function manager() {
 beforeEach(() => {
   mockSelection.selectedMint = undefined;
   mockSetSelectedMint.mockClear();
+  useDefaultMintSetupStore.setState({ settled: false });
 });
 
 it('loads Numo’s four mints and selects Minibits on a fresh profile', async () => {
@@ -53,7 +55,7 @@ it('preserves an existing selection, including a previously selected Sovran mint
   expect(mockSelection.selectedMint).toBe('https://mint.sovran.money');
 });
 
-it('continues after an unavailable mint and does not select an untrusted default', async () => {
+it('continues after an unavailable mint and selects the first default that is trusted', async () => {
   jest.useFakeTimers();
   try {
     const client = manager();
@@ -69,17 +71,21 @@ it('continues after an unavailable mint and does not select an untrusted default
       MINIBITS,
       ...EXPECTED_MINTS,
     ]);
-    expect(mockSetSelectedMint).not.toHaveBeenCalled();
+    // Minibits never became trusted, so it is never selected; the next
+    // default that is trusted is, rather than leaving the wallet without one.
+    expect(mockSetSelectedMint).toHaveBeenCalledTimes(1);
+    expect(mockSetSelectedMint).toHaveBeenCalledWith(EXPECTED_MINTS[1]);
+    expect(useDefaultMintSetupStore.getState().settled).toBe(true);
   } finally {
     jest.useRealTimers();
   }
 });
 
-it('does not overwrite a user selection made during the final trust check', async () => {
+it('does not overwrite a user selection made during the last trust check', async () => {
   const client = manager();
   let checks = 0;
   client.mint.isTrustedMint.mockImplementation(async () => {
-    if (++checks === 5) mockSelection.selectedMint = 'https://chosen.example';
+    if (++checks === EXPECTED_MINTS.length) mockSelection.selectedMint = 'https://chosen.example';
     return true;
   });
   await initializeDefaultMints(client, () => true);
@@ -92,7 +98,7 @@ it('does not change selection after its profile becomes stale during the trust c
   let live = true;
   let checks = 0;
   client.mint.isTrustedMint.mockImplementation(async () => {
-    if (++checks === 5) live = false;
+    if (++checks === EXPECTED_MINTS.length) live = false;
     return true;
   });
   await initializeDefaultMints(client, () => live);
@@ -105,4 +111,38 @@ it('does no work for a stale manager', async () => {
   expect(client.mint.isTrustedMint).not.toHaveBeenCalled();
   expect(client.mint.addMint).not.toHaveBeenCalled();
   expect(mockSetSelectedMint).not.toHaveBeenCalled();
+});
+
+it('settles and selects without asking the trust store again', async () => {
+  // Every default is trusted already; any further lookup would never answer.
+  const client = manager();
+  let checks = 0;
+  client.mint.isTrustedMint.mockImplementation(
+    () =>
+      new Promise<boolean>((resolve) => {
+        if (++checks <= EXPECTED_MINTS.length) resolve(true);
+      })
+  );
+  const finished = jest.fn();
+  void initializeDefaultMints(client, () => true).then(finished);
+  for (let i = 0; i < 50; i++) await Promise.resolve();
+  expect(finished).toHaveBeenCalled();
+  expect(useDefaultMintSetupStore.getState().settled).toBe(true);
+  expect(mockSetSelectedMint).toHaveBeenCalledWith(MINIBITS);
+  expect(client.mint.isTrustedMint).toHaveBeenCalledTimes(EXPECTED_MINTS.length);
+});
+
+it('settles without a selection when no default could be trusted', async () => {
+  jest.useFakeTimers();
+  try {
+    const client = manager();
+    client.mint.addMint.mockRejectedValue(new Error('unavailable'));
+    const done = initializeDefaultMints(client, () => true);
+    await jest.runAllTimersAsync();
+    await done;
+    expect(mockSetSelectedMint).not.toHaveBeenCalled();
+    expect(useDefaultMintSetupStore.getState().settled).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
 });

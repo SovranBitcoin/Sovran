@@ -1,8 +1,6 @@
 import { normalizeMintUrl } from '@cashu/coco-core';
 
-export const E2E_READY_PROOF_RECONCILIATION_ENV = 'EXPO_PUBLIC_E2E_FUNDED_ASSETS' as const;
-
-export interface E2EReadyProofAsset {
+interface E2EReadyProofAsset {
   mintUrl: string;
   unit: string;
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
-import type { RoutstrModel } from './api';
+import type { RoutstrModel } from '@/shared/stores/profile/routstrStore';
 
 /**
  * Dynamic AI-tab model lineup, derived from the live Routstr `/v1/models`
@@ -47,7 +47,7 @@ export const AI_PROVIDER_IDS = ['openai', 'claude', 'grok', 'google'] as const;
  * the slug or the upstream id instead will happily offer the plaintext twin
  * under an E2EE label.
  */
-export const E2EE_MODEL_PREFIX = 'tinfoil-';
+const E2EE_MODEL_PREFIX = 'tinfoil-';
 
 /**
  * The vendor id encrypted models are offered under.
@@ -66,7 +66,7 @@ export const E2EE_PROVIDER_ID = 'tinfoil';
  *  enclave. The single spelling of the rule — the provider badge, the lineup
  *  grouping and the SDK's own `isTinfoilModel` must agree, or the app promises
  *  an encryption it does not send. */
-export const isE2eeModelId = (id: string | undefined): boolean =>
+const isE2eeModelId = (id: string | undefined): boolean =>
   id?.startsWith(E2EE_MODEL_PREFIX) === true;
 
 /**
@@ -91,8 +91,6 @@ const MAX_PROVIDERS = 12;
  */
 const MIN_MODELS_PER_PROVIDER = 3;
 
-const KNOWN_PROVIDER_IDS = new Set<AiProviderId>(AI_PROVIDER_IDS);
-
 /**
  * One spelling for a model id, so a node's catalog and Routstr's curated list
  * can disagree about dots, case and vendor prefixes without disagreeing about
@@ -100,7 +98,7 @@ const KNOWN_PROVIDER_IDS = new Set<AiProviderId>(AI_PROVIDER_IDS);
  * `deepseek-v4-1-flash` or `deepseek/deepseek-v4.1-flash`. Suffixes such as
  * `:free` or `:batch` are kept — they name a different offering.
  */
-export function normalizeModelId(id: string): string {
+function normalizeModelId(id: string): string {
   const bare = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id;
   return bare.trim().toLowerCase().replace(/\./g, '-');
 }
@@ -147,7 +145,6 @@ const LineupPricingSchema = z.object({
   image: z.number().nullable().catch(null),
   max_cost: z.number().nullable().catch(null),
 });
-export type LineupPricing = z.infer<typeof LineupPricingSchema>;
 
 const LineupEntrySchema = z.object({
   modelId: z.string().max(256),
@@ -184,7 +181,7 @@ const LineupEntrySchema = z.object({
    */
   lastKnown: z.boolean().optional(),
 });
-export type LineupEntry = z.infer<typeof LineupEntrySchema>;
+type LineupEntry = z.infer<typeof LineupEntrySchema>;
 
 const ProviderLineupSchema = z.object({
   auto: LineupEntrySchema.nullable().catch(null),
@@ -322,7 +319,7 @@ const NAME_PREFIX_TO_PROVIDER: [string, AiProviderId][] = [
  * This used to return `null` for every vendor outside a hardcoded four, which
  * silently discarded most of the catalog before it could be ranked.
  */
-export function providerIdForModel(model: RoutstrModel): AiProviderId | null {
+function providerIdForModel(model: RoutstrModel): AiProviderId | null {
   // Before anything else: an enclave row carries no slug and a display name
   // with no vendor prefix and no colon ("Private (E2EE) GLM 5.3", "kimi-k3"),
   // so every signal below returns null for it and the whole encrypted half of
@@ -621,118 +618,6 @@ function rankProviders(
  * deploy alone. Envelope is permissive (Postel's Law): unknown provider ids
  * and extra fields are skipped, malformed models drop individually.
  */
-const NaggLineupModelSchema = z.object({
-  tier: z.string().max(32),
-  id: z.string().max(256),
-  name: z.string().max(256).catch(''),
-  created: z.number().int().nonnegative().catch(0),
-  contextLength: z.number().int().nonnegative().catch(0),
-  maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
-  upstreamId: z.string().max(64).nullable().catch(null).optional(),
-  inputModalities: z
-    .array(z.string().max(32))
-    .max(16)
-    .catch(() => []),
-  pricing: z
-    .object({
-      prompt: z.number().nullable().catch(null),
-      completion: z.number().nullable().catch(null),
-      request: z.number().nullable().catch(null),
-      image: z.number().nullable().catch(null).optional(),
-      maxCost: z.number().nullable().catch(null),
-    })
-    .partial()
-    .catch(() => ({})),
-});
-
-export const NaggAiLineupSchema = z.object({
-  version: z.number().int().catch(1),
-  updatedAt: z.number().int().nonnegative().catch(0),
-  node: z
-    .object({
-      baseUrl: z.string().max(512).catch(''),
-      authMode: z.enum(['bearer', 'x-cashu']).optional().catch(undefined),
-      fallbackUsed: z.boolean().optional().catch(undefined),
-    })
-    .catch(() => ({ baseUrl: '' })),
-  providers: z
-    .array(
-      z.object({
-        id: z.string().max(64),
-        vendor: z.string().max(64).catch(''),
-        models: z
-          .array(NaggLineupModelSchema)
-          .max(16)
-          .catch(() => []),
-      })
-    )
-    .max(64)
-    .catch(() => []),
-});
-type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
-
-/**
- * Map the nagg payload onto the app's `AiLineup` shape. Providers the app
- * doesn't know (a future Qwen/DeepSeek tab served to newer builds) and tiers
- * outside auto/pro/max are skipped — old builds stay correct on a newer
- * payload by construction. Returns a `null` lineup when no known provider
- * carried any model so callers fall back to the client-side derivation.
- */
-export function lineupFromNaggPayload(payload: NaggAiLineup): {
-  lineup: AiLineup | null;
-  nodeBaseUrl: string | null;
-  authMode?: 'bearer' | 'x-cashu';
-} {
-  const lineup = emptyLineup();
-  const knownTiers = new Set<string>(AI_TIER_IDS);
-  let filled = 0;
-  for (const provider of payload.providers.slice(0, MAX_PROVIDERS)) {
-    const providerId = provider.id.trim();
-    if (!providerId) continue;
-    // Any vendor nagg offers becomes a tab. Old builds pinned this to four
-    // ids, so a nagg deploy that widened the menu was invisible to them —
-    // the opposite of why the lineup is served from nagg at all.
-    lineup[providerId] ??= emptyProviderLineup();
-    for (const model of provider.models) {
-      if (!knownTiers.has(model.tier)) continue;
-      const tier = model.tier as AiTierId;
-      lineup[providerId][tier] = {
-        modelId: model.id,
-        displayName: stripProviderPrefix(model.name) || model.id,
-        contextLength: model.contextLength,
-        created: model.created,
-        visionInput: model.inputModalities?.includes('image') ?? false,
-        satsPricing: {
-          prompt: model.pricing?.prompt ?? null,
-          completion: model.pricing?.completion ?? null,
-          request: model.pricing?.request ?? null,
-          image: model.pricing?.image ?? null,
-          max_cost: model.pricing?.maxCost ?? null,
-        },
-        maxCompletionTokens: model.maxCompletionTokens ?? null,
-        upstreamId: model.upstreamId ?? null,
-      };
-      filled++;
-    }
-    // A vendor the app does not know by name and that carried no usable tier
-    // is not a tab. The known four stay as empty placeholders, which is what
-    // every existing consumer expects to find.
-    if (!providerHasEntries(lineup[providerId]) && !KNOWN_PROVIDER_IDS.has(providerId)) {
-      delete lineup[providerId];
-    }
-  }
-  const nodeBaseUrl = payload.node.baseUrl.trim() || null;
-  return { lineup: filled > 0 ? lineup : null, nodeBaseUrl, authMode: payload.node.authMode };
-}
-
-/** Same `Provider:` prefix strip as `displayNameFor`, for nagg names. */
-function stripProviderPrefix(raw: string): string {
-  const trimmed = raw.trim();
-  const colonIdx = trimmed.indexOf(':');
-  if (colonIdx >= 0 && colonIdx < trimmed.length - 1) return trimmed.slice(colonIdx + 1).trim();
-  return trimmed;
-}
-
 export function mergeLineupWithLastKnown(
   derived: AiLineup,
   lastKnown: AiLineup | null | undefined

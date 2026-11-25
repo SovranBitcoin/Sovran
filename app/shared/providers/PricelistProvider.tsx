@@ -12,9 +12,23 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
   const setBtcPrices = usePricelistStore((s) => s.setBtcPrices);
   const setLoading = usePricelistStore((s) => s.setLoading);
   const setError = usePricelistStore((s) => s.setError);
-  const { isOffline } = useOfflineStatus();
+  // Only the phone reporting no network pauses the feed. Failed reachability
+  // probes do not: Coinbase's /v2/time can be the only probe, and Coinbase
+  // being down is exactly when the feed must still reach Mempool.space; the
+  // feed's own backoff bounds those retries.
+  const { isDisconnected } = useOfflineStatus();
 
   const feedRef = useRef<PricelistFeed | null>(null);
+  const offlineRef = useRef(isDisconnected);
+
+  // Disconnected pauses the feed (cancelling any request); reconnecting
+  // refreshes at once when a poll is due or the last one failed. The feed
+  // ignores a repeated state. Declared first so a feed created below starts
+  // from the current connectivity rather than dialling out while offline.
+  useEffect(() => {
+    offlineRef.current = isDisconnected;
+    feedRef.current?.setOffline(isDisconnected);
+  }, [isDisconnected]);
 
   useEffect(() => {
     const feed = createPricelistFeed({
@@ -23,6 +37,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
       onError: setError,
     });
     feedRef.current = feed;
+    feed.setOffline(offlineRef.current);
     feed.start();
     return () => {
       feedRef.current = null;
@@ -30,8 +45,8 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, [setBtcPrices, setLoading, setError]);
 
-  // Refresh on foreground or connectivity recovery. The feed deduplicates
-  // requests and skips resumes within 60 seconds of a successful poll.
+  // Refresh on foreground. The feed deduplicates requests and skips resumes
+  // within 60 seconds of a successful poll.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
@@ -39,16 +54,6 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     });
     return () => subscription.remove();
   }, []);
-
-  const wasOfflineRef = useRef(false);
-  useEffect(() => {
-    const wasOffline = wasOfflineRef.current;
-    wasOfflineRef.current = isOffline;
-    // Only the offline→online EDGE. Firing on the initial `false` would just
-    // re-enter a request already in flight from the effect above.
-    if (isOffline || !wasOffline) return;
-    feedRef.current?.resume('online');
-  }, [isOffline]);
 
   return <>{children}</>;
 };

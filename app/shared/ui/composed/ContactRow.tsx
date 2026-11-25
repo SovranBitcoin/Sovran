@@ -49,8 +49,9 @@ import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
-import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
 import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
+
+const E2EE_BADGE_ICON = 'mdi:lock-outline';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -196,7 +197,7 @@ interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity =
+type Identity =
   NostrIdentity | MintIdentity | ProviderIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =
@@ -233,19 +234,6 @@ export function nostrIdentity(
     isLoadingProfile: opts?.isLoadingProfile,
     verified: opts?.verified,
   };
-}
-
-/** A provider row's identity. The seeded avatar is its face; there is no icon
- *  to fetch. */
-export function providerIdentity(input: {
-  baseUrl: string;
-  displayName?: string;
-  spendableSats?: number;
-  minMessageSats?: number;
-  encryptedModelCount?: number;
-  status?: ProviderIdentity['status'];
-}): ProviderIdentity {
-  return { kind: 'provider', ...input };
 }
 
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
@@ -365,7 +353,6 @@ interface ContactRowProps {
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
-  selectionVariant?: 'circle-check' | 'checkbox';
 
   /** Forwarded to ListRow. `'below'` moves the stats row beneath the
    *  main HStack, indented past the avatar — used by the Select Mint row. */
@@ -813,7 +800,6 @@ export function ContactRow({
   selectable = false,
   selected = false,
   onToggle,
-  selectionVariant = 'circle-check',
   accentPosition,
   trailing: trailingOverride,
   trailingInteractive = false,
@@ -1088,13 +1074,8 @@ export function ContactRow({
       // interactive checkbox (mirrors PostCardGutterHeader's empty-box approach).
       <View style={{ width: 24, height: 24 }} />
     ) : (
-      <SelectableCheck
-        style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
-        selected={selected ?? false}
-        onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
-        size={24}
-        variant="success"
-      />
+      // Visual only: the row is the one control, so VoiceOver reads it once.
+      <SelectableCheck selected={selected ?? false} size={24} recycleKey={mint?.mintUrl ?? seed} />
     )
   ) : null;
 
@@ -1316,6 +1297,7 @@ export function ContactRow({
       onPress={trackedPress}
       loading={resolvedLoading}
       disabled={disabled}
+      selected={selectable ? Boolean(selected) : undefined}
       padding={padding}
       accessibilityLabel={typeof titleBase === 'string' ? titleBase : undefined}
       testID={testID}

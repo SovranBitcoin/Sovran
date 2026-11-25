@@ -33,7 +33,10 @@ import { amountToNumber } from 'wallet/amount';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
-import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
+import {
+  hasSettledKeysetRead,
+  useMintKeysetUnits,
+} from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
 
@@ -118,6 +121,55 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   }, [rawBalanceCtx, activeUnit, inActiveAccount]);
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
+  const [mintStoreHydrated, setMintStoreHydrated] = useState(
+    () => useMintStore.persist?.hasHydrated?.() ?? true
+  );
+
+  useEffect(() => {
+    if (mintStoreHydrated) return;
+    const persistApi = useMintStore.persist;
+    if (!persistApi || persistApi.hasHydrated()) {
+      setMintStoreHydrated(true);
+      return;
+    }
+    return persistApi.onFinishHydration(() => setMintStoreHydrated(true));
+  }, [mintStoreHydrated]);
+
+  // Auto-select a trusted mint whenever the wallet holds trusted mints but has
+  // no current selection (or its stored selection was untrusted). Runs only
+  // after `mint-store` hydrates so a saved choice is never overwritten on boot.
+  useEffect(() => {
+    if (!mintStoreHydrated || rawTrustedMints.length === 0) return;
+    if (preferredMintUrl && rawTrustedMints.some((m) => m.mintUrl === preferredMintUrl)) return;
+    const setSelectedMint = useMintStore.getState?.()?.setSelectedMint;
+    if (typeof setSelectedMint !== 'function') return;
+    const inAccount = rawTrustedMints.filter((m) => inActiveAccount(m.mintUrl));
+    const pool = inAccount.length > 0 ? inAccount : rawTrustedMints;
+    let best = pool[0].mintUrl;
+    let bestBalance = amountToNumber(rawBalanceCtx.byMintAndUnit?.[best]?.[activeUnit]?.total);
+    for (let i = 1; i < pool.length; i += 1) {
+      const candidate = pool[i].mintUrl;
+      const candidateBalance = amountToNumber(
+        rawBalanceCtx.byMintAndUnit?.[candidate]?.[activeUnit]?.total
+      );
+      if (candidateBalance > bestBalance) {
+        best = candidate;
+        bestBalance = candidateBalance;
+      }
+    }
+    walletLog.info('wallet.mint.auto_selected', {
+      hadPreferred: !!preferredMintUrl,
+      trustedCount: rawTrustedMints.length,
+    });
+    setSelectedMint(best);
+  }, [
+    mintStoreHydrated,
+    preferredMintUrl,
+    rawTrustedMints,
+    inActiveAccount,
+    rawBalanceCtx,
+    activeUnit,
+  ]);
 
   const [proofSnapshot, setProofSnapshot] = useState<{
     scope: ProofAmountsScope;
@@ -192,9 +244,16 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     const preferredTestnut = isTestnutMint(preferredMintUrl);
     const syncKey = `${preferredMintUrl}|${preferredTestnut}`;
     if (lastUnitSyncMintRef.current === syncKey) return;
-    lastUnitSyncMintRef.current = syncKey;
+    // Until the mint's info has loaded its units are unknown: consuming the
+    // key now would either retire a persisted `usd` to `sat` on a cold boot or
+    // skip the sync for this mint for good once the info arrives.
     const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
-    if (!mint) return;
+    if (!mint || !mint.mintInfo) return;
+    // Likewise its keysets: info can advertise a unit the mint holds no keys
+    // for, and deciding on the advertisement alone would consume the key
+    // before the keyset read can correct it.
+    if (!hasSettledKeysetRead(keysetUnitsByMint, preferredMintUrl)) return;
+    lastUnitSyncMintRef.current = syncKey;
     const supported = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
     const currentUnit = useMintStore.getState().activeUnit;
     if (supported.some((unit) => toAccountUnit(unit, preferredTestnut) === currentUnit)) return;

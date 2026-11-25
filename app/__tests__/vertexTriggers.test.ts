@@ -1,16 +1,19 @@
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import type { NaggClient } from 'nostr';
 import { ok } from 'neverthrow';
-import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
+import {
+  refreshVertex,
+  isVertexProfileStale,
+  type DirectVertexSender,
+} from '@/shared/lib/nostr/vertex/refreshVertex';
 import { getVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
 import { nostrLog } from '@/shared/lib/logger';
 
 let mockOwner = 'a'.repeat(64);
 let mockEnabled = true;
-let mockNaggEnabled = true;
 let mockAutomation = false;
 const mockSign = jest.fn();
-const mockRest = jest.fn();
+const mockSend = jest.fn<ReturnType<DirectVertexSender>, Parameters<DirectVertexSender>>();
+
 jest.mock('@/shared/lib/nostr/vertex/signVertexRequest', () => ({
   signVertexRequest: (...args: unknown[]) => mockSign(...args),
   vertexAutomationDisabled: () => mockAutomation,
@@ -29,11 +32,6 @@ jest.mock('@/shared/stores/global/profileStore', () => {
       .activeAccountReaders(() => useProfileStore.getState()),
   };
 });
-jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
-  getNostrTierConfig: () => ({
-    nagg: { enabled: mockNaggEnabled, appViewBaseUrl: 'https://nagg.test' },
-  }),
-}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
@@ -48,33 +46,36 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 const ndk = { signer: { user: async () => ({ pubkey: mockOwner }) } } as unknown as NDK;
-const client = { rest: mockRest } as unknown as Pick<NaggClient, 'rest'>;
-const query = () => ({ kind: 'search' as const, query: 'alice', stale: true, ndk, client });
+const query = () => ({ kind: 'search' as const, query: 'alice', stale: true, ndk, send: mockSend });
 let counter = 0;
+
 beforeEach(async () => {
   mockOwner = (++counter).toString(16).padStart(64, '0');
   mockEnabled = true;
-  mockNaggEnabled = true;
   mockAutomation = false;
   mockSign
     .mockReset()
     .mockImplementation(async (event) =>
       ok({ ...event, pubkey: mockOwner, id: 'b'.repeat(64), sig: 'c'.repeat(128) })
     );
-  mockRest.mockReset().mockResolvedValue(ok({ pubkeys: [], vertexFresh: true }));
+  mockSend.mockReset().mockResolvedValue({
+    ok: true,
+    kind: 'search',
+    entries: [],
+    fetchedAt: Math.floor(Date.now() / 1000),
+  });
   jest.mocked(nostrLog.info).mockClear();
   await getVertexBudgetStore(mockOwner).persist.rehydrate();
 });
 
-it('signs one stale search per normalized query, including concurrent callers', async () => {
+it('signs one stale search per normalized query and sends it directly to Vertex', async () => {
   await Promise.all([refreshVertex(query()), refreshVertex({ ...query(), query: ' ALICE ' })]);
   await refreshVertex(query());
   expect(mockSign).toHaveBeenCalledTimes(1);
-  expect(mockRest).toHaveBeenCalledTimes(1);
-  expect(mockRest.mock.calls[0][0]).toMatchObject({
-    path: '/nostr/search',
-    refresh: true,
-    searchParams: { svr: expect.any(String) },
+  expect(mockSend).toHaveBeenCalledTimes(1);
+  expect(mockSend.mock.calls[0][0]).toMatchObject({
+    kind: 5315,
+    pubkey: mockOwner,
   });
   expect(nostrLog.info).toHaveBeenCalledWith('nostr.vertex.client_request', {
     kind: 'search',
@@ -82,11 +83,10 @@ it('signs one stale search per normalized query, including concurrent callers', 
   });
 });
 
-it.each(['fresh', 'toggle', 'mock', 'nagg', 'budget', 'no-signer', 'cancelled'] as const)(
+it.each(['fresh', 'toggle', 'mock', 'budget', 'no-signer', 'cancelled'] as const)(
   'does not sign/send when %s gates the request',
   async (gate) => {
     mockEnabled = gate !== 'toggle';
-    mockNaggEnabled = gate !== 'nagg';
     mockAutomation = gate === 'mock';
     if (gate === 'budget')
       getVertexBudgetStore(mockOwner).setState({
@@ -102,15 +102,21 @@ it.each(['fresh', 'toggle', 'mock', 'nagg', 'budget', 'no-signer', 'cancelled'] 
       signal: controller.signal,
     });
     expect(mockSign).not.toHaveBeenCalled();
-    expect(mockRest).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
   }
 );
 
 it('blocks all later triggers after insufficient credits and logs exhaustion once', async () => {
-  mockRest.mockResolvedValue(ok({ ok: false, reason: 'insufficient_credits' }));
+  mockSend.mockResolvedValue({ ok: false, reason: 'insufficient_credits' });
   await refreshVertex(query());
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
-  expect(mockRest).toHaveBeenCalledTimes(1);
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
+  expect(mockSend).toHaveBeenCalledTimes(1);
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(nostrLog.info).toHaveBeenCalledWith('nostr.vertex.credits_exhausted');
   expect(getVertexBudgetStore(mockOwner).getState().blockedUntilDay).toBeDefined();
@@ -128,7 +134,7 @@ it.each(['profile', 'consent', 'cancel'] as const)(
       return ok({ ...event, pubkey: owner, id: 'signed', sig: 'signature' });
     });
     await refreshVertex({ ...query(), signal: controller.signal });
-    expect(mockRest).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
   }
 );
 
@@ -136,8 +142,20 @@ it('profile age uses seven days in seconds, and a stale profile signs once', asy
   expect(isVertexProfileStale(null)).toBe(true);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000))).toBe(false);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000) - 7 * 86400)).toBe(true);
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
+  await refreshVertex({
+    kind: 'profile',
+    target: 'f'.repeat(64),
+    stale: true,
+    ndk,
+    send: mockSend,
+  });
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(mockSign.mock.calls[0][0].kind).toBe(5312);
 });

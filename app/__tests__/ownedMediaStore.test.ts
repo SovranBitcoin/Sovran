@@ -9,7 +9,7 @@ import {
   useOwnedMediaStore,
 } from '@/shared/stores/profile/ownedMediaStore';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent } from '@/shared/lib/nostr/nostrEventTypes';
 
 jest.mock('@/shared/lib/logger', () => ({
   storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },

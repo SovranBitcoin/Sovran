@@ -1,6 +1,5 @@
 import type { NetworkState } from 'expo-network';
 
-import { backendConfig } from '@/shared/config/backend';
 import { hasFeature } from '@/shared/config/features';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -85,8 +84,8 @@ function toHttpsUrl(url: string, scheme: 'wss' | 'https'): string | null {
 export function defaultReachabilityProbes(): ReachabilityProbe[] {
   const probes: ReachabilityProbe[] = [
     {
-      name: 'nagg',
-      url: `${backendConfig.nostrAppViewBaseUrl}/livez`,
+      name: 'coinbase',
+      url: 'https://api.coinbase.com/v2/time',
       method: 'GET',
       timeoutMs: REACHABILITY_TIMEOUT_MS,
       test: (response) => response.ok,

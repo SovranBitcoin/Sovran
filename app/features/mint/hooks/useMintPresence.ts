@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { selectMintLiveness, type MintLiveness } from '@/features/mint/lib/mintLiveness';
 import { probeMints } from '@/shared/lib/cashu/mintHealth';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -26,7 +27,7 @@ export function useMintPresence(
       const out: Record<string, MintLiveness> = {};
       for (const url of probeUrls) {
         const key = normalizeMintUrlKey(url);
-        out[key] = selectMintLiveness(state.byMintUrl[key]);
+        out[key] = selectMintLiveness(ownEntry(state.byMintUrl, key));
       }
       return out;
     })

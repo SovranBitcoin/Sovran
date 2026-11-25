@@ -191,6 +191,8 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
     if (!mentionToken) return;
 
     const nprofile = createMemoMentionNprofile(result.pubkey, defaultRelays);
+    // A search result with a malformed key leaves the memo and mentions as they are.
+    if (!nprofile) return;
     const displayName = resolveIdentityName({
       pubkey: result.pubkey,
       nostrProfile: result.profile,

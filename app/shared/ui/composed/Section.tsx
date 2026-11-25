@@ -8,6 +8,12 @@ interface SectionProps {
   title: string;
   children: React.ReactNode;
   isDanger?: boolean;
+  /**
+   * A quiet caption under the group: the longer explanation a row's own
+   * one-line description leaves out. A string is set as caption text; any
+   * other node is placed as given.
+   */
+  footer?: React.ReactNode;
 }
 
 /**
@@ -19,10 +25,12 @@ interface SectionProps {
  * the group's outer edge, so the eye runs down one line. Its case is the
  * active style's.
  */
-export const Section: React.FC<SectionProps> = ({ title, children, isDanger }) => {
+export const Section: React.FC<SectionProps> = ({ title, children, isDanger, footer }) => {
   const danger = useThemeColor('danger');
   const paint = useStylePaint();
   const { pad, related, item } = paint.style.space;
+  // Lines up under the rows' text, like the title above them.
+  const captionStyle = { paddingHorizontal: pad, paddingTop: related * 2 };
 
   return (
     <View style={{ paddingVertical: item }}>
@@ -44,6 +52,13 @@ export const Section: React.FC<SectionProps> = ({ title, children, isDanger }) =
         {paint.style.type.uppercaseLabels ? title.toUpperCase() : title}
       </Text>
       <View>{children}</View>
+      {typeof footer === 'string' ? (
+        <Text size={13} color={paint.text.secondary} style={captionStyle}>
+          {footer}
+        </Text>
+      ) : footer ? (
+        <View style={captionStyle}>{footer}</View>
+      ) : null}
     </View>
   );
 };

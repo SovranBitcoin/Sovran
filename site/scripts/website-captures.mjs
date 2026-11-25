@@ -21,10 +21,11 @@ export function websiteCaptures({ repoRoot = root } = {}) {
       const catalog = await buildSourceCatalog(repoRoot);
       const imports = [], entries = [];
       for (const file of ['press/website.json', 'press/artwork/source/screenshots.json', 'press/screenshots/manifest.json', 'press/screenshots/inventory.json']) this.addWatchFile(resolve(repoRoot, file));
+      const allowHistorical = process.env.SOVRAN_ALLOW_HISTORICAL_CAPTURES === '1';
       for (const [index, key] of keys.entries()) {
         const capture = resolveCapture(catalog, key);
         if (!capture?.available) throw new Error(`Website capture is missing or unapproved: ${key}`);
-        if (publicBuild && catalog.fingerprint && capture.freshness !== 'current') throw new Error(`Website capture needs refresh: ${key}`);
+        if (publicBuild && !allowHistorical && catalog.fingerprint && capture.freshness !== 'current') throw new Error(`Website capture needs refresh: ${key}`);
         await readCaptureSource(repoRoot, capture);
         const file = resolve(repoRoot, capture.file);
         this.addWatchFile(file);

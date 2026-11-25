@@ -206,6 +206,60 @@ describe('composeSatoshis — larger inputs', () => {
     // but it should find a nearby lower value
     expect(result.nearestLower).not.toBeNull();
   });
+
+  /**
+   * Past 40 proofs with a sum too large for bitset-dp, meet-in-the-middle
+   * runs on 40 proofs picked by a prefilter. The 40 largest proofs at or below
+   * the target can sum to less than it, so on their own they offer no round-up
+   * at all, though the wallet holds far more than the target. A greedy pass
+   * over every proof still gives real subsets on both sides of the target.
+   */
+  it('offers both nearest amounts from thousands of non-power-of-two proofs', () => {
+    const coins = Array.from({ length: 3000 }, (_, i) => (i % 2 === 0 ? 100_003 : 70_001));
+    const total = coins.reduce((a, b) => a + b, 0);
+    const target = 5_000_000;
+    const started = performance.now();
+    const result = composeSatoshis(coins, target);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(result.exactMatch).toBe(false);
+    expect(result.nearestUpper).not.toBeNull();
+    expect(result.nearestUpper!).toBeGreaterThan(target);
+    expect(result.nearestUpper!).toBeLessThanOrEqual(total);
+    expect(result.nearestUpper! - target).toBeLessThan(100_003);
+    expect(result.nearestLower!).toBeLessThan(target);
+    expect(target - result.nearestLower!).toBeLessThan(100_003);
+    // Both are whole sats made of these proofs: a*100_003 + b*70_001.
+    for (const amount of [result.nearestLower!, result.nearestUpper!]) {
+      const reachable = Array.from({ length: 1501 }, (_, a) => a).some((a) => {
+        const rest = amount - a * 100_003;
+        return rest >= 0 && rest % 70_001 === 0 && rest / 70_001 <= 1500;
+      });
+      expect(reachable).toBe(true);
+    }
+  });
+
+  it('still offers a round-up from thousands of proofs in many denominations', () => {
+    // 3000 distinct amounts: too many bundles to search completely.
+    const coins = Array.from({ length: 3000 }, (_, i) => 1001 + i * 33);
+    const total = coins.reduce((a, b) => a + b, 0);
+    const target = 5_000_003;
+    const result = composeSatoshis(coins, target);
+    expect(result.nearestUpper).not.toBeNull();
+    expect(result.nearestUpper!).toBeGreaterThanOrEqual(target);
+    expect(result.nearestUpper!).toBeLessThanOrEqual(total);
+    expect(result.nearestLower).not.toBeNull();
+    expect(result.nearestLower!).toBeLessThanOrEqual(target);
+  });
+
+  it('finds an exact match among thousands of proofs in few denominations', () => {
+    const coins = Array.from({ length: 3000 }, (_, i) => (i % 2 === 0 ? 100_003 : 70_001));
+    // 30 × 100_003 + 20 × 70_001: reachable, beyond what 40 prefiltered proofs hold.
+    const target = 30 * 100_003 + 20 * 70_001;
+    const result = composeSatoshis(coins, target);
+    expect(result.exactMatch).toBe(true);
+    expect(result.nearestLower).toBe(target);
+    expect(result.nearestUpper).toBe(target);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -364,5 +418,47 @@ describe('buildExactOfflineAmountIndex', () => {
     // The reachable sums should start at the smallest positive composition.
     const index = buildExactOfflineAmountIndex([1, 2]);
     expect(index.reachableSums).not.toContain(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// composeSatoshis — amounts a double cannot hold, and large proofs
+// ---------------------------------------------------------------------------
+
+describe('composeSatoshis — unsafe amounts and large proofs', () => {
+  it('never reports a total that rounding made up', () => {
+    // 2 ** 53 + 1 rounds to 2 ** 53 as a double.
+    const result = composeSatoshis([2 ** 53, 1], 2 ** 53 + 1);
+    expect(result.exactMatch).toBe(false);
+    expect(result.nearestLower).toBeNull();
+    expect(result.nearestUpper).toBeNull();
+    expect(composeSatoshis([2 ** 53, 1], 2 ** 53).exactMatch).toBe(false);
+    expect(composeSatoshis([Number.MAX_SAFE_INTEGER, 1], 5).exactMatch).toBe(false);
+  });
+
+  it('finds an exact match among small proofs hidden by many large ones', () => {
+    const coins = [
+      ...Array.from({ length: 37 }, () => 6),
+      3,
+      3,
+      3,
+      5,
+      ...Array.from({ length: 41 }, (_, i) => 2_000_001 + i),
+    ];
+    const result = composeSatoshis(coins, 8);
+    expect(result.exactMatch).toBe(true);
+    expect(result.nearestLower).toBe(8);
+    expect(result.nearestUpper).toBe(8);
+  });
+
+  it('gives the nearest amounts around a target only large proofs pass', () => {
+    const coins = [
+      ...Array.from({ length: 37 }, () => 6),
+      ...Array.from({ length: 41 }, (_, i) => 2_000_001 + i),
+    ];
+    const result = composeSatoshis(coins, 7);
+    expect(result.exactMatch).toBe(false);
+    expect(result.nearestLower).toBe(6);
+    expect(result.nearestUpper).toBe(12);
   });
 });

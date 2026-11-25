@@ -6,7 +6,10 @@
  *
  * - identity (NUT-06): owned by the wallet bridge (`mintInfo` entry); this
  *   hook only reads its status/error and re-triggers it on Retry.
- * - audit: nagg discovery row via `getDiscoveredMintMetadata` when stale.
+ * - audit: the merged auditor directory row via `getDiscoveredMintMetadata`
+ *   when stale, plus this page's own per-mint auditor reads
+ *   (`readMintAuditDetail`: MintRadar's single-mint figures, the CDK
+ *   auditors' uptime and metrics), which only this page makes.
  * - reviews: aggregate via the session reviews cache (shared with the reviews
  *   screen, so opening it afterwards is a cache hit).
  * - social: operator profile via `useMintProfiles` when stale.
@@ -17,6 +20,8 @@ import { useFocusEffect } from 'expo-router';
 import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
+import { mintAuditDetailDue, readMintAuditDetail } from '@/features/mint/lib/mintAuditDetail';
+import { selectMintInfoStats, type MintInfoStats } from '@/features/mint/lib/mintInfoStats';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { isSupersededError } from '@/shared/lib/cache/createQueryCacheStore';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
@@ -28,6 +33,10 @@ import {
   useCachedMintMetadata,
   useMintMetadataStore,
 } from '@/shared/stores/global/mintMetadataStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { onceLoaded, whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
+import { dataResetGeneration } from '@/shared/lib/account/dataResetFence';
 
 export type MintDetailGroupStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -40,6 +49,8 @@ interface MintDetailRead {
   social: MintDetailGroupStatus;
   /** Cached scalars projected for display (the audit summary, review aggregate, operator). */
   meta: ReturnType<typeof projectMintMeta>;
+  /** The four Mint Info numbers, each from one named source. */
+  stats: MintInfoStats;
   /** Re-run every failed group (identity via the bridge, audit + reviews here). */
   retry: () => void;
 }
@@ -55,6 +66,19 @@ function groupStatus(hasData: boolean, state: GroupState, stale: boolean): MintD
 }
 
 async function runAuditRead(mintUrl: string, signal: AbortSignal): Promise<boolean> {
+  // Gated like the auditor detail reads below: which auditors may be asked is
+  // a saved setting, and the answer is written into saved mint rows.
+  const generation = dataResetGeneration();
+  const options = { orFailed: true };
+  const loaded = await Promise.all([
+    whenLoaded(useSettingsStore, options),
+    whenLoaded(useMintMetadataStore, options),
+    whenLoaded(useMintTestnutStore, options),
+  ]);
+  if (!loaded.every(Boolean) || signal.aborted || dataResetGeneration() !== generation) {
+    return false;
+  }
+  // Writes only while the same holds when the answer lands.
   await getDiscoveredMintMetadata(mintUrl, { signal });
   // The read never throws; a still-stale audit group after it returns means
   // nagg could not be reached (a confirmed "nothing known" stamps the group).
@@ -130,10 +154,12 @@ export function useMintDetailRead(
 ): MintDetailRead {
   const cached = useCachedMintMetadata(mintUrl || null);
   const meta = useMemo(() => projectMintMeta(cached), [cached]);
+  const stats = useMemo(() => selectMintInfoStats(cached), [cached]);
   const [attempt, setAttempt] = useState(0);
   const [openedAtMs] = useState(() => Date.now());
   const [audit, setAudit] = useState<GroupState>(IDLE);
   const [reviews, setReviews] = useState<GroupState>(IDLE);
+  const [detail, setDetail] = useState<GroupState>(IDLE);
 
   // Audit + reviews: revalidate when the group is stale; a Retry bumps `attempt`.
   useEffect(() => {
@@ -163,6 +189,42 @@ export function useMintDetailRead(
     return () => controller.abort();
   }, [mintUrl, attempt]);
 
+  // This page's own per-mint auditor reads, at most once per mint every few
+  // minutes. Gated on the settings load: which auditors may be asked is the
+  // person's choice, and the in-code default would ask them all. Their
+  // answers are written only once the saved mint rows have loaded (a write
+  // before that is saved over them) and only if Delete All has not run since.
+  useEffect(() => {
+    if (!mintUrl) return;
+    const controller = new AbortController();
+    const forced = attempt > 0;
+    const generation = dataResetGeneration();
+    const run = (loaded: boolean) => {
+      if (!loaded || controller.signal.aborted) return;
+      if (!forced && !mintAuditDetailDue(mintUrl, Date.now())) {
+        setDetail({ fetching: false, failed: false, settled: true });
+        return;
+      }
+      const settings = useSettingsStore.getState();
+      setDetail({ fetching: true, failed: false, settled: false });
+      void readMintAuditDetail(mintUrl, {
+        held: useMintMetadataStore.getState().getCached(mintUrl)?.auditObservations,
+        disabledAuditors: settings.disabledMintAuditors,
+        enabledAuditors: settings.enabledMintAuditors,
+        signal: controller.signal,
+      }).then(({ updates, answered }) => {
+        if (controller.signal.aborted) return;
+        onceLoaded(useMintMetadataStore, (metadataLoaded) => {
+          if (!metadataLoaded || dataResetGeneration() !== generation) return;
+          useMintMetadataStore.getState().recordAuditObservations(mintUrl, updates);
+        });
+        setDetail({ fetching: false, failed: !answered, settled: true });
+      });
+    };
+    onceLoaded(useSettingsStore, run);
+    return () => controller.abort();
+  }, [mintUrl, attempt]);
+
   // A read that failed is tried again when the page is returned to: it was
   // the network's answer at one moment, not the mint's. Held in a ref so the
   // failure itself does not re-run the focus effect and retry in a loop.
@@ -185,7 +247,9 @@ export function useMintDetailRead(
   const operatorPubkey = useMemo(
     () =>
       extractMintNostrPubkey({ contact: Array.isArray(contact) ? contact : undefined }) ??
-      discoveredOperator,
+      (discoveredOperator
+        ? extractMintNostrPubkey({ contact: [{ method: 'nostr', info: discoveredOperator }] })
+        : undefined),
     [contact, discoveredOperator]
   );
   const profileInputs = useMemo(
@@ -201,7 +265,11 @@ export function useMintDetailRead(
   const identity: MintDetailGroupStatus =
     !mintUrl || !entry ? 'loading' : identityError ? 'error' : 'ready';
 
-  const hasAudit = meta.audit !== undefined;
+  const hasAudit =
+    meta.audit !== undefined ||
+    stats.uptime !== undefined ||
+    stats.operations !== undefined ||
+    stats.latency !== undefined;
   const hasReviews = meta.kymScore !== undefined || meta.reviewCount !== undefined;
   const hasSocial = meta.contactFollowers !== undefined || meta.contactReputation !== undefined;
   const socialStale = mintUrl ? isMintMetaGroupStale(cached, 'social', openedAtMs) : false;
@@ -221,10 +289,20 @@ export function useMintDetailRead(
   return {
     identity,
     identityError,
-    audit: groupStatus(hasAudit, audit, mintUrl ? !cached?.auditAt : false),
+    audit: groupStatus(
+      hasAudit,
+      {
+        fetching: audit.fetching || detail.fetching,
+        // Failed only when both reads failed: one source answering is an answer.
+        failed: audit.failed && (detail.failed || !detail.settled),
+        settled: audit.settled && (detail.settled || !mintUrl),
+      },
+      mintUrl ? !cached?.auditAt : false
+    ),
     reviews: groupStatus(hasReviews, reviews, mintUrl ? !cached?.reviewsAt : false),
     social,
     meta,
+    stats,
     retry,
   };
 }

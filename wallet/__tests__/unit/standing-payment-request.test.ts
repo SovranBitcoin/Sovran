@@ -9,6 +9,7 @@ import { nip19 } from "nostr-tools";
 
 import {
   ensureStandingPaymentRequest,
+  peekStandingPaymentRequest,
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
 } from "../../src/payment-request-receive";
@@ -407,5 +408,36 @@ describe("standing request ownership under concurrency", () => {
     expect(decodePaymentRequest(right.encodedRequest).nut10?.data).toBe(
       "02" + "cd".repeat(32),
     );
+  });
+
+  it("reuses a purpose-scoped standing request when mints differ only in order (F142)", async () => {
+    const mintsA = ["https://a.mint.example", "https://b.mint.example"];
+    const mintsB = ["https://b.mint.example", "https://a.mint.example"];
+    const create = vi.fn();
+    const manager = mockManager({
+      get: vi.fn().mockResolvedValue(
+        operation({
+          id: "op-nearby-1",
+          mints: mintsA,
+          encodedRequest: encodedFixture("req-1", mintsA),
+        }),
+      ),
+      create,
+    });
+    const nearbyKey = standingPaymentRequestKey("sat", "nearby");
+    const store = memoryStore({ [nearbyKey]: "op-nearby-1" });
+
+    const first = await ensureStandingPaymentRequest(
+      manager,
+      { purpose: "nearby", unit: "sat", mints: mintsB },
+      store,
+    );
+    expect(first.operationId).toBe("op-nearby-1");
+    expect(create).not.toHaveBeenCalled();
+
+    // Synchronous cache lookup is also order-independent for purpose-scoped requests.
+    expect(
+      peekStandingPaymentRequest(manager, { purpose: "nearby", unit: "sat", mints: mintsA }),
+    ).toEqual(first);
   });
 });

@@ -9,8 +9,7 @@
     "wallet",
     "nostr",
     "docs",
-    "copy",
-    "harness"
+    "copy"
   ],
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
@@ -19,7 +18,6 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "harness": "bun harness/src/cli.ts",
     "assets:generate": "node scripts/assets.mjs",
     "assets:check": "node scripts/assets.mjs --check",
     "assets:brand": "node scripts/brand-assets.mjs",
@@ -36,7 +34,7 @@
     "prebuild": "cd app && bun run prebuild",
     "type-check": "bun run --filter '*' type-check",
     "lint": "cd app && bun run lint",
-    "test": "bun run --cwd harness test && bun run --filter '!@sovran/task-harness' test",
+    "test": "bun run --filter '*' test",
     "test:app": "cd app && bun run test",
     "knip": "knip",
     "followups": "node scripts/followups.mjs",
@@ -65,14 +63,6 @@
     "site:assets:check": "node site/scripts/website-assets.mjs --check",
     "site:assets:prune": "node site/scripts/prune-obsolete-assets.mjs",
     "site:scenes": "bun run --cwd site dev --open /scenes",
-    "press:capture": "bun app/e2e/press/run.ts",
-    "press:capture:plan": "bun app/e2e/press/run.ts --plan",
-    "press:import": "bun app/e2e/press/import.ts",
-    "screenshots:refresh": "bun app/e2e/capture/refresh.ts",
-    "screenshots:refresh:plan": "bun app/e2e/capture/refresh.ts --plan",
-    "screenshots:status": "bun app/e2e/capture/status.ts",
-    "screenshots:test": "bun test app/e2e/capture && node --test scripts/capture-cli.test.mjs",
-    "screenshots:native-build": "bun app/e2e/press/native-build.ts",
     "assets:wallpapers": "node scripts/fetch-wallpapers.mjs",
     "persistence": "bun app/scripts/persistence.ts"
   },
@@ -87,10 +77,6 @@
     "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
     "heroui-native@1.0.9": "app/patches/heroui-native+1.0.9.patch",
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
-    "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
-    "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
-    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch",
-    "@routstr/sdk@0.4.6": "app/patches/@routstr+sdk+0.4.6.patch",
     "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch"
   }
 }

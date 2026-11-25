@@ -55,7 +55,7 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
-} from '@/features/feed/hooks/useRecentPeopleProfiles';
+} from '@/shared/hooks/useRecentPeopleProfiles';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';

@@ -5,7 +5,7 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { syncMuteList } from '../moderation';
 import { useRelayListStore } from '../outbox/relayListStore';
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
 
 /** Restore imported-account lists at startup and refresh cross-client edits on foreground. */
 export function useMuteListSync() {

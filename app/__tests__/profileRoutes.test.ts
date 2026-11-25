@@ -31,12 +31,6 @@ describe('profile route helpers', () => {
       pathname: '/(profile-flow)/share',
       params: { type: 'npub', data: 'npub1abc' },
     });
-    expect(
-      buildProfileHref('userMessages', { pubkey: 'b'.repeat(64) }, MODAL_PROFILE_FLOW)
-    ).toEqual({
-      pathname: '/(profile-flow)/userMessages',
-      params: { pubkey: 'b'.repeat(64) },
-    });
   });
 
   it('builds modal-origin profile hrefs for scanner and modal contexts', () => {

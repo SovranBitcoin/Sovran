@@ -5,7 +5,7 @@
  * `nevent` (with an optional relay hint so a recipient can fetch it). Used by
  * the per-post Share / Copy-link actions.
  */
-import { tryNeventEncode } from '@/features/feed/components/nostr/feedParse';
+import { tryNeventEncode } from '@/shared/lib/nostr/nostrBech32';
 
 interface ShareLinks {
   nevent: string;

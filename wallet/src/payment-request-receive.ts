@@ -328,8 +328,21 @@ function cacheFor(manager: Manager): Map<string, StandingPaymentRequest> {
   return map;
 }
 
+function sameMintSet(a: readonly string[], b: readonly string[]): boolean {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const mint of setA) {
+    if (!setB.has(mint)) return false;
+  }
+  return true;
+}
+
 function cacheKey(input: StandingPaymentRequestInput): string {
-  return `${standingPaymentRequestKey(input.unit, input.purpose)}|${input.mints.join(",")}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}|${input.mintsPreferred ?? ""}`;
+  const mintsKey = input.purpose
+    ? [...new Set(input.mints)].sort().join(",")
+    : input.mints.join(",");
+  return `${standingPaymentRequestKey(input.unit, input.purpose)}|${mintsKey}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}|${input.mintsPreferred ?? ""}`;
 }
 
 /** Synchronous read of the last resolved standing request (per lock state)
@@ -367,14 +380,13 @@ export async function ensureStandingPaymentRequest(
       const operation = await manager.paymentRequests.incoming
         .get(recordedId)
         .catch(() => null);
+      const normalizedUnit = input.unit.trim().toLowerCase();
       if (
         operation &&
         operation.state === "active" &&
         !operation.singleUse &&
-        operation.unit === input.unit.trim().toLowerCase() &&
-        (!input.purpose ||
-          (operation.mints.length === input.mints.length &&
-            operation.mints.every((mint) => input.mints.includes(mint))))
+        operation.unit === normalizedUnit &&
+        (!input.purpose || sameMintSet(operation.mints, input.mints))
       ) {
         // Mint list drift (mints trusted/untrusted since creation) is
         // tolerated: the QR advertises the creation-time list; a rotation
@@ -393,7 +405,9 @@ export async function ensureStandingPaymentRequest(
           ? `recorded_${operation.state}`
           : operation.singleUse
             ? "recorded_single_use"
-            : "unit_mismatch";
+            : operation.unit !== normalizedUnit
+              ? "unit_mismatch"
+              : "mints_mismatch";
       logger.warn("creq.standing.recorded_discarded", {
         reason,
         purpose: input.purpose ?? null,

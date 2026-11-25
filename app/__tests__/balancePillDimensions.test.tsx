@@ -106,3 +106,28 @@ describe.each([
     );
   });
 });
+
+describe('flat pill while loading', () => {
+  function pressable(props: Partial<Props>) {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<BalancePillFlat {...base} {...props} />);
+    });
+    const found = renderer.root.findByType('Pressable' as never).props;
+    act(() => renderer.unmount());
+    return found;
+  }
+
+  it('says it is loading and busy, since its placeholder has no words to read', () => {
+    expect(pressable({ isLoading: true })).toMatchObject({
+      accessibilityLabel: 'Loading mint',
+      accessibilityState: { busy: true },
+    });
+  });
+
+  it('lets the balance text speak once loaded', () => {
+    const loaded = pressable({});
+    expect(loaded.accessibilityLabel).toBeUndefined();
+    expect(loaded.accessibilityState).toEqual({ busy: false });
+  });
+});

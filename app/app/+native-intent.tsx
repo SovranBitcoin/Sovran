@@ -1,39 +1,62 @@
 /**
- * @fileoverview expo-router native intent — nostrconnect:// rewrite
+ * @fileoverview expo-router native intent: rewrite links to removed routes.
  *
- * System URLs with the `nostrconnect` scheme carry the entire NIP-46 pairing
- * payload in the URL itself (there is no path to route), so the URL is held
- * in memory and the app is sent to the signer deep-link target with a ticket
- * for it. The target redeems the ticket and opens the 'signer-connect' sheet.
+ * Remote Login (NIP-46) was removed (ADR 0035) and the app no longer claims
+ * the `nostrconnect` scheme, but a link can still arrive: an install that has
+ * not picked up the new scheme list, or a `sovran://…/connect?uri=` link an
+ * older build produced. Such a link carries a pairing bearer secret, so it is
+ * sent to the wallet (`/`) before the router can put it in navigation state.
+ *
+ * The Contacts tab was removed in the same change; a `sovran://contacts` link
+ * (or any `/contacts…` path) opens the Search tab instead of +not-found.
  * Everything else passes through unchanged.
  *
  * Defensive by contract: expo-router documents that throwing here can crash
- * the app, so the rewrite never throws — any failure returns the path
- * unchanged. The URL embeds a pairing bearer secret — never log it and never
- * put it in a route param.
+ * the app, so the rewrite never throws; any failure returns the path
+ * unchanged.
  */
 
-import { holdPairingUri } from '@/features/nostrSigner/lib/pendingPairingUri';
+import { percentDecodeFully } from '@/shared/lib/percentDecode';
 
-const NOSTRCONNECT_SCHEME_RE = /^nostrconnect:\/\//i;
-/** A link that names the connect route itself and carries the pairing link as a param. */
-const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=([^&#]*)/i;
-const CONNECT_ROUTE = '/(signer-flow)/connect';
+const PAIRING_SCHEME_RE = /^(?:nostrconnect|bunker):\/\//i;
+/** Any decoded query/fragment carrying a NIP-46 pairing URI payload. */
+const EMBEDDED_PAIRING_URI_RE = /(?:^|[?&=#/])(?:nostrconnect|bunker):\/\//i;
+/** A link naming the old connect route and carrying a pairing link as a param. */
+const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
+/**
+ * The old Contacts tab: `sovran://contacts`, `/contacts`, a web link's
+ * `https://host/contacts`, or the grouped `/(drawer)/(tabs)/contacts`, with any
+ * sub-path or query. Not `contactsfoo`.
+ */
+const CONTACTS_ROUTE_RE =
+  /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?(?:\((?:drawer|tabs)\)\/)*contacts(?:[/?#].*)?$/i;
+
+function carriesPairingSecret(path: string): boolean {
+  if (PAIRING_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return true;
+  if (EMBEDDED_PAIRING_URI_RE.test(path)) return true;
+  const { decoded, settled } = percentDecodeFully(path);
+  // Encoded deeper than the decoder follows: nothing here needs that, so it
+  // is treated as hiding a pairing link.
+  if (!settled) return true;
+  if (decoded !== path) {
+    if (
+      PAIRING_SCHEME_RE.test(decoded) ||
+      CONNECT_WITH_URI_RE.test(decoded) ||
+      EMBEDDED_PAIRING_URI_RE.test(decoded)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Exported for direct unit coverage. */
 export function rewriteSystemPath(path: string): string {
   try {
     if (typeof path !== 'string') return path;
-    if (NOSTRCONNECT_SCHEME_RE.test(path)) return `${CONNECT_ROUTE}?ticket=${holdPairingUri(path)}`;
-    const carried = CONNECT_WITH_URI_RE.exec(path);
-    if (!carried) return path;
-    // Passing this through would put the link in navigation state before the
-    // route could refuse it.
-    try {
-      return `${CONNECT_ROUTE}?ticket=${holdPairingUri(decodeURIComponent(carried[1]))}`;
-    } catch {
-      return CONNECT_ROUTE;
-    }
+    if (carriesPairingSecret(path)) return '/';
+    if (CONTACTS_ROUTE_RE.test(path)) return '/search';
+    return path;
   } catch {
     return path;
   }

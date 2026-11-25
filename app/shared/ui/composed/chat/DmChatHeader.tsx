@@ -1,4 +1,4 @@
-import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
+import { useModerationActions } from '@/shared/hooks/useModerationActions';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { View } from '@/shared/ui/primitives/View/View';

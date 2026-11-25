@@ -45,7 +45,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
-import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -234,9 +234,6 @@ async function switchWithoutRestart(
  */
 async function restartInto(accountIndex: number): Promise<boolean> {
   await cleanupCocoWithTimeout();
-  // The Routstr client holds a store and a wallet adapter bound to the wallet
-  // just closed. A restart discards it; this covers a restart that does not happen.
-  resetRoutstrClient();
 
   let recorded = false;
   try {
@@ -585,7 +582,11 @@ export async function deleteAllProfiles(): Promise<boolean> {
     const accountIndexes = Array.from(new Set([0, ...profiles.map((p) => p.accountIndex)]));
     const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
-    const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+    const clearSecureData = await prepareSecureDataReset(
+      accountIndexes,
+      importedPubkeys,
+      profiles.map((p) => p.pubkey)
+    );
 
     // If the wipe stops after the databases are gone, reopening must not take
     // their absence for a loss and ask for a restore. Waited for, but a list
@@ -608,8 +609,8 @@ export async function deleteAllProfiles(): Promise<boolean> {
     // still gets cleaned up. AsyncStorage.clear() then catches anything we
     // missed.
     try {
-      const { wipeWhitenoiseStorageForAccounts } = await import('@/features/whitenoise/storage');
-      await wipeWhitenoiseStorageForAccounts(accountIndexes);
+      const { wipeLegacyWhitenoiseStorageForAccounts } = await import('./profileRemovalStorage');
+      await wipeLegacyWhitenoiseStorageForAccounts(accountIndexes);
     } catch (e) {
       log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: redactError(e) });
     }
@@ -625,8 +626,10 @@ export async function deleteAllProfiles(): Promise<boolean> {
     }
 
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything.
-    // Query caches first, so an in-flight read that completes after this
-    // point is rejected by its generation guard instead of re-writing a key.
+    // Query caches and the data reset fence first, so an in-flight read that
+    // completes after this point (a query, a mint-history check, an auditor
+    // reading) is rejected by its generation guard instead of re-writing a key.
+    fenceDataReset();
     clearAllQueryCaches();
     await AsyncStorage.clear();
 

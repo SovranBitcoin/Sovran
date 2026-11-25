@@ -4,8 +4,8 @@ Area: `app/features/bitchat`, `app/features/whitenoise`, `app/features/nostrSign
 `app/shared/lib/routstr`, `app/features/map`. Checkout `sovran-surgery`, branch `surgery/sweep-1`. Paths are relative
 to `app/` unless they say otherwise.
 
-How it was done: read the LEDGER, the follow-up index and every follow-up that names this area (F02, F04, F24, F28,
-F42, F48 to F51, F53, F77, F88, F99, F102, F119, F127, F131 to F133, F153, F183, F184, F195, F196, F198, F206, F207, F225,
+How it was done: read the LEDGER, the follow-up index and every follow-up that names this area (F02, F04, F28,
+F42, F48 to F51, F53, F77, F88, F99, F102, F127, F131 to F133, F153, F183, F184, F195, F196, F198, F206, F207, F225,
 F232, F233, F239, F241, F242), and the pass 3 survey for this area, so nothing below repeats them. Read the pass 3
 commits that touched the area. Ran `bun run knip` (clean), a script that greps every export in the area against
 non-test sources in `app`, `wallet` and `nostr` (only test seams turned up), and `bunx eslint` on the six area files

@@ -18,13 +18,9 @@ import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
-import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
-import { hasFeature } from '@/shared/config/features';
 import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
 import { extractDomain, normalizeMintUrlKey } from '@/shared/lib/url';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { ProviderAvatar } from '@/features/ai/components/ProviderAvatar';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Section } from '@/shared/ui/composed/Section';
 
@@ -33,7 +29,6 @@ interface OperatorRunsSectionProps {
   pubkey: string | null | undefined;
   /** The page's own subject, left out so a mint page does not list itself. */
   excludeMintUrl?: string | null;
-  excludeProviderUrl?: string | null;
   title?: string;
   testID?: string;
 }
@@ -43,7 +38,6 @@ const sameUrl = (a: string, b: string) => normalizeMintUrlKey(a) === normalizeMi
 export function OperatorRunsSection({
   pubkey,
   excludeMintUrl,
-  excludeProviderUrl,
   title = 'Also runs',
   testID = 'operator-runs',
 }: OperatorRunsSectionProps) {
@@ -51,19 +45,13 @@ export function OperatorRunsSection({
   const mints = (stats?.operatesMints ?? []).filter(
     (url) => !excludeMintUrl || !sameUrl(url, excludeMintUrl)
   );
-  const providers = (hasFeature('ai') ? (stats?.operatesAiProviders ?? []) : []).filter(
-    (url) => !excludeProviderUrl || !sameUrl(url, excludeProviderUrl)
-  );
-  if (!pubkey || mints.length + providers.length === 0) return null;
+  if (!pubkey || mints.length === 0) return null;
 
   return (
     <Section title={title}>
       <ListGroup variant="secondary" testID={testID}>
         {mints.map((url) => (
           <RunsMintRow key={`mint:${url}`} mintUrl={url} />
-        ))}
-        {providers.map((url) => (
-          <RunsProviderRow key={`provider:${url}`} baseUrl={url} />
         ))}
       </ListGroup>
     </Section>
@@ -104,40 +92,6 @@ function RunsMintRow({ mintUrl }: { mintUrl: string }) {
           <ListGroup.ItemContent>
             <ListGroup.ItemTitle>{displayName}</ListGroup.ItemTitle>
             <ListGroup.ItemDescription>Mint · {extractDomain(mintUrl)}</ListGroup.ItemDescription>
-          </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix>
-            <Icon name="mdi:chevron-right" size={20} color={muted} />
-          </ListGroup.ItemSuffix>
-        </ListGroup.Item>
-      </PressableFeedback.Scale>
-      <PressableFeedback.Ripple />
-    </PressableFeedback>
-  );
-}
-
-function RunsProviderRow({ baseUrl }: { baseUrl: string }) {
-  const muted = useThemeColor('muted');
-  const known = useRoutstrStore((s) => s.knownProviders[baseUrl]);
-  const displayName = known?.name ?? extractDomain(baseUrl);
-  return (
-    <PressableFeedback
-      animation={false}
-      accessibilityRole="button"
-      accessibilityLabel={`Open AI provider ${displayName}`}
-      testID={`operator-runs-provider:${baseUrl}`}
-      onPress={() =>
-        router.push(buildProviderInfoHref(baseUrl, { seedName: known?.name ?? undefined }))
-      }>
-      <PressableFeedback.Scale>
-        <ListGroup.Item disabled>
-          <ListGroup.ItemPrefix>
-            <ProviderAvatar name={displayName} baseUrl={baseUrl} size={28} />
-          </ListGroup.ItemPrefix>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>{displayName}</ListGroup.ItemTitle>
-            <ListGroup.ItemDescription>
-              AI provider · {extractDomain(baseUrl)}
-            </ListGroup.ItemDescription>
           </ListGroup.ItemContent>
           <ListGroup.ItemSuffix>
             <Icon name="mdi:chevron-right" size={20} color={muted} />

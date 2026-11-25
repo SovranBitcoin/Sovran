@@ -28,7 +28,12 @@ type SkeletonVisualProps = {
   visualDisabled?: boolean;
 };
 
-type SkeletonProps = React.ComponentPropsWithoutRef<typeof View> & SkeletonVisualProps;
+type SkeletonProps = React.ComponentPropsWithoutRef<typeof View> &
+  SkeletonVisualProps & {
+    /** No pulse: for a frame held still (the design-system scrubber), where a
+     *  pulsing bar would misstate the frame being inspected. */
+    static?: boolean;
+  };
 
 const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
   {
@@ -41,6 +46,7 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
     visualPhase = 'loading',
     visualExtra,
     visualDisabled,
+    static: isStatic = false,
     ...props
   },
   forwardedRef
@@ -80,7 +86,11 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
       {...props}
       ref={setRef}
       collapsable={false}
-      className={cn('bg-skeleton rounded-md', !E2E_STATIC_SKELETON && 'animate-pulse', className)}
+      className={cn(
+        'bg-skeleton rounded-md',
+        !isStatic && !E2E_STATIC_SKELETON && 'animate-pulse',
+        className
+      )}
       onLayout={handleLayout}
     />
   );

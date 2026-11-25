@@ -5,12 +5,12 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
 import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
-import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintTestnutToManager } from '@/shared/lib/mintTestnutRefresh';
+import { attachMintHistoryToManager } from '@/features/mint/lib/mintHistorySync';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
@@ -18,6 +18,7 @@ import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -187,13 +188,6 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
       recoverPendingPayments()
     );
     if (!isLive()) return;
-    // The same window, for payments `@routstr/sdk` now owns: it records each
-    // request token before it leaves and clears it when the change is home,
-    // so anything still recorded is money the node has to be asked about.
-    // The sweep above drains rows written before the SDK took over; this one
-    // drains everything since.
-    await recover('routstr_sdk_sweep', 'Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
-    if (!isLive()) return;
     // Sats parked on a Routstr node the app has since been repointed away
     // from: money that is ours but not yet in the wallet, swept once the
     // wallet is ready.
@@ -211,6 +205,9 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     log.warn('coco.phase2.failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    // A failure before the default mints ran must not leave the header pill
+    // waiting on a setup that will not happen this session.
+    if (isLive()) useDefaultMintSetupStore.getState().markSettled();
     bgStage.complete();
   }
 }
@@ -375,6 +372,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
   useEffect(() => {
     if (!manager) return;
     return attachMintTestnutToManager(manager);
+  }, [manager]);
+
+  // Mint history (ADR 0036): Coco's mint-info refreshes are observations, and
+  // the wallet's mints are re-checked in the background, never blocking start.
+  useEffect(() => {
+    if (!manager) return;
+    return attachMintHistoryToManager(manager);
   }, [manager]);
 
   if (failed) {

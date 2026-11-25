@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { legacyNip46SecureKeys } from '@/shared/lib/profile/legacyNip46Cleanup';
 import { derivedKeysAreWellFormed } from './derivationIntegrity';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
 import { REDUX_ERA_ROW, readReduxEraRoot, type ReduxEraRoot } from './reduxEraRoot';
@@ -188,11 +189,6 @@ async function rememberKey(key: string): Promise<void> {
 /** Payment recovery must distinguish an unavailable keychain from an absent value. */
 export function readSensitiveValue(key: string): Promise<string | null> {
   return SecureStore.getItemAsync(key, secureOptions());
-}
-
-/** Remove a value written with `writeSensitiveValue`. */
-export function deleteSensitiveValue(key: string): Promise<void> {
-  return SecureStore.deleteItemAsync(key, secureOptions());
 }
 
 /** Register for Delete All before writing, then verify durable storage. */
@@ -546,20 +542,23 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
  *
  * @param accountIndexes Explicit list of account indexes to clear.
  * @param importedPubkeys Hex pubkeys of imported profiles whose nsec records should be deleted.
+ * @param profilePubkeys Hex pubkeys of every profile, for keys named by pubkey that were never indexed.
  * @returns Promise<boolean> True if cleared successfully, false otherwise
  */
 export async function clearAllSecureData(
   accountIndexes: number[],
-  importedPubkeys: string[] = []
+  importedPubkeys: string[] = [],
+  profilePubkeys: readonly string[] = []
 ): Promise<boolean> {
-  const clear = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+  const clear = await prepareSecureDataReset(accountIndexes, importedPubkeys, profilePubkeys);
   return clear();
 }
 
 /** Read every deletion manifest before the caller destroys any wallet database. */
 export async function prepareSecureDataReset(
   accountIndexes: number[],
-  importedPubkeys: string[] = []
+  importedPubkeys: string[] = [],
+  profilePubkeys: readonly string[] = []
 ): Promise<() => Promise<boolean>> {
   await keyIndexQueue;
   const callerKeys: string[] = [
@@ -579,6 +578,9 @@ export async function prepareSecureDataReset(
   for (const pubkey of importedPubkeys) {
     callerKeys.push(importedNsecKey(pubkey));
   }
+
+  // Remote Login's secrets: its bunker secrets were written outside the index.
+  callerKeys.push(...legacyNip46SecureKeys(profilePubkeys));
 
   // Union with the bookkeeping index so orphaned keys (drift between
   // profileStore and SecureStore) get deleted alongside the caller-supplied

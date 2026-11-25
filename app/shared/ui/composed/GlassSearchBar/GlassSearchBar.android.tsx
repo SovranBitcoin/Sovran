@@ -1,7 +1,9 @@
 import { memo } from 'react';
+import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 
 import { Log } from '@/shared/lib/logger';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { radius } from '@/shared/styles/tokens';
@@ -11,6 +13,8 @@ import { SearchTextInput } from './searchTextInput';
 export const GlassSearchBar = memo(function GlassSearchBar({
   width,
   height = 44,
+  value,
+  onClear,
   ...field
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -45,6 +49,17 @@ export const GlassSearchBar = memo(function GlassSearchBar({
             fontFamily: 'OxygenRegular',
           }}
         />
+        {onClear && value ? (
+          <Pressable
+            testID={field.testID ? `${field.testID}-clear` : undefined}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            hitSlop={10}
+            onPress={onClear}
+            className="-mr-1 h-7 w-7 shrink-0 items-center justify-center rounded-full">
+            <Icon name="mdi:close-circle" size={18} color={withAlpha(foreground, 0.5)} />
+          </Pressable>
+        ) : null}
       </View>
     </Log>
   );

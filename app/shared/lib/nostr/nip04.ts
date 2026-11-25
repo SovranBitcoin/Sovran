@@ -10,42 +10,9 @@
  * Reference: https://github.com/nostr-protocol/nips/blob/master/04.md
  */
 
-import type { VerifiedEvent } from 'nostr-tools/core';
-import { finalizeEvent } from 'nostr-tools/pure';
 import * as nip04 from 'nostr-tools/nip04';
 
 import { nostrLog } from '../logger';
-
-const now = (): number => Math.round(Date.now() / 1000);
-
-/**
- * Build a signed NIP-04 (kind 4) direct message addressed to
- * `recipientPublicKey`. The content is encrypted under the sender↔recipient
- * ECDH secret; the recipient is revealed in a `p` tag for relay routing.
- */
-export function buildNip04DM(params: {
-  content: string;
-  senderPrivateKey: Uint8Array;
-  recipientPublicKey: string;
-}): VerifiedEvent {
-  const ciphertext = nip04.encrypt(
-    params.senderPrivateKey,
-    params.recipientPublicKey,
-    params.content
-  );
-  nostrLog.debug('nostr.nip04.build_dm', {
-    recipientPrefix: params.recipientPublicKey.slice(0, 8),
-  });
-  return finalizeEvent(
-    {
-      kind: 4,
-      content: ciphertext,
-      created_at: now(),
-      tags: [['p', params.recipientPublicKey]],
-    },
-    params.senderPrivateKey
-  ) as VerifiedEvent;
-}
 
 /**
  * Decrypt a NIP-04 ciphertext. `counterpartyPubkey` is the OTHER party — the

@@ -10,7 +10,16 @@ describe('searchListState', () => {
     expect(searchListState('loading', 0, 5, 3)).toBe('placeholders');
     expect(searchListState('revalidating', 0, 5, 3)).toBe('placeholders');
     expect(searchListState('loading', 0, 2, 3)).toBe('nothing'); // 2-char query: no skeletons
-    expect(searchListState('idle', 0, 2, 3)).toBe('nothing');
+  });
+  it('a query the remote search will not take settles on "no results", not a blank list', () => {
+    // Below the remote minimum: the local answer is the whole answer.
+    expect(searchListState('idle', 0, 2, 3)).toBe('no-results');
+    // Remote search off for this query (a build without it, or a payment string).
+    expect(searchListState('idle', 0, 5, 3, 0)).toBe('no-results');
+  });
+  it('stays blank while a remote search is about to start (the debounce)', () => {
+    expect(searchListState('idle', 0, 5, 3)).toBe('nothing');
+    expect(searchListState('idle', 0, 0, 3)).toBe('nothing');
   });
   it('a settled empty answer is "no results"; a failure is an error', () => {
     expect(searchListState('empty', 0, 5, 3)).toBe('no-results');

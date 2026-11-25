@@ -433,7 +433,10 @@ describe('navigation callbacks', () => {
     nav.goBack!();
 
     expect(clearPaymentContext).toHaveBeenCalledWith('send.near_pay');
-    expect(mockRouter.push.mock.calls).toEqual([['/(send-flow)/nearPay'], ['/(mint-flow)/add']]);
+    // Singleton flows open with navigate, so a second tap cannot stack a copy.
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.navigate).toHaveBeenCalledWith('/(send-flow)/nearPay');
+    expect(mockRouter.navigate).toHaveBeenCalledWith('/(mint-flow)/add');
     expect(mockRouter.navigate).toHaveBeenCalledWith({
       pathname: '/(mint-flow)/info',
       params: { mintInfoEntry: '{"mintUrl":"x"}' },

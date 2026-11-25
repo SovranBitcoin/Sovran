@@ -515,7 +515,8 @@ attempt remains documented in [the capture workflow and audit](testing-store-scr
 
 - `settings.moderation.filter`: candidate iOS/Android journey enabling the private
   message filter, saving a phrase, reopening to verify persistence, then disabling
-  filtering. Does not publish a report or mute-list event.
+  filtering. Does not publish a report or mute-list event. Retired on 2026-11-25 with
+  the Moderation settings screen (ADR 0039); the filter's saved store is unchanged.
 - `settings.legal.navigate`: candidate iOS/Android journey opening Terms and
   Privacy from Settings, scrolling each document to its final paragraph and
   returning through the navigation controls.

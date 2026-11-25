@@ -39,6 +39,7 @@ import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore'
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
+import { useMintHistoryStore } from '@/shared/stores/profile/mintHistoryStore';
 import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
@@ -48,6 +49,7 @@ import { useTransactionLocationStore } from '@/shared/stores/profile/transaction
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useDebugTierStore } from '@/shared/stores/runtime/debugTierStore';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 import { useDeleteStatusStore } from '@/shared/stores/runtime/deleteStatusStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
@@ -62,8 +64,8 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
+import { useNotificationPolicyStore } from '@/shared/stores/profile/notificationPolicyStore';
 
 interface MirrorableStore {
   getState(): unknown;
@@ -99,6 +101,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/routstrStore': useRoutstrStore,
   'profile/scanHistoryStore': useScanHistoryStore,
   'profile/searchHistoryStore': useSearchHistoryStore,
+  'profile/mintHistoryStore': useMintHistoryStore,
   'profile/sendReachabilityStore': useSendReachabilityStore,
   'profile/swapTransactionsStore': useSwapTransactionsStore,
   'profile/themeStore': useThemeStore,
@@ -112,6 +115,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/notePickerStore': useNotePickerStore,
   'runtime/pickerSheetStore': usePickerSheetStore,
   'runtime/debugTierStore': useDebugTierStore,
+  'runtime/defaultMintSetupStore': useDefaultMintSetupStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,
   'runtime/nearPayStore': useNearPaySessionStore,
@@ -122,6 +126,6 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/rollbackStore': useRollbackStore,
   'runtime/swapStatusStore': useSwapStatusStore,
   'bitchat/bitchatDmMessages': useBitchatDmMessagesStore,
-  'feed/ignoreStore': useFeedIgnoreStore,
-  'feed/notificationPolicyStore': useNotificationPolicyStore,
+  'profile/ignoreStore': useFeedIgnoreStore,
+  'profile/notificationPolicyStore': useNotificationPolicyStore,
 };

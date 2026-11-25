@@ -16,7 +16,7 @@ import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { paymentLog, redactError } from '@/shared/lib/logger';
-import { isTokenSpent } from '@/shared/lib/routstr/spentProbe';
+import { isTokenSpent } from '@/shared/lib/cashu/spentProbe';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 import { parkedMessageEcash } from './parkedMessageEcash';

@@ -22,12 +22,18 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
  * in a list row stays exactly 44px wide with one of these on it.
  */
 
-type Presence = 'online' | 'offline';
+type Presence = 'online' | 'degraded' | 'offline';
 
 /** Big enough to see at a glance on a 44px row avatar, small enough not to
  *  eat the face at 70px on the provider page. */
 const DOT_SCALE = 0.3;
 const MIN_DOT = 9;
+
+const PRESENCE_LABEL: Record<Presence, string> = {
+  online: 'Online',
+  degraded: 'Having problems',
+  offline: 'Offline',
+};
 
 export function PresenceDot({
   presence,
@@ -38,9 +44,21 @@ export function PresenceDot({
   /** The avatar's size. The dot scales with it. */
   size: number;
 }) {
-  const [background, success, danger] = useThemeColor(['background', 'success', 'danger'] as const);
+  const [background, success, warning, danger] = useThemeColor([
+    'background',
+    'success',
+    'warning',
+    'danger',
+  ] as const);
   const dotSize = Math.max(MIN_DOT, Math.round(size * DOT_SCALE));
-  const color = presence === 'online' ? success : presence === 'offline' ? danger : null;
+  const color =
+    presence === 'online'
+      ? success
+      : presence === 'degraded'
+        ? warning
+        : presence === 'offline'
+          ? danger
+          : null;
 
   const style = useMemo(
     () =>
@@ -56,7 +74,7 @@ export function PresenceDot({
     [background, color, dotSize]
   );
 
-  if (!style) return null;
+  if (!style || !presence) return null;
   return (
     <View
       className="absolute -bottom-px -right-px border-2"
@@ -65,7 +83,7 @@ export function PresenceDot({
       // say it in words for everyone else. A row that is offline ALSO carries
       // "Not answering right now" as its disabled reason, which is where the
       // sighted redundancy went when the Online/Offline pill came out.
-      accessibilityLabel={presence === 'online' ? 'Online' : 'Offline'}
+      accessibilityLabel={PRESENCE_LABEL[presence]}
     />
   );
 }

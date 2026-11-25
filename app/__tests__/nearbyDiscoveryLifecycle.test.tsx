@@ -66,7 +66,14 @@ jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
 }));
 jest.mock('@/shared/hooks/useWarmNip05Profiles', () => ({ useWarmNip05Profiles: jest.fn() }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: { isInitialized: () => mockCocoReady, getInstance: () => ({ id: 'manager' }) },
+  CocoManager: {
+    isInitialized: () => mockCocoReady,
+    getInstance: () => ({
+      id: 'manager',
+      mint: { getAllTrustedMints: async () => [] },
+      wallet: { balances: { byMint: async () => ({}) } },
+    }),
+  },
 }));
 jest.mock('@/features/nearPay/lib/nearbyPayments', () => ({
   NEARBY_PAYMENT_PREFIX: 'sovran:payment:1:',

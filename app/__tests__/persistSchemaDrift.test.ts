@@ -49,6 +49,7 @@ import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
 import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/searchHistoryStore';
+import '@/shared/stores/profile/mintHistoryStore';
 import '@/shared/stores/profile/sendReachabilityStore';
 import '@/shared/stores/profile/swapTransactionsStore';
 import '@/shared/stores/profile/transactionDistributionStore';
@@ -57,10 +58,10 @@ import '@/shared/stores/profile/transactionLocationStore';
 // decayed — every remaining persistConfig call site is imported so the
 // completeness assertion below can hold the registry to the source tree.
 import '@/features/bitchat/stores/bitchatDmMessages';
-import '@/features/feed/stores/ignoreStore';
-import '@/features/feed/stores/notificationPolicyStore';
-import '@/features/nostrSigner/data/nip46ActivityStore';
-import '@/features/nostrSigner/data/nip46ConnectionsStore';
+import '@/shared/stores/profile/ignoreStore';
+import '@/shared/stores/profile/notificationPolicyStore';
+import '@/shared/stores/profile/nip46ActivityStore';
+import '@/shared/stores/profile/nip46ConnectionsStore';
 import '@/shared/lib/nostr/media/mediaServerStore';
 import '@/shared/lib/nostr/outbox/relayListStore';
 import '@/shared/stores/global/btcMapStore';

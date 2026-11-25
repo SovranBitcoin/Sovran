@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Manager } from '@cashu/coco-core';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { z } from 'zod';
+import { copyEntries, ownEntry, setOwnEntry, withOwnEntry } from '@/shared/lib/ownEntry';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
@@ -38,6 +39,11 @@ import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
+import {
+  AuditObservationsSchema,
+  mergeAuditObservations,
+  type AuditObservationUpdate,
+} from '@/shared/lib/cashu/auditors/observation';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -110,6 +116,12 @@ interface MintMetadataState {
     atMs?: number
   ) => void;
 
+  /**
+   * Record auditor readings for one mint, per source, newer winning. Leaves
+   * every freshness stamp alone: a lazy per-mint read is not a discovery pass.
+   */
+  recordAuditObservations: (mintUrl: string, updates: readonly AuditObservationUpdate[]) => void;
+
   /** Bulk upsert from a nagg `/nostr/mint/discover` response. */
   upsertFromDiscover: (mints: DiscoverMint[]) => void;
   clear: () => void;
@@ -164,6 +176,10 @@ const PersistedMintMetadataEntry = z.looseObject({
   liveness: z.enum(['online', 'offline']).optional().catch(undefined),
   livenessAt: z.number().int().nonnegative().optional().catch(undefined),
   livenessSource: z.enum(['probe', 'nagg']).optional().catch(undefined),
+  // per-source auditor readings — additive, tolerant twice over: a reading that
+  // does not parse costs that reading, and a map that does not parse costs the
+  // field, never the mint's row (rebalance reads `auditData.swaps` beside it).
+  auditObservations: AuditObservationsSchema.optional().catch(undefined),
 });
 
 const PersistedMintMetadataStore = z.object({
@@ -242,7 +258,7 @@ export const useMintMetadataStore = create<MintMetadataState>({
         byMintUrl: {},
         legacyMigrated: false,
 
-        getCached: (mintUrl) => get().byMintUrl[normalizeMintUrlKey(mintUrl)],
+        getCached: (mintUrl) => ownEntry(get().byMintUrl, normalizeMintUrlKey(mintUrl)),
 
         mergeCached: (mintUrl, partial, groups) => {
           const key = normalizeMintUrlKey(mintUrl);
@@ -250,10 +266,11 @@ export const useMintMetadataStore = create<MintMetadataState>({
           const stamps: Partial<MintMetadataEntry> = {};
           for (const g of groups) stamps[GROUP_STAMP[g]] = now;
           set((state) => {
-            const next = {
-              ...state.byMintUrl,
-              [key]: { ...state.byMintUrl[key], ...partial, ...stamps },
-            };
+            const next = withOwnEntry(state.byMintUrl, key, {
+              ...ownEntry(state.byMintUrl, key),
+              ...partial,
+              ...stamps,
+            });
             evictIfOverCap(next);
             return { byMintUrl: next };
           });
@@ -261,7 +278,7 @@ export const useMintMetadataStore = create<MintMetadataState>({
 
         isStale: (mintUrl, group, maxAgeMinutes, nowMs = Date.now()) =>
           isMintMetaGroupStale(
-            get().byMintUrl[normalizeMintUrlKey(mintUrl)],
+            ownEntry(get().byMintUrl, normalizeMintUrlKey(mintUrl)),
             group,
             nowMs,
             maxAgeMinutes
@@ -314,28 +331,40 @@ export const useMintMetadataStore = create<MintMetadataState>({
 
         setLiveness: (mintUrl, status, source, atMs = Date.now()) => {
           const key = normalizeMintUrlKey(mintUrl);
-          const held = get().byMintUrl[key]?.livenessAt;
+          const held = ownEntry(get().byMintUrl, key)?.livenessAt;
           if (typeof held === 'number' && held > atMs) return;
           set((state) => ({
-            byMintUrl: {
-              ...state.byMintUrl,
-              [key]: {
-                ...(state.byMintUrl[key] ?? {}),
-                liveness: status,
-                livenessAt: atMs,
-                livenessSource: source,
-              },
-            },
+            byMintUrl: withOwnEntry(state.byMintUrl, key, {
+              ...(ownEntry(state.byMintUrl, key) ?? {}),
+              liveness: status,
+              livenessAt: atMs,
+              livenessSource: source,
+            }),
           }));
+        },
+
+        recordAuditObservations: (mintUrl, updates) => {
+          if (updates.length === 0) return;
+          const key = normalizeMintUrlKey(mintUrl);
+          if (!key) return;
+          set((state) => {
+            const prev = ownEntry(state.byMintUrl, key) ?? {};
+            const next = withOwnEntry(state.byMintUrl, key, {
+              ...prev,
+              auditObservations: mergeAuditObservations(prev.auditObservations, updates),
+            });
+            evictIfOverCap(next);
+            return { byMintUrl: next };
+          });
         },
 
         upsertFromDiscover: (mints) => {
           const now = Date.now();
           set((state) => {
-            const next = { ...state.byMintUrl };
+            const next = copyEntries(state.byMintUrl);
             for (const m of mints) {
               const key = normalizeMintUrlKey(m.mintUrl);
-              const prev = next[key] ?? {};
+              const prev = ownEntry(next, key) ?? {};
               // nagg's own probe verdict, stamped with ITS check time so a
               // fresher local probe is never overwritten by an older sweep.
               const naggCheckedAt = m.checkedAt ? Date.parse(m.checkedAt) : Number.NaN;
@@ -360,7 +389,7 @@ export const useMintMetadataStore = create<MintMetadataState>({
                 m.operatorPubkey !== undefined ||
                 m.operatorNpub !== undefined ||
                 m.vertexRank !== undefined;
-              next[key] = {
+              setOwnEntry(next, key, {
                 ...prev,
                 // identity scalars + the nuts capability map — discover still
                 // does NOT carry the full NUT-06 `info` blob, so do NOT stamp
@@ -392,7 +421,15 @@ export const useMintMetadataStore = create<MintMetadataState>({
                 ...(m.vertexRank !== undefined ? { vertexRank: m.vertexRank } : {}),
                 ...(hasSocial ? { socialAt: now } : {}),
                 ...livenessGroup,
-              };
+                ...(m.auditObservations
+                  ? {
+                      auditObservations: mergeAuditObservations(
+                        prev.auditObservations,
+                        m.auditObservations
+                      ),
+                    }
+                  : {}),
+              });
             }
             evictIfOverCap(next);
             return { byMintUrl: next };
@@ -447,7 +484,7 @@ export async function getCachedMintInfo(
   mintUrl: string
 ): Promise<GetInfoResponse> {
   const key = normalizeMintUrlKey(mintUrl);
-  const entry = useMintMetadataStore.getState().byMintUrl[key];
+  const entry = ownEntry(useMintMetadataStore.getState().byMintUrl, key);
   const now = Date.now();
   // `info` rehydrates as `unknown`; anything that is not an object is a miss.
   const cachedInfo =
@@ -730,6 +767,6 @@ export function useCachedMintMetadata(
   mintUrl: string | null | undefined
 ): MintMetadataEntry | undefined {
   return useMintMetadataStore((s) =>
-    mintUrl ? s.byMintUrl[normalizeMintUrlKey(mintUrl)] : undefined
+    mintUrl ? ownEntry(s.byMintUrl, normalizeMintUrlKey(mintUrl)) : undefined
   );
 }

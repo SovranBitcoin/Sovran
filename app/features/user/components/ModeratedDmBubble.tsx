@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChatMessageBubble } from '@/shared/ui/composed/chat';
 import type { ChatBubbleRenderArgs } from '@/shared/ui/composed/chat/types';
 import { Button } from '@/shared/ui/primitives/Button';
-import { shouldCensorDm } from '@/features/feed/lib/moderation';
+import { shouldCensorDm } from '@/shared/lib/nostr/moderationHelpers';
 
 export function ModeratedDmBubble({
   message,

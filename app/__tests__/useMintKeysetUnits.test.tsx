@@ -8,9 +8,13 @@
 
 import { act, renderHook } from '@testing-library/react-native';
 
-import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
+import {
+  hasSettledKeysetRead,
+  useMintKeysetUnits,
+} from '@/features/wallet/hooks/useMintKeysetUnits';
 
 const MINT = 'https://mint.example';
+const MINT_B = 'https://mint-b.example';
 
 type Handler = () => void;
 const mockHandlers = new Map<string, Set<Handler>>();
@@ -22,7 +26,7 @@ const mockManager = {
     return () => set.delete(handler);
   },
 };
-const mockTrustedMints = [{ mintUrl: MINT }];
+let mockTrustedMints = [{ mintUrl: MINT }];
 const mockGetMintKeysetUnits = jest.fn<Promise<string[]>, [unknown, string]>();
 
 jest.mock('@cashu/coco-react', () => ({
@@ -49,6 +53,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  mockTrustedMints = [{ mintUrl: MINT }];
   mockHandlers.clear();
   mockGetMintKeysetUnits.mockReset();
 });
@@ -89,5 +94,24 @@ test('reads that finish in order publish each answer', async () => {
   await act(async () => mockHandlers.get('mint:updated')?.forEach((handler) => handler()));
   await act(async () => second.resolve(['sat', 'usd']));
   expect(result.current).toEqual({ [MINT]: ['sat', 'usd'] });
+  unmount();
+});
+
+test('replacing a failed-read mint with another failed-read mint settles the replacement key', async () => {
+  mockGetMintKeysetUnits.mockRejectedValue(new Error('db read failed'));
+
+  const { result, rerender, unmount } = renderHook(() => useMintKeysetUnits());
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(hasSettledKeysetRead(result.current, MINT)).toBe(true);
+
+  mockTrustedMints = [{ mintUrl: MINT_B }];
+  await act(async () => {
+    rerender({});
+    await Promise.resolve();
+  });
+  expect(hasSettledKeysetRead(result.current, MINT_B)).toBe(true);
+  expect(hasSettledKeysetRead(result.current, MINT)).toBe(false);
   unmount();
 });

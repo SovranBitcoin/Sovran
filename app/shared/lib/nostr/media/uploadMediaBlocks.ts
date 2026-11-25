@@ -31,7 +31,7 @@ interface UploadableMediaBlock {
  *  - on any failure: abort the surviving siblings, then `Promise.allSettled`
  *    BEFORE reporting orphans — a sibling that finished around the failure
  *    boundary must land its descriptor first, so every uploaded blob stays
- *    deletable from "My media";
+ *    deletable from "Uploaded media";
  *  - blocks that already carry a descriptor (or have no local file) pass
  *    through untouched.
  *

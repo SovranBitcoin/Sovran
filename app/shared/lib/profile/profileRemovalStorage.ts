@@ -9,9 +9,32 @@ import { sdkRecoveryVaultNames } from '@/shared/lib/routstr/sdk/driver';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from '@/features/nearPay/lib/nearbyPaymentStorage';
 import { assertRoutstrStorageEmptyForRemoval } from '@/shared/lib/routstr/securePersistence';
 import { prepareProfileSecureRemoval } from '@/shared/lib/nostr/secureStorage';
-import { clearSecrets } from '@/features/nostrSigner/lib/bunkerSecrets';
-import { WhitenoiseNamespace, whitenoisePrefix } from '@/features/whitenoise/storage/namespaces';
+import { clearLegacyBunkerSecrets } from '@/shared/lib/profile/legacyNip46Cleanup';
 import { removePlaintextCaches } from '@/shared/lib/cache/createPubkeyScopedCache';
+
+/** Legacy Whitenoise AsyncStorage namespaces written by 0.1.0–0.1.3; kept here so profile removal still wipes them. */
+const LEGACY_WHITENOISE_NAMESPACES = [
+  'group-state',
+  'key-package',
+  'invite-received',
+  'invite-unread',
+  'invite-seen',
+  'inbox-cursor',
+  'history',
+  'dm-index',
+] as const;
+
+export async function wipeLegacyWhitenoiseStorageForAccounts(
+  accountIndexes: readonly number[]
+): Promise<void> {
+  if (accountIndexes.length === 0) return;
+  const prefixes = accountIndexes.flatMap((idx) =>
+    LEGACY_WHITENOISE_NAMESPACES.map((ns) => `whitenoise:${idx}:${ns}:`)
+  );
+  const keys = await AsyncStorage.getAllKeys();
+  const matching = keys.filter((key) => prefixes.some((prefix) => key.startsWith(prefix)));
+  if (matching.length > 0) await AsyncStorage.multiRemove(matching);
+}
 import '@/shared/lib/nostr/giftWrapCache';
 import '@/shared/lib/nostr/nip04Cache';
 import {
@@ -285,8 +308,8 @@ export const profileRemovalPorts: RemovalPorts = {
     const secure = securePlans.get(profile.pubkey);
     if (!secure) throw new Error('Account secure deletion plan is unavailable');
     const keys = await AsyncStorage.getAllKeys();
-    const prefixes = Object.values(WhitenoiseNamespace).map(
-      (ns) => `${whitenoisePrefix(profile.accountIndex, ns)}:`
+    const prefixes = LEGACY_WHITENOISE_NAMESPACES.map(
+      (ns) => `whitenoise:${profile.accountIndex}:${ns}:`
     );
     const scoped = persistedStoreKeys('profile').flatMap((name) => [
       `${name}:profile:${profile.pubkey}`,
@@ -323,10 +346,7 @@ export const profileRemovalPorts: RemovalPorts = {
       { name: 'account keys and payment recovery records', run: secure },
       {
         name: 'NIP-46 bunker secrets',
-        run: async () => {
-          const result = await clearSecrets(profile.pubkey);
-          if (result.isErr()) throw new Error('Bunker secret deletion failed');
-        },
+        run: () => clearLegacyBunkerSecrets(profile.pubkey),
       },
       {
         name: 'wallet database',

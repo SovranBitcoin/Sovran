@@ -7,6 +7,7 @@
  */
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { AuditMintResponse } from '@sovranbitcoin/schemas';
+import type { AuditObservations } from '@/shared/lib/cashu/auditors/observation';
 
 /** Historical cache payload only; no live endpoint returns this shape anymore. */
 export type LegacyMintAudit = Omit<AuditMintResponse, 'info'> & { info?: unknown };
@@ -45,6 +46,13 @@ export interface MintMetadataEntry {
   auditSource?: 'ucash' | '8333';
   /** Upstream timestamp retained verbatim, distinct from local auditAt. */
   auditUpdatedAt?: number | string;
+  /**
+   * Each auditor's own reading, by source (MintRadar, uCash, Macadamia, 8333),
+   * so Mint Info can say which source a number came from and never pair one
+   * source's successes with another's total. Written by discovery and by Mint
+   * Info's per-mint detail reads; does not stamp the `audit` group.
+   */
+  auditObservations?: AuditObservations;
   // social / operator — 30m
   contactFollowers?: number;
   contactReputation?: number | null;

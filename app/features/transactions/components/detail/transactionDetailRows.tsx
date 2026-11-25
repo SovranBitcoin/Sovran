@@ -8,6 +8,7 @@ import { describeSendLock } from 'wallet';
 
 import { spendingConditionDetailItems } from '@/features/send/components/SpendingConditionsCard';
 import { transactionIdentitySnapshot } from '@/features/transactions/lib/transactionIdentity';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 /**
  * The trailing `DetailsSection` rows every transaction-detail screen builds
@@ -79,7 +80,7 @@ function peopleDetailItems(entry: Loose): Row[] {
   return rowsOf('People', [
     ['Name', str(identity.name)],
     ['Address', str(identity.nip05)],
-    ['npub', nip19.npubEncode(identity.pubkey)],
+    ['npub', isNostrPubkeyHex(identity.pubkey) ? nip19.npubEncode(identity.pubkey) : null],
     ['Public key', identity.pubkey],
   ]);
 }

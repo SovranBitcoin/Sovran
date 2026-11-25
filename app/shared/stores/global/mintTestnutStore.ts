@@ -23,6 +23,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
@@ -83,7 +84,7 @@ export const useMintTestnutStore = create<MintTestnutState>({
             const key = normalizeMintUrlKey(row.mintUrl);
             next[key] =
               row.probedAt == null
-                ? { ...(next[key] ?? { testnut: false }), checkedAt: now }
+                ? { ...(ownEntry(next, key) ?? { testnut: false }), checkedAt: now }
                 : { testnut: row.testnut, probedAt: row.probedAt, checkedAt: now };
           }
           evictIfOverCap(next);
@@ -100,7 +101,8 @@ export const useMintTestnutStore = create<MintTestnutState>({
             const key = normalizeMintUrlKey(mint.mintUrl);
             // checkedAt 0: the next background pass still asks nagg for the
             // probe time, and an LRU trim drops these seeds first.
-            next[key] = { ...next[key], checkedAt: next[key]?.checkedAt ?? 0, testnut: true };
+            const previous = ownEntry(next, key);
+            next[key] = { ...previous, checkedAt: previous?.checkedAt ?? 0, testnut: true };
           }
           evictIfOverCap(next);
           return { byMintUrl: next };
@@ -124,7 +126,10 @@ export const useMintTestnutStore = create<MintTestnutState>({
 
 /** Synchronous, local-only verdict read for non-React callers. */
 export function isTestnutMint(mintUrl: string): boolean {
-  return useMintTestnutStore.getState().byMintUrl[normalizeMintUrlKey(mintUrl)]?.testnut === true;
+  return (
+    ownEntry(useMintTestnutStore.getState().byMintUrl, normalizeMintUrlKey(mintUrl))?.testnut ===
+    true
+  );
 }
 
 /**

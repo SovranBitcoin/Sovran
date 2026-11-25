@@ -9,7 +9,7 @@
 
 import { act, renderHook } from '@testing-library/react-native';
 
-import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import { useNip46ConnectionsStore } from '@/shared/stores/profile/nip46ConnectionsStore';
 import {
   markHydrationFailed,
   markHydrationLoaded,

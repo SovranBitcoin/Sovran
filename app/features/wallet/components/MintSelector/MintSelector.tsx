@@ -28,6 +28,7 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         balance={shared.balance}
         unit={shared.unit}
         isLoading={shared.isLoading}
+        ctaLabel={shared.ctaLabel}
         iconNode={
           // The same dot the mint rows carry, so the header answers "is my
           // mint up?" without opening the selector. Feedback, never a gate.
@@ -38,6 +39,7 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
               size={24}
               isLoading={shared.isLoading}
             />
+            {/* No dot while pending or loading: there is no mint to report on yet. */}
             {!shared.isLoading ? (
               <PresenceDot presence={liveness === 'unknown' ? null : liveness} size={24} />
             ) : null}
@@ -46,7 +48,6 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         // 24, matching the AI header's provider pill so the two tab headers
         // carry the same size face.
         iconBoxSize={24}
-        loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}
         width={props.width}
         height={props.height}

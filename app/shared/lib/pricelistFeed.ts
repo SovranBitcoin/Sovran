@@ -1,18 +1,40 @@
 /** BTC rates polling, owned outside React so lifecycle teardown cancels all work. */
-import { ResultAsync } from 'neverthrow';
+import { err, ok, ResultAsync } from 'neverthrow';
 import { ApiHttpError, fetchBtcRates } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
-import { RATE_CODES, type BitcoinPrices } from '@/shared/stores/global/pricelistStore';
+import {
+  PRICE_STALE_MINUTES,
+  RATE_CODES,
+  usePricelistStore,
+  type BitcoinPrices,
+} from '@/shared/stores/global/pricelistStore';
 
 export const POLL_MS = 10 * 60 * 1000;
 const RESUME_FRESH_MS = 60 * 1000;
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 300_000];
+/** The age past which the cache counts as stale (the store's own budget). */
+const STALE_MS = PRICE_STALE_MINUTES * 60 * 1000;
 
 interface PricelistFeedOptions {
   onPrices: (prices: Partial<BitcoinPrices>, serverUpdatedAtSeconds?: number) => void;
   onLoading: (loading: boolean) => void;
   onError: (error: string | null) => void;
   fetcher?: typeof fetchBtcRates;
+  /**
+   * When the cached prices were priced, in seconds, or null with no cache.
+   * Defaults to the hydrated pricelist store.
+   */
+  cachedAtSeconds?: () => number | null;
+}
+
+/**
+ * When the cached prices were priced. A legacy write kept only its local
+ * receive time, which says nothing about how old the price was, so it
+ * compares as unknown and the next complete snapshot replaces it.
+ */
+function storeCachedAtSeconds(): number | null {
+  const { pricelist, serverUpdatedAt } = usePricelistStore.getState();
+  return pricelist ? serverUpdatedAt : null;
 }
 
 export interface PricelistFeed {
@@ -20,6 +42,12 @@ export interface PricelistFeed {
   start: () => void;
   /** Refresh stale data after foreground/connectivity recovery. */
   resume: (reason: 'foreground' | 'online') => void;
+  /**
+   * Confirmed offline: cancel the in-flight request (not counted as a
+   * failure) and schedule nothing. Back online: refresh at once if the last
+   * attempt failed or a poll is due, otherwise wait out the interval.
+   */
+  setOffline: (offline: boolean) => void;
   /** Stop permanently, aborting the request and ignoring late completions. */
   stop: () => void;
 }
@@ -29,9 +57,11 @@ export function createPricelistFeed({
   onLoading,
   onError,
   fetcher = fetchBtcRates,
+  cachedAtSeconds = storeCachedAtSeconds,
 }: PricelistFeedOptions): PricelistFeed {
   let started = false;
   let stopped = false;
+  let offline = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let request: AbortController | null = null;
   let lastSuccessAtMs: number | null = null;
@@ -49,8 +79,16 @@ export function createPricelistFeed({
     }, delayMs);
   };
 
+  const cancelRequest = () => {
+    if (!request) return;
+    request.abort();
+    request = null;
+    // The aborted poll returns before its own `onLoading(false)`.
+    onLoading(false);
+  };
+
   const poll = async () => {
-    if (!started || stopped || request) return;
+    if (!started || stopped || offline || request) return;
     clearTimer();
     const controller = new AbortController();
     request = controller;
@@ -64,25 +102,45 @@ export function createPricelistFeed({
     if (stopped || controller.signal.aborted) return;
     request = null;
 
-    if (result.isOk()) {
-      const { rates, updatedAt, degraded } = result.value;
+    // Only a snapshot pricing every supported currency reaches the store.
+    const snapshot = result.andThen(({ rates, ...rest }) => {
       const prices: Partial<BitcoinPrices> = {};
       for (const currency of RATE_CODES) {
-        if (rates[currency]) prices[currency] = rates[currency].price;
+        const price = rates[currency]?.price;
+        if (price === undefined || !Number.isFinite(price) || price <= 0) {
+          return err(new Error(`Incomplete rates: ${currency}`));
+        }
+        prices[currency] = price;
       }
-      onPrices(prices, updatedAt);
+      return ok({ ...rest, prices });
+    });
+
+    if (snapshot.isOk()) {
+      const { prices, updatedAt, degraded, source } = snapshot.value;
+      // A fallback snapshot (Mempool's own `time`) can be older than prices
+      // already cached; keeping the newer cache is still a good poll.
+      const cachedAt = cachedAtSeconds();
+      const older = cachedAt !== null && updatedAt <= cachedAt;
+      if (older) {
+        log.info('pricelist.poll.older', { updatedAt, cachedAt, source: source ?? null });
+      } else {
+        onPrices(prices, updatedAt);
+      }
       onError(null);
       lastSuccessAtMs = Date.now();
       failures = 0;
       log.info('pricelist.poll.ok', {
         updatedAt,
+        source: source ?? null,
         degraded: degraded ?? false,
         currencies: Object.keys(prices),
       });
       schedule(POLL_MS);
     } else {
-      const status = result.error instanceof ApiHttpError ? result.error.status : null;
-      log.warn('pricelist.poll.failed', { status });
+      const status = snapshot.error instanceof ApiHttpError ? snapshot.error.status : null;
+      // The cache stays as it is; say whether it is now past its budget.
+      const stale = lastSuccessAtMs === null || Date.now() - lastSuccessAtMs > STALE_MS;
+      log.warn('pricelist.poll.failed', { status, stale });
       // Warming (503) and other background failures retain cached prices without a toast.
       const delayMs = RETRY_DELAYS_MS[Math.min(failures, RETRY_DELAYS_MS.length - 1)];
       failures = Math.min(failures + 1, RETRY_DELAYS_MS.length);
@@ -99,19 +157,34 @@ export function createPricelistFeed({
       void poll();
     },
     resume: (reason) => {
-      if (!started || stopped || request) return;
+      if (!started || stopped || offline || request) return;
       if (lastSuccessAtMs !== null && Date.now() - lastSuccessAtMs <= RESUME_FRESH_MS) return;
       log.info('pricelist.poll.resume', { reason });
+      void poll();
+    },
+    setOffline: (next) => {
+      if (stopped || next === offline) return;
+      offline = next;
+      if (offline) {
+        log.info('pricelist.poll.paused');
+        clearTimer();
+        cancelRequest();
+        return;
+      }
+      if (!started) return;
+      const sinceSuccessMs = lastSuccessAtMs === null ? null : Date.now() - lastSuccessAtMs;
+      if (failures === 0 && sinceSuccessMs !== null && sinceSuccessMs < POLL_MS) {
+        log.info('pricelist.poll.unpaused', { refresh: 'scheduled' });
+        schedule(POLL_MS - sinceSuccessMs);
+        return;
+      }
+      log.info('pricelist.poll.unpaused', { refresh: 'now' });
       void poll();
     },
     stop: () => {
       stopped = true;
       clearTimer();
-      if (!request) return;
-      request.abort();
-      request = null;
-      // The aborted poll returns before its own `onLoading(false)`.
-      onLoading(false);
+      cancelRequest();
     },
   };
 }

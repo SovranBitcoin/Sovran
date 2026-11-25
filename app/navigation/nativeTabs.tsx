@@ -43,7 +43,7 @@ type HeaderIconButtonProps = {
 /** Minimum 44pt touch target; hitSlop extends so taps near the edge still register. */
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
-export function HeaderIconButton({
+function HeaderIconButton({
   icon,
   color,
   onPress,

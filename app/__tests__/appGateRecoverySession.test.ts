@@ -235,6 +235,8 @@ it('clears secure data and preferences before restarting fresh', async () => {
   expect(CocoManager.completeReset).toHaveBeenCalledWith([0, 3]);
   expect(recordedAtReset).toEqual([false, false]);
   expect(clearAllSecureData).toHaveBeenCalled();
+  // Every profile's pubkey, so its Remote Login secrets are wiped too.
+  expect(prepareSecureDataReset).toHaveBeenCalledWith([0, 3], [], ['a'.repeat(64), 'b'.repeat(64)]);
   expect(AsyncStorage.clear).toHaveBeenCalled();
   expect(restartApp).toHaveBeenCalledTimes(1);
 });

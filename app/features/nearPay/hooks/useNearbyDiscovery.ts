@@ -1,7 +1,7 @@
 import { useWarmNip05Profiles } from '@/shared/hooks/useWarmNip05Profiles';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { NEARBY_PAYMENT_PREFIX, nearbyPayments } from '../lib/nearbyPayments';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useBalanceContext, useMints } from '@cashu/coco-react';
 import { isTestnutUnit } from 'wallet';
@@ -31,7 +31,7 @@ import {
 } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
+import { cashuP2pkPubkeyFromNostrHex, isFixedHex } from '@/shared/lib/protocolIds';
 import { amountToNumber } from 'wallet/amount';
 import { rankAdvertisedMints } from '@/shared/lib/nutCreq';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
@@ -84,8 +84,29 @@ export function useNearbyDiscovery(): void {
     }),
     [profileScope]
   );
+  // Gate the standing nearby payment request until both trusted mints and
+  // balances have finished their initial SQLite load (F142). Otherwise the
+  // first render ranks mints without balances, creates a request, and 7ms
+  // later balances arrive and discard it for a different top-5 mint set.
+  const [walletDataReady, setWalletDataReady] = useState(false);
+  useEffect(() => {
+    setWalletDataReady(false);
+    if (!CocoManager.isInitialized()) return;
+    let cancelled = false;
+    const manager = CocoManager.getInstance();
+    void Promise.all([
+      manager.mint.getAllTrustedMints().catch(() => []),
+      manager.wallet.balances.byMint().catch(() => ({})),
+    ]).then(() => {
+      if (!cancelled) setWalletDataReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileScope]);
+
   const { request } = useStandingPaymentRequest(
-    identityMaterial && mintUrlsKey
+    walletDataReady && identityMaterial && mintUrlsKey
       ? {
           purpose: 'nearby',
           unit: 'sat',
@@ -157,6 +178,12 @@ export function useNearbyDiscovery(): void {
 
   useEffect(() => {
     if (!identityMaterial || !profileScope) return;
+    // A malformed local Noise key declines nearby discovery instead of
+    // throwing out of this effect.
+    if (!isFixedHex(identityMaterial.noisePrivateKeyHex, 32)) {
+      bitchatLog.warn('bitchat.discovery.identity_unusable');
+      return;
+    }
     let disposed = false;
     const capabilities = new Map<string, VerifiedNearbyCapability>();
     const sent = new Map<string, { at: number; creq: string | null; fingerprint: string }>();

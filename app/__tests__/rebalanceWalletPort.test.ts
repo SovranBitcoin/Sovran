@@ -57,6 +57,7 @@ function createFakeManager() {
         execute: jest.fn(() => Promise.resolve({ id: 'melt-op', state: 'finalized' })),
         refresh: jest.fn(() => Promise.resolve({ id: 'melt-op', state: 'pending' })),
         get: jest.fn(() => Promise.resolve({ id: 'melt-op', state: 'prepared' })),
+        cancel: jest.fn(() => Promise.resolve()),
       },
     },
     mint: {
@@ -180,6 +181,12 @@ describe('createRebalanceWalletPort', () => {
     expect(fake.manager.ops.melt.execute).toHaveBeenCalledWith('melt-op');
     expect(fake.manager.ops.melt.refresh).toHaveBeenCalledWith('melt-op');
     expect(fake.manager.ops.melt.get).toHaveBeenCalledWith('melt-op');
+  });
+
+  it('cancels a prepared melt through Coco, releasing its reserved proofs', async () => {
+    const fake = createFakeManager();
+    await port(fake, 'sat').cancelPreparedMelt('melt-op');
+    expect(fake.manager.ops.melt.cancel).toHaveBeenCalledWith('melt-op', expect.any(String));
   });
 
   it('restores in-flight proofs through the app Coco manager for that mint', async () => {

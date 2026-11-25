@@ -38,6 +38,15 @@ const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, d
   );
 };
 
+/** Families opened first, above the rest: every state held still, and every frame. */
+const INSPECT_FAMILY_IDS: readonly string[] = ['ui-kit', 'scrubber'];
+const INSPECT_FAMILIES = DESIGN_SYSTEM_CATALOG.filter((entry) =>
+  INSPECT_FAMILY_IDS.includes(entry.id)
+);
+const COMPONENT_FAMILIES = DESIGN_SYSTEM_CATALOG.filter(
+  (entry) => !INSPECT_FAMILY_IDS.includes(entry.id)
+);
+
 const openScreens = () => router.navigate('/(settings-flow)/design-system-screens');
 const openVariations = () => router.navigate('/(settings-flow)/design-system-variations');
 const openPrompts = () => router.navigate('/(settings-flow)/design-system-prompts');
@@ -137,6 +146,16 @@ export function SettingsDesignSystemScreen() {
           Live previews of shared UI components. Open one to see it in isolation — only the selected
           component animates, so the previews stay smooth.
         </Text>
+        <Section title="Inspect">
+          <ListGroup variant="secondary">
+            {INSPECT_FAMILIES.map((entry, index) => (
+              <React.Fragment key={entry.id}>
+                {index > 0 ? <Separator className="mx-4" /> : null}
+                <DesignSystemLinkItem {...entry} />
+              </React.Fragment>
+            ))}
+          </ListGroup>
+        </Section>
         <Section title="Explore">
           <ListGroup variant="secondary">
             <PressableFeedback
@@ -216,7 +235,7 @@ export function SettingsDesignSystemScreen() {
         </Section>
         <Section title="Components">
           <ListGroup variant="secondary">
-            {DESIGN_SYSTEM_CATALOG.map((entry, index) => (
+            {COMPONENT_FAMILIES.map((entry, index) => (
               <React.Fragment key={entry.id}>
                 {index > 0 ? <Separator className="mx-4" /> : null}
                 <DesignSystemLinkItem {...entry} />

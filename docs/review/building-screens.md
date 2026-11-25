@@ -18,7 +18,7 @@ means it is assembled from the parts they use, not designed fresh.
    | Facts about one thing, in a sheet | `app/app/details.tsx`, `app/shared/ui/composed/DetailsSheet.tsx` |
    | Blocking prompt or error page | `app/shared/blocks/CtaScreen.tsx`, `app/shared/blocks/StartupFailedScreen.tsx` |
 
-   `SettingsNetworkScreen`, `MintInfoScreen`, `SendScreen` and `ContactsScreen` predate the
+   `SettingsNetworkScreen`, `MintInfoScreen` and `SendScreen` predate the
    current parts. Do not copy from them.
 
 2. **Search for the part before making one.** `app/shared/ui/primitives`, `app/shared/ui/composed`

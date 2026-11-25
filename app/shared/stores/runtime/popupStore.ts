@@ -7,7 +7,6 @@ import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
 type SheetButton = {
   text: string;
-  page?: string;
   onPress?: () => void;
 };
 

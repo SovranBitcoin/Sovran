@@ -22,4 +22,12 @@ export interface GlassSearchBarProps {
    * pre-fills the field — used to re-run a tapped recent-search chip.
    */
   seedText?: string;
+  /**
+   * The text the owner holds for this field. With `onClear`, the Android bar
+   * shows a one-tap clear button while it is not empty (iOS search fields
+   * bring their own).
+   */
+  value?: string;
+  /** Empties the field: the owner resets its text and bumps `clearKey`. */
+  onClear?: () => void;
 }

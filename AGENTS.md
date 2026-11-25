@@ -128,7 +128,7 @@ belong in the documents above; with a fixed shape, in a lint rule or test; when 
 means reading what the code does, in a saved check ([how](docs/review/README.md)). A local skill
 is for a procedure with steps and an end.
 
-**Load these when their moment comes:** use `full-send` for the durable task controller in `harness/`.
+**Load these when their moment comes:**
 
 | Skill | When |
 | --- | --- |
@@ -143,8 +143,8 @@ its task), `grilling` (stress-testing a design decision), `codebase-design` and
 `improve-codebase-architecture` (module boundaries and reuse), `domain-modeling` (vocabulary),
 `principle-model-the-domain` and `principle-type-system-discipline` (replacing branching with
 structure, illegal states), `typescript-best-practices`, `expo-router` (route and sheet
-mechanics), `expo-animation` (motion, gestures, haptics), `react-native-best-practices`
-(measured performance work), `react-native-testing` (component tests).
+mechanics), `react-native-best-practices` (measured performance work), `react-native-testing`
+(component tests).
 
 `python3 .agents/skills/manage.py check` verifies the installation; `link` repairs links.
 Upstream snapshots stay unchanged, with provenance in `.agents/skills/sources.json`.

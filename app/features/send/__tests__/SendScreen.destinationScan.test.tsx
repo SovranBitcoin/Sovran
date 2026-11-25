@@ -94,7 +94,7 @@ jest.mock('@/features/nearPay/hooks/useRememberPeers', () => ({ useRememberPeers
 // The row resolves the peer's profile itself; these suites are about the
 // screen's tiers, so the row is a leaf.
 jest.mock('@/features/nearPay/components/NearbyPeerRow', () => ({ NearbyPeerRow: () => null }));
-jest.mock('@/features/contacts/hooks/useOverlaidContactSearch', () => ({
+jest.mock('@/features/search/hooks/useOverlaidContactSearch', () => ({
   useOverlaidContactSearch: () => ({ contactRows: [], loading: false }),
   CONTACT_SEARCH_MIN_LENGTH: 3,
 }));

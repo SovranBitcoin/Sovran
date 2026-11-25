@@ -21,8 +21,7 @@ export const CANONICAL_PAGES = [
   'onboarding-carousel', // the four intro cards (occurrences 1-4)
   // shell
   'wallet', // wallet home (WalletScreen)
-  'drawer', // profile drawer (drawer-profile-name)
-  'profile-switcher', // the picker sheet showing the drawer's profiles (profile-switcher)
+  'drawer', // account switcher drawer (drawer-profile-switch-*, drawer-profile-options-*, drawer-add-account)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
@@ -43,26 +42,17 @@ export const CANONICAL_PAGES = [
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
   'mint-info', // mint info / trust decision screen (MintInfoScreen)
-  'ai-provider-select', // Routstr provider list, the AI pill's destination (ProviderListScreen)
-  'ai-provider-info', // Routstr provider details + reclaim (ProviderInfoScreen)
   'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
   'mint-history', // one mint's NUT-06 update history from its details page (MintChangesScreen)
   'profile', // nostr user profile (UserProfileScreen)
-  'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
   'details', // every fact about one payment, as a table (details-sheet, details-sheet-done)
   'picker', // choosing one of several things, the sheet `openPicker` opens (picker-sheet)
   'emoji-picker', // an emoji grid with search, to copy a token as an emoji (emoji-picker, emoji-picker-search)
   'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
-  'search', // header search overlay with results (SearchOverlay)
-  'settings', // settings root screen ((settings-flow), SettingsScreen)
-  'feed', // home feed tab (FeedScreen: For You / Following)
+  'search', // Search tab: people, mints and places (SearchScreen)
+  'settings', // Settings tab root ((tabs)/settings, SettingsScreen)
   'image-viewer', // fullscreen media overlay; no standalone route
-  'thread', // post thread reader ((user-flow)/thread, ThreadView)
-  'contacts', // contacts tab (ContactsScreen)
-  'notifications', // notifications tab (NotificationsScreen)
-  'ai', // AI chat tab (AiChatScreen)
-  'signer-hub', // Remote Login / NIP-46 signer hub
   'theme-preview', // per-unit wallpaper preview cards ((theme-flow)/preview)
   'gallery', // wallpaper album gallery ((theme-flow)/gallery)
   'transactions', // full transactions list ((transactions-flow)/transactions)
@@ -77,14 +67,11 @@ export const CANONICAL_PAGES = [
   'bitchat-dm',
   'bitchat-network',
   'claim-username',
-  'composer',
   'geohash-chat',
   'map-detail',
   'near-pay',
   'near-pay-peers',
   'not-found',
-  'notification-followers',
-  'notification-mint-changes',
   'onchain-receive',
   'onchain-send',
   'payment-request',
@@ -97,7 +84,6 @@ export const CANONICAL_PAGES = [
   'settings-design-system-fade-stress',
   'settings-design-system-foundations',
   'settings-design-system-loading',
-  'settings-design-system-posts',
   'settings-design-system-screens',
   'settings-design-system-prompts', // every prompt and blocking screen, listed
   'settings-design-system-prompt', // one of them, opened on sample data
@@ -106,11 +92,10 @@ export const CANONICAL_PAGES = [
   'settings-design-system-skeleton-crossfade',
   'settings-design-system-timeline',
   'settings-design-system-wallet-controls',
+  'settings-design-system-ui-kit',
+  'settings-design-system-scrubber',
   'settings-keyring',
-  'settings-media',
-  'settings-moderation',
   'settings-network',
-  'settings-notification-policy',
   'settings-privacy',
   'settings-profile',
   'settings-edit-profile',
@@ -118,19 +103,8 @@ export const CANONICAL_PAGES = [
   'settings-routing',
   'settings-storage',
   'settings-terms',
-  'signer-activity',
-  'signer-activity-detail',
-  'signer-app',
-  'signer-app-permissions',
-  'signer-app-person',
-  'signer-connect',
-  'signer-requests',
-  'signer-share',
-  'stories',
   'theme-background',
   'transaction-filters',
-  'whitenoise-dm',
-  'whitenoise-setup',
 ] as const;
 
 const CANONICAL_PAGE_SET: ReadonlySet<string> = new Set(CANONICAL_PAGES);

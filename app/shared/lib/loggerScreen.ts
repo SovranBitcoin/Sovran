@@ -113,6 +113,7 @@ function useScreenPerfLive(
   const [emptyAtFirstCommit] = useState(!contentReady);
 
   useEffect(() => {
+    if (log.isLevelEnabled?.('debug') === false) return;
     // First commit only; `name` is in the deps for correctness, not to re-fire.
     if (shellMs.current !== null) return;
     const now = monotonicNow();
@@ -130,6 +131,7 @@ function useScreenPerfLive(
   }, [emptyAtFirstCommit, name, routeChanges, startedAt]);
 
   useEffect(() => {
+    if (log.isLevelEnabled?.('debug') === false) return;
     if (!contentReady || contentLogged.current) return;
     contentLogged.current = true;
     log.debug('screen.mount', {
@@ -143,6 +145,7 @@ function useScreenPerfLive(
   // animate; the cast narrows the navigator's event map to the two events read.
   const page = useContext(NavigationContext) as unknown as TransitionSource | undefined;
   useEffect(() => {
+    if (log.isLevelEnabled?.('debug') === false) return;
     if (typeof page?.addListener !== 'function') return;
     let movingSince: number | null = null;
     const offStart = page.addListener('transitionStart', (event) => {

@@ -64,16 +64,7 @@ describe('dmEchoStore', () => {
     expect(kept.at(-1)!.id).toBe('wrap-24');
   });
 
-  it('is seeded into the thread the payment flow navigates to', () => {
-    // Pin both sides of the delivery-to-thread seam so it is not silently
-    // removed or stripped of its active-profile scope.
-    const screen = readFileSync(
-      resolve(__dirname, '../features/user/screens/UserMessagesScreen.tsx'),
-      'utf8'
-    );
-    expect(screen).toContain(
-      '.getForThread({ viewer: nostrKeys.pubkey, protocol, counterparty: pubkey })'
-    );
+  it('is seeded into the active profile scope when the payment flow sends a NIP-17 DM', () => {
     const colada = readFileSync(
       resolve(__dirname, '../features/send/providers/Colada.tsx'),
       'utf8'

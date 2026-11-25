@@ -7,6 +7,9 @@ import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadat
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
+import { readMintAuditDetail } from '@/features/mint/lib/mintAuditDetail';
+import { fenceDataReset } from '@/shared/lib/account/dataResetFence';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -30,6 +33,11 @@ jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
 }));
 jest.mock('@/shared/lib/nostr/fetchMintReviews', () => ({ fetchMintReviews: jest.fn() }));
 jest.mock('@/features/mint/hooks/useMintProfiles', () => ({ useMintProfiles: jest.fn() }));
+// Mint Info's own per-mint auditor reads: stubbed, so no test reaches a network.
+jest.mock('@/features/mint/lib/mintAuditDetail', () => ({
+  mintAuditDetailDue: () => true,
+  readMintAuditDetail: jest.fn(),
+}));
 jest.mock('@/features/send/lib/createSovranScreenActionsBridge', () => ({
   retryMintInfoFetch: jest.fn(() => true),
 }));
@@ -41,6 +49,8 @@ jest.mock('@/shared/lib/logger', () => {
     cashuLog: sink,
     monotonicNow: () => Date.now(),
     mintUrlLogFields: () => ({}),
+    applyFileLogging: jest.fn(),
+    redactError: (e: unknown) => e,
   };
 });
 
@@ -56,6 +66,7 @@ beforeEach(() => {
   useMintMetadataStore.setState({ byMintUrl: {} });
   mintReviewsCache.clear();
   jest.mocked(getDiscoveredMintMetadata).mockImplementation(async () => store().getCached(MINT));
+  jest.mocked(readMintAuditDetail).mockResolvedValue({ updates: [], answered: false });
   jest
     .mocked(fetchMintReviews)
     .mockResolvedValue(
@@ -88,9 +99,40 @@ it('shows loading for a cold audit group, then ready once discovery stamps it', 
   );
   const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
   expect(result.current.audit).toBe('loading');
+  // Asked once the saved settings and mint rows have loaded.
+  await waitFor(() => expect(getDiscoveredMintMetadata).toHaveBeenCalledTimes(1));
+  expect(result.current.audit).toBe('loading');
   await act(async () => finish());
   await waitFor(() => expect(result.current.audit).toBe('ready'));
   expect(getDiscoveredMintMetadata).toHaveBeenCalledTimes(1);
+});
+
+it('does not ask nagg for the audit when Delete All ran while the saved stores loaded', async () => {
+  let loadSettings!: () => void;
+  const rehydrated = new Promise<void>((resolve) => {
+    loadSettings = resolve;
+  });
+  // Settings are still loading when the page opens.
+  const hydrated = jest.spyOn(useSettingsStore.persist, 'hasHydrated').mockReturnValue(false);
+  const listeners: (() => void)[] = [];
+  const onFinish = jest
+    .spyOn(useSettingsStore.persist, 'onFinishHydration')
+    .mockImplementation((listener) => {
+      listeners.push(listener as () => void);
+      return () => {};
+    });
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  fenceDataReset();
+  hydrated.mockReturnValue(true);
+  await act(async () => {
+    loadSettings();
+    await rehydrated;
+    for (const listener of listeners) listener();
+  });
+  await waitFor(() => expect(result.current.audit).toBe('error'));
+  expect(getDiscoveredMintMetadata).not.toHaveBeenCalled();
+  hydrated.mockRestore();
+  onFinish.mockRestore();
 });
 
 it('reports error for an audit read that could not reach nagg, and retries on demand', async () => {
@@ -185,4 +227,89 @@ it('accepts late review updates until the detail read is aborted', async () => {
   act(() => update?.({ ...first, tier: 'nagg', score: 2, reviewCount: 3 }));
   expect(store().getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90 });
   expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data.score).toBe(4.5);
+});
+
+it('records the per-mint auditor reads and shows the stats they carry', async () => {
+  jest.mocked(readMintAuditDetail).mockResolvedValue({
+    updates: [
+      {
+        source: 'ucash',
+        observedAt: 1,
+        uptime: { pct: 100, window: '24h', checks: 25 },
+        latency: { ms: 3394, kind: 'mean', window: '24h' },
+      },
+    ],
+    answered: true,
+  });
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  await waitFor(() => expect(result.current.stats.uptime?.source).toBe('ucash'));
+  // One source answering is an answer, even with the directory read failing.
+  await waitFor(() => expect(result.current.audit).toBe('ready'));
+  expect(result.current.stats.latency).toEqual({
+    ms: 3394,
+    kind: 'mean',
+    window: '24h',
+    source: 'ucash',
+  });
+  expect(readMintAuditDetail).toHaveBeenCalledWith(
+    MINT,
+    expect.objectContaining({ disabledAuditors: [], enabledAuditors: [] })
+  );
+});
+
+it('waits for the saved mint rows to load before recording auditor readings', async () => {
+  const reading = {
+    source: 'ucash' as const,
+    observedAt: 1,
+    uptime: { pct: 100, window: '24h' as const, checks: 25 },
+  };
+  jest.mocked(readMintAuditDetail).mockResolvedValue({ updates: [reading], answered: true });
+  let finish!: () => void;
+  const loaded = jest.spyOn(useMintMetadataStore.persist, 'hasHydrated').mockReturnValue(false);
+  const listen = jest
+    .spyOn(useMintMetadataStore.persist, 'onFinishHydration')
+    .mockImplementation((listener) => {
+      finish = () => listener(useMintMetadataStore.getState());
+      return () => {};
+    });
+  const record = jest.spyOn(store(), 'recordAuditObservations');
+  try {
+    renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+    await waitFor(() => expect(readMintAuditDetail).toHaveBeenCalled());
+    await act(async () => {});
+    // Written now, the empty in-memory store would be saved over the rows on disk.
+    expect(record).not.toHaveBeenCalled();
+    loaded.mockReturnValue(true);
+    act(() => finish());
+    await waitFor(() => expect(record).toHaveBeenCalledWith(MINT, [reading]));
+  } finally {
+    loaded.mockRestore();
+    listen.mockRestore();
+    record.mockRestore();
+  }
+});
+
+it('drops auditor readings that land after Delete All', async () => {
+  const { fenceDataReset } = jest.requireActual<
+    typeof import('@/shared/lib/account/dataResetFence')
+  >('@/shared/lib/account/dataResetFence');
+  let answer!: (value: Awaited<ReturnType<typeof readMintAuditDetail>>) => void;
+  jest.mocked(readMintAuditDetail).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+  );
+  const record = jest.spyOn(store(), 'recordAuditObservations');
+  try {
+    renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+    await waitFor(() => expect(readMintAuditDetail).toHaveBeenCalled());
+    fenceDataReset();
+    await act(async () =>
+      answer({ updates: [{ source: 'ucash', observedAt: 1 }], answered: true })
+    );
+    expect(record).not.toHaveBeenCalled();
+  } finally {
+    record.mockRestore();
+  }
 });

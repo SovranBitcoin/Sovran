@@ -27,7 +27,7 @@ import { activePubkey } from '@/shared/stores/global/profileStore';
 import { paymentLog, redactError } from '@/shared/lib/logger';
 import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
-import { isTokenSpent } from '@/shared/lib/routstr/spentProbe';
+import { isTokenSpent } from '@/shared/lib/cashu/spentProbe';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

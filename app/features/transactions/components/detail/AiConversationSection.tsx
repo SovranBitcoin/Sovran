@@ -24,15 +24,12 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { Surface } from '@/shared/ui/composed/Surface';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 
 import { aiConversationPreview } from '@/features/transactions/lib/aiConversationPreview';
-import { openAiSession } from '@/features/transactions/lib/openAiSession';
-import { hasFeature } from '@/shared/config/features';
 
 interface AiConversationSectionProps {
   group: Pick<AiRequestGroup, 'sessionId' | 'messageId' | 'model'>;
@@ -52,18 +49,14 @@ export function AiConversationSection({ group }: AiConversationSectionProps) {
     [session, group.messageId]
   );
 
-  // The payment stays in history; its link into the AI tab ships with `ai`.
-  if (!hasFeature('ai') || !session || !preview) return null;
+  if (!session || !preview) return null;
 
   const title = session.title || 'Conversation';
 
   return (
     <Log name="AiConversationSection">
-      <Pressable
-        onPress={() => openAiSession(session.id)}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={`Conversation: ${title}. Opens the AI chat on it.`}
+      <View
+        accessibilityLabel={`Conversation: ${title}`}
         testID="ai-request-conversation"
         className="mx-4 pt-4">
         <Surface>
@@ -88,7 +81,7 @@ export function AiConversationSection({ group }: AiConversationSectionProps) {
             {group.model ?? title}
           </Text>
         </HStack>
-      </Pressable>
+      </View>
     </Log>
   );
 }

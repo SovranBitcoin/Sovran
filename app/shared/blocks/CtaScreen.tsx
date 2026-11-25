@@ -123,7 +123,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
     // this same prompt flow, so it simply pushes.
     dismissalHandled.current = true;
     useCtaStore.getState().startBackup();
-    router.push('/(prompt-flow)/backup-intro');
+    router.navigate('/(prompt-flow)/backup-intro');
   };
   return (
     <CtaView

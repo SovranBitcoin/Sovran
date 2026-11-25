@@ -100,9 +100,6 @@ const XCASHU_TOKENS = {
     },
   ],
 };
-const GROUP_ID_HEX = '9a'.repeat(32);
-const GROUP_STATE = Uint8Array.from({ length: 48 }, (_, index) => (index * 37) % 256);
-const DM_PEER = ACCOUNTS[2].pubkey;
 
 /** The active account's radio identity; only an inbound payment would read it. */
 const IDENTITY: BitchatBLEIdentityMaterial = {
@@ -203,20 +200,14 @@ describe('E20: what 0.1.4 writes outside its stores, after the upgrade', () => {
     expect(await createSdkStorageDriver(A0).getItem('xcashu_tokens', {})).toEqual(XCASHU_TOKENS);
   });
 
-  it('keeps the Whitenoise group state and DM index of their accounts', async () => {
-    const { AsyncStorageKVBackend } =
-      require('@/features/whitenoise/storage/asyncStorageBackend') as typeof import('@/features/whitenoise/storage/asyncStorageBackend');
-    const { WhitenoiseNamespace, whitenoisePrefix } =
-      require('@/features/whitenoise/storage/namespaces') as typeof import('@/features/whitenoise/storage/namespaces');
-    const { WhitenoiseDmIndex } =
-      require('@/features/whitenoise/storage/dmIndex') as typeof import('@/features/whitenoise/storage/dmIndex');
-    const groupState = new AsyncStorageKVBackend<Uint8Array>(
-      whitenoisePrefix(0, WhitenoiseNamespace.GroupState)
-    );
-    expect(await groupState.getItem(GROUP_ID_HEX)).toEqual(GROUP_STATE);
-    expect(await new WhitenoiseDmIndex(1).list()).toEqual([
-      { pubkey: DM_PEER, groupIdHex: GROUP_ID_HEX },
-    ]);
+  it('preserves legacy Whitenoise AsyncStorage keys untouched on upgrade', () => {
+    const after = snapshot();
+    const saved: Record<string, string> = records.asyncStorage;
+    const whitenoiseKeys = Object.keys(saved).filter((k) => k.startsWith('whitenoise:'));
+    expect(whitenoiseKeys.length).toBeGreaterThan(0);
+    for (const key of whitenoiseKeys) {
+      expect(after.asyncStorage[key]).toBe(saved[key]);
+    }
   });
 });
 
@@ -254,17 +245,6 @@ describe('E20: what 0.1.4 writes outside its stores, after the upgrade', () => {
     await driver.setItem('xcashu_tokens', XCASHU_TOKENS);
     await driver.flush();
 
-    const { AsyncStorageKVBackend } =
-      require('@/features/whitenoise/storage/asyncStorageBackend') as typeof import('@/features/whitenoise/storage/asyncStorageBackend');
-    const { WhitenoiseNamespace, whitenoisePrefix } =
-      require('@/features/whitenoise/storage/namespaces') as typeof import('@/features/whitenoise/storage/namespaces');
-    const { WhitenoiseDmIndex } =
-      require('@/features/whitenoise/storage/dmIndex') as typeof import('@/features/whitenoise/storage/dmIndex');
-    await new AsyncStorageKVBackend<Uint8Array>(
-      whitenoisePrefix(0, WhitenoiseNamespace.GroupState)
-    ).setItem(GROUP_ID_HEX, GROUP_STATE);
-    await new WhitenoiseDmIndex(1).set(DM_PEER, GROUP_ID_HEX);
-
     const after = snapshot();
     const changed = (was: Record<string, string>, now: Record<string, string>) =>
       Object.fromEntries(Object.entries(now).filter(([key, value]) => was[key] !== value));
@@ -272,10 +252,7 @@ describe('E20: what 0.1.4 writes outside its stores, after the upgrade', () => {
       asyncStorage: changed(before.asyncStorage, after.asyncStorage),
       secureStore: changed(before.secureStore, after.secureStore),
     };
-    // Only the records: nothing else on the disk moved while they were written.
-    expect(Object.keys(written.asyncStorage).every((key) => key.startsWith('whitenoise:'))).toBe(
-      true
-    );
+    expect(Object.keys(written.asyncStorage)).toEqual([]);
     expect(Object.keys(before.secureStore).filter((key) => !(key in after.secureStore))).toEqual(
       []
     );

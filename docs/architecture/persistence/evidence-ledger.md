@@ -1,5 +1,16 @@
 # Evidence ledger
 
+**Simplification-stack verdict, 2026-11-23, candidate `track5/state-machines` (stacked on `track2/slim-down`, `track4/replace-e2e-harness-slop`, `track1/ci-docs-skills-cleanup`): INCONCLUSIVE (PASS on automated persistence surface; device in-place upgrades NOT RUN on headless Linux).**
+
+The slim-down and zero-backend tracks removed Feed, Composer, Stories, Notifications, Routstr/AI UI, old Nostr DM UI, White Noise UI, `nagg`, and the old E2E/task harness while preserving every persisted store name, storage key, SecureStore key, SQLite database filename, and key/seed derivation path. One additive field was added (`settingsStore.disabledMintAuditors`, default `[]`, no version bump). White Noise's active AsyncStorage files were removed while retaining all 8 legacy wipe prefixes in `profileRemovalStorage.ts`; Routstr persisted stores remain hydrated and recoverable via Settings → Recovery ("Collect AI leftovers").
+
+| Evidence | Current result |
+| --- | --- |
+| `surface.sh main` vs `HEAD` | Zero changes to storage dependency versions (`@cashu/coco-core` 2.0.0, `@react-native-async-storage/async-storage` 2.2.0, `expo-secure-store` ~56.0.4, `expo-sqlite` ~56.0.5, `zustand` ^5.0.8), SecureStore keys, SQLite database filenames, or seed derivation paths. |
+| `cd app && bun run test:upgrade` | **13/13 suites, 1,325/1,325 tests passed** (2 skipped) across all 20 frozen epochs (`E01-0.0.1`..`E20-0.1.4`) and Coco database upgrades. |
+| Independent cross-provider verifier | **Codex (`gpt-6.2-sol`)** verified all 7 `persistence-surface.json` sections PASS, `disabledMintAuditors` upgrade-safe without version bump, legacy White Noise wipe prefixes intact, and Routstr recovery intact. |
+| Real in-place device upgrade (iOS / Android) | **NOT RUN**: headless Linux environment has no iOS Simulator or Android Emulator; must be run before store release. |
+
 **Decision-slice verdict, 2026-11-11, candidate `48b236c1399c7dbd34fa8669f940746726854a8f`
 (`surgery/decisions-1`): INCONCLUSIVE.**
 
@@ -40,9 +51,8 @@ certify this candidate.
 - **99 builds from 2024** predate this repository. What they wrote is unknown.
 
 Third artifact of the [persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
-procedure. The builds are in [release-provenance.md](release-provenance.md), the durable
-surface in [persistence-map.md](persistence-map.md), the role reports in
-[audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
+procedure. The builds are in [release-provenance.md](release-provenance.md) and the durable
+surface is in [persistence-map.md](persistence-map.md) (the full `audit-2026-10-10` role reports — `persistence-investigator.md`, `adversarial-and-recovery.md`, `coco-and-cashu.md`, `release-historian.md` — are archived in `~/home/archive/sovran/docs/architecture/persistence/audit-2026-10-10/`). Tests are under `app/__tests__/`; every one named
 here was run on 2026-10-10 as part of the full suite, and again on 2026-10-11 at `7131591b5`:
 7,441 app tests passed and one is skipped, with the wallet (1,714) and Nostr (352) suites,
 type-check and lint.
@@ -230,7 +240,7 @@ released shape and the candidate reader for every row are in the persistence map
 | What this adds          | Coco 1.0.0's database migrated by 2.0.0; and the first binary upgrade onto a build that contains this audit's fixes, so none of them disturbs a healthy 0.1.0 install                                                                                                            |
 | Not covered             | Spending the proofs; several accounts; Routstr                                                                                                                                                                                                                                   |
 
-Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
+Earlier, weaker runs (archived in `~/home/archive/sovran/PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
 the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
 nothing lost.
 

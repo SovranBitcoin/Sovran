@@ -19,7 +19,7 @@ import {
   normalizeRelayList,
 } from '@/shared/lib/nostr/outbox/defaults';
 
-export interface RecipientRelays {
+interface RecipientRelays {
   pubkey: string;
   /** The recipient's NIP-65 read relays (empty if unknown). */
   readRelays: readonly string[];

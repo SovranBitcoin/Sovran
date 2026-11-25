@@ -2,17 +2,17 @@
   "version": 1,
   "phones": {
     "wallet": { "captureId": "ios/wallet" },
-    "feed": { "captureId": "ios/feed" },
+    "receive": { "captureId": "ios/receive-qr" },
     "send": { "captureId": "ios/send" },
-    "notifications": { "captureId": "ios/notifications" },
-    "ai": { "captureId": "ios/ai" },
-    "contacts": { "captureId": "ios/contacts" }
+    "contacts": { "captureId": "ios/contacts" },
+    "mints": { "captureId": "ios/mint-info" },
+    "reviews": { "captureId": "ios/mint-reviews" }
   },
   "scenes": {
-    "hero": { "preset": "duo-depth", "phones": ["feed", "wallet"] },
+    "hero": { "preset": "duo-depth", "phones": ["receive", "wallet"] },
     "wallet": { "preset": "duo-overlap", "phones": ["wallet", "send"] },
-    "social": { "preset": "duo-depth", "phones": ["notifications", "feed"] },
-    "ai": { "preset": "single-tilt", "phones": ["ai"] },
+    "contacts": { "preset": "duo-depth", "phones": ["contacts", "receive"] },
+    "mints": { "preset": "duo-overlap", "phones": ["mints", "reviews"] },
     "offline": { "preset": "duo-overlap", "phones": ["contacts", "send"] }
   },
   "recipes": [
@@ -21,9 +21,9 @@
       "scene": "hero",
       "version": 1,
       "id": "og",
-      "title": "Sovran wallet and feed",
-      "headline": "Sound money meets freedom of expression.",
-      "subtitle": "Payments and conversations in one app.",
+      "title": "Sovran Bitcoin and Cashu wallet",
+      "headline": "Private Bitcoin and ecash, in your pocket.",
+      "subtitle": "Cashu ecash, Lightning, contacts, and independent mints with no Sovran backend.",
       "background": "black",
       "width": 1200,
       "height": 630

@@ -21,7 +21,6 @@ jest.mock('@/shared/lib/popup/popups/actionSheets', () => ({}));
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/emojiPicker', () => ({}));
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({}));
-jest.mock('@/shared/lib/popup/popups/deleteStatus', () => ({}));
 jest.mock('@/shared/lib/popup/popups/payment', () => ({}));
 
 import { staticPopup } from '@/shared/lib/popup/popups';

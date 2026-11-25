@@ -26,6 +26,8 @@ interface EmptyStateProps {
   action?: React.ReactNode;
   /** Glyph size; defaults to the standard empty-state size. */
   iconSize?: number;
+  /** Stable id for the native test harness. */
+  testID?: string;
 }
 
 export function EmptyState({
@@ -34,11 +36,12 @@ export function EmptyState({
   subtitle,
   action,
   iconSize = EMPTY_STATE_ICON_SIZE,
+  testID,
 }: EmptyStateProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
   return (
-    <VStack align="center" style={styles.container}>
+    <VStack align="center" style={styles.container} testID={testID}>
       <Icon name={icon} size={iconSize} color={defaultColor} />
       <Spacer size={spacing.sm} />
       <Text bold size={fontSize.lg} style={{ color: withAlpha(foreground, alpha.disabled) }}>

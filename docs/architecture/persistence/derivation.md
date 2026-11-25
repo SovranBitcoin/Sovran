@@ -74,8 +74,8 @@ another's seed.
 
 The identity path (`m/44'/1237'/i'/0/0`) and the wallet path have not changed since profiles
 existed. What changed is how the wallet seed was made from the child key; the table is in
-[persistence-map.md](persistence-map.md#wallet-storage-and-seed-derivation) and the source reads
-are in [audit-2026-10-10/coco-and-cashu.md](audit-2026-10-10/coco-and-cashu.md).
+[persistence-map.md](persistence-map.md#wallet-storage-and-seed-derivation) and the original
+2026-10-10 source reads (`audit-2026-10-10/coco-and-cashu.md`) were archived out of the repo.
 
 | Releases | Wallet seed | Imported accounts |
 |---|---|---|

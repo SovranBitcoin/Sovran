@@ -10,7 +10,7 @@ type LiveSheetGetResult = Partial<{
   icon: PopupIcon;
   message: string;
   durationMs: number;
-  buttons: { text: string; page?: string; onPress?: () => void }[];
+  buttons: { text: string; onPress?: () => void }[];
   status: LiveSheetStatus;
 }>;
 

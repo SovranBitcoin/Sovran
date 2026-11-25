@@ -54,6 +54,7 @@ function useShiftLoggerLive(component: string): ShiftReporter {
 
   const report = useCallback<ShiftReporter['report']>(
     (event, key, value, extra) => {
+      if (!visualLoggingEnabled()) return;
       if (!Number.isFinite(value)) return;
       const prev = lastRef.current.get(key);
       const firstMeasure = prev === undefined;
@@ -185,7 +186,7 @@ type VisualViewToken<ItemT> = {
  * on some paths, and `item` as `any`; the caller names the row type it is
  * rendering. Cast only — no runtime narrowing.
  */
-export function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
+function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
   return {
     index: typeof token.index === 'number' ? token.index : null,
     key: token.key,
@@ -325,17 +326,12 @@ const VISUAL_SCOPE_REGISTRY = new Map<string, Map<string, VisualRecord>>();
 const VISUAL_SCOPE_LAST_REMEASURE_AT = new Map<string, number>();
 let visualLayoutMountSequence = 0;
 
-export const VISUAL_LIST_VIEWABILITY_CONFIG = {
-  itemVisiblePercentThreshold: 1,
-  minimumViewTime: 0,
-};
-
 /**
  * Collapse a viewability token batch into the {start,end} range the visual-list
  * logger reports. Buffered bounds mirror the raw ones — FlashList already
  * windows for us, so there is no extra buffer to account for.
  */
-export function visualViewabilityRange(tokens: { index: number | null }[]): {
+function visualViewabilityRange(tokens: { index: number | null }[]): {
   start: number;
   end: number;
   startBuffered: number;
@@ -1083,7 +1079,7 @@ function useVisualStateLoggerLive(config: VisualStateConfig): void {
   const lastSignatureRef = useRef<string | null>(null);
   configRef.current = config;
 
-  const signature = visualStateSignature(config.state);
+  const signature = visualLoggingEnabled(config.enabled) ? visualStateSignature(config.state) : '';
 
   useEffect(() => {
     const current = configRef.current;

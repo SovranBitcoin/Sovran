@@ -27,18 +27,20 @@ const STORE_DIRS: Record<string, string> = {
   profile: 'shared/stores/profile',
   runtime: 'shared/stores/runtime',
   bitchat: 'features/bitchat/stores',
-  feed: 'features/feed/stores',
 };
 
 /** Files intentionally absent from the mirror. Every exclusion needs a durable
- * reason: either there is no enumerable store instance, or the state contains
- * plaintext secrets that must never enter debug artifacts. */
+ * reason: either there is no enumerable store instance, the state contains
+ * plaintext secrets that must never enter debug artifacts, or the store is
+ * inert and loading it would only rewrite saved data nobody reads. */
 const EXCLUDED: ReadonlySet<string> = new Set([
   'profile/restoreActiveSessionView',
   'runtime/clearPaymentContext',
   'runtime/dmEchoStore', // DM bodies may be live bearer ecash tokens
   'runtime/legProgress', // factory: instances are created per call, not enumerable
   'profile/vertexBudgetStore', // factory: one zustand/vanilla store per owner pubkey, not enumerable
+  'profile/nip46ActivityStore', // inert since Remote Login's removal (ADR 0035); never loaded
+  'profile/nip46ConnectionsStore', // inert since Remote Login's removal (ADR 0035); never loaded
 ]);
 
 function storeFiles(): string[] {

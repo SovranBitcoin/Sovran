@@ -2,8 +2,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * @fileoverview Empty-query body for the unified search surface.
  *
- * Shown on every surface (Contacts, Feed, Wallet) the moment search is open but
- * nothing is typed, regardless of selected scope. Two consistent sections:
+ * Shown on the Search tab while nothing is typed, regardless of selected scope. Two consistent sections:
  *   1. Recent query chips — tap to re-run (per-surface, via `useRecentSearches`).
  *   2. Recent people strip — shared across surfaces (`recentPeopleStore`).
  * Followed by a prompt explaining what can be searched.
@@ -16,8 +15,8 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
-import { RecentPeopleSearchStrip } from '@/features/feed/components/RecentPeopleSearchStrip';
+import { FeedTabButton } from '@/shared/ui/composed/search/FeedTabButton';
+import { RecentPeopleSearchStrip } from '@/shared/ui/composed/search/RecentPeopleSearchStrip';
 import { useRecentSearches, type RecentSearchSurface } from './useRecentSearches';
 
 export type EmptySearchPrompt = { icon: string; title: string; subtitle: string };

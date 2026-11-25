@@ -1,19 +1,19 @@
-import type { ComponentProps } from 'react';
-import { StyleSheet } from 'react-native';
-import { UserFeed } from '@/features/feed';
-import { hasFeature } from '@/shared/config/features';
+import type { ReactElement } from 'react';
+import { StyleSheet, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 
-type Props = ComponentProps<typeof UserFeed>;
+type Props = {
+  pubkey?: string;
+  ListHeaderComponent?: ReactElement | null;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  [key: string]: unknown;
+};
 
 /**
- * The scrolling body of a profile: the header, and beneath it the person's
- * posts when the build ships the feed (ADR 0021). Without the feed it is the
- * same list in header-only form, so nothing is fetched and the header keeps
- * its scroll-driven morph.
+ * The scrolling body of a profile: header-only list so the profile header keeps
+ * its scroll-driven morph without fetching any social posts.
  */
 export function ProfileBody(props: Props) {
-  if (hasFeature('feed')) return <UserFeed {...props} />;
   return (
     <List
       screen

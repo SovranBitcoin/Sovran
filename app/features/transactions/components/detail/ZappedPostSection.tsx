@@ -25,22 +25,17 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
  * the tap opens on a painted post rather than a spinner.
  */
 
-import { useEffect } from 'react';
-import { InteractionManager, StyleSheet } from 'react-native';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
 import { getZap } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { prefetchThread } from '@/features/feed/lib/prefetchThread';
-import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -54,36 +49,6 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
   const zap = entry ? getZap(entry) : null;
   // Resolve bare annotations before choosing the generated fallback.
   const { metadata: cachedProfile, isResolving } = useNostrProfileMetadata(zap?.authorPubkey);
-
-  const eventId = zap?.eventId;
-  const authorPubkey = zap?.authorPubkey;
-  const snapshotName = zap?.authorName;
-  const snapshotPicture = zap?.authorAvatarUrl;
-
-  // Warm the thread while the card is visible, so the tap below paints from
-  // cache. The author snapshot we already persisted is seeded at LOW
-  // confidence (gap fill only, still counts as stale), so it can fill the
-  // thread's first frame without ever outranking a real kind-0.
-  useEffect(() => {
-    if (!eventId) return;
-    const task = InteractionManager.runAfterInteractions(() => {
-      if (authorPubkey && (snapshotName || snapshotPicture)) {
-        seedLowConfidenceProfiles({
-          [authorPubkey]: {
-            ...(snapshotName ? { name: snapshotName } : {}),
-            ...(snapshotPicture ? { picture: snapshotPicture } : {}),
-          },
-        });
-      }
-      void prefetchThread(eventId);
-    });
-    return () => task.cancel();
-  }, [eventId, authorPubkey, snapshotName, snapshotPicture]);
-
-  const openThread = () => {
-    if (!eventId) return;
-    router.push({ pathname: '/(transactions-flow)/thread', params: { eventId } });
-  };
 
   if (!zap?.eventId) return null;
 
@@ -99,11 +64,8 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
 
   return (
     <Log name="ZappedPostSection">
-      <Pressable
-        onPress={openThread}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={`Zapped post by ${authorName}. Opens the post.`}
+      <View
+        accessibilityLabel={`Zapped post by ${authorName}`}
         testID="zapped-post-section"
         style={styles.wrap}>
         <Surface contentStyle={styles.cardContent}>
@@ -140,7 +102,7 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
             </Text>
           ) : null}
         </HStack>
-      </Pressable>
+      </View>
     </Log>
   );
 }

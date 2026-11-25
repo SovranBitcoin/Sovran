@@ -10,7 +10,8 @@ const navLog = log.child({ module: 'nav' });
  * The module each entry screen belongs to, keyed by its leaf route name
  * (ADR 0021). Transaction history is exempt: a past payment stays viewable
  * after its rail is switched off. `(filter-flow)` is absent on purpose: it
- * holds the transaction filters, which every build ships.
+ * holds the transaction filters, which every build ships. So do the three tabs
+ * (Wallet, Settings, Search) and the `(settings-flow)` pages.
  */
 const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   lightningSend: 'lightning',
@@ -26,32 +27,8 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   bitchatDM: 'nutDrop',
   bitchatNetwork: 'nutDrop',
   geohashChat: 'nutDrop',
-  userMessages: 'directMessages',
-  whitenoiseDM: 'directMessages',
-  whitenoiseSetup: 'directMessages',
   profile: 'nostr',
   claimUsername: 'nostr',
-  composer: 'feed',
-  thread: 'feed',
-  stories: 'feed',
-  provider: 'ai',
-  providers: 'ai',
-  aiRequest: 'ai',
-};
-
-/** Whole route groups that belong to one module. */
-const GROUP_FEATURE: Readonly<Record<string, Feature>> = {
-  '(signer-flow)': 'nostr',
-  '(ai-flow)': 'ai',
-  '(stories-flow)': 'feed',
-};
-
-/** Tabs that belong to one module; their nested screens go with them. */
-const TAB_FEATURE: Readonly<Record<string, Feature>> = {
-  feed: 'feed',
-  notifications: 'feed',
-  ai: 'ai',
-  contacts: 'contacts',
 };
 
 const EXEMPT_GROUPS = new Set(['(transactions-flow)', '(settings-flow)']);
@@ -62,17 +39,8 @@ export function disabledFeatureForRoute(
   enabled: (feature: Feature) => boolean = hasFeature
 ): Feature | null {
   if (segments.some((segment) => EXEMPT_GROUPS.has(segment))) return null;
-  const group = segments.find((segment) => segment in GROUP_FEATURE);
-  const tabsAt = segments.indexOf('(tabs)');
-  const tab = tabsAt === -1 ? undefined : segments[tabsAt + 1];
   const leaf = segments.at(-1);
-  const feature = group
-    ? GROUP_FEATURE[group]
-    : tab && tab in TAB_FEATURE
-      ? TAB_FEATURE[tab]
-      : leaf
-        ? ROUTE_FEATURE[leaf]
-        : undefined;
+  const feature = leaf ? ROUTE_FEATURE[leaf] : undefined;
   return feature && !enabled(feature) ? feature : null;
 }
 

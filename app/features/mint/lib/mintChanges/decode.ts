@@ -56,6 +56,8 @@ export type Entry = {
   patch: PatchOp[];
   /** Upstream's own summaries; only shown when the patch yields nothing. */
   summary: string[];
+  /** The change was seen, but its details were too large to keep on this phone. */
+  oversized?: boolean;
 };
 
 type Feed = {

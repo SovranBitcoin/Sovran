@@ -11,10 +11,6 @@ codereview/
 │   ├── lenses/          # one heuristic checklist per review dimension (11 files)
 │   ├── reports/         # full per-run reports (findings + evidence + refutations)
 │   └── LEDGER.md        # fingerprinted findings + coverage log (novelty across runs)
-├── analyze-structure/   # repo-wide structural metrics
-│   ├── index.mjs              # CLI dispatch + structural reports
-│   ├── extract.mjs            # exports / imports / identifiers
-│   └── metrics.mjs            # LOC, complexity, type-smells, components, depth
 ├── lookalikes/          # cross-file declaration similarity
 │   └── index.mjs              # name / value / color / edit-distance reports
 ├── log-doctor/          # session-log preprocessing for LLM debugging
@@ -27,7 +23,7 @@ codereview/
     └── ansi.mjs         # dim/bold/yellow/green/cyan (lookalikes only)
 ```
 
-`bun run audit`, `bun run fix`, `bun run optimize`, `bun run analyze-structure`,
+`bun run audit`, `bun run fix`, `bun run optimize`,
 and `npm run log-doctor` invoke these by their canonical paths. There are no
 `scripts/` shims — paths in audit.md / fix.md / commands below match
 exactly what gets run.
@@ -39,9 +35,9 @@ shapes per tool.
 
 | Convention                     | What it means                                                                                                                                               |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Positional first arg**       | Scopes the run. For `analyze-structure` and `lookalikes`, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
+| **Positional first arg**       | Scopes the run. For `lookalikes`, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
 | `--json`                       | Machine-readable output — present everywhere. Pipe through `jq` to filter.                                                                                  |
-| Compact output for LLM context | `analyze-structure --llm` (~5K tokens), `log-doctor full --format md` (~6K).                                                                                |
+| Compact output for LLM context | `log-doctor full --format md` (~6K).                                                                                |
 | `--no-<report>`                | Suppress a default-on report to compress output.                                                                                                            |
 | `--<threshold> N`              | Numeric tuning flag. Each tool documents its set below.                                                                                                     |
 
@@ -53,9 +49,6 @@ slice plan, or commit message.
 
 | Symptom or question                               | Tool                | Mode / flag                     |
 | ------------------------------------------------- | ------------------- | ------------------------------- |
-| "Where should we refactor next?"                  | `analyze-structure` | `--llm` (score block)           |
-| "Which files are too coupled?"                    | `analyze-structure` | default — fanin/coupling/cycles |
-| "Does this one file show up in any hotspot?"      | `analyze-structure` | `--focus path/to/file.ts`       |
 | "Where are the duplicate names?"                  | `lookalikes`        | default reports                 |
 | "Two values look the same — are they?"            | `lookalikes`        | `--by-value '#FF0000'`          |
 | "What's `red` defined as in this repo?"           | `lookalikes`        | `--by-name red`                 |
@@ -66,47 +59,12 @@ slice plan, or commit message.
 | "Is there a memory leak?"                         | `log-doctor`        | `gc --latest`                   |
 | "Which mode fits in my context window?"           | `log-doctor`        | `budget`                        |
 
-## analyze-structure
+## lookalikes
 
-Repo-wide structural metrics: structural / depth / quality / symbol / concept
-reports plus the `--llm` compact summary (which includes the structural-health
-score).
-
-Declaration similarity lives in its own CLI, `codereview/lookalikes/index.mjs`
-— name collisions, value collisions, color near-matches, name similarities, and
-focus / by-name / by-value / inventory lookups.
-
-Both share the file walker, source utilities, and ignore lists from
-`shared/`. analyze-structure also pulls per-file metrics from
-`metrics.mjs` and structural extraction from `extract.mjs`.
-
-### Dense-output recipes
-
-```bash
-# 1. Score block only (~300 tokens) — pick a slice, judge "did this help?"
-node codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# Repo/p'
-
-# 2. Top of LLM summary (~2K tokens) — score + headline counts + top hotspots.
-node codereview/analyze-structure/index.mjs --llm | head -180
-
-# 3. Full LLM summary (~5K tokens).
-node codereview/analyze-structure/index.mjs --llm
-
-# 4. Subtree only.
-node codereview/analyze-structure/index.mjs features/payments --llm
-node codereview/analyze-structure/index.mjs ../colada --llm
-
-# 5. Single dimension — disable everything else for max signal-to-noise.
-node codereview/analyze-structure/index.mjs --llm \
-  --no-fanin --no-coupling --no-cycles --no-orphans --no-colocate \
-  --no-component --no-typesafety
-
-# 6. Focus on one file — full repo pass, then filter to sections that
-#    cite it. Sections without per-file rows (Score, totals, Instability
-#    per folder) pass through unchanged. Silence in a hotspot section
-#    means the file genuinely has no signal in that dimension.
-node codereview/analyze-structure/index.mjs --llm --focus features/foo/Bar.tsx
-```
+Declaration similarity CLI (`codereview/lookalikes/index.mjs`) — name collisions,
+value collisions, color near-matches, name similarities, and focus / by-name /
+by-value / inventory lookups. Uses the file walker, source utilities, and ignore
+lists from `shared/`.
 
 ### lookalikes recipes
 

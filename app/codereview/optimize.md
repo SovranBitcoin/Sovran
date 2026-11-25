@@ -32,7 +32,7 @@ Load before selecting lenses:
   `sovran-ui` (skeleton/content-shift rules), plus the domain skill matching
   chosen lenses (`sovran-feed`, `sovran-payments`, `sovran-data`,
   `sovran-architecture`).
-- `codereview/README.md` — analyze-structure + log-doctor recipes.
+- `codereview/README.md` — lookalikes + log-doctor recipes.
 - `wallet/docs/STATE_MACHINE.md` — authoritative PaymentMachine contract;
   Section 11 lists known gaps (do not re-report those as new).
 - `app/shared/lib/contentShiftLog.ts` — the `*.shift.*` instrumentation.
@@ -97,12 +97,7 @@ npx tsx codereview/log-doctor/index.ts startup  --latest        # startup lens
 ```
 
 No usable session log is fine — proceed statically and list it under
-Verification Gaps. Structural entry points when a lens needs a target:
-
-```bash
-node codereview/analyze-structure/index.mjs --llm | head -180
-node codereview/analyze-structure/index.mjs features/<area> --llm
-```
+Verification Gaps.
 
 ### 4. Fan out lens subagents
 

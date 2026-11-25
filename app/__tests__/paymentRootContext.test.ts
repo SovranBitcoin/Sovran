@@ -47,26 +47,16 @@ describe('fresh payment-root context clearing', () => {
       start: 'machine.startSendEcash({',
     },
     {
-      file: 'app/features/user/screens/UserMessagesScreen.tsx',
-      clear: "clearPaymentContext('user.messages.send_money')",
-      start: '(machine as SendMoneyPaymentMachine).startSendEcash({',
-    },
-    {
-      file: 'app/features/feed/components/nostr/NoteContent.tsx',
-      clear: "clearPaymentContext('feed.lightning_invoice')",
-      start: 'machine.execute(meltTarget, { reset: true })',
-    },
-    {
-      // Preset zap path: clear before booking the amount into the machine.
-      file: 'app/features/feed/hooks/useZap.ts',
-      clear: "clearPaymentContext('feed.zap_post')",
-      start: 'machine.enterAmount(',
-    },
-    {
-      // Custom zap path: clear before entering the send flow.
-      file: 'app/features/feed/hooks/useZap.ts',
-      clear: "clearPaymentContext('feed.zap_post')",
+      // Search's Pay buttons and action card start a payment from outside the
+      // send flow, so they pass a root and the helper clears first.
+      file: 'app/features/send/lib/startContactSend.ts',
+      clear: 'if (options.root) clearPaymentContext(options.root)',
       start: 'machine.startSendEcash({',
+    },
+    {
+      file: 'app/shared/ui/composed/search/SearchResultRows.tsx',
+      clear: "clearPaymentContext('search.action')",
+      start: 'machine.scan?.(item.descriptor.raw',
     },
   ])('$file clears stale routing state before starting Colada', ({ file, clear, via, start }) => {
     const source = readSource(file);

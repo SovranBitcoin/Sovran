@@ -390,7 +390,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
         void actions.setInput.execute({ input: minorToRawInput(total, entryUnit), mode: 'unit' });
       },
     });
-    router.push('/notes');
+    router.navigate('/notes');
   }, [actions.setInput, canSendOffline, effectiveAmount, entryUnit, heldNotes]);
   const stackOptions = useMemo(
     () =>

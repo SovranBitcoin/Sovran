@@ -128,6 +128,20 @@ export function normalizeMintUrlKey(url: string): string {
  * extractDomain('http://test.com') // 'test.com'
  * extractDomain('invalid-url') // 'invalid-url'
  */
+/**
+ * The host of a saved server URL, for a label: `https://blossom.x/` →
+ * `blossom.x`, `wss://cache.x/v1` → `cache.x`. Never throws: a value that does
+ * not parse (one saved by an older release) is shown without its scheme, so
+ * a bad saved URL cannot take down the screen that names it.
+ */
+export function urlHostLabel(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  }
+}
+
 export function extractDomain(url: string): string {
   if (!url) {
     cashuLog.debug('url.domain.extract', { inputLength: 0, resultLength: 0, empty: true });

@@ -7,8 +7,17 @@ import type { Manager } from '@cashu/coco-core';
 import {
   createSovranHandlers,
   createSovranNotifications,
+  createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { paramPopup, sendMemoPopup } from '@/shared/lib/popup';
+import {
+  copyPopup,
+  copyTokenAsEmoji,
+  nfcSendFailedPopup,
+  paramPopup,
+  sendMemoPopup,
+} from '@/shared/lib/popup';
+import * as Clipboard from 'expo-clipboard';
+import { writeTokenToNFC } from '@/shared/lib/nfc';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { paymentLog } from '@/shared/lib/logger';
@@ -33,6 +42,9 @@ function paymentLogCalls(): unknown[][] {
 jest.mock('wallet', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   rawAnnotationKey: jest.fn((raw: string) => `raw:${raw}`),
+  // The real checked encoder, over this file's mocked cashu-ts encoder.
+  encodeTokenChecked: (token: unknown) =>
+    jest.requireActual('../../wallet/src/ecash').encodeTokenChecked(token),
 }));
 
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
@@ -142,8 +154,10 @@ jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: { getState: jest.fn(() => ({})) },
 }));
+const mockAddScan = jest.fn();
 jest.mock('@/shared/stores/profile/scanHistoryStore', () => ({
-  useScanHistoryStore: { getState: jest.fn(() => ({})) },
+  useScanHistoryStore: { getState: jest.fn(() => ({ addScan: mockAddScan })) },
+  isSensitiveScanInput: () => false,
 }));
 jest.mock('@/shared/stores/profile/sendReachabilityStore', () => ({
   useSendReachabilityStore: {
@@ -596,20 +610,12 @@ describe('createSovranHandlers profile routing', () => {
     releaseDelivery();
     await sendComplete;
 
-    expect(mockDismissAll).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/userMessages',
-      params: { pubkey: recipientPubkey },
-    });
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(useContactSendStore.getState().active).toBeNull();
-    expect(mockDismissAll.mock.invocationCallOrder[0]).toBeLessThan(
-      mockNavigate.mock.invocationCallOrder[0]
-    );
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
-  it('delivers to the contact but ends on the wallet when the build has no DM pages', async () => {
-    mockHasFeature.mockImplementation((feature) => feature !== 'directMessages');
+  it('delivers to the contact and ends on the wallet, with no DM page to open', async () => {
     const recipientPubkey = 'cd'.repeat(32);
     const bearerToken = 'cashuA-contact-token-no-dm-pages';
     useContactSendStore
@@ -638,8 +644,8 @@ describe('createSovranHandlers profile routing', () => {
     // The rail is unchanged: the token still travels over the DM transport.
     expect(deliverContactEcashDm).toHaveBeenCalledWith({ recipientPubkey, token: bearerToken });
     expect(useContactSendStore.getState().active).toBeNull();
-    // Only the ending differs: the flow closes onto the wallet and nothing is
-    // pushed on top. `dismissAll` would stop at the send chooser.
+    // The flow closes onto the wallet and nothing is pushed on top.
+    // `dismissAll` would stop at the send chooser.
     expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(mockDismissAll).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
@@ -685,10 +691,7 @@ describe('createSovranHandlers profile routing', () => {
       recipientPubkey,
       token: lockedToken,
     });
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/userMessages',
-      params: { pubkey: recipientPubkey },
-    });
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
   });
 
   it('keeps the contact target and opens bearer hand-off when DM delivery fails', async () => {
@@ -914,5 +917,115 @@ it('shows the NFC unfunded-unit explanation from the wallet', () => {
   expect(paramPopup).toHaveBeenCalledWith('nfc-error', {
     title: 'Currency unavailable',
     message,
+  });
+});
+
+describe('createSovranNotifications scan history', () => {
+  const { setTransactionAnnotation } = jest.requireMock(
+    '@/shared/stores/profile/transactionAnnotationStore'
+  ) as { setTransactionAnnotation: jest.Mock };
+  const TOKEN = 'cashuBo2FteBtodHRwczovL21pbnQuZXhhbXBsZS5jb20';
+  const resolved = (source: string, intentType: string, rawInput = TOKEN) => ({
+    rawInput,
+    parsedType: 'cashu',
+    intentType,
+    source,
+  });
+
+  beforeEach(() => {
+    mockAddScan.mockReset();
+    setTransactionAnnotation.mockReset();
+  });
+
+  it('keeps a token pasted from Search out of scan history and annotations', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('search', 'receiveToken'));
+    expect(mockAddScan).not.toHaveBeenCalled();
+    expect(setTransactionAnnotation).not.toHaveBeenCalled();
+  });
+
+  it('records an invoice paid from Search as a paste', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('search', 'meltLightningInvoice', 'lnbc1invoice'));
+    expect(mockAddScan).toHaveBeenCalledWith(
+      expect.objectContaining({ raw: 'lnbc1invoice', type: 'lightning', source: 'paste' })
+    );
+  });
+
+  it('still records a token scanned or pasted on the Send screen', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onScanResolved?.(resolved('clipboard', 'receiveToken'));
+    void notifications.onScanResolved?.(resolved('qr', 'receiveToken'));
+    expect(mockAddScan).toHaveBeenCalledTimes(2);
+    expect(mockAddScan).toHaveBeenCalledWith(
+      expect.objectContaining({ raw: TOKEN, type: 'ecash', source: 'paste' })
+    );
+  });
+});
+
+describe('send token export actions', () => {
+  const validProof = {
+    id: '009a1f293253e41e',
+    amount: 2,
+    secret: 'secret',
+    C: `02${'ef'.repeat(32)}`,
+  };
+  function context(proofOverrides: Record<string, unknown> = {}, variantId?: string) {
+    const proofs = [{ ...validProof, ...proofOverrides }];
+    return {
+      entry: {
+        id: 'send-1',
+        type: 'send',
+        operationId: 'op-1',
+        token: { mint: 'https://mint.example', unit: 'sat', proofs },
+      },
+      manager: { ops: { send: { reclaim: jest.fn() } } },
+      ...(variantId ? { variantId } : {}),
+    };
+  }
+  const send = () => createSovranScreenActionHandlers().sendToken!;
+
+  beforeEach(() => {
+    jest.mocked(getEncodedToken).mockReset();
+    jest.mocked(getEncodedToken).mockReturnValue('cashuBencoded');
+    jest.mocked(writeTokenToNFC).mockReset();
+    jest.mocked(Clipboard.setStringAsync).mockReset();
+    jest.mocked(copyPopup).mockReset();
+    jest.mocked(copyTokenAsEmoji).mockReset();
+    jest.mocked(nfcSendFailedPopup).mockReset();
+  });
+
+  it('writes, copies and emoji-copies a well-formed token', async () => {
+    await send().nfc!(context() as never);
+    expect(writeTokenToNFC).toHaveBeenCalledWith('cashuBencoded');
+    await send().copy!(context() as never);
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('cashuBencoded');
+    expect(copyPopup).toHaveBeenCalledWith('token');
+    await send().copy!(context({}, 'emoji') as never);
+    expect(copyTokenAsEmoji).toHaveBeenCalledWith('cashuBencoded');
+  });
+
+  it.each([
+    ['id', 'error'],
+    ['id', 'false'],
+    ['id', '12345'],
+    ['C', '12345'],
+    ['dleq', { e: '12345', s: 'aa'.repeat(32), r: 'bb'.repeat(32) }],
+  ])('refuses a malformed %s before encoding, NFC or clipboard', async (key, value) => {
+    const nfcCtx = context({ [key]: value });
+    const before = JSON.stringify(nfcCtx.entry);
+    await expect(send().nfc!(nfcCtx as never)).resolves.toBeUndefined();
+    await expect(send().copy!(context({ [key]: value }) as never)).resolves.toBeUndefined();
+    await expect(
+      send().copy!(context({ [key]: value }, 'emoji') as never)
+    ).resolves.toBeUndefined();
+    expect(getEncodedToken).not.toHaveBeenCalled();
+    expect(writeTokenToNFC).not.toHaveBeenCalled();
+    expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
+    expect(copyTokenAsEmoji).not.toHaveBeenCalled();
+    expect(copyPopup).not.toHaveBeenCalled();
+    expect(nfcSendFailedPopup).toHaveBeenCalledTimes(1);
+    expect(nfcCtx.manager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(JSON.stringify(nfcCtx.entry)).toBe(before);
   });
 });

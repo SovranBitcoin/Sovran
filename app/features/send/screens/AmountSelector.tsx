@@ -401,6 +401,7 @@ export function AmountSelector({
         <MintSelector
           testID="amount-mint-selector"
           selectedMintUrl={mintUrl}
+          unit={unit}
           onRequestMintList={onRequestMintList}
           width={mintBottomPillWidth}
           height={footerControlHeight}

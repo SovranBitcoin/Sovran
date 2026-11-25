@@ -1,18 +1,11 @@
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { Screen } from '@/shared/ui/composed/Screen';
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-} from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -23,26 +16,19 @@ import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { buildMintHistoryHref } from '@/shared/lib/nav/mintInfoRoutes';
-import { formatRate } from '@/shared/lib/number';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
-import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
-import {
-  StatsGrid as StatsGridBlock,
-  UNKNOWN_STAT,
-  type GridStat,
-} from '@/shared/ui/composed/StatsGrid';
-import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
+import { MintHeader, mintHealthFromAudit } from '@/features/mint/components/MintHeader';
+import { StatsGrid as StatsGridBlock } from '@/shared/ui/composed/StatsGrid';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import Svg, { Circle } from 'react-native-svg';
 import { useScreenActions } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   log,
   useLifecycleLogger,
@@ -50,17 +36,25 @@ import {
   useWhyDidRender,
 } from '@/shared/lib/logger';
 import { urlHost, useVisualStateLogger, visualLayoutScopePart } from '@/shared/lib/contentShiftLog';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { openExternalUrl } from '@/shared/lib/url';
-import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import {
+  useNostrProfileMetadata,
+  useNostrProfileMetadataMany,
+} from '@/shared/hooks/useNostrProfileMetadata';
+import { copyPopup } from '@/shared/lib/popup';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
-import type { MintAuditSummary } from '../lib/auditInfo';
-import { buildMintDetailsRows } from '../lib/mintDetailsRows';
+import { useMintInputFees } from '../hooks/useMintInputFees';
+import { mintInfoStatCards, type MintInfoStats } from '../lib/mintInfoStats';
+import { buildMintDetailsRows, mintMotd } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
+  getMintInfoNostrCopyValue,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
   resolveMintInfoNostrContactPubkey,
@@ -70,150 +64,18 @@ const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
 });
 
-/**
- * The audit success rate as a ring around the mint's icon, drawn on the first
- * frame: it used to fade in after the content mounted, so it blinked into a
- * page that was already showing. With no audit it is a plain track, not a
- * half-green, half-red ring that read as a 50% score.
- */
-function ProgressRing({
-  size = 84,
-  strokeWidth = 3,
-  progress,
-  successColor,
-  errorColor,
-  trackColor,
-  children,
-}: {
-  size?: number;
-  strokeWidth?: number;
-  /** Share of operations that succeeded, 0..1; `undefined` when not audited. */
-  progress: number | undefined;
-  successColor: string;
-  errorColor: string;
-  trackColor: string;
-  children?: React.ReactNode;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const center = size / 2;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke={progress === undefined ? trackColor : errorColor}
-          strokeWidth={strokeWidth}
-          fill="transparent"
-        />
-        {progress !== undefined && (
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={successColor}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - progress)}
-            strokeLinecap="round"
-          />
-        )}
-      </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.centered]}>{children}</View>
-    </View>
-  );
-}
-
-function AnimatedAvatar({
-  picture,
-  name,
-  alt,
-  status,
-  size = 70,
-  isLoading = false,
-}: {
-  picture?: string;
-  name?: string;
-  alt?: string;
-  status?: string;
-  size?: number;
-  isLoading?: boolean;
-}) {
-  const badgeAnim = useSharedValue(0);
-  const badgeStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    opacity: badgeAnim.get(),
-    transform: [{ scale: badgeAnim.get() }],
-  }));
-
-  useEffect(() => {
-    if (status && !isLoading) {
-      badgeAnim.set(withDelay(80, withSpring(1, { damping: 14, stiffness: 260 })));
-    }
-  }, [status, isLoading, badgeAnim]);
-
-  const badgeSize = size * 0.33;
-
-  return (
-    <View>
-      <MintIcon iconUrl={picture} size={size} name={name} alt={alt} isLoading={isLoading} />
-      {status && (
-        <Animated.View style={badgeStyle}>
-          <AvatarStatusDot status={status} size={badgeSize} />
-        </Animated.View>
-      )}
-    </View>
-  );
-}
-
 function StatsGrid({
   status,
   onRetry,
-  audit,
+  stats,
 }: {
   /** The audit group's read status; the block is ALWAYS mounted and swaps content in place. */
   status: MintDetailGroupStatus;
   onRetry: () => void;
-  /** The same `selectMintAudit` reading the mint rows show, so the two agree. */
-  audit?: MintAuditSummary;
+  /** Each number from one named source (`selectMintInfoStats`). */
+  stats: MintInfoStats;
 }) {
-  const { successRate, avgLatencyMs, mints, melts } = audit ?? {};
-
-  const stats: GridStat[] = [
-    {
-      label: 'Success rate',
-      description: 'Of mint and melt operations',
-      value: successRate !== undefined ? formatRate(successRate) : UNKNOWN_STAT,
-      placeholder: '100%',
-      accent: true,
-    },
-    {
-      label: 'Average time',
-      // ucash reports its own probe latency; the retired audit API timed swaps.
-      description: audit?.source === 'ucash' ? 'Measured by the auditor' : 'For successful swaps',
-      value: avgLatencyMs !== undefined ? `${Math.round(avgLatencyMs)} ms` : UNKNOWN_STAT,
-      placeholder: '420 ms',
-      accent: true,
-    },
-    {
-      label: 'Total mints',
-      description: 'Total mint operations',
-      value: mints !== undefined ? Math.round(mints).toString() : UNKNOWN_STAT,
-      placeholder: '12,345',
-    },
-    {
-      label: 'Total melts',
-      description: 'Total melt operations',
-      value: melts !== undefined ? Math.round(melts).toString() : UNKNOWN_STAT,
-      placeholder: '12,345',
-    },
-  ];
+  const cards = mintInfoStatCards(stats);
 
   // One slot for every state so the block never unmounts (no layout shift
   // when audit lands, is missing, or fails): skeleton → values, or an inline
@@ -253,7 +115,7 @@ function StatsGrid({
   }
   return (
     <StatsGridBlock
-      stats={stats}
+      stats={cards}
       loading={status === 'loading'}
       visualKey="mint-info-stats"
       visualSurface="mint-info"
@@ -266,11 +128,6 @@ function StatsGrid({
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const [danger, success, ringTrack] = useThemeColor([
-    'danger',
-    'green-300',
-    'surface-tertiary',
-  ] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
@@ -301,7 +158,8 @@ export function MintInfoScreen() {
       picture: iconUrl,
     },
     title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
-    collapseAt: 110,
+    // Past the 72pt icon, the name goes up into the header.
+    collapseAt: 98,
   });
   // The inspect paths seed mintInfoEntry with only { mintUrl }, so KYM review
   // data never arrives via the entry on that route. Fall back to the same
@@ -325,20 +183,37 @@ export function MintInfoScreen() {
   // rows use. The entry's audit fields are a snapshot of that store taken at
   // navigation, so reading them here let the page lag behind its own row.
   const audit = detail.meta.audit;
+  const inputFees = useMintInputFees(mintUrl, isTrusted);
   const identityError = detail.identityError;
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
   const contactRows = getSortedMintInfoContacts(contact);
+  const motd = mintMotd(entry?.motd);
   // NUT-06 first; a placeholder there (e.g. the literal `npub…`) falls back to
   // the operator nagg's discovery row resolved for this mint.
   const nostrContactPubkey = resolveMintInfoNostrContactPubkey(
     contactRows,
     cachedMeta?.operatorPubkey
   );
-  const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
-    nostrContactPubkey ?? null
+  const extraNostrPubkeys = Array.from(
+    new Set(
+      contactRows
+        .map((row) =>
+          row.isNostr
+            ? resolveMintInfoNostrContactPubkey([row], cachedMeta?.operatorPubkey)
+            : undefined
+        )
+        .filter((pk): pk is string => Boolean(pk) && pk !== nostrContactPubkey)
+    )
   );
-  const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
+  // Kind-0 metadata (name + picture) through the canonical entity cache with
+  // automatic retries across Primal/relays — `useNostrProfile` only reads the
+  // stats ladder and can leave the operator's avatar blank.
+  const { metadata: nostrContactProfile, isResolving: nostrContactLoading } =
+    useNostrProfileMetadata(nostrContactPubkey);
+  const { metadata: extraContactProfiles, loadingPubkeys: extraContactLoadingPubkeys } =
+    useNostrProfileMetadataMany(extraNostrPubkeys);
+  const nostrContactPicture = nostrContactProfile?.picture;
   // The footer's Details button asks for the modal; DetailsSection opens it.
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -441,13 +316,15 @@ export function MintInfoScreen() {
       case 'x':
         await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
         break;
-      case 'nostr':
-        if (pubkey) {
-          router.push(buildModalProfileHref({ pubkey }));
-        } else {
-          await Clipboard.setStringAsync(info);
+      case 'nostr': {
+        const npubToCopy = getMintInfoNostrCopyValue(info, pubkey);
+        if (npubToCopy) {
+          await EnhancedHaptics.copyHaptic();
+          await Clipboard.setStringAsync(npubToCopy);
+          copyPopup('npub');
         }
         break;
+      }
       default:
         await Clipboard.setStringAsync(info);
     }
@@ -539,30 +416,19 @@ export function MintInfoScreen() {
               pubkey: nostrContactPubkey,
               name: getMintInfoNostrDisplayName(nostrContactProfile, ''),
             },
+            inputFees,
           })}
         />
         <View className="pt-4">
           <VStack align="center" className="w-full pb-8 pt-6">
-            <Animated.View className="items-center" style={morph.contentStyle}>
-              <ProgressRing
-                size={84}
-                progress={audit?.successRate}
-                successColor={success}
-                errorColor={danger}
-                trackColor={ringTrack}>
-                <AnimatedAvatar
-                  picture={iconUrl}
-                  name={displayName}
-                  alt={`${displayName} icon`}
-                  status={audit?.state}
-                  size={70}
-                  isLoading={detail.identity === 'loading'}
-                />
-              </ProgressRing>
-              <Text bold size={22} numberOfLines={2} className="mt-3 text-center">
-                {displayName}
-              </Text>
-            </Animated.View>
+            <MintHeader
+              name={displayName}
+              mintUrl={mintUrl}
+              iconUrl={iconUrl}
+              health={mintHealthFromAudit(audit?.state)}
+              isLoading={detail.identity === 'loading'}
+              style={morph.contentStyle}
+            />
 
             {/* The two things a reader does with a mint page besides trusting it,
               as the same labelled circles the profile page uses for Send Money /
@@ -626,7 +492,7 @@ export function MintInfoScreen() {
               </VStack>
             )}
 
-            <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
+            <StatsGrid status={detail.audit} onRetry={detail.retry} stats={detail.stats} />
           </VStack>
 
           {identityError && (
@@ -712,13 +578,13 @@ export function MintInfoScreen() {
             </>
           )}
 
-          {typeof entry?.motd === 'string' && (
+          {motd && (
             <>
               <Notice
                 status="warning"
                 title="Message from the mint"
                 collapseLines={4}
-                description={entry.motd}
+                description={motd}
                 testID="mint-info-motd"
               />
               <Spacer size={12} />
@@ -732,20 +598,25 @@ export function MintInfoScreen() {
                   const rowNostrPubkey = c.isNostr
                     ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
                     : undefined;
-                  const rowProfile =
-                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                  const rowProfile = !rowNostrPubkey
+                    ? null
+                    : rowNostrPubkey === nostrContactPubkey
                       ? nostrContactProfile
-                      : null;
-                  const rowPicture =
-                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
-                      ? nostrContactPicture
-                      : undefined;
+                      : (extraContactProfiles.get(rowNostrPubkey) ?? null);
+                  const rowPicture = rowProfile?.picture;
+                  const rowResolving = !rowNostrPubkey
+                    ? false
+                    : rowNostrPubkey === nostrContactPubkey
+                      ? nostrContactLoading
+                      : extraContactLoadingPubkeys.has(rowNostrPubkey);
                   const fallbackNpub = c.isNostr
                     ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
                     : undefined;
                   const title = c.isNostr
                     ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
                     : c.info;
+                  const showNpubSubtitle =
+                    c.isNostr && Boolean(fallbackNpub) && title !== fallbackNpub;
                   return (
                     <PressableFeedback
                       key={`${c.method}:${c.info}:${c.originalIndex}`}
@@ -759,7 +630,7 @@ export function MintInfoScreen() {
                       }
                       accessibilityRole={c.isNostr ? 'button' : 'link'}
                       accessibilityLabel={
-                        c.isNostr ? 'Open Nostr contact profile' : `${c.method}, ${c.info}`
+                        c.isNostr ? `Copy ${title} npub` : `${c.method}, ${c.info}`
                       }
                       onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
                       <PressableFeedback.Scale>
@@ -767,17 +638,11 @@ export function MintInfoScreen() {
                           <ListGroup.ItemPrefix>
                             {c.isNostr ? (
                               <Avatar
-                                state={
-                                  nostrContactLoading && rowNostrPubkey === nostrContactPubkey
-                                    ? 'loading'
-                                    : rowPicture
-                                      ? 'image'
-                                      : 'fallback'
-                                }
+                                state={avatarStateFor(rowPicture, !rowResolving)}
                                 picture={rowPicture}
                                 seed={rowNostrPubkey ?? c.info}
                                 name={title}
-                                size={32}
+                                size={36}
                               />
                             ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
                               <Icon
@@ -791,8 +656,21 @@ export function MintInfoScreen() {
                           </ListGroup.ItemPrefix>
                           <ListGroup.ItemContent>
                             <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+                            {showNpubSubtitle ? (
+                              <ListGroup.ItemDescription>{fallbackNpub}</ListGroup.ItemDescription>
+                            ) : null}
                           </ListGroup.ItemContent>
-                          <ListGroup.ItemSuffix />
+                          {c.isNostr ? (
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={18}
+                                color={withAlpha(foreground, 0.5)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          ) : (
+                            <ListGroup.ItemSuffix />
+                          )}
                         </ListGroup.Item>
                       </PressableFeedback.Scale>
                       <PressableFeedback.Ripple />
@@ -846,10 +724,6 @@ export function MintInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   statsSlot: {
     width: '100%',
     alignSelf: 'stretch',

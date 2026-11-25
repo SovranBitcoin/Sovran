@@ -1,5 +1,6 @@
-import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
+import { useBlockedConversation } from '@/shared/hooks/useBlockedConversation';
 import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
+import { DmWordFilterStrip } from '@/features/bitchat/components/DmWordFilterStrip';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 /**
  * @fileoverview Geohash-based location chat screen
@@ -250,6 +251,7 @@ export function GeohashChatScreen({
       />
       {header}
       {bleDmBanner}
+      {transport === 'nostr-dm' && !blocked ? <DmWordFilterStrip /> : null}
       <ChatScreen
         surface={surface}
         log={bitchatLog}

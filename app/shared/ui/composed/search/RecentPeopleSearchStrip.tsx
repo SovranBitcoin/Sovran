@@ -1,0 +1,197 @@
+import { useCallback, useMemo } from 'react';
+import { ScrollView, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import * as nip19 from 'nostr-tools/nip19';
+
+import { useRecentPeopleProfiles } from '@/shared/hooks/useRecentPeopleProfiles';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import {
+  remeasureVisualLayoutScope,
+  useVisualScrollMetricsLogger,
+  VISUAL_LOGGING_ENABLED,
+} from '@/shared/lib/contentShiftLog';
+import { navigateToProfile } from '@/features/search/lib/navigateToProfile';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { resolveIdentityName } from '@/shared/lib/identity';
+import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Text } from '@/shared/ui/primitives/Text';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+
+const RECENT_PEOPLE_VISUAL_SCOPE = 'feed.search.recent_people';
+
+export function RecentPeopleSearchStrip({
+  showClear = false,
+  title = 'Recent searches',
+}: {
+  showClear?: boolean;
+  title?: string;
+}) {
+  const entries = useRecentPeopleStore((state) => state.entries);
+  const clearRecentPeople = useRecentPeopleStore((state) => state.clearRecentPeople);
+  const pubkeys = useMemo(() => entries.map((entry) => entry.pubkey), [entries]);
+  const rows = useRecentPeopleProfiles(pubkeys);
+  const [foreground, muted, accent] = useThemeColor(['foreground', 'muted', 'accent'] as const);
+  const stripScrollMetrics = useVisualScrollMetricsLogger({
+    scope: RECENT_PEOPLE_VISUAL_SCOPE,
+    surface: 'search',
+    component: 'RecentPeopleSearchStripScrollView',
+    axis: 'x',
+    phase: showClear ? 'editable' : 'ready',
+    extra: () => ({
+      rows: rows.length,
+      title,
+      showClear,
+    }),
+  });
+  const {
+    onContentSizeChange: handleStripContentSizeChange,
+    onLayout: handleStripLayout,
+    onScroll: reportStripScroll,
+  } = stripScrollMetrics;
+  const handleStripScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      reportStripScroll?.(event);
+      remeasureVisualLayoutScope(RECENT_PEOPLE_VISUAL_SCOPE, 'horizontal_scroll', {
+        extra: {
+          rows: rows.length,
+          title,
+        },
+      });
+    },
+    [reportStripScroll, rows.length, title]
+  );
+  // Purely instrumentation — see NoteContent: an attached `onScroll` costs a
+  // JS dispatch per frame even when everything it calls is a no-op.
+  const stripScrollHandler = VISUAL_LOGGING_ENABLED ? handleStripScroll : undefined;
+
+  if (rows.length === 0) return null;
+
+  return (
+    <VisualLayoutProbe
+      scope={RECENT_PEOPLE_VISUAL_SCOPE}
+      surface="search"
+      component="RecentPeopleSearchStrip"
+      itemKey="section"
+      itemType="strip"
+      className="pb-2 pt-4"
+      extra={{ rows: rows.length, title, showClear }}>
+      <HStack className="mb-2.5 items-center justify-between">
+        <Text bold size={15} color={foreground}>
+          {title}
+        </Text>
+        {showClear ? (
+          <Pressable
+            testID="recent-people-clear"
+            onPress={clearRecentPeople}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear recent searches">
+            <Text size={13} color={accent}>
+              Clear
+            </Text>
+          </Pressable>
+        ) : null}
+      </HStack>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        onLayout={handleStripLayout}
+        onContentSizeChange={handleStripContentSizeChange}
+        onScroll={stripScrollHandler}
+        scrollEventThrottle={250}
+        contentContainerClassName="gap-2.5">
+        {rows.map((row, index) => (
+          <VisualLayoutProbe
+            key={row.pubkey}
+            scope={RECENT_PEOPLE_VISUAL_SCOPE}
+            surface="search"
+            component="RecentPersonCard"
+            itemKey={`person:${row.pubkey.slice(0, 12)}`}
+            itemType={row.isLoading && !row.metadata ? 'loading' : 'loaded'}
+            index={index}
+            extra={{ title }}>
+            <RecentPersonCard
+              pubkey={row.pubkey}
+              displayName={resolveIdentityName({
+                pubkey: row.pubkey,
+                nostrProfile: row.metadata,
+              })}
+              picture={row.metadata?.picture}
+              subtitle={row.metadata?.nip05 ?? safeNpub(row.pubkey)}
+              subtitleEllipsizeMode={row.metadata?.nip05 ? 'tail' : 'middle'}
+              isLoading={row.isLoading && !row.metadata}
+              foreground={foreground}
+              muted={muted}
+            />
+          </VisualLayoutProbe>
+        ))}
+      </ScrollView>
+    </VisualLayoutProbe>
+  );
+}
+
+function RecentPersonCard({
+  pubkey,
+  displayName,
+  picture,
+  subtitle,
+  subtitleEllipsizeMode,
+  isLoading,
+  foreground,
+  muted,
+}: {
+  pubkey: string;
+  displayName: string;
+  picture?: string;
+  subtitle: string;
+  subtitleEllipsizeMode: 'tail' | 'middle';
+  isLoading: boolean;
+  foreground: string;
+  muted: string;
+}) {
+  const handlePress = useCallback(() => navigateToProfile(pubkey), [pubkey]);
+  return (
+    <Pressable
+      testID={`recent-person-${pubkey}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${displayName}`}
+      haptics
+      activeOpacity={0.72}
+      onPress={handlePress}
+      className="min-h-[88px] w-[82px] items-center justify-center">
+      <Avatar
+        state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
+        picture={picture}
+        size={52}
+        name={displayName}
+        seed={pubkey}
+      />
+      <Text
+        bold
+        size={13}
+        color={foreground}
+        numberOfLines={1}
+        className="mt-2 self-stretch text-center">
+        {displayName}
+      </Text>
+      <Text
+        size={11}
+        color={muted}
+        numberOfLines={1}
+        ellipsizeMode={subtitleEllipsizeMode}
+        className="mt-[3px] self-stretch text-center">
+        {subtitle}
+      </Text>
+    </Pressable>
+  );
+}
+
+function safeNpub(pubkey: string): string {
+  try {
+    return nip19.npubEncode(pubkey);
+  } catch {
+    return pubkey;
+  }
+}

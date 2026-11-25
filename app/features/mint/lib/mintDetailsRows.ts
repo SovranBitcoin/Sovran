@@ -7,6 +7,7 @@
 import * as nip19 from 'nostr-tools/nip19';
 
 import { selectMintAudit } from '@/features/mint/lib/auditInfo';
+import { formatInputFee, type UnitInputFee } from '@/features/mint/lib/mintCapabilities';
 import { NUT_TITLES } from '@/features/mint/lib/mintChanges/nuts';
 import { getSortedMintInfoContacts } from '@/features/mint/lib/mintInfoContacts';
 import { selectMintLiveness } from '@/features/mint/lib/mintLiveness';
@@ -23,6 +24,8 @@ interface MintDetailsSource {
   cached?: MintMetadataEntry;
   /** The operator's Nostr identity, as the page resolved it. */
   operator?: { pubkey?: string; name?: string };
+  /** What spending each unit costs, from the active keysets; omitted until known. */
+  inputFees?: readonly UnitInputFee[] | null;
   now?: number;
 }
 
@@ -65,11 +68,11 @@ function when(value: unknown, now: number): string | undefined {
 }
 
 /**
- * The NUTs a mint offers, named. A NUT counts only when its settings are an
- * object that is not `disabled` and, where it says, is `supported` (a NUT-17
- * list of subscriptions counts when it is not empty).
+ * The NUTs a mint offers, by number, in order. A NUT counts only when its
+ * settings are an object that is not `disabled` and, where it says, is
+ * `supported` (a NUT-17 list of subscriptions counts when it is not empty).
  */
-export function supportedNutNames(nuts: unknown): string[] {
+function supportedNuts(nuts: unknown): string[] {
   if (!nuts || typeof nuts !== 'object') return [];
   return Object.entries(nuts as Record<string, unknown>)
     .filter(([, setting]) => {
@@ -80,12 +83,16 @@ export function supportedNutNames(nuts: unknown): string[] {
       return Array.isArray(supported) ? supported.length > 0 : supported === true;
     })
     .map(([nut]) => nut)
-    .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
-    .map((nut) =>
-      Object.prototype.hasOwnProperty.call(NUT_TITLES, nut)
-        ? `${NUT_TITLES[nut]} (NUT-${nut})`
-        : `NUT-${nut}`
-    );
+    .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+}
+
+/** The NUTs a mint offers, named by their spec titles. */
+export function supportedNutNames(nuts: unknown): string[] {
+  return supportedNuts(nuts).map((nut) =>
+    Object.prototype.hasOwnProperty.call(NUT_TITLES, nut)
+      ? `${NUT_TITLES[nut]} (NUT-${nut})`
+      : `NUT-${nut}`
+  );
 }
 
 function npubOf(pubkey: string | undefined): string | undefined {
@@ -104,6 +111,7 @@ export function buildMintDetailsRows({
   entry,
   cached,
   operator,
+  inputFees,
   now = Date.now(),
 }: MintDetailsSource): DetailsSheetItem[] {
   const rows: DetailsSheetItem[] = [];
@@ -125,9 +133,16 @@ export function buildMintDetailsRows({
   add('Mint', 'Mint public key', text(info?.pubkey));
   const units = cached?.supportedUnits?.map(text).filter((u) => u !== undefined);
   add('Mint', 'Units', units?.length ? units.join(', ') : undefined);
+  add(
+    'Mint',
+    'Spending fee',
+    inputFees?.length ? inputFees.map(formatInputFee).join('\n') : undefined
+  );
   const nuts = supportedNutNames(info?.nuts ?? cached?.nuts);
   add('Mint', 'Supported features', nuts.length ? nuts.join('\n') : undefined);
-  add('Mint', 'Message from the mint', text(entry?.motd) ?? text(info?.motd));
+  // Through `mintMotd`, as the banner reads it: Nutshell's shipped default
+  // ("Message to users") is not a message from anyone.
+  add('Mint', 'Message from the mint', mintMotd(entry?.motd) ?? mintMotd(info?.motd));
   add('Mint', 'Summary', text(entry?.description) ?? text(info?.description));
   add('Mint', 'Full description', text(entry?.longDescription) ?? text(info?.description_long));
   const contacts = getSortedMintInfoContacts(
@@ -230,4 +245,16 @@ export function buildMintDetailsRows({
   add('Last updated', 'Status check', when(cached?.livenessAt, now));
 
   return rows;
+}
+
+/** Nutshell's shipped `MINT_INFO_MOTD` default, which many mints never change. */
+const PLACEHOLDER_MOTD = 'message to users';
+
+/** The mint's message of the day, when its operator actually wrote one. */
+export function mintMotd(motd: unknown): string | undefined {
+  // Screen-action entries may carry a boxed string (`FormattedString`).
+  if (typeof motd !== 'string' && !(motd instanceof String)) return undefined;
+  const message = String(motd).trim();
+  if (!message || message.toLowerCase() === PLACEHOLDER_MOTD) return undefined;
+  return message;
 }

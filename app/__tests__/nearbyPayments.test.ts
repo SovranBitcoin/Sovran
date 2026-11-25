@@ -285,6 +285,34 @@ it('refuses invalid radio input before it occupies durable inbox capacity', asyn
   );
 });
 
+it.each([
+  ['id', 'error'],
+  ['id', 'false'],
+  ['id', '12345'],
+  ['dleq', { e: '12345', s: 'aa'.repeat(32), r: 'bb'.repeat(32) }],
+  ['dleq', { e: 'aa'.repeat(32), s: 'false', r: 'bb'.repeat(32) }],
+])(
+  'refuses a proof with malformed %s hex before decoding or touching the inbox',
+  async (field, value) => {
+    const valid = JSON.parse(incomingPayload());
+    const payload = JSON.stringify({
+      ...valid,
+      proofs: [{ ...valid.proofs[0], [field]: value }],
+    });
+    const failure = await nearbyPayments(mockManager)
+      .ingest(payload, pubkey)
+      .then(
+        () => null,
+        (error: unknown) => error
+      );
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).not.toMatch(/hex string expected/);
+    expect(mockStorage.size).toBe(0);
+    expect(mockManager.paymentRequests.incoming.list).not.toHaveBeenCalled();
+    expect(mockManager.mint.isTrustedMint).not.toHaveBeenCalled();
+  }
+);
+
 it('resumes an existing delivery after a later journal write fails', async () => {
   await captureNearbyDelivery({ manager: mockManager, mintUrl: mint, lockPubkey: `02${pubkey}` })!(
     'send-a'

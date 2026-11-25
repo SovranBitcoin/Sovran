@@ -53,8 +53,6 @@ export const icons: string[] = [
   'circle-flags:gb',
   // Post action menus (repost / ignore) — referenced from actionMenuPopup
   // string literals the scanner can't follow.
-  'mdi:format-quote-close',
-  'mdi:eye-off-outline',
   'mdi:account-cancel-outline',
   'mdi:account-multiple',
   // Empty-state showcase variants — passed dynamically through EmptyState.
@@ -62,14 +60,8 @@ export const icons: string[] = [
   'mdi:bluetooth-off',
   'hugeicons:blockchain-01',
   'fluent:apps-16-filled',
-  'ri:openai-fill', // Using robot as OpenAI icon
-  'ri:anthropic-fill',
-  'ri:twitter-x-fill',
-  'ri:google-fill',
   // Model picker dynamic-lineup chrome (vision marker + offline row).
-  'mdi:image-outline',
   'mdi:cloud-off-outline',
-  'mdi:brain',
   'mdi:help-circle',
   'mdi:check-circle',
   'mdi:circle-outline',
@@ -116,23 +108,11 @@ export const icons: string[] = [
   'proicons:photo',
   'majesticons:search-line',
   'solar:key-bold',
-  // Post action bar — one family (Tabler), outline at rest, filled when active.
-  'tabler:message-circle',
-  'tabler:message-circle-filled',
-  'tabler:repeat',
-  'tabler:heart',
-  'tabler:heart-filled',
-  'tabler:bolt',
-  'tabler:bolt-filled',
-  'garden:arrow-retweet-fill-16',
-  'iconamoon:comment-fill',
-  'garden:heart-fill-16',
-  'iconamoon:heart-fill',
   'hugeicons:new-twitter',
   'mdi:at',
   'mingcute:lightning-fill',
-  'mingcute:play-fill',
   'material-symbols:report-rounded',
+  'material-symbols:settings-outline-rounded',
   'material-symbols:settings-rounded',
   'mdi:robot',
   'feather:wifi',
@@ -142,13 +122,8 @@ export const icons: string[] = [
   'stash:qr-code',
   'ic:round-star',
   'humbleicons:url',
-  'lucide:square-pen',
   'mdi:menu',
-  'mingcute:home-4-fill',
-  'mingcute:home-4-line',
-  'mdi:bell',
   'mdi:bell-off-outline',
-  'mdi:bell-outline',
 
   // Mint-update glyphs (Notifications → Mints, and the Mint updates screen).
   // Passed dynamically per change kind, so the scanner can't follow them.
@@ -160,12 +135,10 @@ export const icons: string[] = [
   'mdi:card-account-details-outline', // profile / identity fields
 
   // Explore page icons
-  'mdi:chevron-left',
   'mdi:chevron-right',
   'mdi:map-marker',
   'mdi:account-group',
   'mdi:arrow-right',
-  'mdi:trending-up',
   'mdi:airplane',
 
   // Map page icons
@@ -183,7 +156,6 @@ export const icons: string[] = [
   'mdi:store',
   'mdi:cash-multiple',
   'mdi:camera',
-  'mdi:tree',
   'mdi:currency-usd',
   'mdi:palette',
   'mdi:alert-circle',
@@ -195,7 +167,6 @@ export const icons: string[] = [
   'mdi:key-plus',
   'mdi:key-arrow-right',
   'mdi:trash-can-outline',
-  'mdi:chevron-up',
   'mdi:key-variant',
 
   // Lightning Address card icons
@@ -209,10 +180,8 @@ export const icons: string[] = [
   // Pending Ecash icons
   'mdi:clock-outline',
   'mdi:history',
-  'mdi:clock-alert-outline',
   'mdi:broom',
   'mdi:check-circle-outline',
-  'fluent:wallet-24-filled',
 
   // Video feed icons (iconamoon to match comment/heart engagement icons)
   'mdi:fullscreen',
@@ -240,8 +209,6 @@ export const icons: string[] = [
   'mdi:lightning-bolt',
   'mdi:magnify',
   'mdi:map-marker-radius',
-  'mdi:message-outline',
-  'mdi:message-reply',
   'mdi:message-text',
   'mdi:open-in-new',
   'mdi:play',
@@ -259,6 +226,7 @@ export const icons: string[] = [
   'mdi:skip-next',
   'mdi:swap-horizontal',
   'mdi:ticket-percent',
+  'mingcute:search-3-fill',
   'mingcute:search-3-line',
   'ri:arrow-left-line',
   'ri:close-circle-line',
@@ -287,24 +255,10 @@ export const icons: string[] = [
   'mdi:cloud-download-outline',
 
   // Drawer and bottom tab bar route icons — selected/unselected pairs
-  'mdi:account-group-outline',
   'mdi:robot-outline',
 
   // Nostr posting — composer, polls, relays, share, media states
   'mdi:pencil',
-  'mdi:image-plus',
-  'mdi:poll',
-  'mdi:minus-circle-outline',
-  'mdi:checkbox-marked',
-  'mdi:radiobox-marked',
-  'mdi:checkbox-blank-outline',
-  'mdi:radiobox-blank',
-  'mdi:wifi-off',
-  'mdi:account-multiple-plus-outline',
-  'mdi:share-variant-outline',
-  'mdi:link-variant',
-  'mdi:image-broken-variant',
-  'mdi:arrow-expand',
 ];
 
 export function CurrencyIcon({

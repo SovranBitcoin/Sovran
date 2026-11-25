@@ -1,12 +1,11 @@
 /**
- * Cache for nagg's mint-info changelog (`/nostr/mint/changes`).
+ * nagg's mint-info changelog cache (`/nostr/mint/changes`), kept inert.
  *
- * Caches the FETCH, not the decoded rows: one ecosystem-wide response serves
- * every consumer (the Notifications → Mints tab and the per-mint detail
- * screen), and decoding is a pure `useMemo` at the read site. Host-scoped —
- * what a mint published about itself is the same for every profile — and
- * persisted, so the tab paints its last known state on cold launch instead of
- * flashing empty while the request is in flight.
+ * nagg no longer serves the changelog; mint history is recorded on the phone
+ * in `mint-history-store` (ADR 0036). This store stays declared under its
+ * released name, scope and shape so an install that cached the feed still
+ * loads, keeps and wipes that row like any other store
+ * (`releasedPersistedSurface.test.ts`). Nothing reads or writes it.
  */
 import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore';
 import type { MintChangesResponse } from '@/shared/lib/apiClient';

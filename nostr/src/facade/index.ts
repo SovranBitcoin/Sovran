@@ -24,3 +24,4 @@ export * as primal from "./primal";
 export * as relay from "./relay";
 export * from "./feed-pager";
 export * from "./vertex-request";
+export * from "./vertex-direct";

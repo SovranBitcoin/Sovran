@@ -11,6 +11,23 @@ export interface RebalanceTransfer {
   chainId?: string;
   chainPath?: string[];
   chainHopIndex?: number;
+  /**
+   * One leg only: a melt Lightning finds no route for fails this transfer
+   * instead of being sent through middleman mints. The caller routes.
+   */
+  directOnly?: boolean;
+  /**
+   * Most the source may be debited, in sats: the invoice plus the mint's fee
+   * reserve and input fee of the prepared melt. Above it the transfer fails
+   * before anything is paid.
+   */
+  sourceDebitCap?: number;
+  /**
+   * Deliver exactly `amount` or nothing: where the source balance, fees or
+   * proof selection would lower it, the transfer fails before anything is
+   * paid instead of moving less.
+   */
+  exactAmount?: boolean;
 }
 
 /** The recipient side: a prepared bolt11 mint operation whose invoice the melt pays. */
@@ -45,6 +62,14 @@ export interface RebalancePreparedMelt {
   amount?: AmountValue;
   fee_reserve?: AmountValue;
   swap_fee?: AmountValue;
+  /** False when the selected proofs are melted as they are (no pre-swap). */
+  needsSwap?: boolean;
+  /** Sum of the proofs reserved for this melt. */
+  inputAmount?: AmountValue;
+  /** The pre-swap's outputs; `send` is what the melt then spends. */
+  swapOutputData?: {
+    send?: readonly { blindedMessage?: { amount?: AmountValue } }[];
+  };
 }
 
 /** A melt operation's persisted state. */
@@ -71,12 +96,19 @@ export interface RebalanceWalletPort {
   probeMeltFeeReserve(mintUrl: string, invoice: string): Promise<number>;
   createMintReceipt(mintUrl: string, amount: number): Promise<RebalanceMintReceipt>;
   getMintOperation(operationId: string): Promise<RebalanceMintSnapshot | null>;
+  /**
+   * Re-check a recipient operation with its mint and return its latest state.
+   * Optional: readers fall back to `getMintOperation`.
+   */
+  refreshMintOperation?(operationId: string): Promise<RebalanceMintSnapshot | null>;
   prepareMelt(mintUrl: string, invoice: string): Promise<RebalancePreparedMelt>;
   executeMelt(operationId: string): Promise<RebalanceMeltSnapshot | undefined>;
   refreshMelt(operationId: string): Promise<RebalanceMeltSnapshot>;
   getMeltOperation(operationId: string): Promise<RebalanceMeltSnapshot | null>;
   /** Return proofs stuck `inflight` on the mint to ready. */
   restoreInflightProofs(mintUrl: string): Promise<void>;
+  /** Cancel a prepared melt that will not be executed, releasing its reserved proofs. */
+  cancelPreparedMelt(operationId: string): Promise<void>;
   trustMint(mintUrl: string): Promise<void>;
   /** Untrust every URL; report those still holding a balance. */
   releaseTrust(mintUrls: readonly string[]): Promise<{
@@ -145,6 +177,8 @@ export interface RebalanceEventSink {
   legUpdated(legId: string, update: RebalanceLegUpdate): void;
   mintReceiptCreated(legId: string, receipt: RebalanceMintReceipt): void;
   meltPrepared(legId: string, melt: RebalancePreparedMelt): void;
+  /** A prepared melt was cancelled before it was executed: it never paid, and never will. */
+  meltReleased?(operationId: string): void;
   /** A middleman route is about to run: create one leg per hop and return their ids in order. */
   routeAttemptStarted(
     stepId: string,

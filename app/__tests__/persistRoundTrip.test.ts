@@ -40,10 +40,10 @@ const APP_DIR = resolve(__dirname, '..');
 /** Every module that registers a persisted store. */
 const STORE_MODULES = [
   '@/features/bitchat/stores/bitchatDmMessages',
-  '@/features/feed/stores/ignoreStore',
-  '@/features/feed/stores/notificationPolicyStore',
-  '@/features/nostrSigner/data/nip46ActivityStore',
-  '@/features/nostrSigner/data/nip46ConnectionsStore',
+  '@/shared/stores/profile/ignoreStore',
+  '@/shared/stores/profile/notificationPolicyStore',
+  '@/shared/stores/profile/nip46ActivityStore',
+  '@/shared/stores/profile/nip46ConnectionsStore',
   '@/shared/lib/nostr/media/mediaServerStore',
   '@/shared/lib/nostr/outbox/relayListStore',
   '@/shared/stores/global/btcMapStore',
@@ -74,6 +74,7 @@ const STORE_MODULES = [
   '@/shared/stores/profile/routstrStore',
   '@/shared/stores/profile/scanHistoryStore',
   '@/shared/stores/profile/searchHistoryStore',
+  '@/shared/stores/profile/mintHistoryStore',
   '@/shared/stores/profile/sendReachabilityStore',
   '@/shared/stores/profile/swapTransactionsStore',
   '@/shared/stores/profile/themeStore',

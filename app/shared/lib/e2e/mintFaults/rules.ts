@@ -12,9 +12,6 @@
 import { z } from 'zod';
 import { normalizeMintUrl } from '@cashu/coco-core';
 
-/** Armed/launch channel: the harness-owned Metro serializes a rule-set here.
- * Presence of the var (even with zero rules) arms the interceptor. */
-export const E2E_MINT_FAULTS_ENV = 'EXPO_PUBLIC_E2E_MINT_FAULTS' as const;
 /** Dynamic channel: rule-set file the harness writes into the app container,
  * relative to the container's Documents/ directory (beside e2e/state.json). */
 export const MINT_FAULT_RULES_REL = 'e2e/mint-faults.json' as const;
@@ -148,10 +145,6 @@ const mintFaultLedgerSchema = z.object({
   entries: z.array(mintFaultLedgerEntrySchema),
 });
 export type MintFaultLedger = z.infer<typeof mintFaultLedgerSchema>;
-
-export function serializeMintFaultRuleSet(set: MintFaultRuleSet): string {
-  return JSON.stringify(mintFaultRuleSetSchema.parse(set));
-}
 
 export function parseMintFaultRuleSet(raw: string): MintFaultRuleSet {
   let value: unknown;

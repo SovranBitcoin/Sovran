@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { ProfileDetailsScreen } from '../components/ProfileDetailsScreen';
 import { readRecoveryInformation, type RecoveryInformation } from '../lib/readRecoveryInformation';
 
@@ -107,7 +108,7 @@ function RecoveryDetails({
     };
   }, [profile, attempt]);
   const keys =
-    profile && information?.nsec
+    profile && information?.nsec && isNostrPubkeyHex(profile.pubkey)
       ? {
           pubkey: profile.pubkey,
           npub: npubEncode(profile.pubkey),

@@ -3,10 +3,11 @@ import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { FIAT_UNITS, type FiatUnit } from 'wallet/units';
-import { storeLog, applyFileLogging } from '@/shared/lib/logger';
+import { storeLog, applyFileLogging, applyVerboseLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
+import { MINT_AUDITORS } from '@/shared/lib/cashu/auditors/registry';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -88,6 +89,12 @@ interface SettingsState {
    */
   fileLoggingEnabled: boolean;
   /**
+   * Dev toggle: emit debug/info/warn logs and run render/layout-shift probes.
+   * Turn off to eliminate dev-build logging overhead on device; errors and
+   * fatals still emit. Dev-only; inert in production and E2E log builds.
+   */
+  verboseLoggingEnabled: boolean;
+  /**
    * Dev toggles: per-tier enablement for the resilient Nostr data layer
    * (nagg → Primal cache → raw relays). Each flag, when false, removes that tier
    * from the facade's fallback chain — so a developer can simulate "nagg is
@@ -100,6 +107,14 @@ interface SettingsState {
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
   primalHostsDisabled: string[];
+  /** Mint auditor ids the user switched OFF (denylist: empty = all enabled). */
+  disabledMintAuditors: string[];
+  /**
+   * Off-by-default mint auditor ids the user switched ON. Kept apart from the
+   * denylist so an install that saved `disabledMintAuditors` before an opt-in
+   * auditor existed never starts using it.
+   */
+  enabledMintAuditors: string[];
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -198,6 +213,7 @@ const PersistedSettings = z.object({
   regenerateP2PKOnReceive: z.boolean().default(true).catch(true),
   sendLocationEnabled: z.boolean().default(false).catch(false),
   fileLoggingEnabled: z.boolean().default(false).catch(false),
+  verboseLoggingEnabled: z.boolean().default(true).catch(true),
   vertexCreditsEnabled: z.boolean().default(true).catch(true),
   naggTierEnabled: z.boolean().default(true).catch(true),
   primalTierEnabled: z.boolean().default(true).catch(true),
@@ -211,6 +227,12 @@ const PersistedSettings = z.object({
    * the default and the safe direction to fail in.
    */
   primalHostsDisabled: tolerantArray(z.string().max(2048), 16)
+    .default([])
+    .catch(() => []),
+  disabledMintAuditors: tolerantArray(z.string().max(64), 16)
+    .default([])
+    .catch(() => []),
+  enabledMintAuditors: tolerantArray(z.string().max(64), 16)
     .default([])
     .catch(() => []),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
@@ -242,11 +264,14 @@ const DEFAULT_SETTINGS: SettingsState = {
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
   fileLoggingEnabled: false,
+  verboseLoggingEnabled: true,
   vertexCreditsEnabled: true,
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
   primalHostsDisabled: [],
+  disabledMintAuditors: [],
+  enabledMintAuditors: [],
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -286,6 +311,7 @@ interface SettingsActions {
 
   // On-device file logging (dev diagnostics)
   setFileLoggingEnabled: (enabled: boolean) => void;
+  setVerboseLoggingEnabled: (enabled: boolean) => void;
 
   // Nostr data-layer per-tier enablement (dev)
   setVertexCreditsEnabled: (enabled: boolean) => void;
@@ -293,6 +319,7 @@ interface SettingsActions {
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
   setPrimalHostEnabled: (url: string, enabled: boolean) => void;
+  setMintAuditorEnabled: (id: string, enabled: boolean) => void;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -414,6 +441,13 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           applyFileLogging(enabled);
         },
 
+        setVerboseLoggingEnabled: (enabled: boolean) => {
+          if (!enabled) storeLog.info('store.settings.set_verbose_logging', { enabled });
+          set({ verboseLoggingEnabled: enabled });
+          if (typeof applyVerboseLogging === 'function') applyVerboseLogging(enabled);
+          if (enabled) storeLog.info('store.settings.set_verbose_logging', { enabled });
+        },
+
         // Nostr data-layer tiers (dev)
         setVertexCreditsEnabled: (enabled: boolean) => set({ vertexCreditsEnabled: enabled }),
         setNaggTierEnabled: (enabled: boolean) => {
@@ -433,6 +467,21 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           set((state) => {
             const withoutUrl = state.primalHostsDisabled.filter((entry) => entry !== url);
             return { primalHostsDisabled: enabled ? withoutUrl : [...withoutUrl, url] };
+          });
+        },
+        setMintAuditorEnabled: (id: string, enabled: boolean) => {
+          storeLog.info('store.settings.set_mint_auditor_enabled', { id, enabled });
+          // A default-on auditor is switched through the denylist, a default-off
+          // one through the allowlist; the other list is left as it was.
+          const defaultOn =
+            MINT_AUDITORS.find((auditor) => auditor.id === id)?.defaultEnabled ?? true;
+          set((state) => {
+            if (defaultOn) {
+              const withoutId = state.disabledMintAuditors.filter((entry) => entry !== id);
+              return { disabledMintAuditors: enabled ? withoutId : [...withoutId, id] };
+            }
+            const withoutId = state.enabledMintAuditors.filter((entry) => entry !== id);
+            return { enabledMintAuditors: enabled ? [...withoutId, id] : withoutId };
           });
         },
 
@@ -475,6 +524,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
             experimental: false,
             whitenoiseEnabled: false,
             fileLoggingEnabled: false,
+            verboseLoggingEnabled: true,
             naggTierEnabled: true,
             primalTierEnabled: true,
             relayTierEnabled: true,
@@ -527,6 +577,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
           sendLocationEnabled: state.sendLocationEnabled,
           fileLoggingEnabled: state.fileLoggingEnabled,
+          verboseLoggingEnabled: state.verboseLoggingEnabled,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
           vertexCreditsEnabled: state.vertexCreditsEnabled,
@@ -534,12 +585,17 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           primalTierEnabled: state.primalTierEnabled,
           relayTierEnabled: state.relayTierEnabled,
           primalHostsDisabled: state.primalHostsDisabled,
+          disabledMintAuditors: state.disabledMintAuditors,
+          enabledMintAuditors: state.enabledMintAuditors,
         }),
         afterHydrate: (state, error) => {
           if (error) return;
-          // Resume on-device file logging if it was left on (dev-only; no-op in
-          // production). Mirrors the persisted toggle into the logger transport.
+          // Resume on-device file logging and verbose logging preference
+          // (dev-only; no-op in production and E2E builds).
           applyFileLogging(state?.fileLoggingEnabled ?? false);
+          if (typeof applyVerboseLogging === 'function') {
+            applyVerboseLogging(state?.verboseLoggingEnabled ?? true);
+          }
           const { purgeLegacyMockData } = require('../runtime/mockDataStore') as {
             purgeLegacyMockData: () => void;
           };

@@ -22,14 +22,9 @@ export const FEATURES = [
   'nostr', // identity, profiles; every other Nostr module needs it
   'nostrSearch', // people / npub search
   'ecashMessages', // send ecash to a contact over NIP-17 DMs (the transport, a payment rail)
-  'directMessages', // DM conversation pages: chat threads, message menus, DM lists
-  'contacts', // Contacts tab
-  'feed', // Feed + Notifications tabs, composer
   // Proximity
   'nfc', // tap to pay
   'nutDrop', // Bluetooth Nut Drop
-  // Extras
-  'ai', // Routstr AI tab
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
@@ -41,12 +36,8 @@ const REQUIRES: Partial<Record<Feature, readonly Feature[]>> = {
   paymentRequests: ['ecash'],
   nostrSearch: ['nostr'],
   ecashMessages: ['nostr', 'ecash'],
-  directMessages: ['nostr'],
-  contacts: ['nostr'],
-  feed: ['nostr'],
   nfc: ['ecash'],
   nutDrop: ['ecash'],
-  ai: ['ecash'],
 };
 
 const RAILS = ['ecash', 'lightning', 'onchain'] as const satisfies readonly Feature[];
@@ -64,30 +55,25 @@ const only = (...enabled: Feature[]): FeatureSet => {
 export const EDITIONS = {
   full: all(true),
   /**
-   * The focused payments app: no AI and no DM conversation pages. The feed
-   * stays, on the Feed tab and under each profile.
-   *
-   * `ecashMessages` stays on without them. Ecash that arrives as a message is
-   * redeemed by `useDmEcashAutoRedeem`, mounted at account scope whenever
-   * `ecashMessages` is on, so receiving money never depends on a chat screen.
+   * The focused payments app. No build ships DM conversation pages, so
+   * ecash that arrives as a message is redeemed by `useDmEcashAutoRedeem`,
+   * mounted at account scope whenever `ecashMessages` is on: receiving money
+   * never depends on a chat screen.
    */
-  payments: { ...all(true), ai: false, directMessages: false },
+  payments: all(true),
   lightningOnly: only('lightning', 'bolt12'),
   onchainOnly: only('onchain'),
   ecashLightning: only('ecash', 'lightning', 'bolt12', 'paymentRequests', 'nfc', 'nutDrop'),
-  /** Everything except the social layer: no search, feed or DMs. */
+  /** Everything except the social layer: no people search or ecash messages. */
   private: {
     ...all(true),
     nostr: false,
     nostrSearch: false,
     ecashMessages: false,
-    directMessages: false,
-    contacts: false,
-    feed: false,
   },
 } as const satisfies Record<string, FeatureSet>;
 
-export type Edition = keyof typeof EDITIONS;
+type Edition = keyof typeof EDITIONS;
 
 /** The edition a build ships when `EXPO_PUBLIC_SOVRAN_EDITION` is unset. */
 export const DEFAULT_EDITION: Edition = 'payments';

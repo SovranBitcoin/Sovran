@@ -30,6 +30,7 @@ import {
   normalizeMintUrlKey,
   normalizeUrlForApi,
 } from '@/shared/lib/url';
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { useMintImport } from '@/features/mint/hooks/useMintImport';
 import { staticPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -291,7 +292,6 @@ function MintItem({
       selectable
       selected={selected}
       onToggle={() => onToggle(mint.url)}
-      selectionVariant="checkbox"
       disabled={globalLoading}
       testID={loading ? `contact-row:mint-skeleton:${mint.url}` : `contact-row:mint:${mint.url}`}
     />
@@ -391,7 +391,7 @@ export function MintAddScreen() {
     const filteredOut = searchResults.filter((r) => knownMintUrls.has(normalizeMintUrlKey(r.url)));
     const adapted = searchResults
       .filter((r) => !knownMintUrls.has(normalizeMintUrlKey(r.url)))
-      .map((r) => adaptSearchResult(r, metadataByUrl[normalizeMintUrlKey(r.url)]));
+      .map((r) => adaptSearchResult(r, ownEntry(metadataByUrl, normalizeMintUrlKey(r.url))));
 
     // If searching with a URL-like query that validated as a mint, prepend it
     let pseudoMint: PseudoMint | null = null;

@@ -47,6 +47,7 @@
 
 import React, { useState } from 'react';
 import { StyleProp, ViewStyle, GestureResponderEvent, Platform, StyleSheet } from 'react-native';
+import type { SharedValue } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { controlHeight, fontSize } from '@/shared/styles/tokens';
@@ -184,6 +185,14 @@ interface ButtonProps {
   accessibilityLabel?: string;
   /** Optional VoiceOver hint describing the action's outcome. */
   accessibilityHint?: string;
+  /** `switch` for a button that turns something on and off (say which with
+   *  `accessibilityState.checked`). Defaults to `button`. */
+  accessibilityRole?: 'button' | 'switch';
+  /** Merged into the button's own disabled/busy state, e.g. `{ checked }`. */
+  accessibilityState?: { checked?: boolean };
+  /** Holds the press squeeze at one frame (0 at rest, 1 pressed), for a
+   *  design-system scrubber. Omitted, the press follows touches. */
+  pressProgress?: SharedValue<number>;
 }
 
 /**
@@ -222,6 +231,9 @@ export const Button = ({
   contentColor,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityRole = 'button',
+  accessibilityState,
+  pressProgress,
 }: ButtonProps) => {
   const paint = useStylePaint();
   // One button in every style, Glass included: radius, height, paint and type
@@ -260,10 +272,10 @@ export const Button = ({
   // explicitly — we cannot read text out of a node tree.
   const a11yLabel = accessibilityLabel ?? (typeof text === 'string' ? text : undefined);
   const a11yProps = {
-    accessibilityRole: 'button' as const,
+    accessibilityRole,
     accessibilityLabel: a11yLabel,
     accessibilityHint,
-    accessibilityState: { disabled: disabled || loading, busy: loading },
+    accessibilityState: { ...accessibilityState, disabled: disabled || loading, busy: loading },
   };
   const [foreground, foregroundSecondary, danger] = useThemeColor([
     'foreground',
@@ -384,7 +396,10 @@ export const Button = ({
         activeOpacity={PRESS_OPACITY}
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
-        <PressScale target={PRESS_SCALE}>
+        <PressScale
+          target={PRESS_SCALE}
+          progressOverride={pressProgress}
+          activeOpacity={PRESS_OPACITY}>
           <View
             style={[
               getButtonStyles(),
@@ -421,7 +436,10 @@ export const Button = ({
       activeOpacity={PRESS_OPACITY}
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
-      <PressScale target={PRESS_SCALE}>
+      <PressScale
+        target={PRESS_SCALE}
+        progressOverride={pressProgress}
+        activeOpacity={PRESS_OPACITY}>
         <View
           style={[getButtonStyles(), { minHeight: sz.minHeight }, style]}
           blur={shouldUseBlur}

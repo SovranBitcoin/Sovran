@@ -8,6 +8,7 @@ import {
   SpentThisMonth,
   Transactions,
 } from '@/features/transactions';
+import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { Account } from '@/features/wallet/components/Account';
 import { MessageEcashToReview } from '@/features/payments/components/MessageEcashToReview';
@@ -19,7 +20,6 @@ import { LayoutShiftProbe } from '@/shared/ui/composed/LayoutShiftProbe';
 import { HomeTop } from '@/features/wallet/home/HomeLayouts';
 import type { HomeActions } from '@/features/wallet/home/types';
 import { useAppStyle } from '@/shared/styles/appStyle';
-import { walletScrollY } from '@/features/wallet/lib/walletScroll';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
@@ -31,7 +31,6 @@ import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
 import { useWalletTabFocusPublisher } from '@/features/wallet/hooks/useWalletTabFocusPublisher';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
-import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { toRealUnit } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -126,7 +125,7 @@ export function WalletScreen() {
 
   const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
-    router.push('/(theme-flow)/preview');
+    router.navigate('/(theme-flow)/preview');
   };
 
   const handleSplit = () => {
@@ -150,7 +149,12 @@ export function WalletScreen() {
 
   const handleHistory = () => {
     walletLog.info('wallet.history.tap');
-    router.navigate('/(transactions-flow)/transactions');
+    // Opens on the account the wallet is showing, as the pending and
+    // View-all links do, rather than the sat default.
+    router.navigate({
+      pathname: '/(transactions-flow)/transactions',
+      params: transactionsRouteParams({ currency: account.unit }),
+    });
   };
 
   const handleMap = () => {
@@ -225,14 +229,11 @@ export function WalletScreen() {
     },
   };
 
-  // Keep BootEntrance and the wallet body mounted across the search toggle so
-  // the splash→QR morph never replays and closing search restores this screen.
   return (
     <BootEntrance>
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={pullToAi.refreshControl}
-        scrollY={walletScrollY}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <E2EReadyProofProbe />
@@ -294,8 +295,6 @@ export function WalletScreen() {
           </View>
         </Log>
       </LayoutDebugWrapper>
-      {/* No `topInset`: the overlay reads the navigator header height itself. */}
-      <SearchOverlay recentContext="wallet" />
     </BootEntrance>
   );
 }

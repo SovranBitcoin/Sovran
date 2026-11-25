@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { err, ok } from 'neverthrow';
+import { ok } from 'neverthrow';
 import { useLayoutEffect } from 'react';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 
@@ -21,7 +21,7 @@ jest.mock('@/shared/lib/apiClient', () => ({
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: jest.fn() }));
 jest.mock('@/shared/lib/nostr/client', () => ({ npubToPubkey: jest.fn() }));
-jest.mock('@/features/feed/components/nostr/feedParse', () => ({ tryNpubEncode: jest.fn() }));
+jest.mock('@/shared/lib/nostr/nostrBech32', () => ({ tryNpubEncode: jest.fn() }));
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   getNostrTierConfig: () => ({ nagg: { enabled: true } }),
@@ -57,11 +57,11 @@ beforeEach(() => {
 });
 
 it('cancels a manual refresh when navigating to another profile and ignores its late result', async () => {
-  const finish: ((profile: { pubkey: string }) => void)[] = [];
-  mockFetchProfile.mockImplementation(
+  const finish: ((stats: { tier: 'primal'; followersCount: number }) => void)[] = [];
+  mockFetchStats.mockImplementation(
     () =>
       new Promise((resolve) => {
-        finish.push((profile) => resolve(ok(profile)));
+        finish.push((stats) => resolve(stats));
       })
   );
   const { result, rerender } = renderHook(
@@ -71,21 +71,21 @@ it('cancels a manual refresh when navigating to another profile and ignores its 
     }
   );
   act(() => result.current.refetch());
-  const refreshSignal = mockFetchProfile.mock.calls[1][1].signal as AbortSignal | undefined;
+  const refreshSignal = mockFetchStats.mock.calls[1][1].signal as AbortSignal | undefined;
   rerender({ pubkey: 'second' });
-  await act(async () => finish[1]({ pubkey: 'first' }));
+  await act(async () => finish[1]({ tier: 'primal', followersCount: 10 }));
   expect(refreshSignal?.aborted).toBe(true);
   expect(result.current.data).toBeNull();
   expect(result.current.isLoading).toBe(true);
 
-  await act(async () => finish[2]({ pubkey: 'second' }));
+  await act(async () => finish[2]({ tier: 'primal', followersCount: 20 }));
   expect(result.current.data?.pubkey).toBe('second');
   expect(result.current.isLoading).toBe(false);
 });
 
 it('never commits the previous person’s stats after changing the profile', async () => {
-  mockFetchProfile
-    .mockResolvedValueOnce(ok({ pubkey: 'first' }))
+  mockFetchStats
+    .mockResolvedValueOnce({ tier: 'primal', followersCount: 10, followingCount: 5 })
     .mockImplementation(() => new Promise(() => {}));
   const commits: { requested: string; shown: string | undefined; loading: boolean }[] = [];
   const { rerender } = renderHook(
@@ -109,21 +109,20 @@ it('never commits the previous person’s stats after changing the profile', asy
 });
 
 it('keeps same-profile content during refresh and cancels the latest refresh on unmount', async () => {
-  mockFetchProfile
-    .mockResolvedValueOnce(ok({ pubkey: 'first' }))
+  mockFetchStats
+    .mockResolvedValueOnce({ tier: 'primal', followersCount: 10, followingCount: 5 })
     .mockImplementation(() => new Promise(() => {}));
   const { result, unmount } = renderHook(() => useNostrProfile('first'));
   await act(async () => {});
   act(() => result.current.refetch());
   expect(result.current.data?.pubkey).toBe('first');
   expect(result.current.isLoading).toBe(true);
-  const signal = mockFetchProfile.mock.calls[1][1].signal as AbortSignal;
+  const signal = mockFetchStats.mock.calls[1][1].signal as AbortSignal;
   unmount();
   expect(signal.aborted).toBe(true);
 });
 
 it('settles after all profile sources report unavailable', async () => {
-  mockFetchProfile.mockResolvedValue(err(new Error('nagg unavailable')));
   mockFetchStats.mockResolvedValue(null);
   const { result } = renderHook(() => useNostrProfile('missing'));
   await act(async () => {});
@@ -133,7 +132,6 @@ it('settles after all profile sources report unavailable', async () => {
 });
 
 it('enriches a fallback profile with Vertex without hiding its available metadata', async () => {
-  mockFetchProfile.mockResolvedValue(err(new Error('not indexed')));
   mockFetchStats.mockResolvedValue({
     tier: 'primal',
     metadata: { displayName: 'Alice' },
@@ -164,8 +162,8 @@ it('enriches a fallback profile with Vertex without hiding its available metadat
     followers: 42,
   });
 });
+
 it('preserves fallback content when Vertex cannot refresh', async () => {
-  mockFetchProfile.mockResolvedValue(err(new Error('not indexed')));
   mockFetchStats.mockResolvedValue({ tier: 'primal', metadata: { displayName: 'Alice' } });
   const { result } = renderHook(() => useNostrProfile('alice', true));
   await act(async () => {});
@@ -173,30 +171,27 @@ it('preserves fallback content when Vertex cannot refresh', async () => {
   expect(result.current.error).toBeNull();
 });
 
-it('completes counts nagg lacks from Primal, then the contact list, without ever showing 0', async () => {
-  // nagg without the nostr module: a valid profile with no aggregates.
-  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'alice', score: 0.5, rank: 3 }));
-  let stats!: (value: object | null) => void;
-  mockFetchStats.mockImplementation(() => new Promise((resolve) => (stats = resolve)));
-  mockFetchFollowing.mockResolvedValue(17);
+it('completes missing following count from the contact list without ever showing 0', async () => {
+  mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 120 });
+  let resolveFollowing!: (value: number | undefined) => void;
+  mockFetchFollowing.mockImplementation(
+    () => new Promise((resolve) => (resolveFollowing = resolve))
+  );
   const { result } = renderHook(() => useNostrProfile('alice'));
   await act(async () => {});
   expect(result.current.isLoading).toBe(false);
   expect(result.current.isCountsLoading).toBe(true);
-  expect(result.current.data?.followers).toBeUndefined();
-  // The kind-3 following count lands first and paints on its own (never 0).
-  expect(result.current.data?.follows).toBe(17);
+  expect(result.current.data?.followers).toBe(120);
+  expect(result.current.data?.follows).toBeUndefined();
 
-  // Primal knows followers only; following came from the kind-3 fallback.
-  await act(async () => stats({ tier: 'primal', followersCount: 120 }));
+  await act(async () => resolveFollowing(17));
   expect(result.current.isCountsLoading).toBe(false);
-  expect(result.current.data).toMatchObject({ followers: 120, follows: 17, score: 0.5 });
+  expect(result.current.data).toMatchObject({ followers: 120, follows: 17 });
   expect(mockFetchFollowing).toHaveBeenCalledWith('alice', expect.anything());
 });
 
 it('reports unknown counts as undefined when no source can count', async () => {
-  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'bob', score: null, rank: 0 }));
-  mockFetchStats.mockResolvedValue(null);
+  mockFetchStats.mockResolvedValue({ tier: 'relay', metadata: { displayName: 'Bob' } });
   mockFetchFollowing.mockResolvedValue(undefined);
   const { result } = renderHook(() => useNostrProfile('bob'));
   await act(async () => {});
@@ -205,21 +200,7 @@ it('reports unknown counts as undefined when no source can count', async () => {
   expect(result.current.data?.follows).toBeUndefined();
 });
 
-it('asks the tiers afresh for a count nagg omitted, bypassing the header it just cached', async () => {
-  // nagg drops zero-valued aggregates and has no follower count for pubkeys
-  // outside its kind-3 corpus; the answer is cached WITHOUT followers, so a
-  // cache-first stats read would hand it straight back and never ask Primal.
-  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'dave', follows: 12, created_at: 1700000000 }));
-  mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 0, followingCount: 12 });
-  const { result } = renderHook(() => useNostrProfile('dave'));
-  await act(async () => {});
-  expect(mockFetchStats).toHaveBeenCalledWith('dave', expect.objectContaining({ refresh: true }));
-  expect(result.current.data).toMatchObject({ followers: 0, follows: 12 });
-  expect(result.current.isCountsLoading).toBe(false);
-});
-
 it('keeps completed counts when a Vertex refresh answers without aggregates', async () => {
-  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'alice', score: 0.5, rank: 3 }));
   mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 120, followingCount: 9 });
   let complete!: (value: object) => void;
   mockRefreshVertex.mockImplementationOnce(() => new Promise((resolve) => (complete = resolve)));
@@ -234,38 +215,33 @@ it('keeps completed counts when a Vertex refresh answers without aggregates', as
 it('seeds the header from cached profile stats on the first frame and keeps it while revalidating', async () => {
   mockReadCachedStats.mockReturnValue({ pubkey: 'carol', followersCount: 40, followingCount: 12 });
   let finish!: (value: unknown) => void;
-  mockFetchProfile.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+  mockFetchStats.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
   const { result } = renderHook(() => useNostrProfile('carol'));
   expect(result.current.data).toMatchObject({ followers: 40, follows: 12 });
   expect(result.current.isLoading).toBe(true); // revalidating behind a seeded header
-  await act(async () => finish(ok({ pubkey: 'carol', score: 0.2, rank: 1, followers: 41 })));
+  await act(async () => finish({ tier: 'primal', score: 0.2, rank: 1, followersCount: 41 }));
   expect(result.current.data).toMatchObject({ followers: 41, follows: 12, score: 0.2 });
-  expect(mockCacheStats).toHaveBeenCalledWith('carol', expect.objectContaining({ followers: 41 }));
 });
 
 it('a cached score paints on the first frame and survives an answer without one', async () => {
   mockReadCachedStats.mockReturnValue({ pubkey: 'erin', followersCount: 40, score: 71, rank: 3 });
   let finish!: (value: unknown) => void;
-  mockFetchProfile.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+  mockFetchStats.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
   const { result } = renderHook(() => useNostrProfile('erin'));
   expect(result.current.data).toMatchObject({ followers: 40, score: 71, rank: 3 });
-  // nagg answered without a score (the account is below Vertex's floor, or
-  // the cache expired): the score the list showed must not become a dash.
-  await act(async () => finish(ok({ pubkey: 'erin', score: null, rank: 0, followers: 41 })));
+  await act(async () => finish({ tier: 'primal', followersCount: 41, followingCount: 5 }));
   expect(result.current.data).toMatchObject({ followers: 41, score: 71 });
 });
 
 it('a focus change does not restart the ladder', async () => {
-  mockFetchProfile.mockResolvedValue(
-    ok({
-      pubkey: 'dave',
-      score: 0.1,
-      rank: 1,
-      followers: 1,
-      follows: 1,
-      vertexFetchedAt: Date.now() / 1000,
-    })
-  );
+  mockFetchStats.mockResolvedValue({
+    tier: 'primal',
+    score: 0.1,
+    rank: 1,
+    followersCount: 1,
+    followingCount: 1,
+    vertexFetchedAt: Date.now() / 1000,
+  });
   const { rerender } = renderHook(
     ({ focused }: { focused: boolean }) => useNostrProfile('dave', focused),
     {
@@ -273,25 +249,10 @@ it('a focus change does not restart the ladder', async () => {
     }
   );
   await act(async () => {});
-  expect(mockFetchProfile).toHaveBeenCalledTimes(1);
+  expect(mockFetchStats).toHaveBeenCalledTimes(1);
   rerender({ focused: true });
   await act(async () => {});
   rerender({ focused: false });
   await act(async () => {});
-  expect(mockFetchProfile).toHaveBeenCalledTimes(1);
-});
-
-it('counts land independently: the kind-3 following count paints before Primal answers', async () => {
-  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'erin', score: 0.5, rank: 3 }));
-  let stats!: (value: object | null) => void;
-  mockFetchStats.mockImplementation(() => new Promise((resolve) => (stats = resolve)));
-  mockFetchFollowing.mockResolvedValue(7);
-  const { result } = renderHook(() => useNostrProfile('erin'));
-  await act(async () => {});
-  expect(result.current.isCountsLoading).toBe(true);
-  expect(result.current.data?.follows).toBe(7);
-  expect(result.current.data?.followers).toBeUndefined();
-  await act(async () => stats({ tier: 'primal', followersCount: 99 }));
-  expect(result.current.data).toMatchObject({ followers: 99, follows: 7 });
-  expect(result.current.isCountsLoading).toBe(false);
+  expect(mockFetchStats).toHaveBeenCalledTimes(1);
 });

@@ -32,5 +32,5 @@ No melt is submitted on that tap. New fees must not be substituted under an old
 approval. Plain permanent P2PK Nostr payment requests use Coco's P2PK target;
 unsupported conditions are rejected before reserving proofs.
 
-Verification and the disposition of all eleven reported findings are recorded in
-[the regression review](../../../docs/review/regression-verification-2026-09-28.md).
+Verification and the disposition of all eleven reported findings were recorded in the
+2026-09-28 regression review (`docs/review/regression-verification-2026-09-28.md`, archived out of the repo).

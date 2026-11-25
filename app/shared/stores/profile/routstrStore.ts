@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { mintLocalId } from '@/shared/lib/id';
 import { aiLog, storeLog } from '@/shared/lib/logger';
-import { RoutstrModel, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
@@ -39,6 +38,33 @@ import {
 // guards and the display metadata in `features/ai/lib/format.ts`. (These
 // used to be duplicated literal unions to avoid a feature → store cycle;
 // the shared module removed the need.)
+export type RoutstrModel = {
+  id: string;
+  name: string;
+  description: string;
+  created: number;
+  context_length: number;
+  architecture: {
+    modality: string;
+    input_modalities: string[];
+    output_modalities: string[];
+    tokenizer: string;
+    instruct_type: string | null;
+  };
+  pricing: Record<string, number>;
+  sats_pricing: Record<string, number>;
+  per_request_limits: unknown;
+  top_provider: {
+    context_length: number;
+    max_completion_tokens: number | null;
+    is_moderated: boolean;
+  };
+  enabled: boolean;
+  upstream_provider_id: string | null;
+  canonical_slug: string | null;
+  alias_ids: string[] | null;
+};
+
 type RoutstrTierId = AiTierId;
 const TIER_IDS = AI_TIER_IDS;
 const DEFAULT_TIER: RoutstrTierId = 'auto';
@@ -647,14 +673,14 @@ type SessionMirrorState = Pick<
  * The conversation on screen: the saved session's id, or `null` for one that
  * is not saved (anonymous mode). A message written now belongs to it.
  */
-export function selectConversationId(
+function selectConversationId(
   state: Pick<RoutstrState, 'isAnonymousMode' | 'currentSessionId'>
 ): string | null {
   return state.isAnonymousMode ? null : state.currentSessionId;
 }
 
 /** The lineup a model is chosen from: this session's, else the saved one (an empty one stands). */
-export const selectLineup = (state: Pick<RoutstrState, 'lineup' | 'lastKnownLineup'>) =>
+const selectLineup = (state: Pick<RoutstrState, 'lineup' | 'lastKnownLineup'>) =>
   state.lineup ?? state.lastKnownLineup?.lineup ?? null;
 
 /**
@@ -1389,7 +1415,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         const repointReason = carried != null ? 'user_switch' : 'lineup_changed';
         // A catalog is authoritative only for the node that served it.
         if (pinned) {
-          setRoutstrNodeBaseUrl(pinned);
           set({
             lineup,
             serverLineupAt: now,
@@ -1490,7 +1515,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
 
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl ? normalizeNodeUrl(nodeBaseUrl) || null : null;
-        setRoutstrNodeBaseUrl(next);
         const previous = get();
         const moving = next !== null && next !== previous.nodeBaseUrl;
         // The selection that is about to be carried, said here so the
@@ -1720,7 +1744,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         // A pinned provider wins over whatever the last lineup left behind —
         // the point of pinning is that a background refresh cannot move the
         // user off it, and a relaunch is not an exception.
-        setRoutstrNodeBaseUrl(state.userNodeBaseUrl);
         if (
           state.userNodeBaseUrl &&
           state.lastKnownLineup &&

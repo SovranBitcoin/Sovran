@@ -20,11 +20,13 @@ export interface SearchResultData {
 }
 
 /**
- * Pause between keystrokes before a query is sent. Short enough that a
- * deliberate pause feels responsive, long enough to coalesce a burst; the
- * in-flight request is NOT cancelled by a keystroke inside this window.
+ * Pause between keystrokes before a query is sent: the only one between a
+ * keystroke and the remote people search (the search fields emit every
+ * keystroke). Short enough that a deliberate pause feels responsive, long
+ * enough to coalesce a burst; the in-flight request is NOT cancelled by a
+ * keystroke inside this window.
  */
-export const SEARCH_DEBOUNCE_MS = 350;
+export const SEARCH_DEBOUNCE_MS = 250;
 
 /** Seed the entity cache with the hit's name/picture so rows paint before kind-0 resolves. */
 function seedProfiles(data: SearchUsersResponse): void {

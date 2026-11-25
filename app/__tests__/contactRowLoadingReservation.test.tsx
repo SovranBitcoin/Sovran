@@ -209,7 +209,6 @@ describe('ContactRow loading reservation', () => {
         })}
         subtitle="mint.example.com"
         selectable
-        selectionVariant="checkbox"
         disabled
       />
     );
@@ -247,12 +246,22 @@ describe('ContactRow loading reservation', () => {
         })}
         subtitle="mint.example.com"
         selectable
-        selectionVariant="checkbox"
       />
     );
 
     expect((listRowProps?.accent as React.ReactElement).type).toBe(RowStatsAccent);
     expect((listRowProps?.trailing as React.ReactElement).type).toBe(SelectableCheck);
     expect(listRowProps?.loading).toBeFalsy();
+  });
+
+  it('tells assistive tech whether a selectable row is selected, and nothing for a plain row', () => {
+    const mint = mintIdentity({ mintUrl: 'https://mint.example.com', displayName: 'Example Mint' });
+    const selectedOf = (element: React.ReactElement) => {
+      jest.mocked(ListRow).mockClear();
+      return renderRow(element)?.selected;
+    };
+    expect(selectedOf(<ContactRow identity={mint} selectable selected />)).toBe(true);
+    expect(selectedOf(<ContactRow identity={mint} selectable />)).toBe(false);
+    expect(selectedOf(<ContactRow identity={mint} />)).toBeUndefined();
   });
 });

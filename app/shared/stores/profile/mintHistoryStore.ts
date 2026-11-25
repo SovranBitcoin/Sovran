@@ -1,0 +1,400 @@
+/**
+ * What each mint has published about itself (NUT-06 `/v1/info`), as this
+ * phone saw it change. Replaces nagg's changelog, which no longer exists
+ * (ADR 0036).
+ *
+ * Per mint, by normalized URL: ONE canonical snapshot (the latest, the
+ * `baseline`), when it was first and last seen, the check bookkeeping the
+ * background sweep runs on, and at most `MAX_REVISIONS` revisions, newest
+ * first. A revision holds the invertible RFC 6902 patch from the document
+ * before it, so walking `invertPatch` back from the baseline rebuilds any
+ * earlier version.
+ *
+ * Bounds (all held by the writer; the reader takes what an older build
+ * wrote): `MAX_MINTS` mints, least recently viewed dropped first but the
+ * wallet's own mints only after every other one; `MAX_REVISIONS` revisions; a
+ * snapshot over `MAX_SNAPSHOT_BYTES` is not kept; a patch over
+ * `MAX_PATCH_BYTES`, or with a pointer the reader would refuse, is kept as an
+ * empty patch marked `oversized`; and the whole saved row is held under
+ * `MAX_ROW_BYTES`, well inside Android's 2 MB cursor window. Sizes are UTF-8
+ * bytes of the JSON text, which is what SQLite stores: a string's `.length`
+ * counts UTF-16 units and undercounts CJK and emoji up to threefold.
+ *
+ * Per profile: which mints a person looks at is theirs. Writers that run in
+ * the background go through `mintHistorySync`, which waits for this store's
+ * load and checks the profile has not changed after every `await`.
+ */
+import { ownEntry, setOwnEntry, withOwnEntry } from '@/shared/lib/ownEntry';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
+
+import {
+  diffMintInfo,
+  hashMintInfo,
+  type CanonicalMintInfo,
+} from '@/features/mint/lib/mintChanges/localDiff';
+import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray, tolerantRecord } from '@/shared/lib/persist/tolerant';
+import { normalizeMintUrlKey } from '@/shared/lib/url';
+
+export const MAX_MINTS = 64;
+export const MAX_REVISIONS = 20;
+const MAX_SNAPSHOT_BYTES = 32_000;
+const MAX_PATCH_BYTES = 8_000;
+/** The whole saved row, envelope included, in UTF-8 bytes. */
+const MAX_ROW_BYTES = 512 * 1024;
+/** The longest JSON pointer a saved patch op may carry; the reader holds the same bound. */
+const MAX_POINTER_LENGTH = 1024;
+/** The longest mint URL saved; the reader holds the same bound on the URL and its key. */
+const MAX_MINT_URL_LENGTH = 2048;
+/** The persist version this store writes (persistConfig's default). */
+const STORE_VERSION = 1;
+/** A check that finds the same document is saved at most this often. */
+export const SEEN_WRITE_THROTTLE_MS = 60 * 60 * 1000;
+/** A mint is checked again this long after a successful check. */
+export const RECHECK_AFTER_SUCCESS_MS = 24 * 60 * 60 * 1000;
+const BACKOFF_MIN_MS = 5 * 60 * 1000;
+const BACKOFF_MAX_MS = 24 * 60 * 60 * 1000;
+/** Opening a mint's history moves it up the eviction order at most this often. */
+const VIEW_WRITE_THROTTLE_MS = 60 * 1000;
+
+interface MintHistoryPatchOp {
+  op: string;
+  path: string;
+  value?: unknown;
+}
+
+export interface MintHistoryRevision {
+  /** Unique per revision, so A → B → A is two revisions with two ids. */
+  id: string;
+  /** Epoch ms of the check that saw the new document. */
+  at: number;
+  /** Epoch ms the old document was last seen: the change happened in between. */
+  previousLastSeenAt?: number;
+  /** Hash of the document this revision produced. */
+  hash: string;
+  patch: MintHistoryPatchOp[];
+  /** The patch was too large to keep; the revision is known, not its detail. */
+  oversized?: boolean;
+}
+
+export interface MintHistoryEntry {
+  /** The URL as first seen, for display. */
+  mintUrl: string;
+  baseline?: CanonicalMintInfo;
+  hash?: string;
+  firstSeenAt?: number;
+  lastSeenAt?: number;
+  lastCheckedAt?: number;
+  consecutiveFailures: number;
+  nextRetryAt?: number;
+  lastViewedAt?: number;
+  /** A mint in the wallet: evicted only after every other mint. */
+  trusted?: boolean;
+  /** Newest first. */
+  revisions: MintHistoryRevision[];
+}
+
+export type MintObservationOutcome = 'baseline' | 'changed' | 'unchanged' | 'rejected';
+
+interface MintHistoryState {
+  byMintUrl: Record<string, MintHistoryEntry>;
+  recordObservation: (
+    mintUrl: string,
+    info: CanonicalMintInfo,
+    nowMs?: number
+  ) => MintObservationOutcome;
+  recordFailure: (mintUrl: string, nowMs?: number, random?: () => number) => void;
+  markViewed: (mintUrl: string, nowMs?: number) => void;
+  /** Which mints are in the wallet; the only ones the sweep checks and eviction spares. */
+  setTrustedMints: (mintUrls: readonly string[]) => void;
+  clear: () => void;
+}
+
+const Timestamp = z.number().int().nonnegative();
+
+const PersistedPatchOp = z.looseObject({
+  op: z.string().max(16),
+  path: z.string().max(MAX_POINTER_LENGTH),
+  value: z.unknown().optional(),
+});
+
+const PersistedRevision = z.object({
+  id: z.string().max(128),
+  at: Timestamp,
+  previousLastSeenAt: Timestamp.optional().catch(undefined),
+  hash: z.string().max(128),
+  patch: z.array(PersistedPatchOp).max(2000).catch([]),
+  oversized: z.boolean().optional().catch(undefined),
+});
+
+const PersistedEntry = z.object({
+  mintUrl: z.string().max(MAX_MINT_URL_LENGTH),
+  baseline: z.record(z.string(), z.unknown()).optional().catch(undefined),
+  hash: z.string().max(128).optional().catch(undefined),
+  firstSeenAt: Timestamp.optional().catch(undefined),
+  lastSeenAt: Timestamp.optional().catch(undefined),
+  lastCheckedAt: Timestamp.optional().catch(undefined),
+  consecutiveFailures: z.number().int().nonnegative().default(0).catch(0),
+  nextRetryAt: Timestamp.optional().catch(undefined),
+  lastViewedAt: Timestamp.optional().catch(undefined),
+  trusted: z.boolean().optional().catch(undefined),
+  revisions: tolerantArray(PersistedRevision, 200).default([]).catch([]),
+});
+
+const PersistedMintHistoryStore = z.object({
+  byMintUrl: tolerantRecord(z.string().max(MAX_MINT_URL_LENGTH), PersistedEntry),
+});
+
+/** UTF-8 bytes of `text`, without encoding it. A lone surrogate counts 3. */
+function utf8Bytes(text: string): number {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x80) bytes += 1;
+    else if (unit < 0x800) bytes += 2;
+    else if (
+      unit >= 0xd800 &&
+      unit <= 0xdbff &&
+      i + 1 < text.length &&
+      (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00
+    ) {
+      bytes += 4;
+      i += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/** UTF-8 bytes of `value` as JSON text; unserializable counts as too large. */
+const byteLength = (value: unknown): number => {
+  try {
+    return utf8Bytes(JSON.stringify(value) ?? '');
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+};
+
+/** The saved row's size: what persist writes is `{ state, version }`. */
+const rowBytes = (byMintUrl: Record<string, MintHistoryEntry>) =>
+  byteLength({ state: { byMintUrl }, version: STORE_VERSION });
+
+/** A patch the reader would load as written: every op within its bounds. */
+const readable = (patch: readonly MintHistoryPatchOp[]) =>
+  patch.every((op) => op.op.length <= 16 && op.path.length <= MAX_POINTER_LENGTH);
+
+let revisionSequence = 0;
+
+/**
+ * A revision id: short, and different for every revision this process
+ * records, even two of the same (from, to) in one millisecond.
+ */
+function revisionId(fromHash: string | undefined, toHash: string, at: number): string {
+  revisionSequence = (revisionSequence + 1) % 36 ** 4;
+  return `${at.toString(36)}-${revisionSequence.toString(36)}-${(fromHash ?? 'none').slice(0, 8)}-${toHash.slice(0, 12)}`;
+}
+
+/** 5 minutes doubling to 24 hours, ±20%, so a fleet of phones does not retry in step. */
+export function failureBackoffMs(consecutiveFailures: number, random: () => number): number {
+  const base = Math.min(
+    BACKOFF_MAX_MS,
+    BACKOFF_MIN_MS * 2 ** Math.max(0, Math.min(consecutiveFailures - 1, 20))
+  );
+  const jitter = 0.8 + random() * 0.4;
+  return Math.round(Math.min(BACKOFF_MAX_MS, base * jitter));
+}
+
+const recency = (entry: MintHistoryEntry) =>
+  Math.max(entry.lastViewedAt ?? 0, entry.lastSeenAt ?? 0, entry.lastCheckedAt ?? 0);
+
+/**
+ * Drop untrusted mints, least recent first, then trusted ones, then the kept
+ * mint's oldest revisions, until within bounds.
+ */
+function evict(byMintUrl: Record<string, MintHistoryEntry>, keep: string): void {
+  // Each entry's share of the row is `"key":{…}` plus a comma the last one
+  // does not have. Counted without the comma, the running size never falls
+  // below the row's real size, so it is measured once and then subtracted.
+  const share = (key: string) => byteLength(key) + byteLength(byMintUrl[key]) + 1;
+  let bytes = rowBytes(byMintUrl);
+  const over = () => Object.keys(byMintUrl).length > MAX_MINTS || bytes > MAX_ROW_BYTES;
+  if (!over()) return;
+  const order = Object.entries(byMintUrl)
+    .filter(([key]) => key !== keep)
+    .sort(([, a], [, b]) => Number(!!a.trusted) - Number(!!b.trusted) || recency(a) - recency(b))
+    .map(([key]) => key);
+  let dropped = 0;
+  for (const key of order) {
+    if (!over()) break;
+    bytes -= share(key);
+    delete byMintUrl[key];
+    dropped += 1;
+  }
+  const kept = ownEntry(byMintUrl, keep);
+  let trimmed = 0;
+  if (kept && bytes > MAX_ROW_BYTES) {
+    const revisions = [...kept.revisions];
+    while (revisions.length > 0 && bytes > MAX_ROW_BYTES) {
+      revisions.pop();
+      trimmed += 1;
+      setOwnEntry(byMintUrl, keep, { ...kept, revisions: [...revisions] });
+      bytes = rowBytes(byMintUrl);
+    }
+  }
+  if (dropped > 0 || trimmed > 0) {
+    storeLog.debug('store.mint_history.evicted', { dropped, trimmed });
+  }
+}
+
+function blank(mintUrl: string): MintHistoryEntry {
+  return { mintUrl, consecutiveFailures: 0, revisions: [] };
+}
+
+export const useMintHistoryStore = create<MintHistoryState>({
+  name: 'mint-history-store',
+  scope: 'profile',
+})(
+  persist(
+    (set, get) => ({
+      byMintUrl: {},
+
+      recordObservation: (mintUrl, info, nowMs = Date.now()) => {
+        const key = normalizeMintUrlKey(mintUrl);
+        if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return 'rejected';
+        if (byteLength(info) > MAX_SNAPSHOT_BYTES) {
+          storeLog.warn('store.mint_history.snapshot_too_large', { bytes: byteLength(info) });
+          // Counted as a failed check, so the sweep backs off instead of
+          // fetching the same oversized answer every minute.
+          get().recordFailure(mintUrl, nowMs);
+          return 'rejected';
+        }
+        const hash = hashMintInfo(info);
+        const held = ownEntry(get().byMintUrl, key);
+
+        if (held?.baseline && held.hash === hash) {
+          const due =
+            held.consecutiveFailures > 0 ||
+            held.lastSeenAt === undefined ||
+            nowMs - held.lastSeenAt >= SEEN_WRITE_THROTTLE_MS;
+          if (!due) return 'unchanged';
+          set((state) => {
+            const current = ownEntry(state.byMintUrl, key);
+            if (!current) return state;
+            return {
+              byMintUrl: withOwnEntry(state.byMintUrl, key, {
+                ...current,
+                lastSeenAt: nowMs,
+                lastCheckedAt: nowMs,
+                consecutiveFailures: 0,
+                nextRetryAt: nowMs + RECHECK_AFTER_SUCCESS_MS,
+              }),
+            };
+          });
+          return 'unchanged';
+        }
+
+        let outcome: MintObservationOutcome = 'baseline';
+        set((state) => {
+          const current = ownEntry(state.byMintUrl, key) ?? blank(mintUrl);
+          const next: MintHistoryEntry = {
+            ...current,
+            baseline: info,
+            hash,
+            firstSeenAt: current.firstSeenAt ?? nowMs,
+            lastSeenAt: nowMs,
+            lastCheckedAt: nowMs,
+            consecutiveFailures: 0,
+            nextRetryAt: nowMs + RECHECK_AFTER_SUCCESS_MS,
+          };
+          // The first sighting is a baseline, never a diff against nothing.
+          if (current.baseline && current.hash !== hash) {
+            outcome = 'changed';
+            const patch = diffMintInfo(current.baseline, info);
+            const oversized = byteLength(patch) > MAX_PATCH_BYTES || !readable(patch);
+            const revision: MintHistoryRevision = {
+              id: revisionId(current.hash, hash, nowMs),
+              at: nowMs,
+              ...(current.lastSeenAt !== undefined
+                ? { previousLastSeenAt: current.lastSeenAt }
+                : {}),
+              hash,
+              patch: oversized ? [] : patch,
+              ...(oversized ? { oversized: true } : {}),
+            };
+            next.revisions = [revision, ...current.revisions].slice(0, MAX_REVISIONS);
+          }
+          const byMintUrl = withOwnEntry(state.byMintUrl, key, next);
+          evict(byMintUrl, key);
+          return { byMintUrl };
+        });
+        storeLog.info('store.mint_history.observed', { outcome });
+        return outcome;
+      },
+
+      recordFailure: (mintUrl, nowMs = Date.now(), random = Math.random) => {
+        const key = normalizeMintUrlKey(mintUrl);
+        if (!key || mintUrl.length > MAX_MINT_URL_LENGTH) return;
+        set((state) => {
+          const current = ownEntry(state.byMintUrl, key) ?? blank(mintUrl);
+          const failures = current.consecutiveFailures + 1;
+          // The baseline and its revisions stand: a mint that did not
+          // answer has not changed what it last said.
+          const byMintUrl = withOwnEntry(state.byMintUrl, key, {
+            ...current,
+            lastCheckedAt: nowMs,
+            consecutiveFailures: failures,
+            nextRetryAt: nowMs + failureBackoffMs(failures, random),
+          });
+          evict(byMintUrl, key);
+          return { byMintUrl };
+        });
+      },
+
+      markViewed: (mintUrl, nowMs = Date.now()) => {
+        const key = normalizeMintUrlKey(mintUrl);
+        const current = ownEntry(get().byMintUrl, key);
+        if (!current) return;
+        if (
+          current.lastViewedAt !== undefined &&
+          nowMs - current.lastViewedAt < VIEW_WRITE_THROTTLE_MS
+        ) {
+          return;
+        }
+        set((state) => ({
+          byMintUrl: withOwnEntry(state.byMintUrl, key, { ...current, lastViewedAt: nowMs }),
+        }));
+      },
+
+      setTrustedMints: (mintUrls) => {
+        const trusted = new Set(mintUrls.map((url) => normalizeMintUrlKey(url)));
+        const held = get().byMintUrl;
+        const changed = Object.entries(held).some(
+          ([key, entry]) => !!entry.trusted !== trusted.has(key)
+        );
+        if (!changed) return;
+        set((state) => ({
+          byMintUrl: Object.fromEntries(
+            Object.entries(state.byMintUrl).map(([key, entry]) => {
+              const isTrusted = trusted.has(key);
+              if (isTrusted) return [key, { ...entry, trusted: true }];
+              const { trusted: _dropped, ...rest } = entry;
+              return [key, rest];
+            })
+          ),
+        }));
+      },
+
+      clear: () => set({ byMintUrl: {} }),
+    }),
+    persistConfig({
+      name: 'mint-history-store',
+      storage: createProfileScopedStorage(),
+      schema: PersistedMintHistoryStore,
+      logKey: 'mint_history',
+      partialize: (state) => ({ byMintUrl: state.byMintUrl }),
+    })
+  )
+);

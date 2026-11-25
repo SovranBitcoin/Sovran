@@ -150,6 +150,7 @@ export type {
 // re-preparation, reconciliation, error classification)
 export {
   createChainSteps,
+  createEngineSingleLegTransferPort,
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
@@ -164,6 +165,7 @@ export type {
   RebalanceRoutingInfo,
   RebalanceTransferOutcome,
   RebalanceWalletPort,
+  SingleLegTransferPort,
 } from "./rebalance";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
@@ -194,9 +196,11 @@ export {
 export { describeDestination } from "./destination-descriptor";
 export {
   decodeEcashTokenMetadata,
+  encodeTokenChecked,
   isValidEcashToken,
   isWellFormedEcashToken,
 } from "./ecash";
+export { isEvenHex, isFixedHex } from "./hex";
 export {
   decodePaymentRequestInfo,
   lockableMintsFromRequest,
@@ -273,8 +277,6 @@ export {
 
 // LNURL resolution (lightning address & lnurlp → bolt11)
 export {
-  requestInvoiceFromLnurl,
-  parseLightningAddress,
   decodeUrlOrAddress,
   isLightningInvoiceBolt11,
 } from "./lnurl";
@@ -300,7 +302,6 @@ export {
   type RequestControls,
 } from "./safeFetch";
 
-export { createNostrMintEnrichment } from "./nostr-mint-enrichment";
 
 // Domain types
 export type {

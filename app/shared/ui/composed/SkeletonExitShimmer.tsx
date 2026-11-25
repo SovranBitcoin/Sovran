@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type PropsWithChildren } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -46,17 +46,14 @@ function useShimmerSweep(visualLayout: { onLayout?: (event: LayoutChangeEvent) =
   return { sweepWidth: containerWidth > 0 ? containerWidth : screenWidth, handleLayout };
 }
 
-const SKELETON_EXIT_DURATION_MS = 620;
 // Internal timing — not exported (only this module reads them).
 const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
 const SKELETON_LOADING_SHIMMER_GAP_MS = 350;
 
-const HIGHLIGHT_WIDTH = 90;
 const LOADING_HIGHLIGHT_WIDTH_RATIO = 1.1;
 const GRADIENT_LOCATIONS = [0, 0.5, 1] as const;
 const GRADIENT_START = { x: 0, y: 0.5 } as const;
 const GRADIENT_END = { x: 1, y: 0.5 } as const;
-const EXIT_SHIMMER_BAR_BASE = { width: HIGHLIGHT_WIDTH } as const;
 
 type SkeletonShimmerVisualProps = {
   visualScope?: string;
@@ -129,71 +126,6 @@ function ShimmerGradient({ colors }: { colors: readonly [string, string, string]
       end={GRADIENT_END}
       style={StyleSheet.absoluteFill}
     />
-  );
-}
-
-/**
- * Fades the wrapped skeleton out while a single bright shimmer line sweeps
- * across. The children stay mounted; only opacity changes. The shimmer line
- * is a separate absolute overlay.
- */
-export function SkeletonExitReveal({
-  active,
-  children,
-  highlightColor,
-  ...visualProps
-}: PropsWithChildren<{ active: boolean; highlightColor?: string } & SkeletonShimmerVisualProps>) {
-  const foreground = useThemeColor('foreground');
-  const progress = useSharedValue(0);
-  const { hostRef, onLayout } = useSkeletonShimmerVisualLayout({
-    active,
-    defaultComponent: 'SkeletonExitReveal',
-    defaultItemType: 'skeleton-exit-shimmer',
-    defaultPhase: 'exiting',
-    ...visualProps,
-  });
-
-  useEffect(() => {
-    if (!active) {
-      cancelAnimation(progress);
-      progress.set(0);
-      return;
-    }
-    progress.set(0);
-    progress.set(
-      withTiming(1, { duration: SKELETON_EXIT_DURATION_MS, easing: Easing.out(Easing.cubic) })
-    );
-    return () => cancelAnimation(progress);
-  }, [active, progress]);
-
-  const { sweepWidth, handleLayout } = useShimmerSweep({ onLayout });
-
-  const fadeStyle = useAnimatedStyle(() => ({
-    opacity: 1 - progress.get(),
-  }));
-
-  const shimmerStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(
-      progress.get(),
-      [0, 1],
-      [-HIGHLIGHT_WIDTH, sweepWidth + HIGHLIGHT_WIDTH]
-    );
-    return { transform: [{ translateX }] };
-  });
-
-  const gradientColors = shimmerColors(highlightColor, withAlpha(foreground, 0.55));
-
-  const shimmerBarStyle = [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle];
-
-  return (
-    <View ref={hostRef} collapsable={false} onLayout={handleLayout}>
-      <Animated.View style={active ? fadeStyle : undefined}>{children}</Animated.View>
-      {active && (
-        <Animated.View pointerEvents="none" style={shimmerBarStyle}>
-          <ShimmerGradient colors={gradientColors} />
-        </Animated.View>
-      )}
-    </View>
   );
 }
 

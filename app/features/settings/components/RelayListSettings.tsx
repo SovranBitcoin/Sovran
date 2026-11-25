@@ -1,15 +1,18 @@
-import { useCallback, useRef, useState } from 'react';
+import { Children, useCallback, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { Input, ListGroup, Separator, TextField } from 'heroui-native';
+import { Input, ListGroup, PressableFeedback, Separator, TextField } from 'heroui-native';
 import { relayEditCopy as copy } from 'copy/prompts';
+import Icon from '@/assets/icons';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { actionMenuPopup } from '@/shared/lib/popup';
+import { urlHostLabel } from '@/shared/lib/url';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
-import { Switch } from '@/shared/ui/primitives/Switch';
 import {
   defaultEntries,
   MAX_RELAYS,
@@ -153,85 +156,79 @@ export function RelayListSettings({
   const reviewing = state.kind === 'reviewing' || state.kind === 'publishing';
   const entries =
     editing || state.kind === 'waiting' ? state.entries : reviewing ? state.review.entries : saved;
+  const setPermissions = (url: string, read: boolean, write: boolean) =>
+    change(entries.map((e) => (e.url === url ? { ...e, read, write } : e)));
+  // One menu per relay while editing, in place of two switches and a Remove link.
+  const openRelayMenu = (entry: RelayListEntry) =>
+    actionMenuPopup({
+      title: urlHostLabel(entry.url),
+      buttons: [
+        {
+          text: copy.readWrite,
+          testID: `settings-network-relay-read-write-${entry.url}`,
+          selected: entry.read && entry.write,
+          onPress: () => setPermissions(entry.url, true, true),
+        },
+        {
+          text: copy.readOnly,
+          testID: `settings-network-relay-read-${entry.url}`,
+          selected: entry.read && !entry.write,
+          onPress: () => setPermissions(entry.url, true, false),
+        },
+        {
+          text: copy.writeOnly,
+          testID: `settings-network-relay-write-${entry.url}`,
+          selected: !entry.read && entry.write,
+          onPress: () => setPermissions(entry.url, false, true),
+        },
+        {
+          text: copy.removed,
+          testID: `settings-network-relay-remove-${entry.url}`,
+          accessibilityLabel: copy.remove(entry.url),
+          variant: 'dangerous',
+          separator: true,
+          onPress: () => change(entries.filter((e) => e.url !== entry.url)),
+        },
+      ],
+    });
+  const notice =
+    state.kind === 'loading'
+      ? { text: copy.loading, testID: 'settings-network-relay-loading' }
+      : 'message' in state && state.message
+        ? { text: state.message, testID: 'settings-network-relay-message' }
+        : null;
   return (
     <Section title={reviewing ? copy.reviewTitle : copy.title}>
       <View className="gap-3">
-        {state.kind === 'idle' && source === 'local' ? <Text>{copy.pending}</Text> : null}
-        {state.kind === 'loading' ? (
-          <Text testID="settings-network-relay-loading">{copy.loading}</Text>
+        {state.kind === 'idle' && source === 'local' ? (
+          <Notice status="info" description={copy.pending} />
         ) : null}
-        {'message' in state && state.message ? (
-          <Text testID="settings-network-relay-message">{state.message}</Text>
-        ) : null}
-        {editing ? <Text>{copy.draft}</Text> : null}
+        {notice ? <Notice status="info" description={notice.text} testID={notice.testID} /> : null}
+        {editing ? <Notice status="info" description={copy.draft} /> : null}
         {reviewing ? (
           <RelayChanges review={state.review} />
-        ) : (
+        ) : entries.length > 0 ? (
+          // No empty card while the list is loading or has nothing in it.
           <ListGroup variant="secondary">
             {[...entries]
               .sort((a, b) => a.url.localeCompare(b.url))
               .map((entry, index) => (
                 <View key={entry.url}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
-                  <ListGroup.Item>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>{entry.url}</ListGroup.ItemTitle>
-                      {health?.[entry.url] && health[entry.url] !== 'connecting' ? (
-                        <Badge
-                          variant={health[entry.url] === 'connected' ? 'success' : 'error'}
-                          size={11}>
-                          {health[entry.url] === 'connected' ? copy.online : copy.offline}
-                        </Badge>
-                      ) : null}
-                      {editing ? (
-                        <View className="flex-row items-center gap-3">
-                          <Text>{copy.read}</Text>
-                          <Switch
-                            testID={`settings-network-relay-read-${entry.url}`}
-                            accessibilityLabel={copy.readFrom(entry.url)}
-                            isSelected={entry.read}
-                            onSelectedChange={(read) =>
-                              change(entries.map((e) => (e.url === entry.url ? { ...e, read } : e)))
-                            }
-                          />
-                          <Text>{copy.write}</Text>
-                          <Switch
-                            testID={`settings-network-relay-write-${entry.url}`}
-                            accessibilityLabel={copy.writeTo(entry.url)}
-                            isSelected={entry.write}
-                            onSelectedChange={(write) =>
-                              change(
-                                entries.map((e) => (e.url === entry.url ? { ...e, write } : e))
-                              )
-                            }
-                          />
-                        </View>
-                      ) : (
-                        <ListGroup.ItemDescription>{permissions(entry)}</ListGroup.ItemDescription>
-                      )}
-                    </ListGroup.ItemContent>
-                    {editing ? (
-                      <ListGroup.ItemSuffix>
-                        <Button
-                          variant="underline"
-                          size="compact"
-                          text={copy.removed}
-                          testID={`settings-network-relay-remove-${entry.url}`}
-                          accessibilityLabel={copy.remove(entry.url)}
-                          onPress={() => change(entries.filter((e) => e.url !== entry.url))}
-                        />
-                      </ListGroup.ItemSuffix>
-                    ) : null}
-                  </ListGroup.Item>
+                  <RelayRow
+                    entry={entry}
+                    health={health?.[entry.url]}
+                    onOpenMenu={editing ? () => openRelayMenu(entry) : undefined}
+                  />
                 </View>
               ))}
           </ListGroup>
-        )}
+        ) : null}
         {editing ? (
           <>
             {state.editor.savedProposal ? (
               <>
-                <Text>{copy.pending}</Text>
+                <Notice status="info" description={copy.pending} />
                 <RelayButton
                   id="relay-use-saved"
                   label={copy.applySaved}
@@ -239,28 +236,31 @@ export function RelayListSettings({
                 />
               </>
             ) : null}
-            <TextField>
-              <Input
-                testID="settings-network-relay-input"
-                accessibilityLabel={copy.url}
-                value={url}
-                onChangeText={setUrl}
-                placeholder="wss://relay.example.com"
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                onSubmitEditing={add}
-              />
-            </TextField>
-            <RelayButton id="relay-add" label={copy.add} onPress={add} />
-            <RelayButton
-              id="restore-defaults"
-              label={copy.defaults}
-              onPress={() => change(defaultEntries())}
-            />
+            <View className="flex-row items-center gap-2">
+              <View className="flex-1">
+                <TextField>
+                  <Input
+                    testID="settings-network-relay-input"
+                    accessibilityLabel={copy.url}
+                    value={url}
+                    onChangeText={setUrl}
+                    placeholder="wss://relay.example.com"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    onSubmitEditing={add}
+                  />
+                </TextField>
+              </View>
+              <RelayButton id="relay-add" label={copy.add} onPress={add} size="compact" />
+            </View>
+            {error ? (
+              <Notice status="warning" description={error} testID="settings-network-relay-error" />
+            ) : null}
             <RelayButton
               id="relay-review"
               label={copy.review}
+              variant="primary"
               onPress={() => {
                 if (!state.entries.some((entry) => entry.write)) {
                   setError(copy.noWrite);
@@ -273,25 +273,42 @@ export function RelayListSettings({
                 });
               }}
             />
+            <ButtonPair>
+              <RelayButton
+                id="restore-defaults"
+                label={copy.defaults}
+                onPress={() => change(defaultEntries())}
+              />
+              <RelayButton id="relay-cancel" label={copy.cancel} onPress={reset} />
+            </ButtonPair>
           </>
         ) : null}
         {reviewing ? (
           <>
             <RelayButton
               id="publish"
+              variant="primary"
               busy={state.kind === 'publishing'}
               label={state.kind === 'publishing' ? copy.publishing : copy.publish}
               onPress={publish}
               disabled={state.kind === 'publishing'}
             />
-            <RelayButton
-              id="relay-back"
-              label={copy.back}
-              onPress={() =>
-                setState({ kind: 'editing', editor: state.editor, entries: state.review.entries })
-              }
-              disabled={state.kind === 'publishing'}
-            />
+            <ButtonPair>
+              <RelayButton
+                id="relay-back"
+                label={copy.back}
+                onPress={() =>
+                  setState({ kind: 'editing', editor: state.editor, entries: state.review.entries })
+                }
+                disabled={state.kind === 'publishing'}
+              />
+              <RelayButton
+                id="relay-cancel"
+                label={copy.cancel}
+                onPress={reset}
+                disabled={state.kind === 'publishing'}
+              />
+            </ButtonPair>
           </>
         ) : null}
         {state.kind === 'idle' ? (
@@ -301,28 +318,105 @@ export function RelayListSettings({
             onPress={() => start()}
             disabled={!ndk || !pubkey}
           />
-        ) : (
-          <RelayButton
-            id="relay-cancel"
-            label={copy.cancel}
-            onPress={reset}
-            disabled={state.kind === 'publishing'}
-          />
-        )}
-        {state.kind === 'waiting' ? (
-          <RelayButton id="relay-reload" label={copy.reload} onPress={() => start(state.entries)} />
         ) : null}
-        {error ? <Text testID="settings-network-relay-error">{error}</Text> : null}
+        {state.kind === 'waiting' || state.kind === 'loading' ? (
+          <ButtonPair>
+            {state.kind === 'waiting' ? (
+              <RelayButton
+                id="relay-reload"
+                label={copy.reload}
+                onPress={() => start(state.entries)}
+              />
+            ) : null}
+            <RelayButton id="relay-cancel" label={copy.cancel} onPress={reset} />
+          </ButtonPair>
+        ) : null}
+        {!editing && error ? (
+          <Notice status="warning" description={error} testID="settings-network-relay-error" />
+        ) : null}
       </View>
     </Section>
   );
 }
 
-function permissions(entry: RelayListEntry) {
-  return (
-    [entry.read ? copy.read : '', entry.write ? copy.write : ''].filter(Boolean).join(', ') ||
-    copy.neither
+/**
+ * One relay: a health dot, the host, and what the wallet uses it for. While
+ * editing the row opens that relay's menu; otherwise it only reads.
+ */
+function RelayRow({
+  entry,
+  health,
+  onOpenMenu,
+}: {
+  entry: RelayListEntry;
+  health: RelayHealth | undefined;
+  onOpenMenu?: () => void;
+}) {
+  const muted = useThemeColor('muted');
+  // Unchecked and still-connecting relays are not called offline.
+  const known = health && health !== 'connecting' ? health : undefined;
+  const dot = known === 'connected' ? 'bg-success' : known ? 'bg-danger' : 'bg-muted';
+  const word = known === 'connected' ? copy.online : known ? copy.offline : undefined;
+  const label = [entry.url, permissions(entry), word].filter(Boolean).join(', ');
+  const item = (
+    <ListGroup.Item disabled={onOpenMenu !== undefined}>
+      <ListGroup.ItemPrefix>
+        <View
+          className={`h-2 w-2 rounded-full ${dot}`}
+          testID={`settings-network-relay-dot-${entry.url}`}
+        />
+      </ListGroup.ItemPrefix>
+      <ListGroup.ItemContent>
+        <ListGroup.ItemTitle numberOfLines={1}>{urlHostLabel(entry.url)}</ListGroup.ItemTitle>
+        <ListGroup.ItemDescription>{permissions(entry)}</ListGroup.ItemDescription>
+      </ListGroup.ItemContent>
+      {onOpenMenu ? (
+        <ListGroup.ItemSuffix>
+          <Icon name="tabler:dots" size={20} color={muted} />
+        </ListGroup.ItemSuffix>
+      ) : null}
+    </ListGroup.Item>
   );
+  if (!onOpenMenu) {
+    return (
+      <View accessible accessibilityLabel={label}>
+        {item}
+      </View>
+    );
+  }
+  return (
+    <PressableFeedback
+      animation={false}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={copy.options(entry.url)}
+      testID={`settings-network-relay-row-${entry.url}`}
+      onPress={onOpenMenu}>
+      <PressableFeedback.Scale>{item}</PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
+  );
+}
+
+/** Secondary actions side by side, sharing the line evenly. */
+function ButtonPair({ children }: { children: ReactNode }) {
+  return (
+    <View className="flex-row gap-2">
+      {Children.toArray(children).map((child, index) => (
+        <View key={index} className="flex-1">
+          {child}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function permissions(entry: RelayListEntry) {
+  if (entry.read && entry.write) return copy.readWrite;
+  if (entry.read) return copy.readOnly;
+  if (entry.write) return copy.writeOnly;
+  return copy.neither;
 }
 function RelayChanges({ review }: { review: RelayListReview }) {
   const urls = [...new Set([...review.base, ...review.entries].map((entry) => entry.url))].sort();
@@ -364,19 +458,24 @@ function RelayButton({
   onPress,
   disabled = false,
   busy = false,
+  variant = 'secondary',
+  size,
 }: {
   id: string;
   label: string;
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  variant?: 'primary' | 'secondary';
+  size?: 'compact';
 }) {
   return (
     <Button
       testID={`settings-network-${id}`}
       accessibilityLabel={label}
       text={label}
-      variant="secondary"
+      variant={variant}
+      size={size}
       disabled={disabled}
       loading={busy}
       onPress={onPress}

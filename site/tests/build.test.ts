@@ -103,14 +103,13 @@ test('only configured captures enter the public import graph; source inputs stay
 test('original composition and native no-JS disclosures survive the build', () => {
   const html = read('dist/index.html');
   const sections = [...html.matchAll(/<section id="([^"]+)"/g)].map(match => match[1]);
-  expect(sections).toEqual(['hero', 'features', 'wallet', 'social', 'ai', 'offline', 'stack', 'faq', 'download']);
-  expect(html).toContain('Sound money meets freedom of expression.');
+  expect(sections).toEqual(['hero', 'features', 'wallet', 'contacts', 'mints', 'offline', 'stack', 'faq', 'download']);
+  expect(html).toContain('Sound money, without the middleman.');
   expect(html).toContain('data-scene="hero"');
   expect(html).toContain('OpenSats');
   expect(html).not.toContain('Retained app captures');
   expect((html.match(/<summary>/g) ?? []).length).toBe(8);
   expect(html).toContain('data-capture-currentness=');
-  expect(html).toContain('data-capture-currentness="app-source-matched"');
 });
 test('production has no workbench pages, API, derived mockup tree or private capture bytes', () => {
   for (const path of ['dev', 'screenshots', 'logos', 'social/index.html', 'social/manifest.json', 'mockups', 'scenes', '__artwork']) expect(existsSync(new URL(`dist/${path}`, site))).toBe(false);

@@ -32,8 +32,6 @@ Start with:
 
 ```bash
 git status --short
-node codereview/analyze-structure/index.mjs --history --reach --leakage --vocab-drift --llm | sed -n '/^Overall:/,/^# Repo/p'
-node codereview/analyze-structure/index.mjs --history --reach --leakage --vocab-drift --llm | head -180
 node codereview/lookalikes/index.mjs --focus <candidate-file>
 bun run knip
 ```
@@ -81,7 +79,7 @@ git diff --check
 bun run type-check
 ```
 
-Add focused lint/tests/knip/analyze-structure/log-doctor checks based on the
+Add focused lint/tests/knip/log-doctor checks based on the
 slice. Before committing, run the full relevant repo gates when practical.
 
 ## Commit

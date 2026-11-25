@@ -188,6 +188,7 @@ function useWhyDidRenderLive(
   // happens here rather than during render so the hook never writes a ref
   // mid-render and every caller stays compilable by the React Compiler.
   useEffect(() => {
+    if (logger.isLevelEnabled?.('debug') === false) return;
     renders.current += 1;
     const inputs = resolveLazy(lazyInputs);
     const before = previous.current;
@@ -245,6 +246,7 @@ function useStateChangeLoggerLive(
   const previous = useRef<Record<string, unknown> | null>(null);
 
   useEffect(() => {
+    if (logger.isLevelEnabled?.('debug') === false) return;
     const states = resolveLazy(lazyStates);
     const before = previous.current;
     previous.current = states;
@@ -299,6 +301,7 @@ function useQueryResultLoggerLive(lazySnapshot: Lazy<QuerySnapshot>, logger: Log
   const emits = useRef(0);
 
   useEffect(() => {
+    if (logger.isLevelEnabled?.('debug') === false) return;
     const snapshot = resolveLazy(lazySnapshot);
     const before = previous.current;
     previous.current = snapshot;
@@ -438,7 +441,9 @@ function countRowRenderLive(
   rowKey: string,
   options?: { logger?: Logger; warnAfter?: number }
 ): void {
-  bumpRow(list, rowKey, options?.logger ?? log, options?.warnAfter ?? 4);
+  const logger = options?.logger ?? log;
+  if (logger.isLevelEnabled?.('debug') === false) return;
+  bumpRow(list, rowKey, logger, options?.warnAfter ?? 4);
 }
 
 /**
@@ -469,6 +474,7 @@ function useRowRenderLoggerLive(
   const warnAfter = options?.warnAfter ?? 4;
   // Every commit, including recycled rows: the aggregate is the point.
   useEffect(() => {
+    if (logger.isLevelEnabled?.('debug') === false) return;
     bumpRow(list, rowKey, logger, warnAfter);
   });
 }

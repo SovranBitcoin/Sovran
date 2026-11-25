@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react-native';
 import { ok } from 'neverthrow';
 import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
-import { useOverlaidContactSearch } from '@/features/contacts/hooks/useOverlaidContactSearch';
+import { useOverlaidContactSearch } from '@/features/search/hooks/useOverlaidContactSearch';
 
 const mockSearch = jest.fn();
 const mockRefresh = jest.fn();

@@ -93,22 +93,22 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('testID={`receive-creq-p2pk-state:${p2pkStateValue.text}`}');
   });
 
-  it('pins the wallet header search toggle and input', () => {
-    const layout = read('shared/ui/composed/SearchLayout.tsx');
-    expect(layout).toContain('`${searchTestIDPrefix}-search-toggle`');
-    expect(layout).toContain('`${searchTestIDPrefix}-search-input`');
-    expect(read('app/(drawer)/(tabs)/index/_layout.tsx')).toContain('searchTestIDPrefix="wallet"');
+  it('pins the tab ids and the Search tab field', () => {
+    const tabs = read('app/(drawer)/(tabs)/_layout.tsx');
+    for (const id of ['tab-wallet', 'tab-settings', 'tab-search']) {
+      expect(tabs).toContain(`testID: '${id}',`);
+    }
+    // iOS 26 draws the Search item as the system search control.
+    expect(tabs).toContain("role: 'search',");
+    expect(read('shared/ui/composed/SearchLayout.tsx')).toContain('testID={searchTestID}');
+    expect(read('app/(drawer)/(tabs)/search/_layout.tsx')).toContain('searchTestID="search-input"');
+    expect(read('features/search/screens/SearchScreen.tsx')).toContain('testID="search-screen"');
     // Liquid-glass header buttons are accessible only WITH a label; the
     // HeaderIconButton must forward both identity props to HeaderGlassCircle.
     const header = read('navigation/nativeTabs.tsx');
     expect(header).toContain(
       '<HeaderGlassCircle onPress={onPress} testID={testID} accessibilityLabel={accessibilityLabel}>'
     );
-  });
-
-  it('pins the DM conversation probe on UserMessagesScreen', () => {
-    const source = read('features/user/screens/UserMessagesScreen.tsx');
-    expect(source).toContain('testID="dm-chat-probe"');
   });
 
   it('pins the inline cashu-token bubble AX identity in chat threads', () => {
@@ -138,9 +138,11 @@ describe('wallet surface e2e selectors', () => {
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
     // Unconditional, not gated on `testID`: a screen reader needs the role and
     // the checked state on EVERY toggle, not only the three the e2e harness
-    // happens to target.
-    expect(settings).toContain('accessibilityRole="switch"');
-    expect(settings).toContain('accessibilityState={{ checked: isSelected }}');
+    // happens to target. The toggle row is the shared Settings row.
+    const rows = read('shared/ui/composed/SettingsRows.tsx');
+    expect(settings).toContain("from '@/shared/ui/composed/SettingsRows'");
+    expect(rows).toContain('accessibilityRole="switch"');
+    expect(rows).toContain('{ checked: isSelected }');
     for (const state of ['mockOffline', 'mockFailSend', 'mockFailMelt']) {
       expect(settings).toContain(`isSelected={${state}}`);
     }
@@ -150,13 +152,6 @@ describe('wallet surface e2e selectors', () => {
     const distribution = read('features/mint/components/distribution/MintDistributionCards.tsx');
     expect(distribution).toContain('isSelected={enabled}');
     expect(distribution).toContain('testID={`mint-distribution-toggle:${mintUrl}`}');
-  });
-
-  it('exposes notification policy selection as semantic radio state', () => {
-    const policy = read('features/settings/screens/SettingsNotificationPolicyScreen.tsx');
-    expect(policy).toContain('accessibilityRole="radio"');
-    expect(policy).toContain('accessibilityState={{ checked: selected }}');
-    expect(policy).toContain('testID={`notification-policy-${option.toLowerCase()}`}');
   });
 
   it.each([
@@ -173,8 +168,6 @@ describe('wallet surface e2e selectors', () => {
   it('drives the Design System through actionable outer-row selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-design-system-row"');
-    // Unconditional, not gated on `testID` — the outer row is one actionable
-    // node with a button role for every caller, not just instrumented ones.
     expect(settings).toContain('accessible');
     expect(settings).toContain('accessibilityRole="button"');
 
@@ -182,27 +175,6 @@ describe('wallet surface e2e selectors', () => {
     expect(catalog).toContain('testID={`design-system-family-${id}`}');
     expect(catalog).toContain('accessibilityLabel={`${title}, ${description}`}');
     expect(catalog).toContain('accessibilityRole="button"');
-
-    const scenario = JSON.parse(read('e2e/scenarios/settings-design-system-showcase.json')) as {
-      steps: unknown[];
-    };
-    expect(scenario.steps).toContainEqual({
-      action: 'tapUntil',
-      sequence: [{ tap: { id: 'settings-design-system-row' } }],
-      until: { id: 'design-system-family-timeline' },
-      attempts: 4,
-      settleMs: 6000,
-    });
-    expect(scenario.steps).not.toContainEqual({
-      action: 'tap',
-      selector: { label: 'Design system, Preview shared UI components' },
-    });
-  });
-
-  it('pins the DM composer testID plumbing', () => {
-    expect(read('features/user/screens/UserMessagesScreen.tsx')).toContain(
-      'composerTestID="dm-composer"'
-    );
   });
 
   it('pins the seed reveal toggles on SettingsProfileScreen', () => {
@@ -213,60 +185,26 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('accessibilityState={{ checked: isVisible }}');
   });
 
-  it('pins the picker sheet ids the Following, model and history scenarios wait on', () => {
+  it('pins the picker sheet ids', () => {
     const sheet = read('shared/ui/composed/PickerSheet.tsx');
     expect(sheet).toContain('testID="picker-sheet"');
     expect(sheet).toContain('testID="picker-sheet-close"');
-    expect(read('features/ai/lib/modelPickerRequest.tsx')).toContain("testID: 'ai-model-picker'");
-  });
-
-  it('gives the AI history header button an AX identity', () => {
-    expect(read('app/(drawer)/(tabs)/ai/_layout.tsx')).toContain(
-      "headerRightTestID: 'ai-history-button'"
-    );
-    // The generic header helper must forward the label/testID to the button.
-    expect(read('navigation/nativeTabs.tsx')).toContain(
-      'accessibilityLabel={headerRightAccessibilityLabel}'
-    );
   });
 
   it('pins the geohash channel probe on GeohashChatScreen', () => {
-    // The channel screen has no other stable AX identity; the suffix pins
-    // WHICH geohash channel opened (mesh vs a location tier).
     expect(read('features/bitchat/screens/GeohashChatScreen.tsx')).toContain(
       "testID={`geohash-chat:${geohash ?? 'unknown'}`}"
     );
   });
 
-  it('pins the fresh-user empty-state ids on the social surfaces', () => {
-    // Empty states are e2e evidence (a blank list and a dedicated guidance
-    // card are indistinguishable without an id); the suffix carries the
-    // variant so a wrong branch (e.g. notifications 'no-profile') fails loud.
-    expect(read('features/contacts/screens/ContactsScreen.tsx')).toContain(
-      'testID={`contacts-empty:${activeFilter.toLowerCase()}`}'
+  it('pins the account switcher drawer ids', () => {
+    const drawer = read('navigation/AccountSwitcherDrawer.tsx');
+    // Keyed by the account's derivation index, its stable identity.
+    expect(read('navigation/AccountRow.tsx')).toContain(
+      'testID={`drawer-profile-switch-${profile.accountIndex}`}'
     );
-    expect(read('features/feed/screens/NotificationsScreen.tsx')).toContain(
-      "testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}"
-    );
-  });
-
-  it('pins the drawer menu row ids', () => {
-    expect(read('navigation/DrawerContent.tsx')).toContain('testID={`drawer-menu-${id}`}');
-    // The rows themselves are data, filtered by the build's feature set.
-    const drawer = read('navigation/drawerMenu.ts');
-    // Row ids are the e2e selector suffixes (drawer-menu-feed, …); renaming
-    // one breaks every scenario that opens that route from the drawer.
-    for (const id of [
-      'feed',
-      'wallet',
-      'contacts',
-      'notifications',
-      'ai',
-      'remote-login',
-      'settings',
-    ]) {
-      expect(drawer).toContain(`id: '${id}',`);
-    }
+    expect(drawer).toContain('testID="drawer-add-account"');
+    expect(drawer).toContain('testID="drawer-import-account"');
   });
 
   it('pins the wallet wallpaper probe and gallery card AX identity', () => {

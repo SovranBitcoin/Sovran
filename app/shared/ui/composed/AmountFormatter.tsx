@@ -11,7 +11,7 @@ import {
 import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
-import { formatAmount } from '@/shared/lib/currency';
+import { formatDisplayAmount } from '@/shared/lib/amountDisplay';
 import { type AmountValue } from 'wallet/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/classNames';
@@ -108,11 +108,7 @@ export function AmountFormatter({
   const storedDisplayPreference = useSettingsStore((state) => state.displayBtc);
   const displayBtc = displayPreference ?? storedDisplayPreference;
 
-  const decorated = decorate(
-    formatAmount({ amount, unit }, { useUserPreference: true, displayPreference: displayBtc }),
-    unit,
-    displayBtc
-  );
+  const decorated = formatDisplayAmount(amount, unit, displayBtc);
   const text = sign ? `${sign} ${decorated}` : decorated;
 
   const resolvedColor = resolveColor({ color, foreground });
@@ -167,22 +163,6 @@ export function AmountFormatter({
       </View>
     </Log>
   );
-}
-
-// Fiat amounts already include their symbol (e.g. "$1,234.56"); only sats
-// modes need decoration. Mode 2 is already suffixed by formatAmount.
-//
-// The ⚡︎ uses U+FE0E (VS15) to request the text-presentation glyph — without
-// it, some OSes render the emoji-color variant which doesn't extract to a
-// vector path inside the glass surface.
-// U+2009 thin space sits ~\u00BD the width of a regular space and reads as the
-// natural gap between a currency glyph and the digits it labels. Mirrored in
-// FiatAmountDisplay so toggling fiat \u2194 sat keeps the symbol cadence identical.
-function decorate(formatted: string, unit: string, displayBtc: number): string {
-  if (unit !== 'sat') return formatted;
-  if (displayBtc === 0 || displayBtc === 3) return `\u20BF\u2009${formatted}`;
-  if (displayBtc === 1) return `${formatted}\u2009\u26A1\uFE0E`;
-  return formatted;
 }
 
 function plainTextStyle(

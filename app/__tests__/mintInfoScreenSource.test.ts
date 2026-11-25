@@ -5,6 +5,8 @@ const ROOT = resolve(__dirname, '..');
 
 describe('mint info screen source', () => {
   const source = readFileSync(resolve(ROOT, 'features/mint/screens/MintInfoScreen.tsx'), 'utf8');
+  // The four stat cards are built by the pure selector the screen renders.
+  const statsSource = readFileSync(resolve(ROOT, 'features/mint/lib/mintInfoStats.ts'), 'utf8');
 
   it('renders the mint address from the shared screen path before contacts', () => {
     const mintAddressStart = source.indexOf('<Section title="Mint address">');
@@ -24,7 +26,7 @@ describe('mint info screen source', () => {
 
   it('uses Nostr profile data to pretty-display the first Nostr contact', () => {
     expect(source).toContain('const contactRows = getSortedMintInfoContacts(contact);');
-    expect(source).toContain('useNostrProfile(');
+    expect(source).toContain('useNostrProfileMetadata(');
     expect(source).toContain('getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)');
     expect(source).toContain('picture={rowPicture}');
   });
@@ -42,7 +44,8 @@ describe('mint info screen source', () => {
     // Unknown counts never render as zero. The dash now belongs to the shared
     // grid, so both counterparty pages spell "nobody measured this" the same
     // way rather than each declaring their own.
-    expect(source).toContain('UNKNOWN_STAT');
+    expect(statsSource).toContain('UNKNOWN_STAT');
+    expect(statsSource).toContain("from '@/shared/ui/composed/StatsGrid'");
     expect(source).toContain("from '@/shared/ui/composed/StatsGrid'");
     expect(source).not.toContain(": '0.0'");
   });
@@ -69,16 +72,27 @@ describe('mint info screen source', () => {
     expect(chart).toContain('No ratings yet');
   });
 
-  it('draws the icon ring without a mount fade or a fake half score', () => {
-    const ringStart = source.indexOf('function ProgressRing(');
-    const ring = source.slice(ringStart, source.indexOf('function AnimatedAvatar(', ringStart));
-    expect(ringStart).toBeGreaterThan(-1);
-    expect(ring).not.toContain('fadeAnim');
-    expect(ring).not.toContain('withTiming');
-    expect(ring).toContain('progress === undefined ? trackColor : errorColor');
+  it('heads the page with the plain mint header: no ring, bottom-right presence dot', () => {
+    const header = readFileSync(resolve(ROOT, 'features/mint/components/MintHeader.tsx'), 'utf8');
+    expect(source).not.toContain('function ProgressRing(');
+    expect(source).not.toContain('react-native-svg');
+    expect(source).not.toContain('AvatarStatusDot');
+    expect(source).toContain('<MintHeader');
+    expect(source).toContain('health={mintHealthFromAudit(audit?.state)}');
+    expect(source).toContain('collapseAt: 98');
+    // A 72pt icon with the shared bottom-right presence dot (no text status line).
+    expect(header).toContain('const ICON_SIZE = 72;');
+    expect(header).toContain('<PresenceDot');
+    expect(header).toContain('const STATUS_FADE_MS = 200;');
+    // The success rate is never invented for an unaudited mint.
     expect(source).not.toContain('progress = 0.5');
     expect(source).not.toContain('?? 0.5');
-    expect(source).toContain('progress={audit?.successRate}');
+  });
+
+  it('shows no capability pills; the spending fee is in Details', () => {
+    expect(source).not.toContain('What this mint supports');
+    expect(source).not.toContain('mint-info-capabilities');
+    expect(source).toContain('inputFees,\n          })}');
   });
 
   it('replaces Close with Details in the footer', () => {
@@ -104,8 +118,12 @@ describe('mint info screen source', () => {
     expect(source).toContain('testID="mint-info-details"');
   });
 
-  it('renders the shared status dot for every audit state', () => {
-    expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
-    expect(source).not.toContain('STATUS_BADGE_CONFIG');
+  it('copies the Nostr contact npub instead of opening a profile/DM link and fetches kind-0 avatar metadata', () => {
+    expect(source).not.toContain('buildModalProfileHref');
+    expect(source).toContain('getMintInfoNostrCopyValue(');
+    expect(source).toContain("copyPopup('npub')");
+    expect(source).toContain('name="lets-icons:copy"');
+    expect(source).toContain('useNostrProfileMetadata(');
+    expect(source).toContain('avatarStateFor(rowPicture, !rowResolving)');
   });
 });

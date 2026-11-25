@@ -52,7 +52,7 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
   activePubkey: () => mockActiveProfile,
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { isInitialized: () => false } }));
-jest.mock('@/shared/lib/routstr/spentProbe', () => ({ isTokenSpent: jest.fn() }));
+jest.mock('@/shared/lib/cashu/spentProbe', () => ({ isTokenSpent: jest.fn() }));
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
   giftWrapCache: {
     cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip17:${viewer}`) },

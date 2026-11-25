@@ -22,10 +22,7 @@
     },
     "production": {
       "environment": "production",
-      "env": {
-        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg.up.railway.app",
-        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg.up.railway.app/graphql"
-      },
+      "env": {},
       "android": {
         "credentialsSource": "remote"
       },
@@ -33,6 +30,16 @@
         "credentialsSource": "remote"
       },
       "autoIncrement": true
+    },
+    "zapstore": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "zapstore"
+      },
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote"
+      }
     }
   },
   "submit": {

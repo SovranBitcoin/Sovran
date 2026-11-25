@@ -19,18 +19,14 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
-      # Root tests include the Node test collector in the harness workspace.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version-file: harness/.node-version
+          node-version: '22'
 
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
       # workflow so the README can carry a status badge per check. This workflow
       # is named for its blocking gate: the test suite.
-      # It also emits non-blocking formatting and structural-review signals.
-      #
-      # The behavioral suites gate the workflow. Prettier and the
-      # structural-health PR report remain non-blocking signals.
+      # Prettier remains a non-blocking formatting signal.
       - name: Setup Sovran
         uses: ./.github/actions/setup-sovran
         with:
@@ -56,72 +52,12 @@ jobs:
       - name: Claims and copy consistency
         run: bun run copy:lint
 
-      - name: Native harness contracts
+      - name: Native smoke & e2e helper tests
         working-directory: ${{ env.APP_DIR }}
-        run: |
-          bun run e2e:validate
-          bun run e2e:test
+        run: bun run e2e:test
 
       - name: Validate asset sources, geometry and generated exports
         run: |
           bun run assets:check
           bun run assets:test
           test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
-
-  # Non-blocking signal job: runs `codereview/analyze-structure` and posts
-  # the LLM-friendly summary as a sticky PR comment. The signal mirrors
-  # what `npm run analyze-structure` (or the `audit/fix` scripts) consume
-  # locally — top complexity hotspots, shallow modules, pass-through
-  # suspects, hub-spoke patterns, churn-weighted hotspots, type-safety
-  # debt, etc. Continues on failure so the structural report never blocks
-  # a merge — it's review-time signal, not a gate.
-  structural-health:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      packages: read
-      pull-requests: write
-    steps:
-      - name: Checkout app
-        uses: actions/checkout@v6
-        with:
-          # Full history needed for `--history` (churn × complexity,
-          # temporal coupling, stale-file signals).
-          fetch-depth: 0
-
-      - name: Setup Sovran
-        uses: ./.github/actions/setup-sovran
-        with:
-          github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-
-      - name: Run analyze-structure
-        working-directory: ${{ env.APP_DIR }}
-        continue-on-error: true
-        run: |
-          bun run codereview/analyze-structure/index.mjs --llm --history \
-            > analyze-output.txt 2>&1 || true
-
-      - name: Post structural-health comment on PR
-        continue-on-error: true
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const marker = '<!-- structural-health -->';
-            const output = fs.readFileSync(`${process.env.APP_DIR}/analyze-output.txt`, 'utf8');
-            // GitHub comment max body: 65,536 chars. Truncate if needed.
-            const MAX = 60_000;
-            const truncated = output.length > MAX
-              ? output.slice(0, MAX) + '\n\n…[truncated]'
-              : output;
-            const body = `${marker}\n## Structural health\n\n\`\`\`\n${truncated}\n\`\`\``;
-            const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
-            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-            } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body });
-            }

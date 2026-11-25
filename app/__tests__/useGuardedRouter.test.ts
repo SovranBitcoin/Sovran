@@ -45,9 +45,9 @@ describe('guardedRouter', () => {
   });
 
   it('forwards a single push to the underlying router', () => {
-    guardedRouter.push('/feed');
+    guardedRouter.push('/details');
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/feed');
+    expect(mockPush).toHaveBeenCalledWith('/details');
   });
 
   it('suppresses a duplicate push within the cooldown window', () => {
@@ -70,8 +70,8 @@ describe('guardedRouter', () => {
   });
 
   it('treats push and navigate to the same href as distinct gates', () => {
-    guardedRouter.push('/contacts');
-    guardedRouter.navigate('/contacts');
+    guardedRouter.push('/claimUsername');
+    guardedRouter.navigate('/claimUsername');
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });

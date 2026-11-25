@@ -7,17 +7,17 @@ export { SettingsRecoveryScreen } from './screens/SettingsRecoveryScreen';
 export { SettingsRoutingScreen } from './screens/SettingsRoutingScreen';
 export { SettingsNetworkScreen } from './screens/SettingsNetworkScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
-export { SettingsMediaScreen } from './screens/SettingsMediaScreen';
 export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
 export { SettingsDesignSystemFoundationsScreen } from './screens/SettingsDesignSystemFoundationsScreen';
 export { SettingsDesignSystemWalletControlsScreen } from './screens/SettingsDesignSystemWalletControlsScreen';
+export { SettingsDesignSystemUiKitScreen } from './screens/SettingsDesignSystemUiKitScreen';
+export { SettingsDesignSystemScrubberScreen } from './screens/SettingsDesignSystemScrubberScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
 export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSystemFadeStressScreen';
-export { SettingsDesignSystemPostsScreen } from './screens/SettingsDesignSystemPostsScreen';
 export { SettingsDesignSystemVariationsScreen } from './screens/SettingsDesignSystemVariationsScreen';
 export { SettingsDesignSystemScreensScreen } from './screens/SettingsDesignSystemScreensScreen';
 export { SettingsDesignSystemPromptsScreen } from './screens/SettingsDesignSystemPromptsScreen';
@@ -26,5 +26,4 @@ export {
   SettingsDesignSystemPromptPreviewScreen,
 } from './screens/SettingsDesignSystemPromptPreviewScreen';
 export { findPromptEntry } from './design-system/prompts';
-export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

@@ -2,7 +2,6 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { Text, UntranslatedText } from '@/shared/ui/primitives/Text';
-import { ListGroup } from 'heroui-native';
 import { Section } from '@/shared/ui/composed/Section';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,7 +19,8 @@ let mockKeys: { pubkey: string; npub: string } | undefined;
 let mockDevMode = false;
 let mockInProcessProfileSwitch = false;
 const mockSetInProcessProfileSwitch = jest.fn();
-let mockPendingCount = 0;
+let mockVerboseLoggingEnabled = true;
+const mockSetVerboseLoggingEnabled = jest.fn();
 let mockPolicy = 'RELAXED';
 
 jest.mock('@/shared/hooks/useProfileDisplay', () => ({
@@ -35,21 +35,23 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
       experimental: mockDevMode,
       inProcessProfileSwitch: mockInProcessProfileSwitch,
       setInProcessProfileSwitch: mockSetInProcessProfileSwitch,
+      verboseLoggingEnabled: mockVerboseLoggingEnabled,
+      setVerboseLoggingEnabled: mockSetVerboseLoggingEnabled,
     }),
 }));
-jest.mock('@/features/feed/stores/notificationPolicyStore', () => ({
+jest.mock('@/shared/stores/profile/notificationPolicyStore', () => ({
   useNotificationPolicyStore: (select: (state: object) => unknown) =>
     select({ policy: mockPolicy }),
 }));
-jest.mock('@/features/nostrSigner', () => ({
-  useNip46RequestsStore: (select: (state: object) => unknown) =>
-    select({ pending: Array.from({ length: mockPendingCount }) }),
-}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
-jest.mock('@/shared/lib/url', () => ({ openExternalUrl: jest.fn() }));
+jest.mock('@/shared/lib/url', () => ({
+  openExternalUrl: jest.fn(),
+  urlHostLabel: jest.requireActual('@/shared/lib/url').urlHostLabel,
+}));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { exportDatabase: jest.fn() } }));
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
+  SHOW_LOGS: true,
   useLifecycleLogger: jest.fn(),
   log: { info: jest.fn(), error: jest.fn() },
   walletLog: { info: jest.fn() },
@@ -120,7 +122,8 @@ beforeEach(() => {
   mockDevMode = false;
   mockInProcessProfileSwitch = false;
   mockSetInProcessProfileSwitch.mockClear();
-  mockPendingCount = 0;
+  mockVerboseLoggingEnabled = true;
+  mockSetVerboseLoggingEnabled.mockClear();
   mockPolicy = 'RELAXED';
 });
 afterEach(() => act(() => tree?.unmount()));
@@ -171,31 +174,6 @@ it('reserves two single-line profile placeholders and replaces them with resolve
   expect(profileText()[1].props.children).toBeTruthy();
 });
 
-it('keeps live descriptions mounted and single-line as stores settle and requests clear', () => {
-  render();
-  const descriptions = () =>
-    ['settings-remote-login-row', 'settings-notifications-row'].map((id) =>
-      control(id).findByType(ListGroup.ItemDescription)
-    );
-  const initial = descriptions();
-  for (const [count, policy] of [
-    [1, 'MODERATE'],
-    [12, 'STRICT'],
-    [0, 'FOLLOWS'],
-  ] as const) {
-    mockPendingCount = count;
-    mockPolicy = policy;
-    act(() => tree.update(<SettingsScreen />));
-    descriptions().forEach((line, index) => {
-      expect(line).toBe(initial[index]);
-      expect(line.props.numberOfLines).toBe(1);
-      expect(line.props.children).toBeTruthy();
-    });
-  }
-  expect(descriptions()[0].props.children).toBe('Sign in to Nostr apps with this device');
-  expect(descriptions()[1].props.children).toBe('Follows');
-});
-
 it('exposes profile switching as a checked switch and toggles in both directions', () => {
   mockDevMode = true;
   render();
@@ -216,4 +194,45 @@ it('exposes profile switching as a checked switch and toggles in both directions
     toggle().props.onPress();
   });
   expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
+});
+
+it('no longer lists Moderation or Uploaded media', () => {
+  mockDevMode = true;
+  render();
+  const ids = tree.root
+    .findAll((node) => typeof node.type === 'string' && typeof node.props.testID === 'string')
+    .map((node) => node.props.testID as string);
+  expect(ids).not.toContain('settings-moderation-row');
+  expect(ids).not.toContain('settings-media-row');
+  expect(JSON.stringify(tree.toJSON())).not.toContain('Uploaded media');
+});
+
+it('keeps Swap routing, under Developer only', () => {
+  const routingSection = () =>
+    tree.root
+      .findAllByType(Section)
+      .find(
+        (section) =>
+          section.findAll((node) => node.props.testID === 'settings-routing-row').length > 0
+      )?.props.title;
+
+  render();
+  expect(routingSection()).toBeUndefined();
+  act(() => tree.unmount());
+
+  mockDevMode = true;
+  render();
+  expect(routingSection()).toBe('Developer');
+});
+
+it('exposes the Verbose logging switch under Developer and toggles it', () => {
+  mockDevMode = true;
+  render();
+  const toggle = () => control('settings-verbose-logging-toggle');
+  expect(toggle().props.accessibilityRole).toBe('switch');
+  expect(toggle().props.accessibilityState).toEqual({ checked: true });
+  act(() => {
+    toggle().props.onPress();
+  });
+  expect(mockSetVerboseLoggingEnabled).toHaveBeenLastCalledWith(false);
 });

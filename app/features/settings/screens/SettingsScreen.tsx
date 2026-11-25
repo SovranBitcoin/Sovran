@@ -1,12 +1,11 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
-import React, { useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Alert } from 'react-native';
 import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
-import { type Href } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -25,14 +24,14 @@ import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
-import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
-import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
-import { useMediaServerStore } from '@/shared/lib/nostr/media/mediaServerStore';
-import { useNip46RequestsStore } from '@/features/nostrSigner';
+import { log, SHOW_LOGS, useLifecycleLogger } from '@/shared/lib/logger';
 import { hasFeature } from '@/shared/config/features';
+import {
+  SettingsListActionItem,
+  SettingsListLinkItem,
+  SettingsToggleItem,
+} from '@/shared/ui/composed/SettingsRows';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -97,109 +96,9 @@ const ProfileButton = () => {
 // never satisfy a human triple-tap window — the owned e2e Metro widens it.
 const TRIPLE_TAP_WINDOW_MS = Number(process.env.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS ?? '') || 1500;
 
-const SIGNER_ROW_DESCRIPTION = 'Sign in to Nostr apps with this device';
-
-/** Live row description: pending-count variant when the signer queue is non-empty. */
-function signerRowDescription(pendingCount: number): string {
-  if (pendingCount <= 0) return SIGNER_ROW_DESCRIPTION;
-  return pendingCount === 1 ? '1 pending request' : `${pendingCount} pending requests`;
-}
-
-const SettingsListActionItem: React.FC<{
-  title: string;
-  description?: string;
-  descriptionNumberOfLines?: number;
-  onPress: () => void;
-  isDanger?: boolean;
-  testID?: string;
-}> = ({ title, description, descriptionNumberOfLines, onPress, isDanger, testID }) => {
-  const danger = useThemeColor('danger');
-  return (
-    <PressableFeedback
-      animation={false}
-      testID={testID}
-      // `accessible` is explicit rather than gated on `testID`: RN's Pressable
-      // already defaults it to true, so the gate never did anything — stating
-      // it keeps the "one actionable outer row" invariant visible.
-      accessible
-      // Keep semantics independent of instrumentation. When the explicit label
-      // is absent, RN synthesizes the same "title, description" string.
-      accessibilityRole="button"
-      accessibilityLabel={testID ? `${title}${description ? `, ${description}` : ''}` : undefined}
-      onPress={onPress}>
-      <PressableFeedback.Scale>
-        <ListGroup.Item disabled>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>
-              {isDanger ? <Text style={{ color: danger }}>{title}</Text> : title}
-            </ListGroup.ItemTitle>
-            {description ? (
-              <ListGroup.ItemDescription numberOfLines={descriptionNumberOfLines}>
-                {description}
-              </ListGroup.ItemDescription>
-            ) : null}
-          </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix />
-        </ListGroup.Item>
-      </PressableFeedback.Scale>
-      <PressableFeedback.Ripple />
-    </PressableFeedback>
-  );
-};
-
-const SettingsListLinkItem: React.FC<{
-  href: Href;
-  title: string;
-  description?: string;
-  descriptionNumberOfLines?: number;
-  isDanger?: boolean;
-  testID?: string;
-}> = ({ href, ...item }) => (
-  <SettingsListActionItem {...item} onPress={() => router.navigate(href)} />
-);
-
-const SettingsToggleItem: React.FC<{
-  title: string;
-  description?: string;
-  isSelected: boolean;
-  onSelectedChange: (selected: boolean) => void;
-  testID?: string;
-}> = ({ title, description, isSelected, onSelectedChange, testID }) => (
-  <PressableFeedback
-    animation={false}
-    onPress={() => onSelectedChange(!isSelected)}
-    testID={testID}
-    accessible
-    // Role and checked-state are unconditional — without them a screen reader
-    // cannot tell a toggle from static text, nor read whether it is on. They
-    // must not depend on whether the row is instrumented.
-    // `accessibilityValue` is dropped: RN derives the iOS 1/0 value from the
-    // switch role plus `checked`, and Android exposes the checked state.
-    accessibilityRole="switch"
-    accessibilityState={{ checked: isSelected }}
-    accessibilityLabel={testID ? title : undefined}>
-    <PressableFeedback.Scale>
-      <ListGroup.Item disabled>
-        <ListGroup.ItemContent>
-          <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
-          {description ? (
-            <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
-          ) : null}
-        </ListGroup.ItemContent>
-        <ListGroup.ItemSuffix>
-          <HeroSwitch isSelected={isSelected} onSelectedChange={onSelectedChange} />
-        </ListGroup.ItemSuffix>
-      </ListGroup.Item>
-    </PressableFeedback.Scale>
-    <PressableFeedback.Ripple />
-  </PressableFeedback>
-);
-
 export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
   const shift = useShiftLogger('SettingsScreen');
-  const mediaServer = useMediaServerStore((s) => s.server);
-  const mediaHost = new URL(mediaServer).host;
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -214,8 +113,6 @@ export const SettingsScreen = () => {
   const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
   const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
-  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
-  const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const layoutGuides = useSettingsStore((state) => state.layoutGuides);
   const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
   const showTouches = useSettingsStore((state) => state.showTouches);
@@ -224,8 +121,8 @@ export const SettingsScreen = () => {
   const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
-  const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
-  const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
+  const verboseLoggingEnabled = useSettingsStore((state) => state.verboseLoggingEnabled);
+  const setVerboseLoggingEnabled = useSettingsStore((state) => state.setVerboseLoggingEnabled);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -277,40 +174,21 @@ export const SettingsScreen = () => {
             <ProfileButton />
           </Section>
         </LayoutShiftProbe>
-        <LayoutShiftProbe tag="settings.preferences">
-          <Section title="Preferences">
-            <ListGroup variant="secondary">
-              <SettingsListLinkItem
-                href="/(settings-flow)/routing"
-                title="Swap routing"
-                testID="settings-routing-row"
-              />
-              {hasFeature('feed') && (
-                <>
-                  <Separator className="mx-4" />
-                  <SettingsListLinkItem
-                    href="/(settings-flow)/notification-policy"
-                    title="Notifications"
-                    testID="settings-notifications-row"
-                    description={notificationPolicyLabel(notificationPolicy)}
-                    descriptionNumberOfLines={1}
-                  />
-                </>
-              )}
-              {hasFeature('nostr') && (
-                <>
-                  <Separator className="mx-4" />
-                  <SettingsListLinkItem
-                    href="/(settings-flow)/network"
-                    title="Network"
-                    testID="settings-network-row"
-                    description="Aggregators, caching, and relays"
-                  />
-                </>
-              )}
-            </ListGroup>
-          </Section>
-        </LayoutShiftProbe>
+        {/* Network is the only preference now, and only in builds with Nostr. */}
+        {hasFeature('nostr') ? (
+          <LayoutShiftProbe tag="settings.preferences">
+            <Section title="Preferences">
+              <ListGroup variant="secondary">
+                <SettingsListLinkItem
+                  href="/(settings-flow)/network"
+                  title="Network"
+                  testID="settings-network-row"
+                  description="Aggregators, caching, and relays"
+                />
+              </ListGroup>
+            </Section>
+          </LayoutShiftProbe>
+        ) : null}
         <LayoutShiftProbe tag="settings.app-information">
           <Section title="App Information">
             <ListGroup variant="secondary">
@@ -335,18 +213,6 @@ export const SettingsScreen = () => {
         <LayoutShiftProbe tag="settings.security">
           <Section title="Security">
             <ListGroup variant="secondary">
-              {hasFeature('nostr') && (
-                <>
-                  <SettingsListLinkItem
-                    href="/(signer-flow)"
-                    title="Remote Login"
-                    testID="settings-remote-login-row"
-                    description={signerRowDescription(signerPendingCount)}
-                    descriptionNumberOfLines={1}
-                  />
-                  <Separator className="mx-4" />
-                </>
-              )}
               <SettingsListLinkItem
                 href="/(settings-flow)/keyring"
                 title="P2PK Keys"
@@ -373,28 +239,6 @@ export const SettingsScreen = () => {
                 isSelected={sendLocationEnabled ?? false}
                 onSelectedChange={setSendLocationEnabled}
               />
-              {hasFeature('nostr') && (
-                <>
-                  <Separator className="mx-4" />
-                  <SettingsListLinkItem
-                    href="/(settings-flow)/moderation"
-                    testID="settings-moderation-row"
-                    title="Moderation"
-                    description="Blocked people and private-message word filter"
-                  />
-                </>
-              )}
-              {hasFeature('feed') && (
-                <>
-                  <Separator className="mx-4" />
-                  <SettingsListLinkItem
-                    href="/(settings-flow)/media"
-                    title="My media"
-                    testID="settings-media-row"
-                    description={`Images you've posted · uploads via ${mediaHost}`}
-                  />
-                </>
-              )}
             </ListGroup>
           </Section>
         </LayoutShiftProbe>
@@ -442,6 +286,12 @@ export const SettingsScreen = () => {
                   onPress={handleExportDatabase}
                 />
                 <Separator className="mx-4" />
+                {/* Every setting here is live, but tunes what most people never change. */}
+                <SettingsListLinkItem
+                  href="/(settings-flow)/routing"
+                  title="Swap routing"
+                  testID="settings-routing-row"
+                />
                 <Separator className="mx-4" />
                 <SettingsListLinkItem
                   href="/(settings-flow)/storage"
@@ -457,6 +307,18 @@ export const SettingsScreen = () => {
                   testID="settings-design-system-row"
                 />
                 <Separator className="mx-4" />
+                {SHOW_LOGS ? (
+                  <>
+                    <SettingsToggleItem
+                      title="Verbose logging"
+                      description="Log renders, layout shifts, and diagnostics. Turn off to reduce dev lag."
+                      testID="settings-verbose-logging-toggle"
+                      isSelected={verboseLoggingEnabled}
+                      onSelectedChange={setVerboseLoggingEnabled}
+                    />
+                    <Separator className="mx-4" />
+                  </>
+                ) : null}
                 <SettingsToggleItem
                   title="Layout guides"
                   testID="settings-layout-guides-toggle"
@@ -505,17 +367,6 @@ export const SettingsScreen = () => {
                   isSelected={mockFailPaymentRequest}
                   onSelectedChange={setMockFailPaymentRequest}
                 />
-                {hasFeature('directMessages') && (
-                  <>
-                    <Separator className="mx-4" />
-                    <SettingsToggleItem
-                      title="White Noise"
-                      testID="settings-white-noise-toggle"
-                      isSelected={whitenoiseEnabled}
-                      onSelectedChange={setWhitenoiseEnabled}
-                    />
-                  </>
-                )}
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Switch profiles without restart"

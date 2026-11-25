@@ -4,7 +4,7 @@
  * What the person muted and blocked is read back entry by entry. One entry
  * that is not an id must cost that entry, never the whole saved store.
  */
-import { PersistedFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { PersistedFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
 
 jest.mock('@react-native-async-storage/async-storage', () => {
   const storage = {

@@ -16,6 +16,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { percentDecodeFully } from '@/shared/lib/percentDecode';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -127,6 +128,27 @@ const PersistedScanHistoryStore = z.object({
     .default([]),
 });
 
+/**
+ * Secret-bearing URIs that must never land in plaintext AsyncStorage scan
+ * history or transaction annotations (e.g. NIP-46 pairing links with bearer
+ * secrets, or raw Nostr private keys). Any character that cannot be part of a
+ * word may come before one: a space, `nostr:`, a query separator, a bracket
+ * or a quote.
+ */
+const SENSITIVE_SCAN_RE = /(?:^|[^a-z0-9])(?:(?:nostrconnect|bunker):\/\/|nsec1[02-9ac-hj-np-z]+)/i;
+
+export function isSensitiveScanInput(raw: string): boolean {
+  if (!raw) return false;
+  if (SENSITIVE_SCAN_RE.test(raw)) return true;
+  if (raw.includes('%')) {
+    const { decoded, settled } = percentDecodeFully(raw);
+    // Encoded deeper than the decoder follows: kept out of history unread.
+    if (!settled) return true;
+    if (decoded !== raw && SENSITIVE_SCAN_RE.test(decoded)) return true;
+  }
+  return false;
+}
+
 export const useScanHistoryStore = create<ScanHistoryStore>({
   name: 'scan-history-store',
   scope: 'profile',
@@ -137,6 +159,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
         entries: [],
 
         addScan: ({ raw, type, source, inputType, container, optionKinds }) => {
+          // Never persist secret-bearing pairing URIs or raw private keys in plaintext history.
+          if (isSensitiveScanInput(raw)) return;
           // Too long to be worth keeping; a history of these fills storage.
           if (raw.length > MAX_SCAN_RAW_LENGTH) return;
           storeLog.info('store.scan_history.add', { type, source, inputType, container });

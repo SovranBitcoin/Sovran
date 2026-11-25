@@ -24,7 +24,7 @@ const mockRouter = {
   dismissAll: jest.fn(),
   dismissTo: jest.fn(),
   canGoBack: jest.fn(() => true),
-  raw: { back: jest.fn() },
+  raw: { back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
 };
 const mockManagerHolder: { current: unknown } = { current: null };
 const mockCalls: string[] = [];
@@ -51,6 +51,7 @@ jest.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ isReady: () => false, getRootState: () => undefined }),
   useSegments: () => [],
   useLocalSearchParams: () => mockParams,
+  usePathname: () => '',
   Stack: { Screen: () => null },
   router: {},
 }));

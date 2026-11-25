@@ -7,6 +7,7 @@ import { ReceiveRailListScreen } from '@/features/receive/screens/ReceiveRailLis
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockPaymentInfo = jest.fn();
 const mockLoadItems = jest.fn();
 const mockQuote = jest.fn<unknown, unknown[]>(() => ({
@@ -22,7 +23,10 @@ jest.mock('@/features/receive/components/OnchainDepositLimitsCard', () => ({
   OnchainDepositLimitsCard: () => null,
 }));
 jest.mock('expo-router', () => ({
-  router: { push: (...args: unknown[]) => mockPush(...args) },
+  router: {
+    push: (...args: unknown[]) => mockPush(...args),
+    navigate: (...args: unknown[]) => mockNavigate(...args),
+  },
   Stack: { Screen: () => null },
 }));
 jest.mock('wallet/react', () => ({
@@ -196,6 +200,7 @@ describe('receive rail presentation', () => {
     mockPaymentInfo.mockClear();
     mockQuote.mockClear();
     mockPush.mockClear();
+    mockNavigate.mockClear();
   });
   it('keeps the standing quote subscribed while its hidden QR is unmounted', () => {
     let renderer!: TestRenderer.ReactTestRenderer;
@@ -284,8 +289,9 @@ describe('receive rail presentation', () => {
       button.props.onPress();
       button.props.onPress();
     });
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith({
       pathname: '/(mint-flow)/add',
       params: { method: 'bolt12', unit: 'sat' },
     });

@@ -219,7 +219,7 @@ it('validates the addresses, fills npub.cash in one tap, and publishes normalise
   expect(
     renderer.root
       .findAllByProps({ accessibilityRole: 'alert' })
-      .some((node) => String(node.props.children).includes('Nostr address'))
+      .some((node) => String(node.props.children).includes('verified name like you@domain.com'))
   ).toBe(true);
 
   // One tap fills the account's npub.cash Lightning address.
@@ -388,7 +388,13 @@ it('fills npub.cash only after the account username passes verification', async 
     await control('edit-profile-nip05-npc').props.onPress();
   });
   expect(control('edit-profile-nip05').props.value).toBe('');
-  expect(control('edit-profile-nip05-error').props.children).toContain('custom npub.cash username');
+  expect(control('edit-profile-nip05-error').props.children).toBe(
+    "Claim a username first. Your automatic address can't be used as a verified name."
+  );
+  // The button says what it fills, in the app's words.
+  expect(
+    renderer.root.findAll((node) => node.props.label === 'Use my Sovran name').length
+  ).toBeGreaterThan(0);
   jest
     .mocked(loadNpcIdentity)
     .mockResolvedValue({ status: 'verified', identifier: 'alice@npub.cash' });
@@ -424,5 +430,32 @@ it('does not re-save an unchanged identity while editing another field offline',
   });
   expect(publishOwnProfileMetadata).toHaveBeenCalledWith(
     expect.objectContaining({ patch: { name: 'New' } })
+  );
+});
+
+describe('a saved profile whose pubkey is not 32-byte hex', () => {
+  const validPubkey = mockProfile.pubkey;
+  afterEach(() => {
+    mockProfile.pubkey = validPubkey;
+  });
+
+  it.each(['error', 'false', '12345'])(
+    'shows the unavailable state for %j without loading, publishing or throwing',
+    async (pubkey) => {
+      mockProfile.pubkey = pubkey;
+      await act(async () => {
+        renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+      });
+      expect(renderer.root.findAllByProps({ testID: 'edit-profile-save' })).toHaveLength(0);
+      expect(renderer.root.findAllByProps({ testID: 'edit-profile-unavailable' })).not.toHaveLength(
+        0
+      );
+      expect(JSON.stringify(renderer.toJSON())).toContain("This profile can't be edited");
+      expect(loadOwnProfileMetadata).not.toHaveBeenCalled();
+      expect(publishOwnProfileMetadata).not.toHaveBeenCalled();
+      expect(ingestOwnProfileMetadata).not.toHaveBeenCalled();
+      // The saved profile row is read, never rewritten.
+      expect(mockProfile.pubkey).toBe(pubkey);
+    }
   );
 });

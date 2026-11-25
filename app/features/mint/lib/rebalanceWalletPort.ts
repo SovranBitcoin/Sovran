@@ -1,12 +1,19 @@
 import type { Proof } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
-import type { RebalanceWalletPort } from 'wallet';
+import {
+  createEngineSingleLegTransferPort,
+  createRebalanceEngine,
+  type createRebalanceLock,
+  type RebalanceWalletPort,
+  type SingleLegTransferPort,
+} from 'wallet';
 import { amountToNumber, requireAmount } from 'wallet/amount';
 
 import { releaseTrustWindow } from '@/features/mint/components/rebalance';
 import { prepareBolt11MeltQuote, prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
+import { cashuLog } from '@/shared/lib/logger';
 
 /**
  * The wallet capabilities the rebalance engine drives, bound to one Coco
@@ -38,6 +45,7 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     createMintReceipt: (mintUrl, amount) =>
       prepareMintQuote(manager, 'bolt11', mintUrl, amount, unit),
     getMintOperation: (operationId) => manager.ops.mint.get(operationId),
+    refreshMintOperation: (operationId) => manager.ops.mint.refresh(operationId),
     prepareMelt: (mintUrl, invoice) => prepareBolt11MeltQuote(manager, mintUrl, invoice),
     executeMelt: (operationId) => manager.ops.melt.execute(operationId),
     refreshMelt: (operationId) => manager.ops.melt.refresh(operationId),
@@ -45,9 +53,44 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     async restoreInflightProofs(mintUrl) {
       await CocoManager.restoreInflightProofsForMint(mintUrl);
     },
+    cancelPreparedMelt: (operationId) =>
+      manager.ops.melt.cancel(operationId, 'Rebalance melt not executed'),
     async trustMint(mintUrl) {
       await manager.mint.addMint(mintUrl, { trusted: true });
     },
     releaseTrust: (mintUrls) => releaseTrustWindow(manager, mintUrls),
   };
+}
+
+/**
+ * The single-leg transfer seam (ADR 0037) on Coco 2.0.0: one mint-to-mint
+ * transfer per call, run by the rebalance engine's one-leg path over this
+ * manager, with the shape Coco v3's `manager.ops.mintSwap` will have. The
+ * quote and melt it is made of stay inside; callers see the leg id only.
+ *
+ * `lock` is the screen's rebalance lock, so a leg never overlaps a plan run.
+ * Adopting Coco v3 replaces this function's body with `manager.ops.mintSwap`.
+ */
+export function createCocoSingleLegTransferPort(
+  manager: Manager,
+  unit: string,
+  options: {
+    lock: ReturnType<typeof createRebalanceLock>;
+    trustedMintUrls: ReadonlySet<string>;
+    minTransferThreshold: number;
+    minFeeReserve: number;
+  }
+): SingleLegTransferPort {
+  const wallet = createRebalanceWalletPort(manager, unit);
+  const engine = createRebalanceEngine({
+    wallet,
+    // A single leg is never routed through middlemen: the caller routes.
+    findRoutes: async () => [],
+    trustedMintUrls: options.trustedMintUrls,
+    minTransferThreshold: options.minTransferThreshold,
+    minFeeReserve: options.minFeeReserve,
+    lock: options.lock,
+    logger: cashuLog,
+  });
+  return createEngineSingleLegTransferPort({ engine, wallet, unit });
 }

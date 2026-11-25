@@ -21,7 +21,7 @@ import {
 import { getCounterparty } from 'wallet';
 
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
-import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { useRecentPeopleProfiles } from '@/shared/hooks/useRecentPeopleProfiles';
 import {
   normalizeRecentPersonPubkey,
   selectRecentPeople,

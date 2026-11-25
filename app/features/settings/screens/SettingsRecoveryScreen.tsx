@@ -40,6 +40,7 @@ import {
   type RecoveryRunOwner,
 } from '@/features/settings/lib/recoveryRun';
 import { withAlpha } from '@/shared/lib/color';
+import { formatUnitBalances } from '@/shared/lib/currency';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
 import {
@@ -50,6 +51,8 @@ import {
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { discoverMints } from '@/shared/lib/apiClient';
 import { fetchDiscoveredMintUrls } from '@/features/settings/lib/recoveryDiscovery';
+import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
+import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -102,6 +105,24 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+
+  // Legacy Routstr AI balance & pending-change reclaim (only shown when
+  // unclaimed credentials or pending payments still exist on this profile).
+  const hasAiLeftovers = useRoutstrStore(
+    (s) =>
+      Object.keys(s.pendingPayments).length > 0 ||
+      Object.values(s.legacyAccounts).some((a) => a.reclaimedAt == null && Boolean(a.apiKey))
+  );
+  const [reclaimingAi, setReclaimingAi] = useState(false);
+  const [aiReclaimNote, setAiReclaimNote] = useState<string | null>(null);
+
+  const handleReclaimAiLeftovers = async () => {
+    if (preview || locked || reclaimingAi) return;
+    setReclaimingAi(true);
+    setAiReclaimNote(null);
+    setAiReclaimNote(await collectAiLeftovers());
+    setReclaimingAi(false);
+  };
 
   useEffect(() => {
     if (!deepProbe || preview) {
@@ -302,6 +323,28 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             iconColor={surfaceSecondary}
           />
         )}
+        {!gateMode && !preview && (hasAiLeftovers || aiReclaimNote) && (
+          <VStack className="bg-surface-secondary w-full gap-2 rounded-2xl px-4 py-3">
+            <VStack className="gap-0.5">
+              <Text size={14} bold className="text-foreground">
+                Collect AI leftovers
+              </Text>
+              <Text size={12} className="text-muted">
+                {aiReclaimNote ?? 'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
+              </Text>
+            </VStack>
+            {hasAiLeftovers && (
+              <Button
+                testID="recovery-reclaim-ai"
+                variant="secondary"
+                text={reclaimingAi ? 'Checking AI nodes…' : 'Collect AI leftovers'}
+                disabled={reclaimingAi || locked}
+                onPress={handleReclaimAiLeftovers}
+              />
+            )}
+          </VStack>
+        )}
+
         {!gateMode && (
           <View className="w-full">
             <Button
@@ -638,7 +681,7 @@ const MintRecoveryRow: React.FC<{
     'warning',
   ] as const);
   const { balances: liveBalances } = useBalanceContext();
-  const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
+  const mintBalances = formatUnitBalances(liveBalances.byMintAndUnit?.[mintUrl]);
 
   const displayName = getMintDisplayName(mint, mintUrl);
   // A stuck mint produces no state change, so the "still scanning" note needs
@@ -663,7 +706,7 @@ const MintRecoveryRow: React.FC<{
           size={12}
           numberOfLines={1}
           style={{ color: isFailure(state.status) ? dangerColor : withAlpha(foreground, 0.4) }}>
-          {progressLabel ?? `${mintBalance.toLocaleString()} sats`}
+          {progressLabel ?? mintBalances}
         </Text>
       </VStack>
       {/* Same dot the payment timeline draws, same size, stroke weight and
@@ -686,3 +729,30 @@ const MintRecoveryRow: React.FC<{
     </HStack>
   );
 };
+
+/** Sweep legacy Routstr balances and pending AI change into the wallet, and
+ *  describe the outcome for the recovery card. Never rejects. */
+async function collectAiLeftovers(): Promise<string> {
+  try {
+    const [legacy, pendingRecovered] = await Promise.all([
+      reclaimRoutstrBalances(),
+      recoverPendingPayments(),
+    ]);
+    const collected = legacy.reclaimed + pendingRecovered;
+    const stillPendingPayments = Object.keys(useRoutstrStore.getState().pendingPayments).length;
+    const hasDeferred = legacy.deferred > 0 || stillPendingPayments > 0;
+    if (collected > 0) {
+      return hasDeferred
+        ? 'Collected available ecash. Some nodes did not answer — try again later.'
+        : 'Collected leftover AI ecash into your wallet.';
+    }
+    if (hasDeferred) return 'AI node did not answer. Your credentials are kept — try again later.';
+    return 'No leftover AI balance found.';
+  } catch (error) {
+    // Shown in the card instead of escaping the press handler unhandled.
+    cashuLog.warn('recovery.ai_reclaim.failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    return "Couldn't check AI nodes. Your credentials are kept — try again later.";
+  }
+}

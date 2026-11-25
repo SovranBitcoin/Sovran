@@ -15,10 +15,20 @@ import {
 initLog('Module', 'OfflineProvider loaded');
 
 type OfflineContextValue = {
+  /** Confirmed offline: no network, or no reachability target answered. */
   isOffline: boolean;
+  /**
+   * Confirmed offline because the phone itself reports no network, not merely
+   * because the probes failed. Work with its own fallbacks (BTC prices fall
+   * back from Coinbase to Mempool.space) pauses only on this.
+   */
+  isDisconnected: boolean;
 };
 
-const OfflineContext = createContext<OfflineContextValue>({ isOffline: false });
+const OfflineContext = createContext<OfflineContextValue>({
+  isOffline: false,
+  isDisconnected: false,
+});
 
 const BORDER_WIDTH = 2;
 const BANNER_HEIGHT = 14;
@@ -95,8 +105,9 @@ function summarizeReachability(result: OfflineReachabilityResult) {
 // Verbatim former effect body; returns the effect's cleanup function.
 function startConnectivityEngine(ctx: {
   setNetworkOffline: React.Dispatch<React.SetStateAction<boolean>>;
+  setNetworkDisconnected: React.Dispatch<React.SetStateAction<boolean>>;
 }): () => void {
-  const { setNetworkOffline } = ctx;
+  const { setNetworkOffline, setNetworkDisconnected } = ctx;
   let mounted = true;
   let active = AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
   let checking = false;
@@ -114,8 +125,10 @@ function startConnectivityEngine(ctx: {
 
   const commit = (
     nowOffline: boolean,
-    reachabilityLog: ReturnType<typeof summarizeReachability>
+    reachabilityLog: ReturnType<typeof summarizeReachability>,
+    disconnected: boolean
   ) => {
+    setNetworkDisconnected(disconnected);
     setNetworkOffline((prev) => {
       if (prev !== nowOffline) {
         log.info('provider.offline.transition', {
@@ -156,7 +169,7 @@ function startConnectivityEngine(ctx: {
           clearTimeout(recheckTimer);
           recheckTimer = null;
         }
-        commit(false, reachabilityLog);
+        commit(false, reachabilityLog, false);
         return;
       }
       offlineEvals += 1;
@@ -167,7 +180,7 @@ function startConnectivityEngine(ctx: {
         offlineRounds += 1;
         if (recheckTimer) clearTimeout(recheckTimer);
         recheckTimer = null;
-        commit(true, reachabilityLog);
+        commit(true, reachabilityLog, reachability.reason === 'network-disconnected');
         return;
       }
       log.debug('provider.offline.pending', {
@@ -257,6 +270,7 @@ function startConnectivityEngine(ctx: {
 
   const onWebOffline = () => {
     log.info('provider.offline.web_event', { event: 'offline' });
+    setNetworkDisconnected(true);
     setNetworkOffline(true);
   };
 
@@ -290,15 +304,17 @@ function startConnectivityEngine(ctx: {
 export function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
   useInitMount('OfflineStatusProvider');
   const [networkOffline, setNetworkOffline] = useState(false);
+  const [networkDisconnected, setNetworkDisconnected] = useState(false);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
+  const isDisconnected = mockOffline || (networkOffline && networkDisconnected);
 
-  useEffect(() => startConnectivityEngine({ setNetworkOffline }), []);
+  useEffect(() => startConnectivityEngine({ setNetworkOffline, setNetworkDisconnected }), []);
 
   // Context provider `value` — consumers can't opt out of identity churn, so
   // this stays manually memoized even under the React Compiler (hazard class).
   // ast-grep-ignore: no-manual-memo-tsx
-  const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
+  const contextValue = useMemo(() => ({ isOffline, isDisconnected }), [isOffline, isDisconnected]);
 
   return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
 }

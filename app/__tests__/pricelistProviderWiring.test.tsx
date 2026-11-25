@@ -1,7 +1,7 @@
 /**
- * The feed's `resume()` is only worth having if something calls it. This
- * renders the real provider over a stubbed feed and drives the two events that
- * are supposed to re-arm it, plus the unmount that has to stop it — the
+ * The feed's `resume()` and `setOffline()` are only worth having if something
+ * calls them. This renders the real provider over a stubbed feed and drives the
+ * foreground and connectivity events, plus the unmount that has to stop it — the
  * provider is remounted on every profile switch, so a missed `stop()` is one
  * orphaned socket per switch.
  */
@@ -20,11 +20,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 jest.mock('@/shared/lib/pricelistFeed', () => {
-  const stub = { start: jest.fn(), resume: jest.fn(), stop: jest.fn() };
+  const stub = { start: jest.fn(), resume: jest.fn(), stop: jest.fn(), setOffline: jest.fn() };
   return { __feed: stub, createPricelistFeed: jest.fn(() => stub) };
 });
 
-const offlineState = { isOffline: false };
+const offlineState = { isOffline: false, isDisconnected: false };
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => offlineState,
 }));
@@ -52,8 +52,10 @@ beforeEach(() => {
   feed.start.mockClear();
   feed.resume.mockClear();
   feed.stop.mockClear();
+  feed.setOffline.mockClear();
   (createPricelistFeed as jest.Mock).mockClear();
   offline.isOffline = false;
+  offline.isDisconnected = false;
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -80,26 +82,48 @@ describe('PricelistProvider wiring', () => {
     expect(feed.resume).toHaveBeenCalledWith('foreground');
   });
 
-  it('re-arms on the offline→online edge, and not on the initial online', () => {
+  it('tells the feed its connectivity before it starts, then on every change', () => {
     const { view } = renderProvider();
-    // Mount is already "online"; re-arming here would only re-enter the dial
-    // the effect above just started.
-    expect(feed.resume).not.toHaveBeenCalled();
-
-    offline.isOffline = true;
-    view.rerender(
-      <PricelistProvider>
-        <Text>child</Text>
-      </PricelistProvider>
+    expect(feed.setOffline.mock.calls).toEqual([[false]]);
+    expect(feed.setOffline.mock.invocationCallOrder[0]).toBeLessThan(
+      feed.start.mock.invocationCallOrder[0]
     );
-    expect(feed.resume).not.toHaveBeenCalled();
+
+    const rerender = () =>
+      view.rerender(
+        <PricelistProvider>
+          <Text>child</Text>
+        </PricelistProvider>
+      );
+    offline.isOffline = true;
+    offline.isDisconnected = true;
+    rerender();
+    expect(feed.setOffline).toHaveBeenLastCalledWith(true);
 
     offline.isOffline = false;
-    view.rerender(
-      <PricelistProvider>
-        <Text>child</Text>
-      </PricelistProvider>
+    offline.isDisconnected = false;
+    rerender();
+    expect(feed.setOffline).toHaveBeenLastCalledWith(false);
+    // Reconnect goes through the pause, not a second resume path.
+    expect(feed.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps polling when only reachability probes fail, so Mempool can still answer', () => {
+    // Coinbase's /v2/time can be the only probe: Coinbase down must not stop
+    // the feed from falling back to Mempool.space.
+    offline.isOffline = true;
+    offline.isDisconnected = false;
+    renderProvider();
+    expect(feed.setOffline.mock.calls).toEqual([[false]]);
+  });
+
+  it('starts a feed paused when the phone is offline at mount', () => {
+    offline.isOffline = true;
+    offline.isDisconnected = true;
+    renderProvider();
+    expect(feed.setOffline.mock.calls[0]).toEqual([true]);
+    expect(feed.setOffline.mock.invocationCallOrder[0]).toBeLessThan(
+      feed.start.mock.invocationCallOrder[0]
     );
-    expect(feed.resume).toHaveBeenCalledWith('online');
   });
 });

@@ -12,46 +12,31 @@
  * `boolean` (the probe ran and produced a verdict); `err` means the probe itself
  * could not run (network/abort/socket failure) and is treated as offline.
  */
-import { ok, err, ResultAsync } from 'neverthrow';
-import { z } from 'zod';
-import { parseWith } from '@sovranbitcoin/schemas';
+import { ResultAsync } from 'neverthrow';
 
-import { fetchJson } from '@/shared/lib/apiClient';
-import { redactError, type RedactedError } from '@/shared/lib/logger';
+import { type RedactedError } from '@/shared/lib/logger';
 import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
 
 /** Uniform per-tier status the Network screen renders. `disabled` = toggle off. */
 export type TierStatus = 'online' | 'offline' | 'checking' | 'disabled';
 
-const NAGG_HEALTH_TIMEOUT_MS = 4_000;
-const PRIMAL_HEALTH_TIMEOUT_MS = 5_000;
-
-const healthzSchema = z.object({ ok: z.union([z.string(), z.boolean()]) });
-const parseHealthz = parseWith(healthzSchema, 'nostr/nagg-healthz');
-
 /**
- * Probe nagg's HTTP `/healthz` through the shared `fetchJson` client (timeout,
- * URL redaction, zod validation). The `err` channel means the probe could not
- * run (unreachable / non-2xx / malformed body) — offline; `ok(true)` means the
- * body reported `{ ok: "true" | true }`.
+ * One Fast-cache server's status. With Fast cache off no server is used, so
+ * every one is off whatever its last probe said; an unprobed one is checking.
  */
-export function probeNaggHealth(
-  baseUrl: string,
-  options: { signal?: AbortSignal } = {}
-): ResultAsync<boolean, RedactedError> {
-  const url = `${baseUrl.replace(/\/+$/, '')}/healthz`;
-  return ResultAsync.fromSafePromise(
-    fetchJson(url, parseHealthz, 'nostr/nagg-healthz', undefined, {
-      signal: options.signal,
-      timeoutMs: NAGG_HEALTH_TIMEOUT_MS,
-    })
-  ).andThen((result) =>
-    result.match(
-      (body) => ok(body.ok === true || body.ok === 'true'),
-      (e) => err(redactError(e))
-    )
-  );
+export function primalHostStatus({
+  tierEnabled,
+  hostEnabled,
+  health,
+}: {
+  tierEnabled: boolean;
+  hostEnabled: boolean;
+  health: TierStatus | undefined;
+}): TierStatus {
+  return tierEnabled && hostEnabled ? (health ?? 'checking') : 'disabled';
 }
+
+const PRIMAL_HEALTH_TIMEOUT_MS = 5_000;
 
 /**
  * Probe Primal's cache. It has no `/healthz`, so we open the WebSocket, send a

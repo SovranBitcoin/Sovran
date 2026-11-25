@@ -7,12 +7,10 @@ import type { PopupTextSegment } from '../format';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export { openProfileSwitcher } from './actionSheets';
+export { openProfileImportMenu, type ProfileImportRequest } from './actionSheets';
 export { sendMemoPopup } from './sendMemoSheet';
 export { copyTokenAsEmoji } from './emojiPicker';
-export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
-export { deleteStatusPopup } from './deleteStatus';
 export {
   paymentStatusPopup,
   swapStatusPopup,
@@ -36,7 +34,7 @@ type PopupSpec = {
   icon?: PopupIcon;
   type?: 'success' | 'error' | 'warning' | 'info';
   variant?: 'toast' | 'sheet';
-  buttons?: { text: string; page?: string; onPress?: () => void }[];
+  buttons?: { text: string; onPress?: () => void }[];
   buttonLayout?: 'row' | 'stack';
 };
 

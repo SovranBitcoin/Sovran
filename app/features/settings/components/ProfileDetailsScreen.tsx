@@ -12,11 +12,10 @@ import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Button as HerouiButton, Description, Input, Label, TextField } from 'heroui-native';
+import { Description, Input, Label, TextField } from 'heroui-native';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Button } from '@/shared/ui/primitives/Button';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { log } from '@/shared/lib/logger';
@@ -60,8 +59,6 @@ export function ProfileDetailsScreen({
   children?: React.ReactNode;
   onBack?: () => void;
 }) {
-  const mutedColor = useThemeColor('muted');
-  const backgroundColor = useThemeColor('background');
   const paint = useStylePaint();
   const { pad, item } = paint.style.space;
   const shift = useShiftLogger('SettingsProfileScreen');
@@ -114,7 +111,6 @@ export function ProfileDetailsScreen({
     // secureTextEntry ignores multiline, so an obscured secret is one line and
     // only grows when the user reveals it — a shift they caused.
     const multiline = !shouldObscure && lines > 1;
-    const name = label.replace(/:$/, '');
 
     return (
       <View className="mb-3">
@@ -134,37 +130,39 @@ export function ProfileDetailsScreen({
             {/* Always mounted: the action row is part of the card's resting
                 height, so it must not appear once the value loads. */}
             <View className="mt-2 w-full flex-row gap-2">
+              {/* Both are the shared secondary button with its own full-contrast
+                  ink: a muted label on the control fill fell under 4.5:1. */}
               {showEyeIcon ? (
-                <HerouiButton
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  isDisabled={!value || loading || isLoading}
-                  testID={`profile-reveal-${fieldKey}`}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: isVisible }}
-                  accessibilityValue={{ text: isVisible ? '1' : '0' }}
-                  onPress={() => toggleFieldVisibility(fieldKey)}>
-                  <Icon
-                    name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
-                    size={15}
-                    color={mutedColor}
+                <View className="flex-1">
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    text={isVisible ? 'Hide' : 'Show'}
+                    icon={
+                      <Icon
+                        name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
+                        size={15}
+                        color={paint.secondary.content}
+                      />
+                    }
+                    disabled={!value || loading || isLoading}
+                    testID={`profile-reveal-${fieldKey}`}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: isVisible }}
+                    accessibilityLabel={`${isVisible ? 'Hide' : 'Show'} ${label}`}
+                    onPress={() => toggleFieldVisibility(fieldKey)}
                   />
-                  <HerouiButton.Label className="text-muted">
-                    {isVisible ? 'Hide' : 'Show'}
-                  </HerouiButton.Label>
-                </HerouiButton>
+                </View>
               ) : null}
               <View className="flex-1">
                 <Button
                   variant="secondary"
                   size="compact"
                   text="Copy"
-                  icon={<Icon name="lets-icons:copy" size={15} color={mutedColor} />}
-                  contentColor={mutedColor}
+                  icon={<Icon name="lets-icons:copy" size={15} color={paint.secondary.content} />}
                   disabled={!value || loading || isLoading}
                   testID={`profile-copy-${copyTarget}`}
-                  accessibilityLabel={`Copy ${name}`}
+                  accessibilityLabel={`Copy ${label}`}
                   onPress={() => handleCopy(value, copyTarget)}
                 />
               </View>
@@ -242,11 +240,11 @@ export function ProfileDetailsScreen({
                   </View>
                 </View>
                 {/* The one way in to the kind-0 editor (name, picture,
-                    Lightning address, Nostr address, about). */}
+                    Lightning address, verified name, about). */}
                 <Button
                   variant="primary"
                   text="Edit profile"
-                  icon={<Icon name="mdi:pencil" size={16} color={backgroundColor} />}
+                  icon={<Icon name="mdi:pencil" size={16} color={paint.primary.content} />}
                   testID="settings-profile-edit"
                   accessibilityLabel="Edit profile"
                   onPress={() => router.push('/(settings-flow)/edit-profile')}
@@ -279,7 +277,7 @@ export function ProfileDetailsScreen({
         />
 
         {renderCopyableDetail(
-          'NIP06:',
+          'Recovery phrase',
           mnemonic || '',
           'mnemonic',
           'mnemonic',
@@ -290,17 +288,17 @@ export function ProfileDetailsScreen({
         {!rootOnly && (
           <>
             {renderCopyableDetail(
-              'NPUB:',
+              'Public key (npub)',
               nostrKeys?.npub || '',
               'npub',
               null,
-              'Your public identifier on the Nostr network.',
+              'Safe to share. People use it to find you.',
               loading,
               3
             )}
 
             {renderCopyableDetail(
-              'NSEC:',
+              'Private key (nsec)',
               nostrKeys?.nsec || '',
               'nsec',
               'nsec',
@@ -309,7 +307,7 @@ export function ProfileDetailsScreen({
             )}
 
             {renderCopyableDetail(
-              `NUT13:`,
+              'Wallet recovery phrase',
               cashuMnemonic || '',
               'cashuMnemonic',
               'cashuMnemonic',

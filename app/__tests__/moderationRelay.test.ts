@@ -5,7 +5,7 @@ import {
   setPersonBlocked,
   syncMuteList,
 } from '../shared/lib/nostr/moderation';
-import { useFeedIgnoreStore } from '../features/feed/stores/ignoreStore';
+import { useFeedIgnoreStore } from '../shared/stores/profile/ignoreStore';
 import { asNostrPubkeyHex } from '../shared/lib/protocolIds';
 import {
   SILENT_READS_BEFORE_LEFT_OUT,

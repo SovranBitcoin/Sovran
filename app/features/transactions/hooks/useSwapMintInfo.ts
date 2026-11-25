@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useManager } from '@cashu/coco-react';
 import { useShallow } from 'zustand/shallow';
+import { ownEntry } from '@/shared/lib/ownEntry';
 import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
@@ -11,7 +12,9 @@ const MAX_CONCURRENT_MISSES = 3;
 export function useSwapMintInfo(mintUrls: string[]): Record<string, MintInfoSummary> {
   const manager = useManager();
   const entries = useMintMetadataStore(
-    useShallow((state) => mintUrls.map((url) => state.byMintUrl[normalizeMintUrlKey(url)]))
+    useShallow((state) =>
+      mintUrls.map((url) => ownEntry(state.byMintUrl, normalizeMintUrlKey(url)))
+    )
   );
 
   useEffect(() => {

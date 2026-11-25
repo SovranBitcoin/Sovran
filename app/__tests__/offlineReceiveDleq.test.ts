@@ -173,6 +173,36 @@ describe('offline receive DLEQ boundary', () => {
     );
   });
 
+  it.each(['error', 'false', '12345'])(
+    'refuses a cached amount key %j as unusable before any curve math',
+    async (malformedKey) => {
+      const { keyset, proof } = makeProofFixture();
+      const before = JSON.stringify(proof);
+      await expectFailure(
+        requirePreparedOfflineReceiveDleq(
+          managerWithKeysets([{ ...keyset, keys: { '1': malformedKey } }]),
+          preparedBatch([proof])
+        ),
+        'missing-amount-key'
+      );
+      expect(JSON.stringify(proof)).toBe(before);
+    }
+  );
+
+  it.each(['error', 'false', '12345'])(
+    'refuses a proof with keyset id %j that no cached keyset carries',
+    async (id) => {
+      const { keyset, proof } = makeProofFixture();
+      await expectFailure(
+        requirePreparedOfflineReceiveDleq(
+          managerWithKeysets([keyset]),
+          preparedBatch([{ ...proof, id }])
+        ),
+        'missing-keyset'
+      );
+    }
+  );
+
   it('rejects a proof when the cached amount key belongs to a different mint key', async () => {
     const { keyset, proof } = makeProofFixture();
     const wrongPrivateKey = fixtureHexToBytes('2'.padStart(64, '0'));

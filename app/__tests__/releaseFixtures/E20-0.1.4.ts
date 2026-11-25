@@ -44,6 +44,61 @@ const SWAP_GROUP_A0 = {
   legs: [{ ...SWAP_A0.state.groups[SWAP_GROUP].legs[0], mintOperationId: 'mint-op-fixture-1' }],
 };
 
+const MINIBITS = 'https://mint.minibits.cash/Bitcoin';
+// shared/lib/url.ts `normalizeMintUrlKey`: the key the 0.1.4 stores read and
+// write a mint's row under. The earlier fixtures' full-URL row stays beside it.
+const MINIBITS_KEY = 'mint.minibits.cash/Bitcoin';
+const METADATA = disk['mint-metadata-store'] as {
+  state: { byMintUrl: Record<string, object> };
+  version: number;
+};
+const OBSERVATIONS = {
+  ucash: {
+    source: 'ucash',
+    observedAt: 1_789_960_000_000,
+    status: 'online',
+    uptime: { pct: 100, window: '24h', checks: 25 },
+    operations: { okCount: 230, totalCount: 241, window: 'all' },
+    latency: { ms: 3394, kind: 'mean', window: '24h' },
+    auditorMintId: 2,
+  },
+  mintradar: {
+    source: 'mintradar',
+    observedAt: 1_789_960_000_000,
+    uptime: { pct: 99.5, window: '24h' },
+    operations: { okCount: 48, totalCount: 50, window: '7d' },
+    latency: { ms: 145, kind: 'median', window: '24h' },
+    sourceUrl: 'https://mintradar.org/mint/https%3A%2F%2Fmint.minibits.cash%2FBitcoin',
+  },
+};
+
+// shared/stores/profile/mintHistoryStore.ts: a mint seen twice, one revision.
+const MINT_HISTORY_KEY = MINIBITS_KEY;
+const MINT_HISTORY = {
+  mintUrl: MINIBITS,
+  baseline: { name: 'Minibits mint', pubkey: '03c2', version: 'cdk-mintd/0.18.3' },
+  hash: 'd'.repeat(64),
+  firstSeenAt: 1_789_900_000_000,
+  lastSeenAt: 1_789_990_000_000,
+  lastCheckedAt: 1_789_990_000_000,
+  consecutiveFailures: 0,
+  nextRetryAt: 1_790_076_400_000,
+  lastViewedAt: 1_789_990_000_000,
+  trusted: true,
+  revisions: [
+    {
+      id: 'mfixture-cccccccc-dddddddddddd',
+      at: 1_789_950_000_000,
+      previousLastSeenAt: 1_789_900_000_000,
+      hash: 'd'.repeat(64),
+      patch: [
+        { op: 'test', path: '/version', value: 'cdk-mintd/0.18.2' },
+        { op: 'replace', path: '/version', value: 'cdk-mintd/0.18.3' },
+      ],
+    },
+  ],
+};
+
 const LAST_KNOWN_VERSION = { version: '0.1.5', minVersion: '0.1.2', fetchedAt: 1_790_000_000_000 };
 const PROVIDER = {
   baseUrl: 'https://node.example',
@@ -143,10 +198,21 @@ export const fixture: ReleaseFixture = {
         .filter((key) => key.startsWith('nut-drop-redeem-queue:profile:'))
         .map((key) => [key, withState(key, { recoveredCopy: null })])
     ),
+    // shared/stores/global/settingsStore.ts: `enabledMintAuditors`, the
+    // allowlist for opt-in auditors (Macadamia), beside the saved denylist.
     'settings-store': withState('settings-store', {
       lastKnownAppVersion: LAST_KNOWN_VERSION,
       vertexCreditsEnabled: false,
       primalHostsDisabled: ['wss://cache2.primal.net/v1'],
+      enabledMintAuditors: ['macadamia'],
+    }),
+    // shared/stores/global/mintMetadataStore.ts: `auditObservations`, each
+    // auditor's own reading of a mint (shared/lib/cashu/auditors/observation.ts).
+    'mint-metadata-store': withState('mint-metadata-store', {
+      byMintUrl: {
+        ...METADATA.state.byMintUrl,
+        [MINIBITS_KEY]: { ...METADATA.state.byMintUrl[MINIBITS], auditObservations: OBSERVATIONS },
+      },
     }),
     // shared/stores/global/pricelistStore.ts: serverUpdatedAt
     'pricelist-store': withState('pricelist-store', { serverUpdatedAt: 1_789_199_340 }),
@@ -159,6 +225,19 @@ export const fixture: ReleaseFixture = {
     [accountKey('ai-provider-directory-store', A0)]: zustandRow(1, {
       providers: [PROVIDER],
       fetchedAt: 1_789_950_000_000,
+    }),
+    // shared/stores/profile/mintHistoryStore.ts: PersistedMintHistoryStore. Every
+    // account has its row; account 0 has recorded one mint.
+    ...Object.fromEntries(
+      Object.keys(disk)
+        .filter((key) => key.startsWith('search-history-store:profile:'))
+        .map((key) => [
+          key.replace('search-history-store:', 'mint-history-store:'),
+          zustandRow(1, { byMintUrl: {} }),
+        ])
+    ),
+    [accountKey('mint-history-store', A0)]: zustandRow(1, {
+      byMintUrl: { [MINT_HISTORY_KEY]: MINT_HISTORY },
     }),
     // shared/stores/global/ctaStore.ts: the schema in its persist options
     'cta-store': zustandRow(1, {
@@ -226,6 +305,18 @@ export const fixture: ReleaseFixture = {
         equals: ['wss://cache2.primal.net/v1'],
       },
       {
+        what: 'the opt-in mint auditor that was turned on',
+        store: 'settings-store',
+        path: ['enabledMintAuditors'],
+        equals: ['macadamia'],
+      },
+      {
+        what: "each auditor's reading of a mint",
+        store: 'mint-metadata-store',
+        path: ['byMintUrl', MINIBITS_KEY, 'auditObservations'],
+        equals: OBSERVATIONS,
+      },
+      {
         what: 'when the server last priced bitcoin',
         store: 'pricelist-store',
         path: ['serverUpdatedAt'],
@@ -249,6 +340,13 @@ export const fixture: ReleaseFixture = {
         accountIndex: 0,
         path: ['providers', 0],
         equals: PROVIDER,
+      },
+      {
+        what: 'the mint info history of account 0',
+        store: 'mint-history-store',
+        accountIndex: 0,
+        path: ['byMintUrl', MINT_HISTORY_KEY],
+        equals: MINT_HISTORY,
       },
       {
         what: 'when the AI provider list of account 0 was read',

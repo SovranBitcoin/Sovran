@@ -166,3 +166,25 @@ describe('belongsToAccount', () => {
     expect(belongsToAccount('all', { unit: 'eur', mintUrl: TESTNUT }, isTestnut)).toBe(true);
   });
 });
+
+describe('prototype-named mint keys', () => {
+  it.each(['https://constructor', 'https://toString'])(
+    'treats %s as a new mint, not an inherited Object member',
+    (mintUrl) => {
+      const store = useMintTestnutStore.getState();
+      store.applyMintInfos([{ mintUrl, testnut: false }]);
+      const key = mintUrl.replace('https://', '').toLowerCase();
+      expect(
+        Object.getOwnPropertyDescriptor(useMintTestnutStore.getState().byMintUrl, key)?.value
+      ).toEqual({ testnut: false, checkedAt: now });
+      expect(isTestnutMint(mintUrl)).toBe(false);
+
+      useMintTestnutStore.setState({ byMintUrl: {} });
+      store.applyDiscover([{ mintUrl, testnut: true, averageScore: null, reviewCount: 0 }]);
+      expect(
+        Object.getOwnPropertyDescriptor(useMintTestnutStore.getState().byMintUrl, key)?.value
+      ).toEqual({ testnut: true, checkedAt: 0 });
+      expect(isTestnutMint(mintUrl)).toBe(true);
+    }
+  );
+});

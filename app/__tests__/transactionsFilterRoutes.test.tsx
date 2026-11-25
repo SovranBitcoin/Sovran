@@ -16,11 +16,13 @@ import { TransactionsFilterProvider } from '@/features/transactions/components/T
 
 let mockRaw: Record<string, string> = {};
 let mockScreenProps: Record<string, unknown> | null = null;
+const mockScreenRenders: Record<string, unknown>[] = [];
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockRaw,
+  usePathname: () => '',
   // The header's right item, drawn in place so it reads the same filters.
   Stack: {
     Screen: ({ options }: { options: { headerRight?: () => React.ReactElement } }) =>
@@ -31,12 +33,15 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
     back: () => mockBack(),
+    // Invalid params recover through the unguarded router.
+    raw: { back: () => mockBack(), canGoBack: () => true },
   },
 }));
 jest.mock('@/features/transactions', () => ({
   ...jest.requireActual('@/features/transactions/components/TransactionsFilterContext'),
   TransactionsScreen: (props: Record<string, unknown>) => {
     mockScreenProps = props;
+    mockScreenRenders.push(props);
     return null;
   },
 }));
@@ -118,6 +123,7 @@ function sheetParams() {
 
 beforeEach(() => {
   mockScreenProps = null;
+  mockScreenRenders.length = 0;
   mockNavigate.mockClear();
   mockBack.mockClear();
 });
@@ -199,4 +205,18 @@ it.each([
   open(raw);
   expect(mockScreenProps).toBeNull();
   expect(mockBack).toHaveBeenCalled();
+});
+
+// The wallet's History and the pending/View-all links open Transactions on the
+// active account's currency. The list must not draw sats (or `All`) first and
+// then swap, and the badge must not count from the defaults on that frame.
+it('draws the first frame with the filters the route names', () => {
+  open({ filterCurrency: 'usd', filterStatus: 'Pending' });
+  expect(mockScreenRenders[0]).toMatchObject({
+    filters: { ...DEFAULT_SHEET_PARAMS, currency: 'usd', status: 'Pending' },
+  });
+  for (const props of mockScreenRenders) {
+    expect(props).toMatchObject({ filters: { currency: 'usd', status: 'Pending' } });
+  }
+  expect(header().badge).toBe(2);
 });
