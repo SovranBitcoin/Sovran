@@ -5,8 +5,8 @@ import { normalizeURL } from 'nostr-tools/utils';
  *
  * Accepts only `ws://` and `wss://` URLs (rejects `http:`, `javascript:`, bare
  * non-URL strings, etc.), lowercases scheme and host, strips default ports and
- * fragments, and normalizes root URLs with a canonical trailing slash matching
- * `nostr-tools`'s `normalizeURL` and prior persisted relay lists.
+ * fragments, and ends every path with a canonical trailing slash, matching the
+ * NDK-normalized relay lists earlier releases saved.
  */
 export function normalizeRelayUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -17,7 +17,10 @@ export function normalizeRelayUrl(raw: string): string {
   if (parsed.protocol !== 'wss:' && parsed.protocol !== 'ws:') {
     throw new Error(`Invalid relay URL protocol: ${parsed.protocol}`);
   }
-  const normalized = normalizeURL(trimmed);
+  // `normalizeURL` drops a path's trailing slash; relay lists saved under NDK
+  // kept it (`wss://nostr.wine/inbox/`), so keep that form for equality.
+  let normalized = normalizeURL(trimmed);
+  if (!normalized.endsWith('/') && !normalized.includes('?')) normalized += '/';
   const check = new URL(normalized);
   if (check.protocol !== 'wss:' && check.protocol !== 'ws:') {
     throw new Error(`Invalid normalized relay URL: ${normalized}`);

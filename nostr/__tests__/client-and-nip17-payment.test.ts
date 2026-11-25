@@ -169,6 +169,9 @@ describe('nostr client & pure nostr-tools NIP-17 payment transport', () => {
   it('normalizes valid ws/wss relay URLs and rejects invalid schemes', () => {
     expect(normalizeRelayUrl('WSS://Relay.Damus.IO')).toBe('wss://relay.damus.io/');
     expect(normalizeRelayUrl('wss://nos.lol:443/')).toBe('wss://nos.lol/');
+    // Saved relay lists kept NDK's trailing slash on paths.
+    expect(normalizeRelayUrl('wss://nostr.wine/inbox/')).toBe('wss://nostr.wine/inbox/');
+    expect(normalizeRelayUrl('wss://a.example/path')).toBe('wss://a.example/path/');
     expect(tryNormalizeRelayUrl('https://not-a-relay.example')).toBeNull();
     expect(tryNormalizeRelayUrl('javascript:alert(1)')).toBeNull();
     expect(tryNormalizeRelayUrl('http-not-relay')).toBeNull();
