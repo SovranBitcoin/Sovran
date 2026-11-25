@@ -1,6 +1,7 @@
 export { normalizeRelayUrl, tryNormalizeRelayUrl } from './normalizeRelayUrl';
 export {
   createPrivateKeySigner,
+  type EncryptionScheme,
   type NostrSigner,
   type UnsignedNostrEvent,
 } from './signer';
