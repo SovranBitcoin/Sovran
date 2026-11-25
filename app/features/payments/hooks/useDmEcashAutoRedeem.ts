@@ -93,9 +93,7 @@ function useDmEcashAutoRedeem(): void {
   // The live subscription is bound to the data layer it was opened on. A tier
   // switched on or off in Network settings builds a new layer, so the effect
   // re-runs and subscribes on that one.
-  const tiers = useSettingsStore(
-    (s) => `${s.naggTierEnabled}|${s.primalTierEnabled}|${s.relayTierEnabled}`
-  );
+  const tiers = useSettingsStore((s) => `${s.primalTierEnabled}|${s.relayTierEnabled}`);
   const pubkey = keys?.pubkey;
   const privateKey = keys?.privateKey;
   // Until the queue is read for this profile it holds an empty default: a token

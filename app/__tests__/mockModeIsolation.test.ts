@@ -181,26 +181,6 @@ it('keeps the wallet total and mint presentation balances coherent without inven
   expect(getMockMintBalance('https://unknown.invalid', 'sat')).toBe(0);
 });
 
-const mockPrivateConversations = [
-  {
-    counterparty: 'ab'.repeat(32),
-    lastMessagePreview: 'Private live message',
-    lastMessageIsOwn: false,
-    lastMessageAtSec: 123,
-  },
-];
-const mockDmReader = jest.fn((..._args: unknown[]) => ({
-  conversations: mockPrivateConversations,
-  loading: false,
-  hasLoadedOnce: true,
-  hasMore: true,
-  loadMore: jest.fn(),
-  refresh: jest.fn(),
-  error: null,
-}));
-jest.mock('@/features/payments/hooks/useDmConversations', () => ({
-  useDmConversations: (...args: unknown[]) => mockDmReader(...args),
-}));
 jest.mock('wallet', () => ({
   getCounterparty: () => null,
   // The fixtures annotate a grouped AI request. Nothing in THIS file reads
@@ -221,36 +201,17 @@ jest.mock('@/shared/hooks/useRecentPeopleProfiles', () => ({
   useRecentPeopleProfiles: (...args: unknown[]) => mockProfileReader(...args),
 }));
 
-it('keeps fictional chats separate from public identities and restores private contacts after toggles', () => {
-  const { useNip17RecentContacts } = require('@/features/payments/hooks/useNip17RecentContacts');
+it('keeps fictional demo people separate from public identities', () => {
   const {
-    getMockContacts,
     getMockProfileMetadata,
-    getMockDmThread,
+    isMockContactPubkey,
   } = require('@/shared/stores/runtime/mockDataStore');
   const { DEMO_RECENT_PUBKEYS } = require('@/shared/stores/runtime/mockPublicProfile');
-  const keys = { pubkey: 'ab'.repeat(32) };
-  act(() => useSettingsStore.getState().setMockMode(false));
-  const { result } = renderHook(() => useNip17RecentContacts(keys));
-  for (const enabled of [true, true, false, true, false]) {
-    act(() => useSettingsStore.getState().setMockMode(enabled));
-    expect(
-      result.current.displayContacts.some((c: { pubkey: string }) => c.pubkey === keys.pubkey)
-    ).toBe(!enabled);
-    if (enabled) {
-      expect(mockDmReader).toHaveBeenLastCalledWith(undefined, undefined, { live: false });
-      expect(result.current.conversations).toEqual([]);
-      expect(result.current.hasMore).toBe(false);
-      expect(result.current.displayContacts).toHaveLength(6);
-      for (const contact of getMockContacts()) {
-        expect(DEMO_RECENT_PUBKEYS).not.toContain(contact.pubkey);
-        expect(getMockProfileMetadata(contact.pubkey).picture).toBeTruthy();
-        expect(getMockProfileMetadata(contact.pubkey).lud16).toBeUndefined();
-        expect(getMockDmThread(contact.pubkey).length).toBeGreaterThan(1);
-      }
-    }
-  }
-  expect(mockPrivateConversations[0].lastMessagePreview).toBe('Private live message');
+  const MAYA = 'b362ccc4912c046428cf9d80b742f44d7fb5a19fa1c227cccb779b2a1f61ef1c';
+  expect(isMockContactPubkey(MAYA)).toBe(true);
+  expect(getMockProfileMetadata(MAYA).picture).toBeTruthy();
+  expect(getMockProfileMetadata(MAYA).lud16).toBeUndefined();
+  for (const pubkey of DEMO_RECENT_PUBKEYS) expect(isMockContactPubkey(pubkey)).toBe(false);
 });
 
 it('uses reviewed public avatars in Send without persisting recents, then restores live people', () => {

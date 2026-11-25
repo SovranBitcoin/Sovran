@@ -20,9 +20,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
  * WHOLE social store on the next launch: follow set, contact tags, engagement
  * map, both deletion sets.
  *
- * `toNoteStats` now holds that contract at the tier boundary
- * (`nostr/src/facade/noteStatsContract.ts`). This is the other half: given a
- * `satsZapped` that satisfies it, what the store persists must parse.
+ * The tier boundary that once held that contract is gone with the feed; this
+ * pins the store's half: given a `satsZapped` that is an integer, what the
+ * store persists must parse.
  */
 const STORE_NAME = 'nostr-social-store';
 const EVENT_ID = 'e'.repeat(64);

@@ -36,7 +36,6 @@ const STORE_DIRS: Record<string, string> = {
 const EXCLUDED: ReadonlySet<string> = new Set([
   'profile/restoreActiveSessionView',
   'runtime/clearPaymentContext',
-  'runtime/dmEchoStore', // DM bodies may be live bearer ecash tokens
   'runtime/legProgress', // factory: instances are created per call, not enumerable
   'profile/vertexBudgetStore', // factory: one zustand/vanilla store per owner pubkey, not enumerable
   'profile/nip46ActivityStore', // inert since Remote Login's removal (ADR 0035); never loaded
@@ -76,9 +75,5 @@ describe('E2E_STORE_MANIFEST completeness', () => {
   it('keeps every reviewed helper, factory, or sensitive store exclusion out', () => {
     const keys = manifestKeys();
     for (const key of EXCLUDED) expect(keys.has(key)).toBe(false);
-  });
-
-  it('never mirrors plaintext DM echoes that may contain bearer ecash tokens', () => {
-    expect(manifestKeys()).not.toContain('runtime/dmEchoStore');
   });
 });

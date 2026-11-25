@@ -9,11 +9,8 @@ import {
   AI_TIER_IDS,
   E2EE_PROVIDER_ID,
   PersistedLineupSchema,
-  curatedIdSet,
-  deriveLineup,
   lineupHasEntries,
   lineupProviderIds,
-  mergeLineupWithLastKnown,
   type AiLineup,
   type AiProviderId,
   type AiTierId,
@@ -38,7 +35,7 @@ import {
 // guards and the display metadata in `features/ai/lib/format.ts`. (These
 // used to be duplicated literal unions to avoid a feature → store cycle;
 // the shared module removed the need.)
-export type RoutstrModel = {
+type RoutstrModel = {
   id: string;
   name: string;
   description: string;
@@ -318,9 +315,6 @@ interface RoutstrSession {
   activeChildren?: Record<string, string>;
 }
 
-// Cache TTL: 5 minutes
-const MODELS_CACHE_TTL_MS = 5 * 60 * 1000; // 300000ms
-
 interface ModelsCache {
   data: RoutstrModel[];
   timestamp: number;
@@ -583,53 +577,11 @@ interface CuratedModelsState {
 }
 
 interface RoutstrActions {
-  /** Adopt a freshly fetched curated list and re-derive the lineup from the
-   *  catalog in hand, so a list that arrives after the catalog still shapes
-   *  the menu this session. */
-  setCuratedModels: (curated: CuratedModelsState) => void;
-  /** Move a credential into `legacyAccounts` so its balance stays reachable.
-   *  Idempotent, and never overwrites a richer record with a poorer one. */
-  archiveAccount: (nodeBaseUrl: string | null, apiKey: string, balanceMsats: number | null) => void;
   /** Mark an archived credential as swept. Keeps the row (the node may still
    *  hold dust, and a refund is idempotent) but stops it being retried. */
   markAccountReclaimed: (nodeBaseUrl: string) => void;
   invalidateServerLineup: () => void;
 
-  /** Add messages to a conversation (`selectConversationId` when they were
-   *  asked) in one write, so a question and its answer's placeholder are
-   *  saved together or not at all, whichever conversation is open now. */
-  addMessages: (conversationId: string | null, messages: RoutstrMessage[]) => void;
-  /** Toggle a message's transient `pending` flag in the conversation it was
-   *  sent in (`selectConversationId` when it was sent), whichever one is open
-   *  now. Used by `useAiSend` to flip the user-bubble spinner → check once
-   *  the streaming round-trip resolves. Cleared on load (see `afterHydrate`). */
-  setMessagePending: (conversationId: string | null, id: string, pending: boolean) => void;
-  /** Persist the final assistant payload (content + reasoning + thinking
-   *  duration + cost) in one atomic write, replacing the placeholder body
-   *  added at stream open, in the conversation it was asked in. Preserves
-   *  `id`, `parentId`, `role`, and `timestamp` so message identity / branch
-   *  links don't shift. */
-  finalizeAssistantMessage: (
-    conversationId: string | null,
-    id: string,
-    fields: {
-      content: string;
-      thinkingDurationSec?: number;
-      reasoningContent?: string;
-      costSats?: number;
-      modelSwitch?: RoutstrMessage['modelSwitch'];
-    }
-  ) => void;
-  /** Pick which sibling is shown at a branch point. Writes through to
-   *  the current session's `activeChildren` so the choice survives across
-   *  app restarts. */
-  setActiveBranch: (parentId: string, childId: string) => void;
-  /** Atomic write of the (provider, tier) pair — used by the tabbed
-   *  picker so flipping a row doesn't briefly leave the store in a
-   *  half-updated state between two `set()` calls. */
-  setSelectedSlot: (slot: { provider: RoutstrProviderId; tier: RoutstrTierId }) => void;
-
-  setCachedModels: (models: RoutstrModel[]) => void;
   /** Apply the nagg-served lineup (already mapped via
    *  `lineupFromNaggPayload`). Takes precedence over `setCachedModels`'
    *  derivation until invalidation and persists the snapshot +
@@ -654,55 +606,11 @@ interface RoutstrActions {
   setUserNode: (nodeBaseUrl: string | null) => void;
   /** Forget a payment whose change is home, or which was never taken. */
   settlePayment: (id: string) => void;
-  isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
-  switchSession: (sessionId: string) => void;
-  /** Title a saved conversation after its first question. */
-  updateSessionTitle: (sessionId: string) => void;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
-
-type SessionMirrorState = Pick<
-  RoutstrState,
-  'conversationHistory' | 'isAnonymousMode' | 'currentSessionId' | 'sessions'
->;
-
-/**
- * The conversation on screen: the saved session's id, or `null` for one that
- * is not saved (anonymous mode). A message written now belongs to it.
- */
-function selectConversationId(
-  state: Pick<RoutstrState, 'isAnonymousMode' | 'currentSessionId'>
-): string | null {
-  return state.isAnonymousMode ? null : state.currentSessionId;
-}
-
-/** The lineup a model is chosen from: this session's, else the saved one (an empty one stands). */
-const selectLineup = (state: Pick<RoutstrState, 'lineup' | 'lastKnownLineup'>) =>
-  state.lineup ?? state.lastKnownLineup?.lineup ?? null;
-
-/**
- * Apply a per-message transform in one conversation (`selectConversationId`
- * when its messages were written): its saved session's message list, and the
- * list on screen only while that conversation is the one shown.
- */
-function mapConversationMessages(
-  state: SessionMirrorState,
-  conversationId: string | null,
-  apply: (messages: RoutstrMessage[]) => RoutstrMessage[]
-): Partial<SessionMirrorState> {
-  const shown = selectConversationId(state) === conversationId;
-  const conversationHistory = shown ? apply(state.conversationHistory) : state.conversationHistory;
-  if (conversationId === null) return { conversationHistory };
-  return {
-    conversationHistory,
-    sessions: state.sessions.map((session) =>
-      session.id === conversationId ? { ...session, messages: apply(session.messages) } : session
-    ),
-  };
-}
 
 // Tightly bounded + tolerant: one malformed attachment must never fail the
 // whole-blob parse (which would wipe sessions AND the apiKey — the exact
@@ -1189,37 +1097,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
       currentSessionId: null,
       isAnonymousMode: false,
 
-      setCuratedModels: (curated) => {
-        const before = get().curatedModels;
-        set({ curatedModels: curated });
-        const same =
-          before != null &&
-          before.ids.length === curated.ids.length &&
-          before.ids.every((id, index) => id === curated.ids[index]);
-        storeLog.info('store.routstr.curated_models_set', {
-          models: curated.ids.length,
-          changed: !same,
-        });
-        // The list shapes the derivation, and the derivation may already have
-        // happened this session against no list or an older one. Re-run it
-        // from the catalog in hand; `setCachedModels` keeps its own rule about
-        // a nagg-served lineup outranking the derivation.
-        const cached = get().modelsCache;
-        if (!same && cached) get().setCachedModels(cached.data);
-      },
-
-      archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
-        if (!apiKey) return;
-        set((state) => ({
-          legacyAccounts: withArchivedAccount(
-            state.legacyAccounts,
-            nodeBaseUrl,
-            apiKey,
-            balanceMsats
-          ),
-        }));
-      },
-
       markAccountReclaimed: (nodeBaseUrl) => {
         set((state) => {
           const existing = state.legacyAccounts[nodeBaseUrl];
@@ -1236,158 +1113,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
 
       invalidateServerLineup: () => {
         set({ serverLineupAt: null, lineup: null });
-      },
-
-      addMessages: (conversationId, messages) => {
-        storeLog.debug('store.routstr.add_message', { roles: messages.map((m) => m.role) });
-        set((state) =>
-          mapConversationMessages(state, conversationId, (list) => [...list, ...messages])
-        );
-      },
-
-      setMessagePending: (conversationId, id, pending) => {
-        set((state) =>
-          mapConversationMessages(state, conversationId, (messages) =>
-            messages.map((msg) => (msg.id === id ? { ...msg, pending } : msg))
-          )
-        );
-      },
-
-      finalizeAssistantMessage: (conversationId, id, fields) => {
-        storeLog.debug('store.routstr.finalize_assistant', {
-          id,
-          contentLength: fields.content.length,
-          hasReasoning: !!fields.reasoningContent,
-          costSats: fields.costSats,
-        });
-        set((state) =>
-          mapConversationMessages(state, conversationId, (messages) =>
-            messages.map((msg) =>
-              msg.id === id
-                ? {
-                    ...msg,
-                    content: fields.content,
-                    thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
-                    reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
-                    costSats: fields.costSats ?? msg.costSats,
-                    modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
-                  }
-                : msg
-            )
-          )
-        );
-      },
-
-      setActiveBranch: (parentId, childId) => {
-        storeLog.info('store.routstr.set_active_branch', { parentId, childId });
-        set((state) => {
-          const next = { ...state.activeChildren, [parentId]: childId };
-          if (state.isAnonymousMode) return { activeChildren: next };
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId ? { ...session, activeChildren: next } : session
-            );
-            return { activeChildren: next, sessions: updatedSessions };
-          }
-          return { activeChildren: next };
-        });
-      },
-
-      setSelectedSlot: (slot) => {
-        // A vendor is valid when the live lineup offers it, not when it is one
-        // of four names compiled into the app: the menu now comes from the
-        // catalog, so its ids do too. The known-four remain acceptable so a
-        // selection survives a lineup that has not landed yet.
-        const lineup = selectLineup(get());
-        const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
-        const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
-        // `TIER_IDS` is the global list of tier NAMES, so it can only say that
-        // `pro` is spelled like a tier — never that THIS vendor has a Pro rung.
-        // The vendor half is checked against the vendors this lineup offers;
-        // the tier half is held to the same standard, against the tiers this
-        // vendor fills. When no lineup can answer yet, that check has nothing
-        // real to run against and the user's own choice stands.
-        const namedTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
-        const safeTier = reselectTierForProvider(safeProvider, namedTier, lineup) ?? namedTier;
-        storeLog.info('store.routstr.set_slot', {
-          provider: safeProvider,
-          tier: safeTier,
-        });
-        set({ selectedProvider: safeProvider, selectedTier: safeTier });
-      },
-
-      setCachedModels: (models: RoutstrModel[]) => {
-        storeLog.debug('store.routstr.set_cached_models', { count: models.length });
-        // Derive the (provider × tier) lineup alongside the raw cache and
-        // persist a compact last-known snapshot, so the model menu keeps
-        // prices + vision flags across offline relaunches. Per-provider
-        // zero-row results (catalog drift on a 200 — the failure class
-        // that produced "cost unavailable") substitute from the previous
-        // snapshot, marked `lastKnown`.
-        // A nagg-served lineup outranks derivation until invalidated by
-        // model rejection or a failed refresh after seven days. Keep the raw catalog (pricing lookups,
-        // vision flags, display names) but leave `lineup` untouched.
-        //
-        // The timestamp alone is NOT enough to claim that precedence.
-        // `serverLineupAt` is persisted and `lineup` is session-only, so after
-        // a cold start the app can hold a day-fresh timestamp and no lineup at
-        // all — and `refreshRoutstrLineup('foreground')` skips a
-        // `serverLineupAt` that young. Deferring to an absent lineup in that
-        // state vetoes the only other source of a menu for a full day, which
-        // is one of the ways the picker got stuck on "Models loading" with a
-        // full catalog already in `modelsCache`. Defer to a server lineup that
-        // is actually in memory; otherwise derive.
-        const held = get().lineup;
-        if (get().serverLineupAt != null && lineupHasEntries(held)) {
-          aiLog.debug('ai.lineup.derive_skipped_server_lineup');
-          set({ modelsCache: { data: models, timestamp: Date.now() } });
-          return;
-        }
-        const { lineup: derived, stats } = deriveLineup(
-          models,
-          undefined,
-          curatedIdSet(get().curatedModels?.ids)
-        );
-        const snapshot = get().lastKnownLineup;
-        const previous = snapshot?.nodeBaseUrl === get().nodeBaseUrl ? snapshot : null;
-        const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
-        const filled = lineupHasEntries(merged);
-        aiLog.info('ai.lineup.derived', {
-          catalogSize: models.length,
-          totalQualifying: stats.totalQualifying,
-          perProvider: stats.perProvider,
-          substitutedProviders: Object.keys(merged).filter(
-            (p) => merged[p] !== derived[p] // mergeLineupWithLastKnown replaces the block reference
-          ),
-          allProvidersEmpty: !lineupHasEntries(derived),
-          keptPreviousLineup: !filled && lineupHasEntries(held),
-        });
-        const now = Date.now();
-        const adopted = filled || !lineupHasEntries(held) ? merged : held;
-        const carried = get().selectionCarriedFrom;
-        set({
-          modelsCache: { data: models, timestamp: now },
-          ...repointSelection(
-            get().selectedProvider,
-            get().selectedTier,
-            adopted,
-            carried != null ? 'user_switch' : 'lineup_changed'
-          ),
-          // The note is spent by the first lineup that can answer for the new
-          // node. An empty derivation is not one — it is a placeholder, and
-          // the re-fit has to wait for a lineup with entries.
-          ...(carried != null && lineupHasEntries(adopted) ? { selectionCarriedFrom: null } : {}),
-          // A catalog that qualifies nothing is not an upgrade on a menu that
-          // works. Node catalogs swing hard within one session (582 models one
-          // read, 10 the next), and an empty derivation is truthy — it would
-          // replace a working lineup AND shadow the `lastKnownLineup` fallback
-          // that every reader falls through to, leaving a menu that cannot
-          // recover until something else happens to refetch.
-          lineup: adopted,
-          lastKnownLineup: filled
-            ? { derivedAt: now, lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
-            : previous,
-        });
       },
 
       setServerLineup: ({ lineup, nodeBaseUrl, authMode }) => {
@@ -1560,12 +1285,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         });
       },
 
-      isCacheStale: (nowMs: number = Date.now()) => {
-        const cache = get().modelsCache;
-        if (!cache) return true;
-        return nowMs - cache.timestamp > MODELS_CACHE_TTL_MS;
-      },
-
       createSession: () => {
         const sessionId = mintLocalId('session');
         storeLog.info('store.routstr.create_session', { sessionId });
@@ -1583,42 +1302,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
           activeChildren: {},
         }));
         return sessionId;
-      },
-
-      switchSession: (sessionId: string) => {
-        storeLog.info('store.routstr.switch_session', { sessionId });
-        const state = get();
-        const session = state.sessions.find((s) => s.id === sessionId);
-        if (session) {
-          set({
-            currentSessionId: sessionId,
-            conversationHistory: session.messages,
-            activeChildren: session.activeChildren ?? {},
-          });
-        } else {
-          storeLog.warn('store.routstr.session_not_found', { sessionId });
-        }
-      },
-
-      updateSessionTitle: (sessionId) => {
-        const state = get();
-        const session = state.sessions.find((s) => s.id === sessionId);
-        if (!session) return;
-
-        // Find first user message to use as title
-        const firstUserMessage = session.messages.find((msg) => msg.role === 'user');
-        if (firstUserMessage) {
-          const title =
-            firstUserMessage.content.length > 50
-              ? firstUserMessage.content.substring(0, 50) + '...'
-              : firstUserMessage.content;
-
-          storeLog.debug('store.routstr.update_session_title', { sessionId, title });
-          const updatedSessions = state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, title } : s
-          );
-          set({ sessions: updatedSessions });
-        }
       },
     }),
     persistConfig({

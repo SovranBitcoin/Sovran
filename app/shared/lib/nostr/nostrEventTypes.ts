@@ -1,10 +1,3 @@
-export interface NoteMetrics {
-  likeCount: number;
-  repostCount: number;
-  replyCount: number;
-  satsZapped: number;
-}
-
 export interface FeedEvent {
   id: string;
   kind: number;

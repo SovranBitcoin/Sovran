@@ -23,7 +23,6 @@ import { useManager } from '@cashu/coco-react';
 import type { NostrClient } from 'nostr/client';
 import { useNostrClient } from '@/shared/providers/NostrClientProvider';
 import { Metadata } from 'nostr-tools/kinds';
-import { getPublicKey } from 'nostr-tools/pure';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
 import { createExecuteMintQuote, createExecuteReceive } from 'wallet/operations';
@@ -85,7 +84,6 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
-import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 import { buildDetectors } from '@/shared/config/featureDetectors';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
@@ -648,38 +646,20 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
-  // NIP-17 gift-wrapped DM (recipient wrap + self-copy, so it lands in our own
-  // thread too). Used by the destination-first Send flow's contact path.
+  // NIP-17 gift-wrapped DM (recipient wrap + self-copy). Used by the
+  // destination-first Send flow's contact path.
   const deliverContactEcashDm = useCallback(
     async ({ recipientPubkey, token }: { recipientPubkey: string; token: string }) => {
       const pk = identity.getPrivateKey();
       const client = identity.getClient();
       if (!pk) throw new Error('Nostr keys not available');
       if (!client) throw new Error('Nostr client not available');
-      const { selfWrapId } = await publishGiftWrappedDM({
+      await publishGiftWrappedDM({
         client,
         senderPrivateKey: pk,
         recipientPublicKey: recipientPubkey,
         content: token,
       });
-      // Seed the thread's optimistic echo lane: this publish happens before the
-      // chat screen mounts, so without it the sender's sent-token bubble only
-      // appears after nagg round-trips the self-copy. Derive the sender pubkey
-      // from the private key we already hold — the provider's cached pubkey ref
-      // can be stale here and a null ref silently skipped the seed (diagnosed
-      // via the dmEchoStore state-mirror: byPeer stayed empty through delivery).
-      const ownPubkey = getPublicKey(pk);
-      paymentLog.info('contact_send.echo.seeded', { selfWrapId });
-      useDmEchoStore.getState().append(
-        { viewer: ownPubkey, protocol: 'nip17', counterparty: recipientPubkey },
-        {
-          id: selfWrapId,
-          content: token,
-          isOwn: true,
-          created_at: Math.floor(Date.now() / 1000),
-          pubkey: ownPubkey,
-        }
-      );
     },
     [identity]
   );

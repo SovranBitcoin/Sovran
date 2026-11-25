@@ -8,8 +8,7 @@
  * file under the store directories whose module-level export is a zustand
  * `create(...)` hook must appear here unless it is an explicit sensitive-state
  * exclusion. Pure helpers with no store and per-call factories are excluded as
- * well. `dmEchoStore` is deliberately absent: its plaintext DM body may be a
- * live bearer ecash token and must never enter debug artifacts.
+ * well.
  */
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';

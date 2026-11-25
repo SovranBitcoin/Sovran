@@ -158,40 +158,17 @@ describe("NostrEntityCache source ranking (nagg > primal > relay)", () => {
     // Freshness dominates: a newer profile edit is the truth regardless of tier.
     expect(cache.getProfile("pk")?.name).toBe("relay-new");
   });
-
-  it("a lower-ranked source never erases higher-ranked metrics", () => {
-    const cache = createNostrEntityCache();
-    cache.ingestNoteStats(
-      { n1: { likes: 9, reposts: 2, replies: 4, zaps: 1, satsZapped: 100 } },
-      "nagg",
-    );
-    // Relay reports a partial/poorer view — it must not erase nagg's counts.
-    cache.ingestNoteStats(
-      { n1: { likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 } },
-      "relay",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(9);
-    expect(cache.getNoteStats("n1")?.satsZapped).toBe(100);
-    // A nagg refresh (equal rank) is last-write-wins.
-    cache.ingestNoteStats(
-      { n1: { likes: 11, reposts: 2, replies: 4, zaps: 1, satsZapped: 100 } },
-      "nagg",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(11);
-  });
 });
 
 describe("NostrEntityCache stats + clear", () => {
-  it("caches note stats and clears all stores on profile switch", () => {
+  it("clears all stores on profile switch", () => {
     const cache = createNostrEntityCache();
-    cache.ingestNoteStats(
-      { n1: { likes: 3, reposts: 1, replies: 2, zaps: 0, satsZapped: 0 } },
-      "nagg",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(3);
+    cache.ingestProfileMetadata({ pk: { name: "someone" } }, 100, "relay");
+    cache.ingestProfileStats({ pubkey: "pk", followers: 3 } as never);
+    expect(cache.getProfile("pk")?.name).toBe("someone");
     cache.clear();
-    expect(cache.getNoteStats("n1")).toBeUndefined();
     expect(cache.getProfile("pk")).toBeUndefined();
+    expect(cache.getProfileStats("pk")).toBeUndefined();
   });
 });
 

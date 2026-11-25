@@ -1,8 +1,4 @@
-import type {
-  NostrTier,
-  NoteStats,
-  NoteStatsMap,
-} from "@sovranbitcoin/schemas";
+import type { NostrTier } from "@sovranbitcoin/schemas";
 import type { NaggProfileInfo } from "../../map/feed";
 import type { ProfileMetadata } from "../profiles";
 import type { ProfileStats } from "../profile-stats";
@@ -70,13 +66,6 @@ export type CachedProfile = ProfileMetadata & {
 };
 
 /**
- * Aggregate note metrics tagged with the rank of their source, so a lower tier
- * (e.g. relay) can never erase counts a higher tier (nagg) already provided.
- * Mirrors how `CachedProfile` extends `ProfileMetadata` with provenance.
- */
-export type CachedNoteStats = NoteStats & { srcRank: number };
-
-/**
  * A profile-header aggregate keyed by pubkey: counts, joined date, Vertex
  * reputation and what the pubkey operates. This is the ONE owner of "how
  * reputable / how followed is this person" — search hits, discovery rows, the
@@ -87,7 +76,6 @@ export type CachedProfileStats = ProfileStats;
 
 const DEFAULT_LIMITS = {
   profiles: 5000,
-  noteStats: 5000,
   profileStats: 2000,
 } as const;
 
@@ -125,31 +113,14 @@ const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
   return base;
 };
 
-/**
- * Stats merge by source rank: a lower-ranked source never erases a higher one's
- * counts. Higher-or-equal rank overlays field-level (last-write at equal rank);
- * a strictly lower rank is ignored.
- */
-const mergeNoteStats: Merge<CachedNoteStats> = (existing, patch) => {
-  if (!existing) return fieldLevelMerge(undefined, patch);
-  const incomingRank = patch.srcRank ?? 0;
-  if (incomingRank < existing.srcRank) return existing;
-  const merged = fieldLevelMerge(existing, patch);
-  merged.srcRank = Math.max(existing.srcRank, incomingRank);
-  return merged;
-};
-
 export interface NostrEntityCache {
   /** Stores exposed for granular subscription by a binding. Prefer the helpers below for writes. */
   readonly profiles: NormalizingStore<CachedProfile>;
-  readonly noteStats: NormalizingStore<CachedNoteStats>;
   readonly profileStats: NormalizingStore<CachedProfileStats>;
   /** Which profile pubkeys have a fetch in flight (loading vs absent, for bindings). */
   readonly pendingProfiles: PendingSet;
   /** First metadata fetch settlement, including misses (memory-only). */
   readonly settledProfiles: NormalizingStore<{ settledAt: number }>;
-  /** Which note ids have a stats fetch in flight (placeholder vs unknown, for bindings). */
-  readonly pendingNoteStats: PendingSet;
 
   /** Seed minimal name+picture (feed/notification profiles) at low confidence, tagged by source. */
   ingestProfileInfos(
@@ -162,7 +133,6 @@ export interface NostrEntityCache {
     seenAt: number,
     source: CacheSource,
   ): void;
-  ingestNoteStats(stats: NoteStatsMap, source: CacheSource): void;
   ingestProfileStats(stats: CachedProfileStats): void;
 
   getProfile(pubkey: string): CachedProfile | undefined;
@@ -171,7 +141,6 @@ export interface NostrEntityCache {
     profiles: Record<string, CachedProfile>;
     missing: string[];
   };
-  getNoteStats(id: string): NoteStats | undefined;
   getProfileStats(pubkey: string): CachedProfileStats | undefined;
 
   /** Drop everything — call on profile switch to prevent cross-profile bleed. */
@@ -185,11 +154,6 @@ export function createNostrEntityCache(
     name: 'profiles',
     maxEntries: limits.profiles ?? DEFAULT_LIMITS.profiles,
     merge: mergeProfile,
-  });
-  const noteStats = createNormalizingStore<CachedNoteStats>({
-    name: 'noteStats',
-    maxEntries: limits.noteStats ?? DEFAULT_LIMITS.noteStats,
-    merge: mergeNoteStats,
   });
   const profileStats = createNormalizingStore<CachedProfileStats>({
     name: 'profileStats',
@@ -212,15 +176,12 @@ export function createNostrEntityCache(
       pending.end(keys);
     },
   };
-  const pendingNoteStats = createPendingSet();
 
   return {
     profiles,
-    noteStats,
     profileStats,
     pendingProfiles,
     settledProfiles,
-    pendingNoteStats,
 
     ingestProfileInfos(infos, source) {
       const srcRank = sourceRank(source);
@@ -253,12 +214,6 @@ export function createNostrEntityCache(
         ]),
       );
     },
-    ingestNoteStats(stats, source) {
-      const srcRank = sourceRank(source);
-      noteStats.setMany(
-        Object.entries(stats).map(([id, stat]) => [id, { ...stat, srcRank }]),
-      );
-    },
     ingestProfileStats(stats) {
       profileStats.set(stats.pubkey, stats);
     },
@@ -276,9 +231,6 @@ export function createNostrEntityCache(
       }
       return { profiles: out, missing };
     },
-    getNoteStats(id) {
-      return noteStats.get(id);
-    },
     getProfileStats(pubkey) {
       return profileStats.get(pubkey);
     },
@@ -286,7 +238,6 @@ export function createNostrEntityCache(
     clear() {
       profiles.clear();
       settledProfiles.clear();
-      noteStats.clear();
       profileStats.clear();
     },
   };

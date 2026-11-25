@@ -129,7 +129,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F150](F150.md) | high | fix | Redeeming ecash from a link opened while Settings is open can leave the app redrawing forever |
 | [F151](F151.md) | medium | decision | A lightning: or bitcoin: link opened from outside the app lands on the page-not-found page |
 | [F152](F152.md) | medium | decision | While a mint holds a Lightning payment pending, the pay page cannot be left and its wording disagrees with itself |
-| [F153](F153.md) | medium | fix | An answer that arrives while a chat is open is not shown until the chat is opened again |
 | [F154](F154.md) | low | test | Pre-existing native harness and lint failures remain |
 | [F155](F155.md) | low | device | Consolidated results needs Android and semantic verification |
 | [F156](F156.md) | medium | fix | Pilot the bound native story gate through full-send, and bind performance evidence |
@@ -205,7 +204,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F246](F246.md) | high | device | Verify the decided payment and relay flows on iOS and Android |
 | [F247](F247.md) | medium | test | Expand declarative persistence cases beyond baseline field evidence |
 | [F248](F248.md) | medium | decision | Privacy policy points to a Settings media page the app no longer has |
-| [F249](F249.md) | low | decision | useNip17RecentContacts and the DM conversation readers have no screen after the Contacts tab |
 | [F250](F250.md) | high | device | Run the new tabs, Search tab and account drawer on iPhone and Android |
 | [F251](F251.md) | medium | device | Mint Info stats/header and Mint history states not yet seen on a device or covered by a native scenario |
 | [F252](F252.md) | medium | device | Look at the sectioned Search tab on both platforms and add its native scenario |
