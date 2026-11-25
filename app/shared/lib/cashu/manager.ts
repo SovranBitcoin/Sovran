@@ -446,6 +446,15 @@ export class CocoManager {
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
 
+  /**
+   * A copy of the open wallet's 64-byte Cashu seed, or null before a wallet
+   * opens. The caller owns the copy and must zero it (`fill(0)`) when done;
+   * the memoized seed is untouched.
+   */
+  static async copyWalletSeed(): Promise<Uint8Array | null> {
+    return this.seedGetter ? this.seedGetter() : null;
+  }
+
   /** Zero and drop the current session's memoized Cashu seed, if one exists. */
   static disposeSeed(): void {
     if (this.seedGetter) disposeCashuSeedGetter(this.seedGetter);

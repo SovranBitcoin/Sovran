@@ -50,7 +50,13 @@ import {
 } from '@/features/transactions/components/detail/timeline/timelineTheme';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { discoverMints } from '@/shared/lib/apiClient';
-import { fetchDiscoveredMintUrls } from '@/features/settings/lib/recoveryDiscovery';
+import {
+  discoverRecoveryMintUrls,
+  relayEventsReader,
+} from '@/features/settings/lib/recoveryDiscovery';
+import { hasFeature } from '@/shared/config/features';
+import { CocoManager } from '@/shared/lib/cashu/manager';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useRoutstrRecoveryCard } from '@/features/settings/lib/useRoutstrRecoveryCard';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
@@ -104,6 +110,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const { client: nostrClient } = useNostrClient();
 
   // Routstr AI money still outside the wallet: the store's unfinished payments
   // and archived credentials, and the records the removed SDK left behind.
@@ -125,12 +132,22 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     // enable "Search all mints", swipe immediately, and get an empty probe
     // list with no indication anything was still loading.
     setIsDiscovering(true);
-    void fetchDiscoveredMintUrls(
-      mints.map((m) => m.mintUrl),
-      discoverMints,
-      controller.signal
-    ).then((urls) => {
+    void discoverRecoveryMintUrls({
+      knownUrls: mints.map((m) => m.mintUrl),
+      fetchMints: discoverMints,
+      // The mint list this seed backed up to Nostr (NUT-27, as cashu.me
+      // writes it), read only and ahead of the directory's audited mints.
+      backup:
+        hasFeature('nostr') && nostrClient
+          ? {
+              readSeed: () => CocoManager.copyWalletSeed(),
+              fetchEvents: relayEventsReader(nostrClient),
+            }
+          : undefined,
+      signal: controller.signal,
+    }).then((urls) => {
       if (controller.signal.aborted) return;
+      cashuLog.info('recovery.discovery.complete', { candidates: urls.length });
       setDiscoveredMintUrls(urls);
       setIsDiscovering(false);
     });
@@ -138,7 +155,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       controller.abort();
       setIsDiscovering(false);
     };
-  }, [deepProbe, mints, preview]);
+  }, [deepProbe, mints, preview, nostrClient]);
 
   // Lock navigation when recovery is in progress.
   // Skipped in gateMode — the screen isn't mounted as a route at all, so

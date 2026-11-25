@@ -119,3 +119,85 @@ export async function fetchBackedUpMintUrls(
     keys.privateKey.fill(0);
   }
 }
+
+/** What the Nostr client offers a read: its relays, and a one-shot query. */
+interface RelayReader {
+  relayUrls(): string[];
+  queryRelay(
+    url: string,
+    filters: readonly ReturnType<typeof mintBackupFilter>[],
+    timeoutMs?: number
+  ): Promise<{ events: readonly unknown[] }>;
+}
+
+/** Long enough for a slow relay, short enough not to hold the swipe back. */
+const BACKUP_RELAY_TIMEOUT_MS = 8_000;
+
+/**
+ * Reads a filter from every relay the client is configured with (where
+ * NUT-27 wallets, cashu.me among them, publish), merged. An abort settles it
+ * at once with nothing; one relay failing never fails the read.
+ */
+export function relayEventsReader(client: RelayReader): FetchRelayEvents {
+  return (filter, signal) =>
+    new Promise<readonly unknown[]>((resolve) => {
+      if (signal?.aborted) return resolve([]);
+      const onAbort = () => resolve([]);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      void Promise.allSettled(
+        client.relayUrls().map((url) => client.queryRelay(url, [filter], BACKUP_RELAY_TIMEOUT_MS))
+      ).then((results) => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve(results.flatMap((r) => (r.status === 'fulfilled' ? r.value.events : [])));
+      });
+    });
+}
+
+/**
+ * The mints "Search all mints" adds to recovery: those this seed's NUT-27
+ * backup lists first (the person's own list, so the likeliest to hold their
+ * money), then audited mints from the directory, de-duplicated against each
+ * other and the wallet's mints, capped. Read only. The seed copy `readSeed`
+ * hands over is zeroed when done, whatever happens; a missing seed, an
+ * offline relay or no backup leaves just the audited list.
+ */
+export async function discoverRecoveryMintUrls({
+  knownUrls,
+  fetchMints,
+  backup,
+  signal,
+}: {
+  knownUrls: readonly string[];
+  fetchMints: typeof discoverMints;
+  /** Omitted when Nostr is not in this build. */
+  backup?: {
+    /** A copy of the wallet's 64-byte seed that this call owns, or null. */
+    readSeed: () => Promise<Uint8Array | null>;
+    fetchEvents: FetchRelayEvents;
+  };
+  signal?: AbortSignal;
+}): Promise<string[]> {
+  const backedUp = async (): Promise<string[]> => {
+    if (!backup) return [];
+    let seed: Uint8Array | null = null;
+    try {
+      seed = await backup.readSeed();
+      if (!seed || signal?.aborted) return [];
+      return await fetchBackedUpMintUrls(knownUrls, seed, backup.fetchEvents, signal);
+    } catch {
+      return [];
+    } finally {
+      seed?.fill(0);
+    }
+  };
+  const audited = async (): Promise<string[]> => {
+    try {
+      return await fetchDiscoveredMintUrls(knownUrls, fetchMints, signal);
+    } catch {
+      return [];
+    }
+  };
+  const [fromBackup, fromAudit] = await Promise.all([backedUp(), audited()]);
+  if (signal?.aborted) return [];
+  return admitAll([...fromBackup, ...fromAudit], knownUrls);
+}

@@ -69,6 +69,10 @@ jest.mock('@sovranbitcoin/schemas', () => ({
   parseWith: jest.fn(() => jest.fn()),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
+// No account Nostr client here: backup discovery is skipped.
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: undefined, isInitialized: false }),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   storeLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
