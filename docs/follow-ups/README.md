@@ -95,7 +95,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F98](F98.md) | low | device | Claim redux-era ecash on a device against a real mint; add a prompt scenario and retry |
 | [F99](F99.md) | low | device | The first-launch Routstr load is fixed in tests but has not been seen on a device |
 | [F100](F100.md) | medium | device | An install left unstamped by 0.0.63 to 0.1.3 is still asked to restore, and the upgrade fix is unseen on a device |
-| [F101](F101.md) | low | decision | Confirm the curated For You account list and each key before the feed ships |
 | [F102](F102.md) | low | device | Re-test whether the bitchat announce patch is still needed against the current App Store build |
 | [F108](F108.md) | medium | fix | Open work recorded in other documents has not been moved into this ledger |
 | [F111](F111.md) | medium | device | No old build is kept for iPhone, and the upgrade from the last release is run by hand |
@@ -123,7 +122,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F142](F142.md) | high | fix | Each app start adds two nearby standing payment requests and none is ever closed |
 | [F143](F143.md) | medium | device | On a first launch the splash covers the Terms page for nine seconds |
 | [F144](F144.md) | medium | investigation | Verify native onboarding and resolve maximum text-size clipping |
-| [F145](F145.md) | low | upstream | The simulator screen capture in serve-sim 0.1.44 crashes about once in fifteen stories |
 | [F146](F146.md) | high | investigation | A paid invoice is never added when the wallet's counters are behind what the mint has signed |
 | [F147](F147.md) | medium | investigation | Adding a mint leaves the app unresponsive for about three seconds |
 | [F148](F148.md) | low | investigation | Choosing the test mint switches the wallet to its USD account a moment after its bitcoin one |
@@ -159,7 +157,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F180](F180.md) | high | investigation | Standing-quote work that outlives a profile switch can write into the next profile |
 | [F181](F181.md) | medium | decision | A receive or mint lookup can adopt another operation's row when its own has not been saved yet |
 | [F183](F183.md) | medium | decision | BitChat drops a failed public or geohash send without telling the person |
-| [F184](F184.md) | medium | fix | A Whitenoise inbox start that fails before subscribing is not retried |
 | [F185](F185.md) | medium | fix | Feed: refresh can latch, and failed replies and poll votes are silent |
 | [F186](F186.md) | medium | fix | Mint screens show sat balances under another unit, and stale validation results |
 | [F187](F187.md) | low | investigation | The swap toast can latch as mounted when no toast host is registered |
@@ -177,9 +174,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F201](F201.md) | medium | decision | Cancel is offered on a pending melt, and Redeem depends on an id prefix |
 | [F202](F202.md) | medium | fix | A nearby payment keeps being re-sent over Bluetooth after it was acknowledged |
 | [F203](F203.md) | medium | decision | Own-account sync can overwrite newer local state with older or empty answers |
-| [F204](F204.md) | medium | decision | A poll posted as a reply has no reply tags; failed replies and failed paging are silent |
 | [F205](F205.md) | medium | decision | Swaps disappear from filtered transaction lists |
-| [F206](F206.md) | medium | decision | Whitenoise leaves things behind when a step fails |
 | [F207](F207.md) | low | investigation | Smaller state leftovers found while pinning |
 | [F208](F208.md) | high | decision | A second rejected blob is overwritten when an older set-aside copy already exists |
 | [F213](F213.md) | medium | decision | A Nut Drop the app was killed in the middle of redeeming is later shown as already redeemed |
@@ -190,7 +185,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F222](F222.md) | medium | decision | Changing the npub.cash mint and then switching account saves the mint on the other account |
 | [F223](F223.md) | low | fix | An unreadable Vertex budget date turns Vertex lookups off for good |
 | [F224](F224.md) | medium | decision | Pay on a preview does nothing while the payment machine sits on an error |
-| [F225](F225.md) | low | decision | White Noise setup counts key packages that were stored but not published |
 | [F226](F226.md) | low | decision | An acceleration invoice that arrives after its screen closed is still handed back |
 | [F227](F227.md) | high | decision | A follow can wait for ever, and nothing on screen says it is not published |
 | [F228](F228.md) | high | device | The Android Tap to pay repair and the NFC tap cleanup have not been run on a phone |
