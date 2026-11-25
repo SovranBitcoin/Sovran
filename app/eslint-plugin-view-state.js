@@ -55,11 +55,11 @@ function rendersJsx(node) {
   }
 }
 
-/** The operands of `a && b && c`, left to right. */
+/** The operands of an `&&` tree, left to right (flattening both sides). */
 function andOperands(node) {
   const target = unwrap(node);
   if (target && target.type === 'LogicalExpression' && target.operator === '&&') {
-    return [...andOperands(target.left), target.right];
+    return [...andOperands(target.left), ...andOperands(target.right)];
   }
   return [target];
 }

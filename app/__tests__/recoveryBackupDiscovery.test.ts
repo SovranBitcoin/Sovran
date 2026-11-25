@@ -134,17 +134,53 @@ describe('relayEventsReader', () => {
       { id: 'wss://a.example' },
       { id: 'wss://b.example' },
     ]);
-    expect(queryRelay).toHaveBeenCalledWith('wss://a.example', [filter], expect.any(Number));
+    expect(queryRelay).toHaveBeenCalledWith(
+      'wss://a.example',
+      [filter],
+      expect.any(Number),
+      expect.any(AbortSignal)
+    );
   });
 
-  it('settles with nothing as soon as it is aborted', async () => {
+  it('aborts underlying relay queries and settles with nothing when aborted', async () => {
     const controller = new AbortController();
+    const signals: AbortSignal[] = [];
     const read = relayEventsReader({
       relayUrls: () => ['wss://slow.example'],
-      queryRelay: () => new Promise(() => {}),
+      queryRelay: (_url, _filters, _timeoutMs, signal) => {
+        if (signal) signals.push(signal);
+        return new Promise(() => {});
+      },
     });
     const pending = read(filter, controller.signal);
     controller.abort();
     await expect(pending).resolves.toEqual([]);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.aborted).toBe(true);
+  });
+
+  it('does not wait for a silent straggler after another relay answers', async () => {
+    jest.useFakeTimers();
+    try {
+      const stragglerSignals: AbortSignal[] = [];
+      const read = relayEventsReader({
+        relayUrls: () => ['wss://fast.example', 'wss://silent.example'],
+        queryRelay: (url, _filters, _timeoutMs, signal) => {
+          if (url === 'wss://fast.example') {
+            return Promise.resolve({ events: [{ id: 'from-fast' }] });
+          }
+          if (signal) stragglerSignals.push(signal);
+          return new Promise(() => {});
+        },
+      });
+      const pending = read(filter);
+      await Promise.resolve();
+      jest.advanceTimersByTime(800);
+      await expect(pending).resolves.toEqual([{ id: 'from-fast' }]);
+      expect(stragglerSignals).toHaveLength(1);
+      expect(stragglerSignals[0]!.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

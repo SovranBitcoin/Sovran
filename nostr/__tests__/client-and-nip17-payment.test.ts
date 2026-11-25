@@ -323,4 +323,44 @@ describe('nostr client & pure nostr-tools NIP-17 payment transport', () => {
     expect(senderClient.signer).toBeUndefined();
     expect(senderClient.relayUrls()).toEqual([]);
   });
+
+  it('closes the underlying relay subscription immediately when queryRelay signal aborts', async () => {
+    const frames: unknown[][] = [];
+    class SilentSubSocket implements WebSocketLike {
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onmessage: ((e: { data: unknown }) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onclose: ((e: { code?: number; reason?: string }) => void) | null = null;
+
+      constructor(_url: string) {
+        queueMicrotask(() => {
+          this.readyState = 1;
+          this.onopen?.();
+        });
+      }
+
+      send(raw: string): void {
+        frames.push(JSON.parse(raw) as unknown[]);
+      }
+
+      close(): void {
+        this.readyState = 3;
+      }
+    }
+
+    const client = new NostrClient({ WebSocketImpl: SilentSubSocket });
+    const controller = new AbortController();
+    const pending = client.queryRelay('wss://silent.test/', [{ kinds: [37375] }], 10_000, controller.signal);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(frames.some((f) => f[0] === 'REQ')).toBe(true);
+    const reqId = frames.find((f) => f[0] === 'REQ')?.[1];
+
+    controller.abort();
+    const result = await pending;
+    expect(result).toEqual({ events: [], eose: false });
+    expect(frames).toContainEqual(['CLOSE', reqId]);
+
+    client.dispose();
+  });
 });

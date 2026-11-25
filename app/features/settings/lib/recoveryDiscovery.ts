@@ -126,30 +126,66 @@ interface RelayReader {
   queryRelay(
     url: string,
     filters: readonly ReturnType<typeof mintBackupFilter>[],
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<{ events: readonly unknown[] }>;
 }
 
-/** Long enough for a slow relay, short enough not to hold the swipe back. */
-const BACKUP_RELAY_TIMEOUT_MS = 8_000;
+/** Upper bound when no relay answers; short enough not to hold the swipe back. */
+const BACKUP_RELAY_TIMEOUT_MS = 3_000;
+/** Once one relay answers, give stragglers a brief window before closing them. */
+const BACKUP_RELAY_GRACE_MS = 800;
 
 /**
  * Reads a filter from every relay the client is configured with (where
- * NUT-27 wallets, cashu.me among them, publish), merged. An abort settles it
- * at once with nothing; one relay failing never fails the read.
+ * NUT-27 wallets, cashu.me among them, publish), merged. An abort cancels
+ * every underlying relay subscription at once and settles with nothing; one
+ * silent relay is cut short after a brief grace window once another answers,
+ * so it never stalls the recovery swipe.
  */
 export function relayEventsReader(client: RelayReader): FetchRelayEvents {
   return (filter, signal) =>
     new Promise<readonly unknown[]>((resolve) => {
       if (signal?.aborted) return resolve([]);
-      const onAbort = () => resolve([]);
-      signal?.addEventListener('abort', onAbort, { once: true });
-      void Promise.allSettled(
-        client.relayUrls().map((url) => client.queryRelay(url, [filter], BACKUP_RELAY_TIMEOUT_MS))
-      ).then((results) => {
+      const urls = client.relayUrls();
+      if (urls.length === 0) return resolve([]);
+
+      const queryController = new AbortController();
+      const collected: unknown[] = [];
+      let remaining = urls.length;
+      let settled = false;
+      let graceTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const finish = (events: readonly unknown[]) => {
+        if (settled) return;
+        settled = true;
+        if (graceTimer) clearTimeout(graceTimer);
         signal?.removeEventListener('abort', onAbort);
-        resolve(results.flatMap((r) => (r.status === 'fulfilled' ? r.value.events : [])));
-      });
+        if (!queryController.signal.aborted) queryController.abort();
+        resolve(events);
+      };
+      const onAbort = () => finish([]);
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      for (const url of urls) {
+        void client
+          .queryRelay(url, [filter], BACKUP_RELAY_TIMEOUT_MS, queryController.signal)
+          .then((result) => {
+            if (settled) return;
+            collected.push(...result.events);
+            remaining -= 1;
+            if (remaining === 0) {
+              finish(collected);
+            } else if (!graceTimer) {
+              graceTimer = setTimeout(() => finish(collected), BACKUP_RELAY_GRACE_MS);
+            }
+          })
+          .catch(() => {
+            if (settled) return;
+            remaining -= 1;
+            if (remaining === 0) finish(collected);
+          });
+      }
     });
 }
 

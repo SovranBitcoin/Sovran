@@ -286,7 +286,15 @@ export class NostrClient {
     };
   }
 
-  queryRelay(rawUrl: string, filters: readonly Filter[], timeoutMs = 10_000): Promise<RelayQueryResult> {
+  queryRelay(
+    rawUrl: string,
+    filters: readonly Filter[],
+    timeoutMs = 10_000,
+    signal?: AbortSignal
+  ): Promise<RelayQueryResult> {
+    if (signal?.aborted) {
+      return Promise.resolve({ events: [], eose: false });
+    }
     return new Promise<RelayQueryResult>((resolve) => {
       const events: VerifiedEvent[] = [];
       let settled = false;
@@ -295,9 +303,12 @@ export class NostrClient {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
         handle?.stop();
         resolve({ events, eose });
       };
+      const onAbort = () => finish(false);
+      signal?.addEventListener('abort', onAbort, { once: true });
       const timer = setTimeout(() => finish(false), timeoutMs);
       handle = this.subscribeRelay(rawUrl, filters, {
         onEvent: (event) => {

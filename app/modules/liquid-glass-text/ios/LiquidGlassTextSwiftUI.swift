@@ -484,6 +484,7 @@ private struct RollingGlassAmount: View {
         }
         .onChange(of: model.text) { _, _ in update() }
         .onChange(of: model.formatKey) { _, _ in update() }
+        .onChange(of: model.numericValue) { _, _ in update() }
     }
 
     @ViewBuilder
@@ -517,7 +518,14 @@ private struct RollingGlassAmount: View {
 
     private func update() {
         let next = AmountSlots.tokenize(model.text)
-        let snap = reduceMotion || shownFormatKey != model.formatKey
+        let formatChanged = shownFormatKey != model.formatKey
+        // Numeric-only updates within the same displayed rounding bucket still
+        // refresh `shownValue` so a subsequent crossing rolls in the true direction.
+        if !formatChanged && next == shown.map(\.slot) {
+            shownValue = model.numericValue
+            return
+        }
+        let snap = reduceMotion || formatChanged
         let valueDirection: CGFloat? = model.numericValue == shownValue
             ? nil
             : (model.numericValue > shownValue ? 1 : -1)

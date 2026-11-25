@@ -40,6 +40,10 @@ tester.run('no-jsx-loading-branch', plugin.rules['no-jsx-loading-branch'], {
       errors: [{ messageId: 'branch' }],
     },
     {
+      code: 'const a = <View>{showDetails && (isLoading && <Spinner />)}</View>;',
+      errors: [{ messageId: 'branch', data: { flag: 'isLoading' } }],
+    },
+    {
       code: 'const a = <View>{isFetching && <Spinner />}</View>;',
       options: [{ names: ['isFetching'] }],
       errors: [{ messageId: 'branch', data: { flag: 'isFetching' } }],
