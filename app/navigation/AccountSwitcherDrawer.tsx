@@ -12,9 +12,16 @@
  * sliding drawer paints beneath it on iPhone.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { useAnimatedReaction } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useDrawerProgress, type DrawerContentComponentProps } from 'expo-router/drawer';
 import { setStringAsync } from 'expo-clipboard';
@@ -38,6 +45,7 @@ import {
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
+import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -47,8 +55,8 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import {
+  accountHandle,
   accountNpub,
-  accountSecondaryLine,
   accountsCountLabel,
   formatCachedBalance,
   UNKNOWN_BALANCE,
@@ -109,16 +117,10 @@ function useCloseDrawerAndWait(navigation: DrawerNavigation) {
     });
 }
 
-function AccountRow({
-  profile,
-  isActive,
-  isPending,
-  locked,
-  displayBtc,
-  onPress,
-  onOpenMenu,
-}: {
+type AccountRowProps = {
   profile: ProfileEntry;
+  /** Kind-0 metadata already in the cache, if any. The row fetches nothing. */
+  metadata: NostrProfileMetadata | undefined;
   isActive: boolean;
   isPending: boolean;
   locked: boolean;
@@ -126,27 +128,69 @@ function AccountRow({
   onPress: (profile: ProfileEntry) => void;
   /** Long press and the trailing button open the same account menu. */
   onOpenMenu: (profile: ProfileEntry, name: string) => void;
-}) {
-  const [muted, accent] = useThemeColor(['muted', 'accent'] as const);
-  // Cache only: a profile seen before shows its name, picture and handle;
-  // nothing is fetched. The saved name and picture still come first.
-  const { metadata } = useCachedNostrProfile(profile.pubkey);
+  /**
+   * Drives the active highlight and check badge from outside (0 = plain row,
+   * 1 = active), so a design-system scrubber can hold any frame. Omitted, the
+   * row follows `isActive` on its own.
+   */
+  activeProgress?: SharedValue<number>;
+};
+
+/** The active highlight and check badge settle quickly; a switch is not a show. */
+const ACTIVE_FADE_MS = 180;
+
+/**
+ * One account: name on the first line, balance (and handle, when there is
+ * one) on the second. Presentational: everything it shows comes in as props.
+ */
+export function AccountRow({
+  profile,
+  metadata,
+  isActive,
+  isPending,
+  locked,
+  displayBtc,
+  onPress,
+  onOpenMenu,
+  activeProgress,
+}: AccountRowProps) {
+  const [muted, accentForeground] = useThemeColor(['muted', 'accent-foreground'] as const);
+  const reducedMotion = useReducedMotion();
+  const ownProgress = useSharedValue(isActive ? 1 : 0);
+  useEffect(() => {
+    const target = isActive ? 1 : 0;
+    ownProgress.set(reducedMotion ? target : withTiming(target, { duration: ACTIVE_FADE_MS }));
+  }, [isActive, reducedMotion, ownProgress]);
+  const progress = activeProgress ?? ownProgress;
+  const highlightStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
+  const badgeStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ scale: 0.6 + progress.get() * 0.4 }],
+  }));
+
   const name = resolveIdentityName({
     pubkey: profile.pubkey,
     overrideName: profile.cachedDisplayName,
     nostrProfile: metadata,
   });
   const picture = profile.cachedPicture ?? metadata?.picture;
-  const secondary = accountSecondaryLine(profile.pubkey, metadata?.nip05);
+  const handle = accountHandle(metadata?.nip05);
   const balance = formatCachedBalance(profile.cachedBalanceSats, displayBtc);
+  const balanceUnknown = balance === UNKNOWN_BALANCE;
   const dimmed = locked && !isPending;
 
   return (
-    <View className={`flex-row items-center pr-2 ${dimmed ? 'opacity-50' : ''}`}>
+    <View className={`mx-3 flex-row items-center ${dimmed ? 'opacity-50' : ''}`}>
+      {/* The active account sits on an inset, rounded highlight. */}
+      <Animated.View
+        pointerEvents="none"
+        className="bg-surface-secondary absolute inset-0 rounded-2xl"
+        style={highlightStyle}
+      />
       <Pressable
         testID={`drawer-profile-switch-${profile.accountIndex}`}
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${balance === UNKNOWN_BALANCE ? 'balance unknown' : balance}`}
+        accessibilityLabel={`${name}, ${balanceUnknown ? 'balance unknown' : balance}`}
         accessibilityHint={isActive ? 'Current account' : 'Switches to this account'}
         accessibilityState={{ selected: isActive, disabled: locked, busy: isPending }}
         disabled={locked}
@@ -155,8 +199,8 @@ function AccountRow({
         onLongPress={() => onOpenMenu(profile, name)}
         className="min-w-0 flex-1">
         <PressScale target={locked ? 1 : PRESS_SCALE}>
-          <View className="flex-row items-center gap-3 py-2.5 pl-5 pr-2">
-            {/* Fixed-size pieces never shrink; the name column takes what is left. */}
+          <View className="flex-row items-center gap-3 py-2.5 pl-2">
+            {/* Fixed-size pieces never shrink; the text column takes what is left. */}
             <View className="shrink-0">
               <Avatar
                 state={picture ? 'image' : 'fallback'}
@@ -165,35 +209,45 @@ function AccountRow({
                 name={name}
                 size={44}
               />
+              {/* Badge corner: the check on the active account, a spinner while switching. */}
+              {isPending ? (
+                <View className="bg-surface absolute -bottom-0.5 -right-0.5 h-5 w-5 items-center justify-center rounded-full">
+                  <Spinner size={12} color={muted} />
+                </View>
+              ) : (
+                <Animated.View
+                  testID={isActive ? 'drawer-profile-active-badge' : undefined}
+                  className="bg-accent border-surface-secondary absolute -bottom-0.5 -right-0.5 h-5 w-5 items-center justify-center rounded-full border-2"
+                  style={badgeStyle}>
+                  <Icon name="fluent:checkmark-16-filled" size={12} color={accentForeground} />
+                </Animated.View>
+              )}
             </View>
             <View className="min-w-0 flex-1 gap-0.5">
-              <Text size={16} medium numberOfLines={1} accessible={false}>
+              <Text size={16} semibold numberOfLines={1} accessible={false}>
                 {name}
               </Text>
-              <Text size={13} color={muted} numberOfLines={1} accessible={false}>
-                {secondary}
-              </Text>
-            </View>
-            {/* Capped, so a huge balance at large text cannot squeeze the name away. */}
-            <View className="max-w-[40%] shrink-0">
-              <Text
-                size={14}
-                medium
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-                className="tabular-nums"
-                color={balance === UNKNOWN_BALANCE ? muted : undefined}
-                accessible={false}>
-                {balance}
-              </Text>
-            </View>
-            <View className="w-5 shrink-0 items-center">
-              {isPending ? (
-                <Spinner size={16} color={muted} />
-              ) : isActive ? (
-                <Icon name="fluent:checkmark-16-filled" size={18} color={accent} />
-              ) : null}
+              <View className="min-w-0 flex-row items-center">
+                {/* The balance never truncates; the handle gives way first. */}
+                <Text
+                  size={13}
+                  className="shrink-0 tabular-nums"
+                  color={balanceUnknown ? muted : undefined}
+                  numberOfLines={1}
+                  accessible={false}>
+                  {balance}
+                </Text>
+                {handle ? (
+                  <Text
+                    size={13}
+                    color={muted}
+                    numberOfLines={1}
+                    className="min-w-0 shrink"
+                    accessible={false}>
+                    {` · ${handle}`}
+                  </Text>
+                ) : null}
+              </View>
             </View>
           </View>
         </PressScale>
@@ -206,13 +260,21 @@ function AccountRow({
         accessibilityHint={`Copy, view or edit ${name}`}
         accessibilityState={{ disabled: locked }}
         disabled={locked}
-        hitSlop={8}
+        hitSlop={4}
         onPress={() => onOpenMenu(profile, name)}
-        className="h-9 w-9 shrink-0 items-center justify-center rounded-full">
+        className="h-11 w-11 shrink-0 items-center justify-center rounded-full">
         <Icon name="tabler:dots" size={20} color={muted} />
       </Pressable>
     </View>
   );
+}
+
+/** The drawer's row: reads the cached profile, then draws {@link AccountRow}. */
+function CachedAccountRow(props: Omit<AccountRowProps, 'metadata' | 'activeProgress'>) {
+  // Cache only: a profile seen before shows its name, picture and handle;
+  // nothing is fetched. The saved name and picture still come first.
+  const { metadata } = useCachedNostrProfile(props.profile.pubkey);
+  return <AccountRow {...props} metadata={metadata} />;
 }
 
 function FooterAction({
@@ -404,7 +466,7 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
           </Text>
         </View>
         {profiles.map((profile) => (
-          <AccountRow
+          <CachedAccountRow
             key={profile.accountIndex}
             profile={profile}
             isActive={profile.accountIndex === activeAccountIndex}

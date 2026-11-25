@@ -7,13 +7,13 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
-  accountSecondaryLine,
+  accountHandle,
   accountsCountLabel,
   formatCachedBalance,
   UNKNOWN_BALANCE,
 } from '@/navigation/accountSwitcher';
 
-import { AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
+import { AccountRow, AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
 
 const mockState = {
   profiles: [
@@ -64,9 +64,21 @@ jest.mock('@/shared/lib/popup', () => ({
 
 // The drawer reads as already closed, so a close-wait resolves at once.
 jest.mock('expo-router/drawer', () => ({ useDrawerProgress: () => ({ get: () => 0 }) }));
-jest.mock('react-native-reanimated', () => ({
-  useAnimatedReaction: () => undefined,
-}));
+jest.mock('react-native-reanimated', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  return {
+    __esModule: true,
+    default: {
+      View: ({ children, ...props }: { children?: import('react').ReactNode }) =>
+        createElement('View', props, children),
+    },
+    useAnimatedReaction: () => undefined,
+    useAnimatedStyle: () => ({}),
+    useReducedMotion: () => true,
+    useSharedValue: (value: number) => ({ get: () => value, set: () => undefined }),
+    withTiming: (value: number) => value,
+  };
+});
 jest.mock('react-native-worklets', () => ({
   scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args),
 }));
@@ -164,10 +176,11 @@ describe('account row wording', () => {
     expect(formatCachedBalance(2100, 2)).toBe('2,100 sats');
   });
 
-  it('prefers the NIP-05 handle and falls back to a shortened npub', () => {
-    expect(accountSecondaryLine('a'.repeat(64), 'alice@example.com')).toBe('alice@example.com');
-    expect(accountSecondaryLine('a'.repeat(64), '_@example.com')).toBe('@example.com');
-    expect(accountSecondaryLine('a'.repeat(64))).toMatch(/^npub1.+….+$/);
+  it('shows the NIP-05 handle only when there is one, never a shortened npub', () => {
+    expect(accountHandle('alice@example.com')).toBe('alice@example.com');
+    expect(accountHandle('_@example.com')).toBe('@example.com');
+    expect(accountHandle(undefined)).toBeNull();
+    expect(accountHandle('')).toBeNull();
   });
 
   it('counts accounts', () => {
@@ -183,7 +196,8 @@ describe('AccountSwitcherDrawer', () => {
     expect(screen.getByText('2,100 sats')).toBeTruthy();
     expect(screen.getByText(UNKNOWN_BALANCE)).toBeTruthy();
     expect(screen.getByText('0 sats')).toBeTruthy();
-    expect(screen.getAllByTestId('icon:fluent:checkmark-16-filled')).toHaveLength(1);
+    expect(screen.getAllByTestId('drawer-profile-active-badge')).toHaveLength(1);
+    expect(screen.queryByText(/npub1/)).toBeNull();
     expect(screen.getByTestId('drawer-profile-switch-0').props.accessibilityState).toMatchObject({
       selected: true,
     });
@@ -294,6 +308,8 @@ describe('AccountSwitcherDrawer', () => {
     renderDrawer();
     const button = screen.getByTestId('drawer-profile-options-1');
     expect(button.props.accessibilityLabel).toBe('Account options');
+    // A 44pt button (h-11 w-11) plus a little slop.
+    expect(button.props.className).toContain('h-11 w-11');
     expect(button.props.hitSlop).toBeGreaterThan(0);
     await act(async () => {
       fireEvent.press(button);
@@ -304,6 +320,12 @@ describe('AccountSwitcherDrawer', () => {
       'View profile',
     ]);
     expect(mockSwitch).not.toHaveBeenCalled();
+  });
+
+  it('puts a cached NIP-05 handle after the balance', () => {
+    mockCachedMetadata[mockState.profiles[0]!.pubkey] = { nip05: 'alice@example.com' };
+    renderDrawer();
+    expect(screen.getByText(' · alice@example.com')).toBeTruthy();
   });
 
   it('shows a cached profile name and picture when the account saved none', () => {
@@ -317,5 +339,35 @@ describe('AccountSwitcherDrawer', () => {
     expect(
       screen.getByTestId(`avatar:${other!.pubkey.slice(0, 1)}:https://pic.example/a.png`)
     ).toBeTruthy();
+  });
+});
+
+describe('AccountRow', () => {
+  it('draws from its props alone, metadata included', () => {
+    const profile = {
+      accountIndex: 1,
+      pubkey: 'b'.repeat(64),
+      addedAt: 2,
+      cachedDisplayName: 'Second',
+    };
+    // Held mid-way, as a design-system scrubber would hold it.
+    const halfway = { get: () => 0.5, set: () => undefined };
+    render(
+      <AccountRow
+        profile={profile}
+        metadata={{ nip05: '_@sovran.money', fetchedAt: 0 }}
+        isActive
+        isPending={false}
+        locked={false}
+        displayBtc={2}
+        onPress={jest.fn()}
+        onOpenMenu={jest.fn()}
+        activeProgress={halfway as never}
+      />
+    );
+    expect(screen.getByText('Second')).toBeTruthy();
+    expect(screen.getByText(UNKNOWN_BALANCE)).toBeTruthy();
+    expect(screen.getByText(' · @sovran.money')).toBeTruthy();
+    expect(screen.getByTestId('drawer-profile-active-badge')).toBeTruthy();
   });
 });

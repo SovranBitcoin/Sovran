@@ -13,7 +13,8 @@ import { alpha, radius } from '@/shared/styles/tokens';
 export default function DrawerLayout() {
   const [nestedPushed, setNestedPushed] = useState(false);
   const { width } = useWindowDimensions();
-  const drawerWidth = Math.min(width * 0.82, 320);
+  // Always leaves a 48pt strip to tap closed; 345pt on a 393pt phone, 360pt at most.
+  const drawerWidth = Math.min(width - 48, 360);
   const surface = useThemeColor('surface');
   const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
   // Match the device's hardware screen corner radius so the scene's rounded

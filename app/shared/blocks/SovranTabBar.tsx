@@ -1,5 +1,15 @@
+import { useEffect } from 'react';
 import { useReportTabBarHeight } from '@/shared/hooks/useScreenInsets';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import Icon from 'assets/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { withAlpha } from '@/shared/lib/color';
@@ -21,24 +31,100 @@ const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 /** A whole tab is a big target: press it only slightly (Emil: 0.97 for cards). */
 const TAB_PRESS_SCALE = 0.97;
 
+/** The magnifier turns into a close mark while Search is open. */
+const SEARCH_CLOSE_MS = 180;
+
+type SearchTabIconProps = {
+  focused: boolean;
+  color: string;
+  /**
+   * Drives the magnifier → close crossfade from outside (0 = magnifier,
+   * 1 = close), so a design-system scrubber can hold any frame. Omitted, the
+   * icon follows `focused` on its own.
+   */
+  searchCloseProgress?: SharedValue<number>;
+};
+
+/** The Search tab's icon: a magnifier, and a close mark while Search is open. */
+export function SearchTabIcon({ focused, color, searchCloseProgress }: SearchTabIconProps) {
+  const reducedMotion = useReducedMotion();
+  const ownProgress = useSharedValue(focused ? 1 : 0);
+  useEffect(() => {
+    const target = focused ? 1 : 0;
+    ownProgress.set(
+      reducedMotion
+        ? target
+        : withTiming(target, { duration: SEARCH_CLOSE_MS, easing: Easing.out(Easing.cubic) })
+    );
+  }, [focused, reducedMotion, ownProgress]);
+  const progress = searchCloseProgress ?? ownProgress;
+
+  const searchStyle = useAnimatedStyle(() => ({
+    opacity: 1 - progress.get(),
+    transform: [{ rotate: `${progress.get() * 90}deg` }, { scale: 1 - progress.get() * 0.25 }],
+  }));
+  const closeStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [
+      { rotate: `${(progress.get() - 1) * 90}deg` },
+      { scale: 0.75 + progress.get() * 0.25 },
+    ],
+  }));
+
+  return (
+    <View className="h-6 w-6">
+      <Animated.View
+        testID={focused ? undefined : 'tab-search-icon'}
+        className="absolute inset-0 items-center justify-center"
+        style={searchStyle}>
+        <Icon
+          name={focused ? 'mingcute:search-3-fill' : 'mingcute:search-3-line'}
+          color={color}
+          size={24}
+        />
+      </Animated.View>
+      <Animated.View
+        testID={focused ? 'tab-search-close-icon' : undefined}
+        className="absolute inset-0 items-center justify-center"
+        style={closeStyle}>
+        <Icon name="material-symbols:close-rounded" color={color} size={24} />
+      </Animated.View>
+    </View>
+  );
+}
+
 type TabBarIcon = NonNullable<BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']>;
 
 type TabButtonProps = {
   focused: boolean;
   color: string;
   label: string;
+  /** Read by screen readers in place of `label` when they differ. */
+  accessibilityLabel?: string;
   testID: string | undefined;
+  accessibilityHint?: string;
   onPress: () => void;
   onLongPress: () => void;
   icon: TabBarIcon | undefined;
 };
 
-function TabButton({ focused, color, label, testID, onPress, onLongPress, icon }: TabButtonProps) {
+function TabButton({
+  focused,
+  color,
+  label,
+  accessibilityLabel,
+  testID,
+  accessibilityHint,
+  onPress,
+  onLongPress,
+  icon,
+}: TabButtonProps) {
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
       testID={testID}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -62,7 +148,26 @@ function TabButton({ focused, color, label, testID, onPress, onLongPress, icon }
   );
 }
 
-export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+type SovranTabBarProps = BottomTabBarProps & {
+  /** A tab that closes when pressed while open, instead of staying put. */
+  closeableRoute?: string;
+  /** Leaves the open `closeableRoute` (back to the tab the person came from). */
+  onCloseRoute?: () => void;
+  /** Label for the open `closeableRoute`, e.g. "Close search". */
+  closeLabel?: string;
+  /** Where closing leads, read after the label, e.g. "Returns to Wallet". */
+  closeHint?: string;
+};
+
+export function SovranTabBar({
+  state,
+  descriptors,
+  navigation,
+  closeableRoute,
+  onCloseRoute,
+  closeLabel,
+  closeHint,
+}: SovranTabBarProps) {
   const insets = useSafeAreaInsets();
   const reportHeight = useReportTabBarHeight();
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
@@ -85,8 +190,14 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
           const { options } = descriptors[route.key];
           const focused = state.index === index;
           const color = focused ? activeColor : inactiveColor;
+          const closes = focused && route.name === closeableRoute && onCloseRoute !== undefined;
 
           const onPress = () => {
+            if (closes) {
+              void EnhancedHaptics.navigateHaptic();
+              onCloseRoute();
+              return;
+            }
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -110,6 +221,8 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
               focused={focused}
               color={color}
               label={label}
+              accessibilityLabel={closes ? closeLabel : undefined}
+              accessibilityHint={closes ? closeHint : undefined}
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}

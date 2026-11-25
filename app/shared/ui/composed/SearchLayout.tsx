@@ -110,6 +110,9 @@ export function SearchLayout({ title, placeholder, searchTestID }: SearchLayoutP
       headerTransparent: false,
       headerShadowVisible: false,
       headerStyle: { backgroundColor: surface },
+      // iOS draws the scroll-edge (large) appearance separately; without this it
+      // is transparent and the black window behind the stack shows through.
+      headerLargeStyle: { backgroundColor: surface },
       ...androidField,
     },
   });

@@ -5,7 +5,6 @@
 import * as nip19 from 'nostr-tools/nip19';
 
 import { formatDisplayAmount } from '@/shared/lib/amountDisplay';
-import { truncateMiddle } from '@/shared/lib/strings';
 
 /** Shown when this install has never seen an account's balance. */
 export const UNKNOWN_BALANCE = '—';
@@ -19,14 +18,13 @@ export function formatCachedBalance(sats: number | null | undefined, displayBtc:
   return formatDisplayAmount(sats, 'sat', displayBtc);
 }
 
-/** The line under the name: the NIP-05 handle when known, else the shortened npub. */
-export function accountSecondaryLine(pubkey: string, nip05?: string | null): string {
-  if (nip05) return nip05.startsWith('_@') ? `@${nip05.slice(2)}` : nip05;
-  try {
-    return truncateMiddle(nip19.npubEncode(pubkey));
-  } catch {
-    return truncateMiddle(pubkey);
-  }
+/**
+ * The NIP-05 handle shown after the balance, or null when there is none. The
+ * npub is not shown in the row: "Copy npub" in the account menu has it.
+ */
+export function accountHandle(nip05?: string | null): string | null {
+  if (!nip05) return null;
+  return nip05.startsWith('_@') ? `@${nip05.slice(2)}` : nip05;
 }
 
 /** The npub to copy, or null for a key that does not encode. */

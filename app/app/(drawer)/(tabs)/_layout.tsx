@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Tabs } from 'expo-router';
 import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
 import { View } from 'react-native';
 import type { SFSymbol } from 'expo-symbols';
 import Icon from 'assets/icons';
-import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
+import { SearchTabIcon, SovranTabBar } from '@/shared/blocks/SovranTabBar';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -13,6 +15,20 @@ export const unstable_settings = {
 };
 
 type TabName = 'index' | 'settings' | 'search';
+/** The tabs Search can close back to. */
+type ReturnTab = Exclude<TabName, 'search'>;
+
+const SEARCH_CLOSE_LABEL = 'Close search';
+const RETURN_TABS: Record<
+  ReturnTab,
+  { hint: string; href: '/(drawer)/(tabs)/index' | '/(drawer)/(tabs)/settings' }
+> = {
+  index: { hint: 'Returns to Wallet', href: '/(drawer)/(tabs)/index' },
+  settings: { hint: 'Returns to Settings', href: '/(drawer)/(tabs)/settings' },
+};
+
+const isTabName = (name: string): name is TabName =>
+  name === 'index' || name === 'settings' || name === 'search';
 
 type TabDef = {
   name: TabName;
@@ -53,13 +69,24 @@ const TAB_DEFS: readonly TabDef[] = [
     title: 'Search',
     testID: 'tab-search',
     role: 'search',
-    sf: { default: 'magnifyingglass', selected: 'magnifyingglass' },
+    // Open, the Search tab is the way out of Search.
+    sf: { default: 'magnifyingglass', selected: 'xmark' },
     monicon: { default: 'mingcute:search-3-line', selected: 'mingcute:search-3-fill' },
   },
 ];
 
 export default function TabLayout() {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [focusedTab, setFocusedTab] = useState<TabName>('index');
+  // The last tab other than Search: pressing the open Search tab goes back there.
+  const [returnTab, setReturnTab] = useState<ReturnTab>('index');
+  const searchOpen = focusedTab === 'search';
+
+  const onTabFocus = (name: string) => {
+    if (!isTabName(name)) return;
+    setFocusedTab(name);
+    if (name !== 'search') setReturnTab(name);
+  };
 
   // iOS 26+ uses native liquid-glass tabs.
   if (isExpo55NativeTabsSupported()) {
@@ -71,24 +98,39 @@ export default function TabLayout() {
               labelStyle={{ default: { color: muted }, selected: { color: foreground } }}
               iconColor={{ default: muted, selected: foreground }}
               tintColor={foreground}
-              disableTransparentOnScrollEdge>
-              {TAB_DEFS.map((tab) => (
-                <Expo55NativeTabs.Trigger
-                  disableAutomaticContentInsets
-                  key={tab.name}
-                  name={tab.name}
-                  role={tab.role}
-                  unstable_nativeProps={{
-                    tabBarItemTestID: tab.testID,
-                    tabBarItemAccessibilityLabel: tab.title,
-                  }}>
-                  {/* A `role` item takes the system's own title. */}
-                  {tab.role ? null : (
-                    <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
-                  )}
-                  <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
-                </Expo55NativeTabs.Trigger>
-              ))}
+              disableTransparentOnScrollEdge
+              screenListeners={({ route }) => ({
+                focus: () => onTabFocus(route.name),
+                tabPress: () => {
+                  if (route.name !== 'search' || !searchOpen) return;
+                  // The navigator re-selects Search right after this event, so
+                  // leave on the next frame or the re-select would win.
+                  requestAnimationFrame(() => router.navigate(RETURN_TABS[returnTab].href));
+                },
+              })}>
+              {TAB_DEFS.map((tab) => {
+                const closes = tab.name === 'search' && searchOpen;
+                return (
+                  <Expo55NativeTabs.Trigger
+                    disableAutomaticContentInsets
+                    key={tab.name}
+                    name={tab.name}
+                    role={tab.role}
+                    // Pressing the open Search tab closes it; it never pops or scrolls.
+                    disablePopToTop={tab.name === 'search'}
+                    disableScrollToTop={tab.name === 'search'}
+                    unstable_nativeProps={{
+                      tabBarItemTestID: tab.testID,
+                      tabBarItemAccessibilityLabel: closes ? SEARCH_CLOSE_LABEL : tab.title,
+                    }}>
+                    {/* A `role` item takes the system's own title. */}
+                    {tab.role ? null : (
+                      <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
+                    )}
+                    <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
+                  </Expo55NativeTabs.Trigger>
+                );
+              })}
             </Expo55NativeTabs>
           </View>
         </BackgroundProvider>
@@ -104,7 +146,16 @@ export default function TabLayout() {
           <Tabs
             initialRouteName="index"
             screenOptions={{ headerShown: false }}
-            tabBar={(props) => <SovranTabBar {...props} />}>
+            screenListeners={({ route }) => ({ focus: () => onTabFocus(route.name) })}
+            tabBar={(props) => (
+              <SovranTabBar
+                {...props}
+                closeableRoute="search"
+                onCloseRoute={() => props.navigation.navigate(returnTab)}
+                closeLabel={SEARCH_CLOSE_LABEL}
+                closeHint={RETURN_TABS[returnTab].hint}
+              />
+            )}>
             {TAB_DEFS.map((tab) => (
               <Tabs.Screen
                 key={tab.name}
@@ -113,13 +164,16 @@ export default function TabLayout() {
                   title: tab.title,
                   tabBarAccessibilityLabel: tab.title,
                   tabBarButtonTestID: tab.testID,
-                  tabBarIcon: ({ focused, color }) => (
-                    <Icon
-                      name={focused ? tab.monicon.selected : tab.monicon.default}
-                      color={color as string}
-                      size={24}
-                    />
-                  ),
+                  tabBarIcon: ({ focused, color }) =>
+                    tab.name === 'search' ? (
+                      <SearchTabIcon focused={focused} color={color as string} />
+                    ) : (
+                      <Icon
+                        name={focused ? tab.monicon.selected : tab.monicon.default}
+                        color={color as string}
+                        size={24}
+                      />
+                    ),
                 }}
               />
             ))}
