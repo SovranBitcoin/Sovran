@@ -74,6 +74,14 @@ export function formatMintInfoNostrFallback(info: string, pubkey?: string): stri
   return truncateMiddle(trimmed);
 }
 
+/** Full npub string copied to the clipboard when tapping a mint's Nostr contact. */
+export function getMintInfoNostrCopyValue(info: string, pubkey?: string): string {
+  if (pubkey && isNostrPubkeyHex(pubkey)) {
+    return nip19.npubEncode(pubkey);
+  }
+  return info.trim();
+}
+
 export function getMintInfoNostrDisplayName(
   profile: NostrProfileNameFields | null | undefined,
   fallback: string

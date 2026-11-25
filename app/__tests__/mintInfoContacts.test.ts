@@ -3,6 +3,7 @@ import * as nip19 from 'nostr-tools/nip19';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrContactPubkey,
+  getMintInfoNostrCopyValue,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
   resolveMintInfoNostrContactPubkey,
@@ -81,5 +82,11 @@ describe('mint info contacts', () => {
     expect(() => formatMintInfoNostrFallback('npub\u2026', 'npub\u2026')).not.toThrow();
     expect(formatMintInfoNostrFallback('npub\u2026', 'npub\u2026')).toBe('npub\u2026');
     expect(formatMintInfoNostrFallback('custom', '12345')).toBe('custom');
+  });
+
+  it('returns the full npub to copy from hex or npub contacts without throwing on placeholders', () => {
+    expect(getMintInfoNostrCopyValue(PUBKEY, PUBKEY)).toBe(NPUB);
+    expect(getMintInfoNostrCopyValue(NPUB, PUBKEY)).toBe(NPUB);
+    expect(getMintInfoNostrCopyValue('npub\u2026', 'npub\u2026')).toBe('npub\u2026');
   });
 });

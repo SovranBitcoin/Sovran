@@ -26,7 +26,7 @@ describe('mint info screen source', () => {
 
   it('uses Nostr profile data to pretty-display the first Nostr contact', () => {
     expect(source).toContain('const contactRows = getSortedMintInfoContacts(contact);');
-    expect(source).toContain('useNostrProfile(');
+    expect(source).toContain('useNostrProfileMetadata(');
     expect(source).toContain('getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)');
     expect(source).toContain('picture={rowPicture}');
   });
@@ -116,5 +116,14 @@ describe('mint info screen source', () => {
     // One thing on the page is called Details: the long description is not.
     expect(source).not.toContain('title="Details"');
     expect(source).toContain('testID="mint-info-details"');
+  });
+
+  it('copies the Nostr contact npub instead of opening a profile/DM link and fetches kind-0 avatar metadata', () => {
+    expect(source).not.toContain('buildModalProfileHref');
+    expect(source).toContain('getMintInfoNostrCopyValue(');
+    expect(source).toContain("copyPopup('npub')");
+    expect(source).toContain('name="lets-icons:copy"');
+    expect(source).toContain('useNostrProfileMetadata(');
+    expect(source).toContain('avatarStateFor(rowPicture, !rowResolving)');
   });
 });

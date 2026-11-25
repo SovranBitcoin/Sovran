@@ -29,7 +29,6 @@ import { withAlpha } from '@/shared/lib/color';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   log,
   useLifecycleLogger,
@@ -37,8 +36,14 @@ import {
   useWhyDidRender,
 } from '@/shared/lib/logger';
 import { urlHost, useVisualStateLogger, visualLayoutScopePart } from '@/shared/lib/contentShiftLog';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { openExternalUrl } from '@/shared/lib/url';
-import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import {
+  useNostrProfileMetadata,
+  useNostrProfileMetadataMany,
+} from '@/shared/hooks/useNostrProfileMetadata';
+import { copyPopup } from '@/shared/lib/popup';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -49,6 +54,7 @@ import { mintInfoStatCards, type MintInfoStats } from '../lib/mintInfoStats';
 import { buildMintDetailsRows, mintMotd } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
+  getMintInfoNostrCopyValue,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
   resolveMintInfoNostrContactPubkey,
@@ -189,10 +195,25 @@ export function MintInfoScreen() {
     contactRows,
     cachedMeta?.operatorPubkey
   );
-  const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
-    nostrContactPubkey ?? null
+  const extraNostrPubkeys = Array.from(
+    new Set(
+      contactRows
+        .map((row) =>
+          row.isNostr
+            ? resolveMintInfoNostrContactPubkey([row], cachedMeta?.operatorPubkey)
+            : undefined
+        )
+        .filter((pk): pk is string => Boolean(pk) && pk !== nostrContactPubkey)
+    )
   );
-  const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
+  // Kind-0 metadata (name + picture) through the canonical entity cache with
+  // automatic retries across Primal/relays — `useNostrProfile` only reads the
+  // stats ladder and can leave the operator's avatar blank.
+  const { metadata: nostrContactProfile, isResolving: nostrContactLoading } =
+    useNostrProfileMetadata(nostrContactPubkey);
+  const { metadata: extraContactProfiles, loadingPubkeys: extraContactLoadingPubkeys } =
+    useNostrProfileMetadataMany(extraNostrPubkeys);
+  const nostrContactPicture = nostrContactProfile?.picture;
   // The footer's Details button asks for the modal; DetailsSection opens it.
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -295,13 +316,15 @@ export function MintInfoScreen() {
       case 'x':
         await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
         break;
-      case 'nostr':
-        if (pubkey) {
-          router.push(buildModalProfileHref({ pubkey }));
-        } else {
-          await Clipboard.setStringAsync(info);
+      case 'nostr': {
+        const npubToCopy = getMintInfoNostrCopyValue(info, pubkey);
+        if (npubToCopy) {
+          await EnhancedHaptics.copyHaptic();
+          await Clipboard.setStringAsync(npubToCopy);
+          copyPopup('npub');
         }
         break;
+      }
       default:
         await Clipboard.setStringAsync(info);
     }
@@ -575,20 +598,25 @@ export function MintInfoScreen() {
                   const rowNostrPubkey = c.isNostr
                     ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
                     : undefined;
-                  const rowProfile =
-                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                  const rowProfile = !rowNostrPubkey
+                    ? null
+                    : rowNostrPubkey === nostrContactPubkey
                       ? nostrContactProfile
-                      : null;
-                  const rowPicture =
-                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
-                      ? nostrContactPicture
-                      : undefined;
+                      : (extraContactProfiles.get(rowNostrPubkey) ?? null);
+                  const rowPicture = rowProfile?.picture;
+                  const rowResolving = !rowNostrPubkey
+                    ? false
+                    : rowNostrPubkey === nostrContactPubkey
+                      ? nostrContactLoading
+                      : extraContactLoadingPubkeys.has(rowNostrPubkey);
                   const fallbackNpub = c.isNostr
                     ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
                     : undefined;
                   const title = c.isNostr
                     ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
                     : c.info;
+                  const showNpubSubtitle =
+                    c.isNostr && Boolean(fallbackNpub) && title !== fallbackNpub;
                   return (
                     <PressableFeedback
                       key={`${c.method}:${c.info}:${c.originalIndex}`}
@@ -602,7 +630,7 @@ export function MintInfoScreen() {
                       }
                       accessibilityRole={c.isNostr ? 'button' : 'link'}
                       accessibilityLabel={
-                        c.isNostr ? 'Open Nostr contact profile' : `${c.method}, ${c.info}`
+                        c.isNostr ? `Copy ${title} npub` : `${c.method}, ${c.info}`
                       }
                       onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
                       <PressableFeedback.Scale>
@@ -610,17 +638,11 @@ export function MintInfoScreen() {
                           <ListGroup.ItemPrefix>
                             {c.isNostr ? (
                               <Avatar
-                                state={
-                                  nostrContactLoading && rowNostrPubkey === nostrContactPubkey
-                                    ? 'loading'
-                                    : rowPicture
-                                      ? 'image'
-                                      : 'fallback'
-                                }
+                                state={avatarStateFor(rowPicture, !rowResolving)}
                                 picture={rowPicture}
                                 seed={rowNostrPubkey ?? c.info}
                                 name={title}
-                                size={32}
+                                size={36}
                               />
                             ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
                               <Icon
@@ -634,8 +656,21 @@ export function MintInfoScreen() {
                           </ListGroup.ItemPrefix>
                           <ListGroup.ItemContent>
                             <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+                            {showNpubSubtitle ? (
+                              <ListGroup.ItemDescription>{fallbackNpub}</ListGroup.ItemDescription>
+                            ) : null}
                           </ListGroup.ItemContent>
-                          <ListGroup.ItemSuffix />
+                          {c.isNostr ? (
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={18}
+                                color={withAlpha(foreground, 0.5)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          ) : (
+                            <ListGroup.ItemSuffix />
+                          )}
                         </ListGroup.Item>
                       </PressableFeedback.Scale>
                       <PressableFeedback.Ripple />

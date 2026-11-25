@@ -247,7 +247,9 @@ export function useMintDetailRead(
   const operatorPubkey = useMemo(
     () =>
       extractMintNostrPubkey({ contact: Array.isArray(contact) ? contact : undefined }) ??
-      discoveredOperator,
+      (discoveredOperator
+        ? extractMintNostrPubkey({ contact: [{ method: 'nostr', info: discoveredOperator }] })
+        : undefined),
     [contact, discoveredOperator]
   );
   const profileInputs = useMemo(
