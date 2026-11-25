@@ -21,6 +21,8 @@ const STORAGE_OPTIONS = { title: 'Storage inventory' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
 const DESIGN_SYSTEM_FOUNDATIONS_OPTIONS = { title: 'Foundations' };
 const DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS = { title: 'Wallet controls' };
+const DESIGN_SYSTEM_UI_KIT_OPTIONS = { title: 'State-locked UI kit' };
+const DESIGN_SYSTEM_SCRUBBER_OPTIONS = { title: 'Animation frame scrubber' };
 const DESIGN_SYSTEM_LOADING_OPTIONS = { title: 'Loading indicator' };
 const DESIGN_SYSTEM_SEGMENTED_OPTIONS = { title: 'Segmented progress' };
 const DESIGN_SYSTEM_TIMELINE_OPTIONS = { title: 'Timeline' };
@@ -59,6 +61,8 @@ export default function SettingsFlowLayout() {
         name="design-system-wallet-controls"
         options={DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS}
       />
+      <Stack.Screen name="design-system-ui-kit" options={DESIGN_SYSTEM_UI_KIT_OPTIONS} />
+      <Stack.Screen name="design-system-scrubber" options={DESIGN_SYSTEM_SCRUBBER_OPTIONS} />
       <Stack.Screen name="design-system-loading" options={DESIGN_SYSTEM_LOADING_OPTIONS} />
       <Stack.Screen name="design-system-segmented" options={DESIGN_SYSTEM_SEGMENTED_OPTIONS} />
       <Stack.Screen name="design-system-timeline" options={DESIGN_SYSTEM_TIMELINE_OPTIONS} />

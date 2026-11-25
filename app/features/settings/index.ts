@@ -10,6 +10,8 @@ export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
 export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
 export { SettingsDesignSystemFoundationsScreen } from './screens/SettingsDesignSystemFoundationsScreen';
 export { SettingsDesignSystemWalletControlsScreen } from './screens/SettingsDesignSystemWalletControlsScreen';
+export { SettingsDesignSystemUiKitScreen } from './screens/SettingsDesignSystemUiKitScreen';
+export { SettingsDesignSystemScrubberScreen } from './screens/SettingsDesignSystemScrubberScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';

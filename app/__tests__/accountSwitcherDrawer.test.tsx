@@ -13,7 +13,8 @@ import {
   UNKNOWN_BALANCE,
 } from '@/navigation/accountSwitcher';
 
-import { AccountRow, AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
+import { AccountRow } from '@/navigation/AccountRow';
+import { AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
 
 const mockState = {
   profiles: [

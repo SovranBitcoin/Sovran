@@ -200,7 +200,9 @@ describe('wallet surface e2e selectors', () => {
   it('pins the account switcher drawer ids', () => {
     const drawer = read('navigation/AccountSwitcherDrawer.tsx');
     // Keyed by the account's derivation index, its stable identity.
-    expect(drawer).toContain('testID={`drawer-profile-switch-${profile.accountIndex}`}');
+    expect(read('navigation/AccountRow.tsx')).toContain(
+      'testID={`drawer-profile-switch-${profile.accountIndex}`}'
+    );
     expect(drawer).toContain('testID="drawer-add-account"');
     expect(drawer).toContain('testID="drawer-import-account"');
   });

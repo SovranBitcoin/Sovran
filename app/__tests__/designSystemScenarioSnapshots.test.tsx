@@ -25,13 +25,14 @@ const render = (ui: React.ReactElement) => renderBare(ui, { wrapper: SnapshotCap
 
 jest.mock('@/shared/lib/logger', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const logger = {
+  const logger: Record<string, unknown> = {
     debug: jest.fn(),
     error: jest.fn(),
     info: jest.fn(),
     isLevelEnabled: jest.fn(() => false),
     warn: jest.fn(),
   };
+  logger.child = () => logger;
 
   return {
     Log: ({ children }: { children?: React.ReactNode }) =>
@@ -79,6 +80,24 @@ jest.mock('liquid-glass-text', () => ({
   },
 }));
 
+// A real text field needs a DOM under react-native-web; its props are what the snapshot keeps.
+jest.mock('@/shared/ui/composed/GlassSearchBar/searchTextInput', () => ({
+  SearchTextInput: (props: Record<string, unknown>) =>
+    jest.requireActual<typeof import('react')>('react').createElement('SearchTextInput', props),
+}));
+
+// Both resolve per platform in the app; the snapshots pin the non-glass tier.
+jest.mock(
+  '@/shared/ui/composed/BalancePill',
+  () => jest.requireActual('@/shared/ui/composed/BalancePill/BalancePill.flat'),
+  { virtual: true }
+);
+jest.mock(
+  '@/shared/ui/composed/GlassSearchBar',
+  () => jest.requireActual('@/shared/ui/composed/GlassSearchBar/GlassSearchBar.ios'),
+  { virtual: true }
+);
+
 jest.mock('@/shared/lib/popup', () => ({
   copyPopup: jest.fn(),
 }));
@@ -103,7 +122,21 @@ jest.mock('heroui-native', () => {
     { Scale, Ripple }
   );
 
-  return { PressableFeedback };
+  const host =
+    (name: string) =>
+    ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
+      ReactActual.createElement(name, props, children);
+  const ListGroup = Object.assign(host('ListGroup'), {
+    Item: host('ListGroupItem'),
+    ItemContent: host('ListGroupItemContent'),
+    ItemDescription: host('ListGroupItemDescription'),
+    ItemPrefix: host('ListGroupItemPrefix'),
+    ItemSuffix: host('ListGroupItemSuffix'),
+    ItemTitle: host('ListGroupItemTitle'),
+  });
+  const Switch = Object.assign(host('Switch'), { Thumb: host('SwitchThumb') });
+
+  return { ListGroup, PressableFeedback, Switch };
 });
 
 jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
@@ -260,6 +293,8 @@ const SEGMENTED_PROGRESS_FAMILY = getDesignSystemFamily('segmented-progress');
 const SKELETON_CROSSFADE_FAMILY = getDesignSystemFamily('skeleton-crossfade');
 const TIMELINE_FAMILY = getDesignSystemFamily('timeline');
 const WALLET_CONTROLS_FAMILY = getDesignSystemFamily('wallet-controls');
+const UI_KIT_FAMILY = getDesignSystemFamily('ui-kit');
+const SCRUBBER_FAMILY = getDesignSystemFamily('scrubber');
 
 describe('Design System exact structural snapshots', () => {
   it('removes unstable renderer fields without dropping visual or accessibility output', () => {
@@ -375,6 +410,52 @@ describe('Design System exact structural snapshots', () => {
 
       view.rerender(scenario.render());
       expect(canonicalizeReactTestTree(view.toJSON())).toMatchSnapshot(scenario.id);
+    });
+  }
+
+  it('locks every UI kit scenario to one component and one state', () => {
+    expect(
+      UI_KIT_FAMILY.scenarios.map((scenario) => `${scenario.component}:${scenario.state}`)
+    ).toMatchSnapshot('ui-kit-states');
+    UI_KIT_FAMILY.scenarios.forEach((scenario) => {
+      expect(scenario.component).toEqual(expect.any(String));
+      expect(scenario.state).toEqual(expect.any(String));
+    });
+  });
+
+  for (const scenario of UI_KIT_FAMILY.scenarios) {
+    it(`renders ui-kit/${scenario.id}`, () => {
+      const view = render(scenario.render());
+
+      try {
+        view.rerender(scenario.render());
+        expect(canonicalizeReactTestTree(view.toJSON())).toMatchSnapshot(scenario.id);
+      } finally {
+        view.unmount();
+      }
+    });
+  }
+
+  it('keeps the scrubber transition catalog complete', () => {
+    expect(SCRUBBER_FAMILY.scenarios.map((scenario) => scenario.id)).toEqual([
+      'button-press',
+      'mint-selector-crossfade',
+      'selectable-check',
+      'account-row-active',
+      'search-tab-close',
+    ]);
+  });
+
+  for (const scenario of SCRUBBER_FAMILY.scenarios) {
+    it(`renders scrubber/${scenario.id} at its midpoint`, () => {
+      const view = render(scenario.render());
+
+      try {
+        view.rerender(scenario.render());
+        expect(canonicalizeReactTestTree(view.toJSON())).toMatchSnapshot(scenario.id);
+      } finally {
+        view.unmount();
+      }
     });
   }
 

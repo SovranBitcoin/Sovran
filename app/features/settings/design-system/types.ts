@@ -7,10 +7,27 @@
 import type { Href } from 'expo-router';
 import type { ReactElement } from 'react';
 
+/** One discrete state a fixture locks a component in, for the state-locked UI kit. */
+export type DesignSystemComponentState =
+  | 'default'
+  | 'loading'
+  | 'empty'
+  | 'populated'
+  | 'error'
+  | 'offline'
+  | 'disabled'
+  | 'selected'
+  | 'worst-case'
+  | 'large-text';
+
 export interface DesignSystemScenario {
   readonly id: string;
   readonly title: string;
   readonly covers: readonly string[];
+  /** The component this scenario locks, by its exported name. */
+  readonly component?: string;
+  /** The state it is locked in. */
+  readonly state?: DesignSystemComponentState;
   render(): ReactElement;
 }
 
