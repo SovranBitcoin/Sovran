@@ -7,6 +7,7 @@ import Icon from 'assets/icons';
 import { SearchTabIcon, SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
+import { DrawerSceneOverlay } from '@/navigation/DrawerSceneOverlay';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -148,6 +149,7 @@ export default function TabLayout() {
                 );
               })}
             </Expo55NativeTabs>
+            <DrawerSceneOverlay />
           </View>
         </BackgroundProvider>
       </TabBarInsetsProvider>
@@ -194,6 +196,7 @@ export default function TabLayout() {
               />
             ))}
           </Tabs>
+          <DrawerSceneOverlay />
         </View>
       </BackgroundProvider>
     </TabBarInsetsProvider>

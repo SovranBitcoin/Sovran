@@ -30,6 +30,9 @@ function mockHost(name: string) {
       .createElement(name, null, props.children as React.ReactNode);
 }
 
+jest.mock('@/navigation/DrawerSceneOverlay', () => ({
+  DrawerSceneOverlay: () => null,
+}));
 jest.mock('@/navigation/nativeTabs', () => {
   const Trigger = Object.assign(
     (props: { name: string; unstable_nativeProps: Record<string, unknown> }) => {

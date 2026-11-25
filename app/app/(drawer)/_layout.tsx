@@ -5,22 +5,20 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 import { isNestedStackAtRoot } from '@/navigation/drawerGesture';
 import { DrawerContent } from '@/navigation/DrawerContent';
+import { computeDrawerWidth } from '@/navigation/DrawerSceneOverlay';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
-import { alpha, radius } from '@/shared/styles/tokens';
+import { radius } from '@/shared/styles/tokens';
 
 export default function DrawerLayout() {
   const [nestedPushed, setNestedPushed] = useState(false);
   const { width } = useWindowDimensions();
-  // Always leaves a 48pt strip to tap closed; 345pt on a 393pt phone, 360pt at most.
-  const drawerWidth = Math.min(width - 48, 360);
   const surface = useThemeColor('surface');
-  const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
   // Match the device's hardware screen corner radius so the scene's rounded
   // TL/BL hug the physical display curve. Falls back to a token-driven radius
   // when null (Android <12, or devices without rounded displays).
   const deviceRadius = getScreenCornerRadius(radius['2xl']);
+  const drawerWidth = computeDrawerWidth(width, deviceRadius);
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
@@ -46,7 +44,10 @@ export default function DrawerLayout() {
             borderCurve: 'continuous',
             overflow: 'hidden',
           },
-          overlayColor: `rgba(${overlayRgb},${alpha.strong})`,
+          // Stock overlay stays transparent for tap-to-close; `DrawerSceneOverlay`
+          // draws the rounded dim + hairline inside the clipped scene so square
+          // overlay corners never cover the continuous curve.
+          overlayColor: 'transparent',
           // A narrow edge, so swipes across the wallet's account carousel stay with it.
           swipeEdgeWidth: 32,
           swipeMinDistance: 10,
