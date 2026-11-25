@@ -150,7 +150,7 @@ async function runCocoPhase2({
     if (!isLive()) return;
     bgStage.log('Waiting for wallet restore...');
     await initPhase('Coco-bg.restoreReady', () =>
-      awaitRestoreReady(useWalletLifecycleStore, controller.signal)
+      awaitRestoreReady(useWalletLifecycleStore, signal)
     );
     if (!isLive()) return;
     bgStage.log('Starting NPC sync...');
