@@ -52,6 +52,7 @@ import {
   buildOnchainRequiredConfirmationProgress,
   buildSatisfiedOnchainConfirmationProgress,
 } from '@/shared/lib/cashu/onchainMint';
+import { hasFeature } from '@/shared/config/features';
 import { useMempoolAcceleration } from '@/shared/hooks/useMempoolAcceleration';
 import { useMempoolTxConfirmations } from '@/shared/hooks/useMempoolTxConfirmations';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -215,6 +216,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     return <ScreenLoadingState message="Loading transaction..." />;
   }
 
+  const railEnabled = hasFeature('onchain');
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const onchainAddress = discoveryAddress;
   // Settled cost when coco reported one, else the selected option's reserve
@@ -247,8 +249,8 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              // Only after settlement; before that, Pay / Cancel apply.
-              condition: isPaid,
+              // Only after settlement (or when viewing history on a disabled rail); before that, Pay / Cancel apply.
+              condition: isPaid || !railEnabled,
             },
             {
               testID: 'onchain-send-cancel',
@@ -259,7 +261,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
                 await actions.cancel.execute();
                 onCancel();
               },
-              condition: actions.cancel.available,
+              condition: railEnabled && actions.cancel.available,
               disabled: anyLoading,
             },
             {
@@ -268,7 +270,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
               onPress: () => actions.pay.execute(),
-              condition: actions.pay.available,
+              condition: railEnabled && actions.pay.available,
               disabled: anyLoading,
             },
           ]}

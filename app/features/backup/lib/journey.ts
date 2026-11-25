@@ -18,16 +18,37 @@ const BACKUP_ROUTES: ReadonlySet<string> = new Set([
  */
 const PROMPT_ROUTES: ReadonlySet<string> = new Set(['cta', 'cta-sample', ...BACKUP_ROUTES]);
 
-type Routes = readonly { name: string }[] | undefined;
+type NavRoute = {
+  name: string;
+  state?: {
+    routes?: readonly NavRoute[];
+  };
+};
+
+type Routes = readonly NavRoute[] | undefined;
+
+/**
+ * Walk nested navigation states too: Expo Router's `useRootNavigationState()`
+ * returns the outer navigator whose single route (`__root`) holds the app
+ * stack under `route.state.routes`.
+ */
+function hasRouteInTree(routes: Routes, targets: ReadonlySet<string>): boolean {
+  if (!routes) return false;
+  for (const route of routes) {
+    if (targets.has(route.name)) return true;
+    if (route.state?.routes && hasRouteInTree(route.state.routes, targets)) return true;
+  }
+  return false;
+}
 
 /** Whether the root stack holds a backup page, so the backup session is live. */
 export function isBackupJourneyOpen(routes: Routes): boolean {
-  return routes?.some((route) => BACKUP_ROUTES.has(route.name)) ?? false;
+  return hasRouteInTree(routes, BACKUP_ROUTES);
 }
 
 /** Whether the root stack holds a prompt or backup page. */
 export function isPromptOpen(routes: Routes): boolean {
-  return routes?.some((route) => PROMPT_ROUTES.has(route.name)) ?? false;
+  return hasRouteInTree(routes, PROMPT_ROUTES);
 }
 
 /** How many prompt and backup pages sit on top of the root stack. */

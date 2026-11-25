@@ -33,6 +33,14 @@ describe('links into flattened route groups', () => {
     ['sovran:///(user-flow)/geohashChat?geohash=u4pru', '/geohashChat?geohash=u4pru'],
     ['https://sovran.money/(profile-flow)/profile?pubkey=ab#top', '/profile?pubkey=ab#top'],
     ['/(user-flow)/share?type=npub&data=npub1abc', '/share?type=npub&data=npub1abc'],
+    ['/(user-flow)/share?type=profile&data=npub1abc', '/share?type=profile&data=npub1abc'],
+    ['/(user-flow)/share', '/share?type=npub'],
+    ['/(user-flow)/share?data=npub1abc', '/share?data=npub1abc&type=npub'],
+    [
+      '/(profile-flow)/share?npub=npub1abc&lud16=alice@example.com#top',
+      '/share?npub=npub1abc&lud16=alice@example.com&type=npub#top',
+    ],
+    ['/(profile-flow)/share#top', '/share?type=npub#top'],
     [
       '/(profile-flow)/bitchatDM?transport=ble-dm&peerID=0011',
       '/bitchatDM?transport=ble-dm&peerID=0011',

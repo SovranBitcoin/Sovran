@@ -33,29 +33,59 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
 
 const EXEMPT_GROUPS = new Set(['(settings-flow)']);
 
+interface HistoryEntryRule {
+  readonly param: string;
+  readonly type: 'mint' | 'melt' | 'send' | 'receive';
+  readonly requiresQuoteId: boolean;
+}
+
 /**
  * The payment detail routes that transaction history opens, each with the
- * param that carries the history row it shows. `navigateToTransactionDetail`
- * marks such an entry `historyView=1` and passes the row; only an entry with
- * both is a past payment, readable after its rail is switched off. A bare
- * `historyView=1` cannot open a disabled rail's live flow.
+ * param and persisted-entry shape it expects. `navigateToTransactionDetail`
+ * marks such an entry `historyView=1` and passes the serialized Coco history
+ * row; only a well-formed persisted entry is readable after its rail is
+ * switched off. A bare `historyView=1`, an empty `{}` payload, or a synthetic
+ * preview (`quoteId: ''`) cannot open a disabled rail's live flow.
  */
-const HISTORY_ENTRY_PARAM: Readonly<Record<string, string>> = {
-  lightningSend: 'meltHistoryEntry',
-  onchainSend: 'meltHistoryEntry',
-  lightningReceive: 'mintHistoryEntry',
-  onchainReceive: 'mintHistoryEntry',
-  sendToken: 'sendHistoryEntry',
-  receiveToken: 'receiveHistoryEntry',
+const HISTORY_ENTRY_RULE: Readonly<Record<string, HistoryEntryRule>> = {
+  lightningSend: { param: 'meltHistoryEntry', type: 'melt', requiresQuoteId: true },
+  onchainSend: { param: 'meltHistoryEntry', type: 'melt', requiresQuoteId: true },
+  lightningReceive: { param: 'mintHistoryEntry', type: 'mint', requiresQuoteId: true },
+  onchainReceive: { param: 'mintHistoryEntry', type: 'mint', requiresQuoteId: true },
+  sendToken: { param: 'sendHistoryEntry', type: 'send', requiresQuoteId: false },
+  receiveToken: { param: 'receiveHistoryEntry', type: 'receive', requiresQuoteId: false },
 };
 
 type RouteParams = Readonly<Record<string, string | string[] | undefined>>;
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasNonEmptyId(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0;
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 function isHistoryEntry(leaf: string, params: RouteParams): boolean {
-  const entryParam = HISTORY_ENTRY_PARAM[leaf];
-  if (!entryParam || params.historyView !== '1') return false;
-  const entry = params[entryParam];
-  return typeof entry === 'string' && entry.length > 0;
+  const rule = HISTORY_ENTRY_RULE[leaf];
+  if (!rule || params.historyView !== '1') return false;
+  const raw = params[rule.param];
+  if (typeof raw !== 'string' || raw.length === 0) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  if (record.type !== rule.type) return false;
+  if (!hasNonEmptyId(record.id)) return false;
+  if (!isNonEmptyString(record.mintUrl)) return false;
+  if (typeof record.createdAt !== 'number' || !Number.isFinite(record.createdAt)) return false;
+  if (rule.requiresQuoteId && !isNonEmptyString(record.quoteId)) return false;
+  return true;
 }
 
 /** The disabled module a route needs, or null when the build ships it. */

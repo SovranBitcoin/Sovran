@@ -17,6 +17,7 @@ import { useWindowDimensions } from 'react-native';
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { isMeltQuotePaid, isMeltQuoteReadyToPay } from 'wallet';
 import { useScreenActions } from 'wallet/react';
+import { hasFeature } from '@/shared/config/features';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
@@ -188,6 +189,7 @@ export function LightningSendScreen({
   }
 
   const isPreview = !entry.quoteId;
+  const railEnabled = hasFeature('lightning');
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const isPaid = isMeltQuotePaid(entry);
@@ -237,7 +239,7 @@ export function LightningSendScreen({
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              condition: isPaid,
+              condition: isPaid || !railEnabled,
             },
             {
               testID: 'melt-cancel',
@@ -254,7 +256,8 @@ export function LightningSendScreen({
               // Hidden while the pay is in flight — a disabled X mid-payment
               // reads as a broken button. Synthetic previews remain directly
               // dismissible even though the rollback action is unavailable.
-              condition: (isPreview || actions.cancel.available) && !actions.pay.loading,
+              condition:
+                railEnabled && (isPreview || actions.cancel.available) && !actions.pay.loading,
               disabled: anyLoading,
             },
             {
@@ -263,7 +266,7 @@ export function LightningSendScreen({
               icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
               onPress: () => actions.pay.execute(),
-              condition: actions.pay.available,
+              condition: railEnabled && !(isHistoryView && isPreview) && actions.pay.available,
               disabled: anyLoading,
             },
           ]}

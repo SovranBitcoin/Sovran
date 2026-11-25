@@ -15,7 +15,11 @@ import {
   BACKUP_SNOOZE_MS,
   LATEST_VERSION_MAX_AGE_MS,
 } from '@/shared/lib/cta/definitions';
-let mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+type MockRoute = { name: string; state?: { routes: MockRoute[] } };
+let mockNavigation: { key: string; routes: MockRoute[] } = {
+  key: 'root',
+  routes: [{ name: '(drawer)' }],
+};
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
@@ -175,10 +179,19 @@ it('reserves one modal and re-evaluates on close with a version received while c
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toBeDefined();
 });
 it('presents no prompt while a backup page is open, with or without its prompt beneath', () => {
-  // Settings opens the backup with no prompt beneath it.
+  // Settings opens the backup with no prompt beneath it, and Expo Router wraps
+  // the app stack inside `__root.state.routes`.
   for (const routes of [
     [{ name: '(drawer)' }, { name: '(settings-flow)' }, { name: 'backup-intro' }],
     [{ name: '(drawer)' }, { name: 'cta' }, { name: 'backup-intro' }, { name: 'backup-verify' }],
+    [
+      {
+        name: '__root',
+        state: {
+          routes: [{ name: '(drawer)' }, { name: '(settings-flow)' }, { name: 'backup-intro' }],
+        },
+      },
+    ],
   ]) {
     mockNavigation = { key: 'root', routes };
     const view = render(<HostWithScreen />);

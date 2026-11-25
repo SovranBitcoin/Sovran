@@ -44,15 +44,35 @@ const CONTACTS_ROUTE_RE =
 const LEGACY_GROUP_RE =
   /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?\((filter|map|theme|user|profile|prompt|transactions)-flow\)(\/[^?#]*)?([?#].*)?$/i;
 
+/**
+ * Both removed `(user-flow)/share` and `(profile-flow)/share` wrappers
+ * defaulted `type` to `npub`, whereas the root `/share` screen defaults to
+ * `profile` (which omits the Lightning tab). Preserve the `npub` default when
+ * a legacy share link omits `type`.
+ */
+function withDefaultShareType(tail: string): string {
+  const hashAt = tail.indexOf('#');
+  const query = hashAt === -1 ? tail : tail.slice(0, hashAt);
+  const hash = hashAt === -1 ? '' : tail.slice(hashAt);
+  if (/(?:^\?|&)type=/i.test(query)) return tail;
+  const nextQuery = query === '' || query === '?' ? '?type=npub' : `${query}&type=npub`;
+  return `${nextQuery}${hash}`;
+}
+
 /** The root path for a link into a flattened group, or null when it names none. */
 function rewriteLegacyGroup(path: string): string | null {
   const match = LEGACY_GROUP_RE.exec(path);
   if (!match) return null;
   const [, group, leaf = '', tail = ''] = match;
   const bare = leaf === '' || leaf === '/';
+  const lowerGroup = group.toLowerCase();
   // The map group's index page is the map; no other group had one.
-  if (group.toLowerCase() === 'map' && (bare || /^\/index\/?$/i.test(leaf))) return `/map${tail}`;
-  return bare ? null : `${leaf}${tail}`;
+  if (lowerGroup === 'map' && (bare || /^\/index\/?$/i.test(leaf))) return `/map${tail}`;
+  if (bare) return null;
+  if ((lowerGroup === 'user' || lowerGroup === 'profile') && /^\/share\/?$/i.test(leaf)) {
+    return `${leaf}${withDefaultShareType(tail)}`;
+  }
+  return `${leaf}${tail}`;
 }
 
 function carriesPairingSecret(path: string): boolean {

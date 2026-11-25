@@ -26,6 +26,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { hasFeature } from '@/shared/config/features';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { Text } from '@/shared/ui/primitives/Text';
 import { formatAmount } from '@/shared/lib/currency';
@@ -120,6 +121,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       </Text>
     ) : null;
 
+  const railEnabled = hasFeature('ecash');
   const bottomButtons = (
     <BottomButtons>
       <ButtonHandler
@@ -141,7 +143,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             icon: 'ri:close-circle-line',
             variant: 'secondary',
             onPress: async () => actions.back.execute(),
-            condition: canClose,
+            condition: canClose || !railEnabled,
           },
           {
             testID: 'receive-token-cancel',
@@ -151,7 +153,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             // Keep dismissal explicit while the token is still unredeemed.
             // Relying on an implicit header/back gesture makes it too easy for
             // device tests (and users) to confuse preview with acceptance.
-            condition: !canClose,
+            condition: !canClose && railEnabled,
             disabled: actions.redeem.loading,
           },
           {
@@ -162,7 +164,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
               await actions.redeem.execute();
             },
             loading: actions.redeem.loading,
-            condition: actions.redeem.available,
+            condition: railEnabled && actions.redeem.available,
           },
         ]}
       />

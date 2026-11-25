@@ -381,6 +381,25 @@ describe('reopening a Lightning send', () => {
     expect(testIds()).toEqual(expect.arrayContaining(['melt-pay', 'melt-cancel']));
     expect(moneyCalls()).toEqual([]);
   });
+
+  it('never exposes Pay in historyView when the lightning rail is disabled', async () => {
+    const features =
+      require('@/shared/config/features') as typeof import('@/shared/config/features');
+    const spy = jest.spyOn(features, 'hasFeature').mockImplementation((f) => f !== 'lightning');
+    try {
+      await open(<LightningSendRoute where="test.lightningSend" />, {
+        historyView: '1',
+        meltHistoryEntry: JSON.stringify({ ...MELT_BASE, state: 'UNPAID' }),
+      });
+
+      expect(testIds()).toContain('melt-close');
+      expect(testIds()).not.toContain('melt-pay');
+      expect(testIds()).not.toContain('melt-cancel');
+      expect(moneyCalls()).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('reopening an ecash send (route shell only)', () => {

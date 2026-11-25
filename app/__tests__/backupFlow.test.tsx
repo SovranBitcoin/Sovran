@@ -22,9 +22,10 @@ const mockBack = jest.fn();
 const mockLog = jest.fn();
 const mockMnemonic = jest.fn();
 const mockDispatch = jest.fn();
+type MockNavRoute = { name: string; state?: { routes: MockNavRoute[] } };
 // The root stack: the journey's pages over the prompt that opened them.
-const JOURNEY = [{ name: '(drawer)' }, { name: 'cta' }, { name: 'backup-intro' }];
-let mockRootRoutes: { name: string }[] = JOURNEY;
+const JOURNEY: MockNavRoute[] = [{ name: '(drawer)' }, { name: 'cta' }, { name: 'backup-intro' }];
+let mockRootRoutes: MockNavRoute[] = JOURNEY;
 const mockNavigation = {
   getState: () => ({ routes: mockRootRoutes }),
   dispatch: (...args: unknown[]) => mockDispatch(...args),
@@ -247,4 +248,15 @@ it('keeps one session across the pages and starts afresh once the journey closes
   mockRootRoutes = JOURNEY;
   show(<BackupIntroScreen />);
   expect(mockLog.mock.calls.filter(([event]) => event === 'backup.flow.opened')).toHaveLength(2);
+});
+it('clears the mnemonic and resets when routes are nested under Expo Router __root', () => {
+  mockRootRoutes = [{ name: '__root', state: { routes: JOURNEY } }];
+  show(<BackupIntroScreen />);
+  show(<BackupWordsScreen />);
+  show(<SessionProbe />);
+  expect(view.root.findByProps({ testID: 'probe' }).props).toMatchObject({ words: 12 });
+  mockRootRoutes = [{ name: '__root', state: { routes: [{ name: '(drawer)' }] } }];
+  show(<SessionProbe />);
+  expect(view.root.findByProps({ testID: 'probe' }).props).toMatchObject({ words: 0, position: 0 });
+  expect(mockLog).toHaveBeenCalledWith('backup.flow.abandoned');
 });
