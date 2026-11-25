@@ -189,6 +189,7 @@ export function MintDistributionScreen() {
   }, [trustedMints, getMintInfo]);
 
   const handleDistributionChange = (mintUrl: string, bp: number) => {
+    if (membershipPending) return;
     log.debug('mint.distribution.change', {
       ...mintUrlLogFields(mintUrl),
       basisPoints: bp,
@@ -199,6 +200,7 @@ export function MintDistributionScreen() {
   };
 
   const handleSplitEvenlyToggle = (next: boolean) => {
+    if (membershipPending) return;
     log.info('mint.distribution.split_evenly.toggle', {
       enabled: next,
       currency: selectedCurrency,
@@ -213,6 +215,7 @@ export function MintDistributionScreen() {
   };
 
   const handleToggleMint = (mintUrl: string, enabled: boolean) => {
+    if (membershipPending) return;
     log.info('mint.distribution.toggle', {
       ...mintUrlLogFields(mintUrl),
       enabled,
@@ -327,6 +330,7 @@ export function MintDistributionScreen() {
                   <ListGroup.ItemSuffix>
                     <HeroSwitch
                       isSelected={splitEvenly}
+                      isDisabled={membershipPending}
                       onSelectedChange={handleSplitEvenlyToggle}
                       aria-label="Split evenly"
                       testID="mint-distribution-split-evenly"
@@ -340,7 +344,7 @@ export function MintDistributionScreen() {
               mintUrls={mintUrls}
               mintInfoMap={mintInfoMap}
               distribution={distribution}
-              slidersDisabled={splitEvenly}
+              slidersDisabled={splitEvenly || membershipPending}
               onDistributionChange={handleDistributionChange}
               onToggleMint={handleToggleMint}
             />

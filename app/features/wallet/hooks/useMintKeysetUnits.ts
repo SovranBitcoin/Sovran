@@ -62,6 +62,7 @@ export function useMintKeysetUnits(): Record<string, string[] | undefined> {
         const unchanged =
           prevKeys.length === entries.length &&
           entries.every(([url, units]) => {
+            if (!Object.hasOwn(prev, url)) return false;
             const before = prev[url];
             return (
               before === units ||

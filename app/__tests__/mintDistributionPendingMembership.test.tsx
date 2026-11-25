@@ -49,12 +49,34 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => ['black'
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
 jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));
 jest.mock('@/navigation/headerItems', () => ({ withGlassHeaderItems: (o: object) => o }));
-jest.mock('@/shared/ui/composed/ScreenScrollView', () => ({ ScreenScrollView: () => null }));
-jest.mock('@/shared/ui/composed/Screen', () => ({ Screen: () => null }));
+jest.mock('@/shared/ui/composed/ScreenScrollView', () => ({
+  ScreenScrollView: ({ children }: { children?: React.ReactNode }) => children ?? null,
+}));
+jest.mock('@/shared/ui/composed/Screen', () => ({
+  Screen: ({ children }: { children?: React.ReactNode }) => children ?? null,
+}));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: () => null }));
-jest.mock('@/shared/ui/primitives/View/View', () => ({ View: () => null }));
-jest.mock('heroui-native', () => ({ ListGroup: () => null }));
-jest.mock('@/shared/ui/primitives/Switch', () => ({ Switch: () => null }));
+jest.mock('@/shared/ui/primitives/View/View', () => ({
+  View: ({ children }: { children?: React.ReactNode }) => children ?? null,
+}));
+jest.mock('heroui-native', () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) => children ?? null;
+  const ListGroup = Object.assign(Pass, {
+    Item: Pass,
+    ItemContent: Pass,
+    ItemTitle: () => null,
+    ItemDescription: () => null,
+    ItemSuffix: Pass,
+  });
+  return { ListGroup };
+});
+let capturedSwitchProps: { isDisabled?: boolean; onSelectedChange?: (next: boolean) => void } = {};
+jest.mock('@/shared/ui/primitives/Switch', () => ({
+  Switch: (props: { isDisabled?: boolean; onSelectedChange?: (next: boolean) => void }) => {
+    capturedSwitchProps = props;
+    return null;
+  },
+}));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: () => null }));
 jest.mock('@/shared/ui/composed/ButtonHandler', () => ({ ButtonHandler: () => null }));
 jest.mock('@/features/mint/components/MintCurrencyTabs', () => ({ MINT_CURRENCY_TABS_HEIGHT: 40 }));
@@ -97,5 +119,30 @@ it('keeps saved weights while a trusted mint is still loading its info', () => {
   act(() => {
     renderer!.update(<MintDistributionScreen />);
   });
+  expect(useMintDistributionStore.getState().distributions.sat).toEqual({ [A]: 7000, [B]: 3000 });
+});
+
+it('blocks Split evenly from pruning saved weights while a trusted mint is still loading', () => {
+  useMintDistributionStore.setState({ distributions: { sat: { [A]: 7000, [B]: 3000 } } });
+  capturedSwitchProps = {};
+
+  mockMints = [{ mintUrl: A, mintInfo: { units: ['sat'] } }, { mintUrl: B }];
+  act(() => {
+    renderer = TestRenderer.create(<MintDistributionScreen />);
+  });
+  expect(capturedSwitchProps.isDisabled).toBe(true);
+  act(() => {
+    capturedSwitchProps.onSelectedChange?.(true);
+  });
+  expect(useMintDistributionStore.getState().distributions.sat).toEqual({ [A]: 7000, [B]: 3000 });
+
+  mockMints = [
+    { mintUrl: A, mintInfo: { units: ['sat'] } },
+    { mintUrl: B, mintInfo: { units: ['sat'] } },
+  ];
+  act(() => {
+    renderer!.update(<MintDistributionScreen />);
+  });
+  expect(capturedSwitchProps.isDisabled).toBe(false);
   expect(useMintDistributionStore.getState().distributions.sat).toEqual({ [A]: 7000, [B]: 3000 });
 });

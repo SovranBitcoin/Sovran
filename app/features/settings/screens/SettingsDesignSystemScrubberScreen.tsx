@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Slider } from 'heroui-native';
 
 import {
@@ -150,6 +150,10 @@ export function SettingsDesignSystemScrubberScreen() {
   const [master, setMaster] = useState(0);
   const values = SCRUB_TRANSITIONS.map((transition) => frames[transition.id]);
   const shared = values.every((value) => value === values[0]) ? values[0] : null;
+
+  useEffect(() => {
+    if (shared !== null) setMaster(shared);
+  }, [shared]);
 
   const scrubAll = (value: number) => {
     setMaster(value);

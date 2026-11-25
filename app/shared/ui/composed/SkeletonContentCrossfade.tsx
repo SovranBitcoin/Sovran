@@ -152,10 +152,13 @@ export function SkeletonContentCrossfade({
       setPhase('loading');
       return;
     }
-    setPhase((prev) => {
-      if (prev !== 'loading') return prev;
-      return animatedExit ? 'exiting' : 'content';
-    });
+    if (!animatedExit) {
+      cancelAnimation(progress);
+      progress.set(1);
+      setPhase('content');
+      return;
+    }
+    setPhase((prev) => (prev === 'loading' ? 'exiting' : prev));
   }, [loading, animatedExit, progress]);
 
   // Drive the one-shot crossfade while exiting.

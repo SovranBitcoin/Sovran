@@ -430,4 +430,29 @@ describe('SkeletonContentCrossfade crossfadeContent', () => {
     expect(present(r, 'sk')).toBe(false);
     act(() => r.unmount());
   });
+
+  it('reveals content at full opacity on loading→loaded when Reduce Motion is enabled', () => {
+    mockReducedMotion = true;
+    const r = render(
+      <SkeletonContentCrossfade
+        loading
+        crossfadeContent
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    act(() =>
+      r.update(
+        <SkeletonContentCrossfade
+          loading={false}
+          crossfadeContent
+          renderSkeleton={skeletonNode}
+          renderContent={contentNode}
+        />
+      )
+    );
+    expect(present(r, 'sk')).toBe(false);
+    expect(opacityOf(r, 'ct')).toBe(1);
+    act(() => r.unmount());
+  });
 });

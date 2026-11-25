@@ -482,16 +482,21 @@ describe('Animation frame scrubber screen', () => {
     }
   });
 
-  it('moves the Scrub all slider to the frame every transition agrees on', () => {
+  it('moves the Scrub all slider to the frame every transition agrees on and keeps it there when one diverges', () => {
     const view = render(<SettingsDesignSystemScrubberScreen />, { wrapper: Wrapper });
     try {
       const master = () =>
         byTestId('design-system-scrub-all-slider').findByType('Slider' as never).props.value;
+      pressAndFlush('design-system-scrub-all-25');
+      expect(master()).toBe(25);
       for (const transition of SCRUB_TRANSITIONS) {
-        pressAndFlush(`design-system-scrub-${transition.id}-50`);
+        pressAndFlush(`design-system-scrub-${transition.id}-75`);
       }
-      expect(byTestId('design-system-scrub-all-value').props.children).toBe('50.0%');
-      expect(master()).toBe(50);
+      expect(byTestId('design-system-scrub-all-value').props.children).toBe('75.0%');
+      expect(master()).toBe(75);
+      pressAndFlush(`design-system-scrub-${SCRUB_TRANSITIONS[0].id}-50`);
+      expect(byTestId('design-system-scrub-all-value').props.children).toBe('Mixed');
+      expect(master()).toBe(75);
     } finally {
       view.unmount();
     }
