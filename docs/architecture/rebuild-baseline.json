@@ -1,11 +1,11 @@
 {
   "appRuntimeFiles": 1221,
-  "appRuntimeLoc": 184356,
+  "appRuntimeLoc": 184358,
   "walletRuntimeFiles": 146,
   "walletRuntimeLoc": 43887,
   "nostrRuntimeFiles": 47,
   "nostrRuntimeLoc": 5709,
-  "totalRuntimeLoc": 233952,
+  "totalRuntimeLoc": 233954,
   "routeFiles": 103,
   "flowGroupCount": 4,
   "providerFiles": 17,

@@ -333,9 +333,7 @@ describe('PopupHost presentation', () => {
 
   it('keeps a custom sheet footer registered in its mount effect (Android NFC Close button)', () => {
     const r = mountHost();
-    act(() =>
-      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: undefined } as never)
-    );
+    act(() => usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} }));
     expect(r.root.findAll((node) => node.props.testID === 'nfc-close').length).toBeGreaterThan(0);
   });
 });

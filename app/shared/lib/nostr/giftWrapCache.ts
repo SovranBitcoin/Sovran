@@ -15,7 +15,9 @@ const cache = createPubkeyScopedCache<UnwrappedDM>({
   storagePrefixNeg: 'nip17-unwrap-cache-neg:v1',
   log: nostrLog,
   validate: (v): v is UnwrappedDM =>
-    !!v && typeof (v as UnwrappedDM).senderPubkey === 'string' && !containsBearerEcash(v as UnwrappedDM),
+    !!v &&
+    typeof (v as UnwrappedDM).senderPubkey === 'string' &&
+    !containsBearerEcash(v as UnwrappedDM),
   shouldPersist: (v) => !containsBearerEcash(v),
 });
 

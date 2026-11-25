@@ -117,7 +117,8 @@ describe('Slider gesture safety', () => {
   it('ignores accessibility increment/decrement when disabled', () => {
     const { onChange, onChangeEnd } = mountSlider({ isDisabled: true });
     const host = renderer!.root.findAll(
-      (node) => node.props.testID === 'fee-slider' && typeof node.props.onAccessibilityAction === 'function'
+      (node) =>
+        node.props.testID === 'fee-slider' && typeof node.props.onAccessibilityAction === 'function'
     )[0]!;
     expect(host.props.accessibilityActions).toEqual([]);
     act(() => {
