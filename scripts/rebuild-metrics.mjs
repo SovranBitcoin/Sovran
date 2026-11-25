@@ -84,14 +84,15 @@ function collectMetrics() {
   const nostrFiles = walkRuntimeSource(join(ROOT, "nostr/src"));
   const routeFiles = walkRuntimeSource(join(ROOT, "app/app"));
   const allRuntime = [...appFiles, ...walletFiles, ...nostrFiles];
-  // A provider file is any app file named `*Provider`, wherever it lives, and
-  // every component file in `app/runtime/` (the app root, the account scope
-  // and the adapters they mount). Moving a provider between folders, or
-  // renaming it, never takes it out of the count.
+  // Count provider files by exported component / Context.Provider usage AND
+  // `app/runtime/*.tsx` so renaming a file (e.g. *Provider -> *Scope) cannot
+  // lower the metric and files like `Colada.tsx` are counted honestly.
+  const providerPattern =
+    /\bexport\s+(?:default\s+)?(?:function|const)\s+\w*Provider\b|<[\w.]+\.Provider\b/;
   const providerFiles = appFiles.filter(
     (file) =>
-      /Provider\.(ts|tsx)$/.test(file) ||
-      /\/app\/runtime\/[^/]+\.tsx$/.test(file),
+      /\/app\/runtime\/[^/]+\.tsx$/.test(file) ||
+      providerPattern.test(readFileSync(file, "utf8")),
   );
 
   const rootPkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));

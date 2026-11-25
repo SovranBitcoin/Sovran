@@ -149,7 +149,9 @@ async function runCocoPhase2({
     // RestoreGate routes the user to /restore when this is pending.
     if (!isLive()) return;
     bgStage.log('Waiting for wallet restore...');
-    await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
+    await initPhase('Coco-bg.restoreReady', () =>
+      awaitRestoreReady(useWalletLifecycleStore, controller.signal)
+    );
     if (!isLive()) return;
     bgStage.log('Starting NPC sync...');
     await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());

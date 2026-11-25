@@ -90,6 +90,17 @@ describe('awaitRestoreReady (audit 28.json F-004 / 40.json F-003)', () => {
     queueMicrotask(() => store.setState('complete'));
     await expect(promise).resolves.toBeUndefined();
   });
+
+  it('unsubscribes and resolves immediately when aborted mid-restore', async () => {
+    const store = makeFakeStore('pending');
+    const controller = new AbortController();
+    const promise = awaitRestoreReady(store, controller.signal);
+    expect(store.listenerCount()).toBe(1);
+
+    controller.abort();
+    await expect(promise).resolves.toBeUndefined();
+    expect(store.listenerCount()).toBe(0);
+  });
 });
 
 describe('which saved restore statuses are ready', () => {
