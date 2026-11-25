@@ -55,6 +55,7 @@ interface ManagedRelay {
   url: string;
   socket: WebSocketLike | null;
   status: RelayHealth;
+  frames: number;
   disconnectCount: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   pendingPublishes: Map<string, PendingPublish>;
@@ -212,9 +213,16 @@ export class NostrClient {
         relay.pendingPublishes.delete(event.id);
       }
 
+      const framesAtStart = relay.frames;
       const timer = setTimeout(() => {
         relay.pendingPublishes.delete(event.id);
-        reject(new Error(`Publish timed out after ${timeoutMs}ms on ${url}`));
+        const timeoutErr = new Error(`Publish timed out after ${timeoutMs}ms on ${url}`);
+        reject(timeoutErr);
+        // Drop a stalled connecting socket or one that stayed completely silent
+        // throughout this publish so the next retry opens a fresh connection.
+        if (relay.socket && (relay.status !== 'connected' || relay.frames === framesAtStart)) {
+          this.handleDisconnect(relay, timeoutErr);
+        }
       }, timeoutMs);
 
       const pending: PendingPublish = {
@@ -342,6 +350,7 @@ export class NostrClient {
       url,
       socket: null,
       status: 'disconnected',
+      frames: 0,
       disconnectCount: 0,
       reconnectTimer: null,
       pendingPublishes: new Map(),
@@ -399,15 +408,24 @@ export class NostrClient {
 
     socket.onmessage = (msg) => {
       if (this._disposed || relay.socket !== socket) return;
+      relay.frames += 1;
       const parsed = parseWireFrame(msg.data);
       if (!parsed) return;
       const frame = parsed as unknown[];
       const type = frame[0];
 
-      if (type === 'OK' && typeof frame[1] === 'string') {
+      // NIP-01 requires a full 4-tuple: ["OK", <event_id>, <true|false>, <message>].
+      // Ignore malformed/truncated frames so they never falsely confirm delivery.
+      if (
+        type === 'OK' &&
+        frame.length >= 4 &&
+        typeof frame[1] === 'string' &&
+        typeof frame[2] === 'boolean' &&
+        typeof frame[3] === 'string'
+      ) {
         const eventId = frame[1];
-        const accepted = frame[2] === true;
-        const reason = typeof frame[3] === 'string' ? frame[3] : '';
+        const accepted = frame[2];
+        const reason = frame[3];
         const pending = relay.pendingPublishes.get(eventId);
         if (pending) {
           clearTimeout(pending.timer);

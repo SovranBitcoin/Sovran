@@ -166,15 +166,71 @@ function nip17Unwrap(recipientSk: Uint8Array, wrap: VerifiedEvent): {
 }
 
 describe('nostr client & pure nostr-tools NIP-17 payment transport', () => {
-  it('normalizes valid ws/wss relay URLs and rejects invalid schemes', () => {
+  it('normalizes valid ws/wss relay URLs, preserves path/query distinction, and rejects invalid schemes', () => {
     expect(normalizeRelayUrl('WSS://Relay.Damus.IO')).toBe('wss://relay.damus.io/');
     expect(normalizeRelayUrl('wss://nos.lol:443/')).toBe('wss://nos.lol/');
-    // Saved relay lists kept NDK's trailing slash on paths.
+    // Saved relay lists kept NDK's trailing slash on queryless paths.
     expect(normalizeRelayUrl('wss://nostr.wine/inbox/')).toBe('wss://nostr.wine/inbox/');
     expect(normalizeRelayUrl('wss://a.example/path')).toBe('wss://a.example/path/');
+    // Distinct path/query endpoints must never collapse into each other.
+    expect(normalizeRelayUrl('wss://relay.example/a/?x=1')).toBe('wss://relay.example/a/?x=1');
+    expect(normalizeRelayUrl('wss://relay.example/a?x=1')).toBe('wss://relay.example/a?x=1');
     expect(tryNormalizeRelayUrl('https://not-a-relay.example')).toBeNull();
     expect(tryNormalizeRelayUrl('javascript:alert(1)')).toBeNull();
     expect(tryNormalizeRelayUrl('http-not-relay')).toBeNull();
+  });
+
+  it('ignores truncated NIP-01 OK frames and drops stalled connecting sockets on timeout', async () => {
+    let constructions = 0;
+    let sendTruncatedOk = true;
+    class FlakySocket implements WebSocketLike {
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onclose: ((event: unknown) => void) | null = null;
+      closed = false;
+
+      constructor(public readonly url: string) {
+        constructions += 1;
+        if (sendTruncatedOk) {
+          queueMicrotask(() => {
+            if (!this.closed) this.onopen?.();
+          });
+        }
+      }
+
+      send(raw: string): void {
+        const frame = JSON.parse(raw) as unknown[];
+        if (frame[0] === 'EVENT' && sendTruncatedOk) {
+          const ev = frame[1] as VerifiedEvent;
+          queueMicrotask(() => {
+            this.onmessage?.({ data: JSON.stringify(['OK', ev.id, true]) });
+          });
+        }
+      }
+
+      close(): void {
+        this.closed = true;
+      }
+    }
+
+    const sk = generateSecretKey();
+    const client = new NostrClient({
+      signer: createPrivateKeySigner(sk),
+      WebSocketImpl: FlakySocket,
+      reconnectDelayMs: 60_000,
+    });
+    const ev = client.signEvent({ kind: 1, tags: [], content: 'strict-ok' });
+
+    await expect(client.publishToRelay('wss://flaky.test/', ev, 40)).rejects.toThrow('timed out');
+
+    sendTruncatedOk = false;
+    const before = constructions;
+    await expect(client.publishToRelay('wss://stalled.test/', ev, 30)).rejects.toThrow('timed out');
+    await expect(client.publishToRelay('wss://stalled.test/', ev, 30)).rejects.toThrow('timed out');
+    expect(constructions - before).toBe(2);
+
+    client.dispose();
   });
 
   it('signs valid events and zeroes key copy on signer dispose', () => {

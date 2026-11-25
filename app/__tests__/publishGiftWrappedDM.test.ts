@@ -8,7 +8,7 @@
  * and can be made to refuse it. The seam retries a refused event twice.
  */
 
-import { generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
+import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
@@ -177,4 +177,33 @@ test('extra tags reach the decrypted message for both parties', async () => {
 
   expect(unwrapGiftWrap(mockPublished[0], recipientKey)?.tags).toContainEqual(['subject', 'ecash']);
   expect(unwrapGiftWrap(mockPublished[1], senderKey)?.tags).toContainEqual(['subject', 'ecash']);
+});
+
+test('routes the recipient wrap to the recipient kind-10050 DM relays when advertised', async () => {
+  const publishedUrls: string[] = [];
+  const dmRelayList = finalizeEvent(
+    {
+      kind: 10050,
+      created_at: 1_700_000_100,
+      tags: [['relay', 'wss://inbox.recipient.example/']],
+      content: '',
+    },
+    recipientKey
+  );
+  const routingClient = fakeClient({
+    relays: ['wss://sender.pool.example/'],
+    queryRelay: async () => ({ events: [dmRelayList], eose: true }),
+    publishToRelay: async (url) => {
+      publishedUrls.push(url);
+    },
+  });
+
+  await publishGiftWrappedDM({
+    client: routingClient,
+    senderPrivateKey: senderKey,
+    recipientPublicKey: recipientPub,
+    content: TOKEN,
+  });
+
+  expect(publishedUrls).toEqual(['wss://inbox.recipient.example/', 'wss://sender.pool.example/']);
 });

@@ -12,17 +12,52 @@
  */
 
 import type { NostrClient } from 'nostr/client';
+import type { VerifiedEvent } from 'nostr-tools/pure';
 
 import { buildGiftWrappedDMPair } from './nip17';
 import { nostrLog } from '@/shared/lib/logger';
+import { DM_RELAY_LIST_KIND, readDmRelays } from './outbox/nip17DmRelays';
 import { publishEvent } from './publish';
 
+const DM_RELAY_LOOKUP_TIMEOUT_MS = 3_000;
+
+async function resolveRecipientDmRelays(
+  client: NostrClient,
+  recipientPublicKey: string
+): Promise<string[]> {
+  const discoveryRelays = client.relayUrls();
+  if (discoveryRelays.length === 0 || typeof client.queryRelay !== 'function') return [];
+
+  const settled = await Promise.allSettled(
+    discoveryRelays.map((url) =>
+      client.queryRelay(
+        url,
+        [{ kinds: [DM_RELAY_LIST_KIND], authors: [recipientPublicKey], limit: 5 }],
+        DM_RELAY_LOOKUP_TIMEOUT_MS
+      )
+    )
+  );
+
+  let newest: VerifiedEvent | null = null;
+  for (const res of settled) {
+    if (res.status !== 'fulfilled') continue;
+    for (const event of res.value.events) {
+      if (event.kind !== DM_RELAY_LIST_KIND || event.pubkey !== recipientPublicKey) continue;
+      if (!newest || event.created_at > newest.created_at) {
+        newest = event;
+      }
+    }
+  }
+  return readDmRelays(newest);
+}
+
 /**
- * Build and publish a NIP-17 gift-wrapped DM pair. Resolves once the recipient
- * wrap is accepted by a relay; the self-copy publish is best-effort (its failure
- * only costs the local thread echo, not delivery). Rejects if the recipient wrap
- * fails to publish — callers MUST treat a rejection as "not delivered" and keep
- * the funds recoverable (do not navigate away as if it succeeded).
+ * Build and publish a NIP-17 gift-wrapped DM pair. Resolves the recipient's
+ * NIP-17 `kind:10050` DM relays when published (falling back to the client's
+ * current pool when none are declared) and resolves once the recipient wrap is
+ * accepted by a relay; the self-copy publish is best-effort. Rejects if the
+ * recipient wrap fails to publish — callers MUST treat a rejection as "not
+ * delivered" and keep the funds recoverable.
  */
 export async function publishGiftWrappedDM(params: {
   client: NostrClient;
@@ -39,11 +74,20 @@ export async function publishGiftWrappedDM(params: {
     ...(extraTags ? { extraTags } : {}),
   });
 
-  const delivered = await publishEvent({ client, event: recipientWrap, resolveOn: 'first-ok' });
+  const recipientRelays = await resolveRecipientDmRelays(client, recipientPublicKey);
+  const delivered = await publishEvent({
+    client,
+    event: recipientWrap,
+    ...(recipientRelays.length > 0 ? { relays: recipientRelays } : {}),
+    resolveOn: 'first-ok',
+  });
   if (delivered.isErr()) {
     throw new Error(`Gift-wrapped DM was not accepted by any relay (${delivered.error.type})`);
   }
-  nostrLog.info('nostr.giftWrapDM.published', { eventId: recipientWrap.id });
+  nostrLog.info('nostr.giftWrapDM.published', {
+    eventId: recipientWrap.id,
+    targetedDmRelays: recipientRelays.length,
+  });
 
   const selfCopy = await publishEvent({ client, event: senderWrap, resolveOn: 'first-ok' });
   if (selfCopy.isErr()) {
@@ -51,6 +95,6 @@ export async function publishGiftWrappedDM(params: {
   }
 
   // The self-wrap id is the dedup key the sender's thread uses to reconcile an
-  // optimistic local echo with the server copy nagg eventually returns.
+  // optimistic local echo with the server copy eventually returned.
   return { selfWrapId: senderWrap.id };
 }
