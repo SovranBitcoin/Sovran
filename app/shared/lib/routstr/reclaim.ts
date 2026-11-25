@@ -598,7 +598,8 @@ async function recoverSdkRecordsOnce(
       // so an interruption between the two writes never orphans child keys as
       // unknown-issuer records on the next launch.
       const nextChildKeys = childKeys.filter(
-        (c) => !hadParent(c) || childKeyHasParent({ ...records, apiKeys: nextApiKeys }, c.parentBaseUrl)
+        (c) =>
+          !hadParent(c) || childKeyHasParent({ ...records, apiKeys: nextApiKeys }, c.parentBaseUrl)
       );
       if (nextChildKeys.length !== childKeys.length) {
         if (!ownsScope()) return outcome;

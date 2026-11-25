@@ -310,6 +310,8 @@ describe('abort and account switch', () => {
         [OTHER_NODE]: {
           apiKey: 'sk-shared',
           nodeBaseUrl: OTHER_NODE,
+          lastKnownBalanceMsats: 0,
+          archivedAt: 1,
           reclaimedAt: 1_700_000_000,
         },
       },
