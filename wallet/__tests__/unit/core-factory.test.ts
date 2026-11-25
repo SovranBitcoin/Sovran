@@ -11,7 +11,7 @@
  * the core of colada's integration layer.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createColada } from '../../src/core/createColada';
 import { createWalletContextTracker } from '../../src/core/walletContextTracker';
 import { createAmountEntryMethodContext } from '../../src/mint-capabilities';
@@ -167,14 +167,23 @@ describe('createWalletContextTracker', () => {
 
   beforeEach(() => {
     mockManager = createMockManager();
+    // The tracker's refreshes are promise chains; the fake clock drains them
+    // without any test waiting on real time.
+    vi.useFakeTimers();
   });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Let the tracker's pending refreshes settle. */
+  const settle = (ms = 50) => vi.advanceTimersByTimeAsync(ms);
 
   it('auto-refreshes on creation from Manager state', async () => {
     const tracker = createWalletContextTracker(mockManager.manager);
 
     // The tracker calls refresh() in the constructor (async)
     // Wait for it to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
 
     const ctx = tracker.getContext();
     expect(ctx.trustedMintUrls).toEqual([MINT1, MINT2]);
@@ -187,7 +196,7 @@ describe('createWalletContextTracker', () => {
     const tracker = createWalletContextTracker(mockManager.manager);
 
     // Wait for constructor's auto-refresh to complete, then refresh again
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
     await tracker.refresh();
 
     const ctx = tracker.getContext();
@@ -256,7 +265,7 @@ describe('createWalletContextTracker', () => {
     });
     // The constructor's auto-refresh coalesces an immediate refresh() call;
     // wait for it to settle like the sibling tests do.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
     await tracker.refresh();
 
     expect(tracker.getContext().unitBalances).toEqual({
@@ -290,7 +299,7 @@ describe('createWalletContextTracker', () => {
       isTestnutMint: (mintUrl) => mintUrl === MINT2,
       isTestnutAccount: () => testnutAccount,
     });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
     await tracker.refresh();
 
     const onchainVariant = (amount: number) =>
@@ -329,7 +338,7 @@ describe('createWalletContextTracker', () => {
     mockManager.emit('proofs:saved', {});
 
     // Wait for async refresh
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
 
     expect(tracker.getContext().mintBalances[MINT1]).toBe(2000);
 
@@ -356,7 +365,7 @@ describe('createWalletContextTracker', () => {
     const tracker = createWalletContextTracker(mockManager.manager);
 
     // Wait for constructor's auto-refresh to settle
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
 
     tracker.dispose();
 
@@ -370,7 +379,7 @@ describe('createWalletContextTracker', () => {
     tracker.subscribe(listener);
     mockManager.emit('proofs:saved', {});
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
 
     // Listener should not be called — event handlers were unsubscribed
     expect(listener).not.toHaveBeenCalled();
@@ -380,7 +389,7 @@ describe('createWalletContextTracker', () => {
     const tracker = createWalletContextTracker(mockManager.manager);
 
     // Wait for initial auto-refresh
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
 
     const callCountBefore = mockManager.manager.mint.getAllTrustedMints.mock.calls.length;
 
@@ -389,7 +398,7 @@ describe('createWalletContextTracker', () => {
     mockManager.emit('proofs:saved', {});
     mockManager.emit('proofs:saved', {});
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await settle(100);
 
     const callCountAfter = mockManager.manager.mint.getAllTrustedMints.mock.calls.length;
     // Should have at most 2 additional calls (one active + one pending), not 3

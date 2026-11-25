@@ -119,7 +119,7 @@ async function open() {
   });
   // The map view mounts after a short delay; the pins are built for it.
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await jest.advanceTimersByTimeAsync(80);
   });
 }
 
@@ -134,10 +134,13 @@ const lastMove = () => mockSetCameraPosition.mock.calls.at(-1)?.[0];
 const jestPlatform = Platform.OS;
 beforeEach(() => {
   jest.clearAllMocks();
+  // The screen's deferrals run on the fake clock; no test waits on real time.
+  jest.useFakeTimers();
   Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
 });
 afterEach(() => {
   act(() => renderer?.unmount());
+  jest.useRealTimers();
   Object.defineProperty(Platform, 'OS', { value: jestPlatform, configurable: true });
 });
 
@@ -178,7 +181,7 @@ it('asks for the location once on opening, not again when the window is resized'
   await act(async () => {
     renderer.update(<MapScreen />);
     // Long enough for a deferred location read to have started, were one queued.
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await jest.advanceTimersByTimeAsync(400);
   });
   mockWindow = upright;
   const stats = renderer.root.find((node) => String(node.type) === 'StatsCard');

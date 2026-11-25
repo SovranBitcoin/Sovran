@@ -293,9 +293,14 @@ describe('a payment machine tap over the adapter', () => {
     const tapA = machine.scan!(undefined, { source: 'nfc' });
     await waitFor(() => created !== undefined);
 
-    // A second tap starts reading and holds its own session open.
-    mockNative.request = () => new Promise(() => {});
-    void machine.scan!(undefined, { source: 'nfc' });
+    // A second tap starts reading and holds its own session open until the
+    // test lets go of it below, so no 30-second session timer outlives the run.
+    let endTapB!: () => void;
+    mockNative.request = () =>
+      new Promise((_resolve, reject) => {
+        endTapB = () => reject(new Error('tap B ended by the test'));
+      });
+    const tapB = machine.scan!(undefined, { source: 'nfc' });
     await waitFor(() => native.requestTechnology.mock.calls.length === 2);
     const cancelsBeforeWrite = native.cancelTechnologyRequest.mock.calls.length;
 
@@ -304,6 +309,9 @@ describe('a payment machine tap over the adapter', () => {
 
     expect(mockTag.current.log.some((line) => line.startsWith('UPDATE'))).toBe(false);
     expect(native.cancelTechnologyRequest.mock.calls.length).toBe(cancelsBeforeWrite);
+
+    endTapB();
+    await Promise.resolve(tapB).catch(() => undefined);
   });
 });
 
