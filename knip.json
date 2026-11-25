@@ -31,7 +31,7 @@
         "expo-screen-corner-radius",
         "react-native-fast-squircle"
       ],
-      "ignoreBinaries": ["claude", "eas", "gh", "tsx", "python3"]
+      "ignoreBinaries": ["eas", "gh", "tsx"]
     },
     "wallet": {
       "project": ["src/**/*.{ts,tsx}", "__tests__/**/*.ts"],
