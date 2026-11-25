@@ -181,6 +181,8 @@ jest.mock('react-native-reanimated', () => {
     __esModule: true,
     default: {
       View,
+      // A host, so the rolling balance's digits render as plain glyphs.
+      Text: (props: Record<string, unknown>) => ReactActual.createElement('AnimatedText', props),
       createAnimatedComponent: <P extends object>(Component: React.ComponentType<P>) => Component,
     },
     Easing: {

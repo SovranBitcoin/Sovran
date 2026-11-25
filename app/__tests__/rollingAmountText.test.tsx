@@ -7,7 +7,6 @@
  * distance, signed by direction (+ = entering from below, rolling up).
  */
 
-import React from 'react';
 import TestRenderer, { act, type ReactTestInstance } from 'react-test-renderer';
 
 import { View } from 'react-native';
@@ -61,7 +60,9 @@ function render(props: { text: string; numericValue?: number; formatKey?: string
 }
 
 const byTestId = (root: ReactTestInstance, id: string) =>
-  root.findAll((n) => n.props.testID === id && (n.type === View || n.type === 'AnimatedText'));
+  root.findAll(
+    (n) => n.props.testID === id && (n.type === View || (n.type as unknown) === 'AnimatedText')
+  );
 
 /** translateY of a slot's glyph, from the flattened animated style. */
 function offsetOf(root: ReactTestInstance, id: string): number | undefined {
@@ -78,7 +79,7 @@ const rolling = (root: ReactTestInstance) =>
   root
     .findAll(
       (n) =>
-        n.type === 'AnimatedText' &&
+        (n.type as unknown) === 'AnimatedText' &&
         typeof n.props.testID === 'string' &&
         n.props.testID.endsWith('-out')
     )

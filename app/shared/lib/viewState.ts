@@ -23,12 +23,10 @@ export type ViewState<T> =
   | { readonly status: 'refreshing'; readonly data: T }
   | { readonly status: 'stale'; readonly data: T; readonly error?: unknown };
 
-export type ViewStatus = ViewState<unknown>['status'];
-
 /** The states that hold data, which a surface renders through one component. */
-export type ViewStateWithData<T> = Extract<ViewState<T>, { data: T }>;
+type ViewStateWithData<T> = Extract<ViewState<T>, { data: T }>;
 
-export interface ViewStateHandlers<T, R> {
+interface ViewStateHandlers<T, R> {
   loading: () => R;
   empty: () => R;
   error: (error: unknown) => R;

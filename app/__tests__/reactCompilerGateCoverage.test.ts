@@ -67,6 +67,7 @@ const NOT_SWEPT: Record<string, string> = {
   'app.config.js': 'Expo config, build time',
   'babel.config.js': 'build config',
   'eslint.config.js': 'build config',
+  'eslint-plugin-view-state.js': 'lint rule, never bundled',
   'expo-env.d.ts': 'type declarations only',
   'jest.config.js': 'build config',
   'jest.staticAssets.js': 'test asset setup, never bundled',

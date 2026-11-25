@@ -36513,7 +36513,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     "₿",
                   ],
                   "props": {
-                    "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j",
+                    "className": "css-text-146c3p1",
                     "dir": "auto",
                     "style": {
                       "color": "rgba(16,16,16,1.00)",
@@ -36523,6 +36523,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       "marginLeft": "0px",
                       "marginRight": "0px",
                       "marginTop": "0px",
+                      "textAlign": "center",
                     },
                   },
                   "type": "div",
@@ -36532,7 +36533,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     " ",
                   ],
                   "props": {
-                    "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j",
+                    "className": "css-text-146c3p1",
                     "dir": "auto",
                     "style": {
                       "color": "rgba(16,16,16,1.00)",
@@ -36542,6 +36543,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       "marginLeft": "0px",
                       "marginRight": "0px",
                       "marginTop": "0px",
+                      "textAlign": "center",
                     },
                   },
                   "type": "div",
@@ -36553,7 +36555,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36563,6 +36565,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36573,6 +36576,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36583,18 +36587,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36609,7 +36604,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-int-0",
                     "dir": null,
                   },
@@ -36620,7 +36615,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     ".",
                   ],
                   "props": {
-                    "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j",
+                    "className": "css-text-146c3p1",
                     "dir": "auto",
                     "style": {
                       "color": "rgba(16,16,16,1.00)",
@@ -36630,6 +36625,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       "marginLeft": "0px",
                       "marginRight": "0px",
                       "marginTop": "0px",
+                      "textAlign": "center",
                     },
                   },
                   "type": "div",
@@ -36641,7 +36637,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36651,6 +36647,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36661,6 +36658,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36671,18 +36669,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36697,7 +36686,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-0",
                     "dir": null,
                   },
@@ -36710,7 +36699,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36720,6 +36709,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36730,6 +36720,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36740,18 +36731,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36766,7 +36748,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-1",
                     "dir": null,
                   },
@@ -36779,7 +36761,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36789,6 +36771,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36799,6 +36782,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36809,18 +36793,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36835,7 +36810,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-2",
                     "dir": null,
                   },
@@ -36848,7 +36823,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "2",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36858,6 +36833,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36868,6 +36844,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36878,18 +36855,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36904,7 +36872,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-3",
                     "dir": null,
                   },
@@ -36917,7 +36885,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "1",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36927,6 +36895,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -36937,6 +36906,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -36947,18 +36917,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -36973,7 +36934,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-4",
                     "dir": null,
                   },
@@ -36986,7 +36947,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -36996,6 +36957,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -37006,6 +36968,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -37016,18 +36979,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -37042,7 +36996,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-5",
                     "dir": null,
                   },
@@ -37055,7 +37009,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -37065,6 +37019,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -37075,6 +37030,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -37085,18 +37041,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -37111,7 +37058,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-6",
                     "dir": null,
                   },
@@ -37124,7 +37071,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                         "0",
                       ],
                       "props": {
-                        "className": "css-text-146c3p1 r-fontVariant-1ghxqbu r-textAlign-q4m81j r-opacity-orgf3d",
+                        "className": "css-text-146c3p1",
                         "dir": "auto",
                         "style": {
                           "color": "rgba(16,16,16,1.00)",
@@ -37134,6 +37081,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                           "marginLeft": "0px",
                           "marginRight": "0px",
                           "marginTop": "0px",
+                          "textAlign": "center",
                         },
                       },
                       "type": "div",
@@ -37144,6 +37092,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                       ],
                       "props": {
                         "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
                         "style": [
                           [
                             {
@@ -37154,18 +37103,9 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                               "textAlign": "center",
                             },
                             {
-                              "fontVariant": [
-                                "tabular-nums",
-                              ],
                               "textAlign": "center",
                             },
                           ],
-                          {
-                            "left": 0,
-                            "position": "absolute",
-                            "right": 0,
-                            "top": 0,
-                          },
                           {
                             "transform": [
                               {
@@ -37180,7 +37120,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx r-overflow-1udh08x",
+                    "className": "css-view-g5y9jx",
                     "data-testid": "amount-slot-frac-7",
                     "dir": null,
                   },
@@ -37188,7 +37128,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
                 },
               ],
               "props": {
-                "className": "css-view-g5y9jx r-alignItems-1awozwy r-flexDirection-18u37iz",
+                "className": "css-view-g5y9jx",
                 "dir": null,
               },
               "type": "div",
@@ -37196,7 +37136,7 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-rolling:
           ],
           "props": {
             "aria-label": "₿ 0.00021000",
-            "className": "css-view-g5y9jx r-alignItems-1awozwy r-flexDirection-18u37iz",
+            "className": "css-view-g5y9jx",
             "dir": null,
           },
           "type": "div",

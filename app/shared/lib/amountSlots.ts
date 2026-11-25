@@ -19,7 +19,7 @@ export type AmountSlot =
   | { kind: 'digit'; key: string; char: string; digit: number }
   | { kind: 'static'; key: string; char: string };
 
-export interface AmountSlotOptions {
+interface AmountSlotOptions {
   /** The decimal separator the formatter emits. The app formats en-US. */
   decimalSeparator?: string;
 }

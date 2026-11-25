@@ -7,7 +7,6 @@
  * profile header's buttons.
  */
 
-import React from 'react';
 import { View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 

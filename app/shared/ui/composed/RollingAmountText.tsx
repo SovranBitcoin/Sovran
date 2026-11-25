@@ -63,7 +63,8 @@ export function RollingAmountText({
   // Far enough to clear the column whatever the font's line box.
   const travel = flat.lineHeight ?? Math.ceil(fontSize * 1.3);
   const slots = tokenizeAmount(text);
-  const textStyle = [style, styles.slotText];
+  // Centred in its column: a narrower glyph sits mid-cell, never left.
+  const textStyle = [style, CENTERED];
 
   return (
     <View
@@ -71,9 +72,9 @@ export function RollingAmountText({
       accessibilityRole="text"
       accessibilityLabel={text}
       testID={testID}
-      style={styles.row}>
+      className="flex-row items-center">
       <View
-        style={styles.row}
+        className="flex-row items-center"
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden>
         {slots.map((slot) =>
@@ -88,7 +89,11 @@ export function RollingAmountText({
               textStyle={textStyle}
             />
           ) : (
-            <Text key={slot.key} allowFontScaling={false} style={textStyle}>
+            <Text
+              key={slot.key}
+              allowFontScaling={false}
+              className="tabular-nums"
+              style={textStyle}>
               {slot.char}
             </Text>
           )
@@ -165,9 +170,9 @@ function DigitSlot({
   }, [rolling, shown.rollId, progress]);
 
   return (
-    <View style={styles.column} testID={`amount-slot-${slot.key}`}>
+    <View className="overflow-hidden" testID={`amount-slot-${slot.key}`}>
       {/* In flow, invisible: gives the column its tabular width and height. */}
-      <Text allowFontScaling={false} style={[textStyle, styles.sizer]}>
+      <Text allowFontScaling={false} className="tabular-nums opacity-0" style={textStyle}>
         {slot.char}
       </Text>
       {rolling ? (
@@ -214,16 +219,11 @@ function RollingGlyph({
     <Animated.Text
       allowFontScaling={false}
       testID={testID}
-      style={[textStyle, styles.glyph, animatedStyle]}>
+      className="absolute left-0 right-0 top-0 tabular-nums"
+      style={[textStyle, animatedStyle]}>
       {char}
     </Animated.Text>
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
-  column: { overflow: 'hidden' },
-  slotText: { fontVariant: ['tabular-nums'], textAlign: 'center' },
-  sizer: { opacity: 0 },
-  glyph: { position: 'absolute', left: 0, right: 0, top: 0 },
-});
+const CENTERED: TextStyle = { textAlign: 'center' };

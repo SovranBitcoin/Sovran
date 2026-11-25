@@ -19,7 +19,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { matchViewState, type ViewState } from '@/shared/lib/viewState';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 
-export interface StateSwitchDataInfo {
+interface StateSwitchDataInfo {
   status: 'ready' | 'refreshing' | 'stale';
   /** Why the data is stale, when a reload failed. */
   error?: unknown;

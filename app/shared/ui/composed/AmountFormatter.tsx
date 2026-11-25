@@ -145,11 +145,11 @@ export function AmountFormatter({
             <View>
               <RNText
                 allowFontScaling={false}
+                // The native roll lays digits out at tabular widths.
+                className={animated ? 'tabular-nums' : undefined}
                 style={[
                   plainTextStyle(size, lineHeight, weight, null, centered),
                   { color: 'transparent' },
-                  // The native roll lays digits out at tabular widths.
-                  animated && styles.tabular,
                 ]}>
                 {text}
               </RNText>
@@ -250,7 +250,3 @@ function ScaleWrapper({
   if (!enabled) return <>{children}</>;
   return <Animated.View style={scaleStyle}>{children}</Animated.View>;
 }
-
-const styles = StyleSheet.create({
-  tabular: { fontVariant: ['tabular-nums'] },
-});

@@ -536,9 +536,6 @@
     "inline-style": 3,
     "stack-layout-props": 3
   },
-  "shared/ui/composed/AmountFormatter.tsx": {
-    "inline-style": 1
-  },
   "shared/ui/composed/AndroidSheetRoot.tsx": {
     "inline-style": 1
   },
