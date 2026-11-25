@@ -6,6 +6,8 @@ import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { generateSecretKey } from 'nostr-tools/pure';
 
 const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+const originalBufferDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Buffer');
+const originalNextTickDescriptor = Object.getOwnPropertyDescriptor(process, 'nextTick');
 
 function setCrypto(value: unknown) {
   Object.defineProperty(globalThis, 'crypto', { configurable: true, writable: true, value });
@@ -31,22 +33,63 @@ describe('runtime shim bootstrap', () => {
     } else {
       Reflect.deleteProperty(globalThis, 'crypto');
     }
+    if (originalBufferDescriptor) {
+      Object.defineProperty(globalThis, 'Buffer', originalBufferDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'Buffer');
+    }
+    if (originalNextTickDescriptor) {
+      Object.defineProperty(process, 'nextTick', originalNextTickDescriptor);
+    } else {
+      Reflect.deleteProperty(process, 'nextTick');
+    }
   });
 
-  it('installs expo-crypto getRandomValues on Hermes-like startup and probes 32 bytes', () => {
+  it('installs expo-crypto getRandomValues, global Buffer, and process.nextTick on Hermes-like startup', async () => {
     setCrypto(undefined);
+    Reflect.deleteProperty(globalThis, 'Buffer');
+    Reflect.deleteProperty(process, 'nextTick');
+
     const getRandomValues = makeNonZeroFill();
     jest.doMock('expo-crypto', () => ({ getRandomValues }));
 
     jest.isolateModules(() => jest.requireActual('../shim'));
 
-    expect(globalThis.crypto.getRandomValues).toBe(getRandomValues);
+    expect(typeof globalThis.crypto.getRandomValues).toBe('function');
     expect(getRandomValues).toHaveBeenCalledTimes(1);
     const probe = getRandomValues.mock.calls[0]?.[0];
     expect(probe).toBeInstanceOf(Uint8Array);
     expect(probe).toHaveLength(32);
+
+    // Buffer must be installed globally so cashu-ts / coco-core do not fall back
+    // to chunked btoa/atob on payloads larger than 32 KiB.
+    expect(typeof globalThis.Buffer?.from).toBe('function');
+    const large = new Uint8Array(40_000);
+    for (let i = 0; i < large.length; i += 1) large[i] = i & 0xff;
+    const encoded = globalThis.Buffer.from(large).toString('base64');
+    // 40_000 % 3 === 1 → trailing `==` only; zero mid-string padding from 32 KiB chunking.
+    expect(encoded.endsWith('==')).toBe(true);
+    expect(encoded.indexOf('=')).toBe(encoded.length - 2);
+    expect(Uint8Array.from(globalThis.Buffer.from(encoded, 'base64'))).toEqual(large);
+
     expect(process.env).toBeDefined();
-    expect(process.nextTick).toEqual(expect.any(Function));
+    expect(typeof process.nextTick).toBe('function');
+    const tickResult = await new Promise<string>((resolve) => {
+      process.nextTick((value: string) => resolve(value), 'ok');
+    });
+    expect(tickResult).toBe('ok');
+  });
+
+  it('fails closed without stack overflow when web adapter recurses into missing WebCrypto', () => {
+    setCrypto(undefined);
+    jest.doMock('expo-crypto', () => ({
+      getRandomValues: <T extends ArrayBufferView>(values: T): T =>
+        globalThis.crypto.getRandomValues(values),
+    }));
+
+    expect(() => jest.isolateModules(() => jest.requireActual('../shim'))).toThrow(
+      'Secure random bootstrap failed: native provider is unavailable'
+    );
   });
 
   it('preserves an existing platform WebCrypto CSPRNG without wrapping recursively', () => {

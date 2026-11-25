@@ -25,13 +25,15 @@ const IGNORED_DIRS = new Set([
   'build',
 ]);
 
-function walkRuntimeSource(dir, out = []) {
+const APP_NON_RUNTIME_DIRS = new Set(['scripts', 'codereview', 'e2e']);
+
+function walkRuntimeSource(dir, out = [], extraIgnored = new Set()) {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (IGNORED_DIRS.has(entry.name)) continue;
+    if (IGNORED_DIRS.has(entry.name) || extraIgnored.has(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      walkRuntimeSource(full, out);
+      walkRuntimeSource(full, out, extraIgnored);
     } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name)) {
       out.push(full);
     }
@@ -63,15 +65,32 @@ function countFlowGroups() {
   ).length;
 }
 
+function countDeps(pkgPath) {
+  if (!existsSync(pkgPath)) return 0;
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  return Object.keys(pkg.dependencies ?? {}).length;
+}
+
 function collectMetrics() {
-  const appFiles = walkRuntimeSource(join(ROOT, 'app'));
+  const appFiles = walkRuntimeSource(join(ROOT, 'app'), [], APP_NON_RUNTIME_DIRS);
   const walletFiles = walkRuntimeSource(join(ROOT, 'wallet/src'));
   const nostrFiles = walkRuntimeSource(join(ROOT, 'nostr/src'));
   const routeFiles = walkRuntimeSource(join(ROOT, 'app/app'));
   const allRuntime = [...appFiles, ...walletFiles, ...nostrFiles];
+  const providerFiles = appFiles.filter(
+    (file) =>
+      (file.includes('/app/shared/providers/') || file.includes('/app/features/')) &&
+      /Provider\.(ts|tsx)$/.test(file)
+  );
 
-  const appPkg = JSON.parse(readFileSync(join(ROOT, 'app/package.json'), 'utf8'));
   const rootPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const appDeps = countDeps(join(ROOT, 'app/package.json'));
+  const workspaceDeps =
+    countDeps(join(ROOT, 'package.json')) +
+    appDeps +
+    countDeps(join(ROOT, 'wallet/package.json')) +
+    countDeps(join(ROOT, 'nostr/package.json')) +
+    countDeps(join(ROOT, 'copy/package.json'));
 
   return {
     appRuntimeFiles: appFiles.length,
@@ -83,17 +102,30 @@ function collectMetrics() {
     totalRuntimeLoc: countLoc(allRuntime),
     routeFiles: routeFiles.length,
     flowGroupCount: countFlowGroups(),
-    appDeps: Object.keys(appPkg.dependencies ?? {}).length,
+    providerFiles: providerFiles.length,
+    contextDefinitionFiles: countMatchingFiles(appFiles, /\bcreateContext\b/),
+    appDeps,
+    workspaceDeps,
     patchedDepsCount: Object.keys(rootPkg.patchedDependencies ?? {}).length,
-    ndkImportFiles: countMatchingFiles(allRuntime, /from\s+['"]@nostr-dev-kit\/ndk/),
-    herouiImportFiles: countMatchingFiles(appFiles, /from\s+['"]heroui-native/),
+    ndkImportFiles: countMatchingFiles(
+      allRuntime,
+      /(?:from\s+|import\s*\(?\s*|require\s*\(\s*)['"]@nostr-dev-kit\/ndk[^'"]*['"]/
+    ),
+    herouiImportFiles: countMatchingFiles(
+      appFiles,
+      /(?:from\s+|import\s*\(?\s*|require\s*\(\s*)['"]heroui-native(?:\/[^'"]*)?['"]/
+    ),
   };
 }
 
 const RATCHET_KEYS = [
+  'totalRuntimeLoc',
   'appDeps',
+  'workspaceDeps',
   'patchedDepsCount',
   'flowGroupCount',
+  'providerFiles',
+  'contextDefinitionFiles',
   'ndkImportFiles',
   'herouiImportFiles',
 ];
@@ -122,12 +154,16 @@ for (const [key, value] of Object.entries(current)) {
 }
 
 if (args.has('--check')) {
-  if (!baseline) {
-    console.error(`Missing baseline at ${BASELINE_PATH}; run with --write first.`);
+  if (!baseline || typeof baseline !== 'object') {
+    console.error(`Missing or invalid baseline at ${BASELINE_PATH}; run with --write first.`);
     process.exit(1);
   }
   const regressions = [];
   for (const key of RATCHET_KEYS) {
+    if (typeof baseline[key] !== 'number' || !Number.isFinite(baseline[key])) {
+      regressions.push(`${key}: missing or non-numeric baseline value`);
+      continue;
+    }
     if (current[key] > baseline[key]) {
       regressions.push(`${key}: ${baseline[key]} -> ${current[key]}`);
     }

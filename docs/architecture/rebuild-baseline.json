@@ -1,15 +1,18 @@
 {
-  "appRuntimeFiles": 1289,
-  "appRuntimeLoc": 204355,
+  "appRuntimeFiles": 1236,
+  "appRuntimeLoc": 184961,
   "walletRuntimeFiles": 146,
   "walletRuntimeLoc": 43887,
   "nostrRuntimeFiles": 63,
   "nostrRuntimeLoc": 10796,
-  "totalRuntimeLoc": 259038,
+  "totalRuntimeLoc": 239644,
   "routeFiles": 121,
   "flowGroupCount": 11,
-  "appDeps": 94,
+  "providerFiles": 14,
+  "contextDefinitionFiles": 19,
+  "appDeps": 92,
+  "workspaceDeps": 102,
   "patchedDepsCount": 4,
   "ndkImportFiles": 31,
-  "herouiImportFiles": 57
+  "herouiImportFiles": 58
 }

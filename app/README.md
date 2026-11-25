@@ -382,11 +382,11 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Bun** as package manager and CI runtime
 - [x] **TypeScript** with `noImplicitOverride`, type-aware ESLint rules, `eslint-plugin-react-perf`; React Compiler coverage is gated in CI by `react-compiler-healthcheck`
 - [x] **Reanimated v4** (legacy `Animated` banned by lint)
-- [x] **React Native Gesture Handler**, **Nitro Modules**, **Worklets**
+- [x] **React Native Gesture Handler**, **Worklets**
 - [x] **Zustand** with Zod-validated persistence
 - [x] **Zod v4** schema validation; `@sovranbitcoin/schemas` for shared payloads
 - [x] **`neverthrow`** for `Result` / `ResultAsync` return types
-- [x] **`react-native-quick-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
+- [x] **`expo-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
 - [x] **Uniwind + Tailwind variants** for styling
 - [x] **`expo-sqlite`** for Coco wallet storage
 - [x] **`expo-secure-store`** for seeds and nsec
