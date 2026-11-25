@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import type { AuditObservationUpdate } from './observation';
 import {
@@ -192,9 +193,11 @@ export function parseNut06InfoJson(raw?: string | null): {
     const parsed = Nut06InfoSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) return {};
     const info = parsed.data;
-    const nostrContact = info.contact?.find(
-      (c) => c.method?.toLowerCase() === 'nostr' && typeof c.info === 'string' && c.info.length > 0
+    const contacts = (info.contact ?? []).filter(
+      (c): c is { method: string; info: string } =>
+        typeof c.method === 'string' && typeof c.info === 'string'
     );
+    const operatorPubkey = extractMintNostrPubkey({ contact: contacts });
     const units = extractUnitsFromNuts(info.nuts);
     return {
       name: cleanQuoted(info.name),
@@ -202,7 +205,7 @@ export function parseNut06InfoJson(raw?: string | null): {
       iconUrl: cleanQuoted(info.icon_url),
       nuts: info.nuts,
       supportedUnits: units.length > 0 ? units : undefined,
-      operatorPubkey: nostrContact?.info,
+      operatorPubkey,
     };
   } catch {
     return {};
@@ -796,7 +799,9 @@ export async function fetchNip87Directory(
       description: cleanQuoted(mint.description),
       iconUrl: cleanQuoted(mint.iconUrl),
       supportedUnits: mint.supportedUnits,
-      operatorPubkey: mint.operatorPubkey,
+      operatorPubkey: mint.operatorPubkey
+        ? extractMintNostrPubkey({ contact: [{ method: 'nostr', info: mint.operatorPubkey }] })
+        : undefined,
       state: mint.state,
       nMints: mint.nMints,
       nMelts: mint.nMelts,

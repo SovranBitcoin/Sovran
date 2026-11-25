@@ -1,3 +1,5 @@
+import * as nip19 from 'nostr-tools/nip19';
+
 import {
   CASHU_AUDIT_LIST_URL,
   collectMintRadarWarnings,
@@ -162,6 +164,8 @@ describe('mint auditor adapters', () => {
   });
 
   it('parses legacy Cashu Auditor (8333.space) and NUT-06 info JSON', async () => {
+    const operatorHex = 'cd'.repeat(32);
+    const operatorNpub = nip19.npubEncode(operatorHex);
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify([
@@ -177,7 +181,7 @@ describe('mint auditor adapters', () => {
               name: 'Cuba Bitcoin',
               description: 'Community mint',
               icon_url: 'https://mint.cubabitcoin.org/icon.png',
-              contact: [{ method: 'nostr', info: 'npub1example' }],
+              contact: [{ method: 'nostr', info: operatorNpub }],
               nuts: {
                 '4': { methods: [{ method: 'bolt11', unit: 'sat' }] },
               },
@@ -195,7 +199,7 @@ describe('mint auditor adapters', () => {
       name: 'Cuba Bitcoin',
       description: 'Community mint',
       iconUrl: 'https://mint.cubabitcoin.org/icon.png',
-      operatorPubkey: 'npub1example',
+      operatorPubkey: operatorHex,
       supportedUnits: ['sat'],
       nMints: 120,
       nMelts: 80,
@@ -334,5 +338,18 @@ describe('multi-auditor merging and fault tolerance', () => {
       expect(res.value.mints).toHaveLength(1);
       expect(res.value.mints[0].name).toBe('Macadamia');
     }
+  });
+
+  it('normalizes valid NUT-06 nostr contacts to hex and rejects placeholders like "npub…"', () => {
+    const hex = 'ab'.repeat(32);
+    const placeholder = parseNut06InfoJson(
+      JSON.stringify({ contact: [{ method: 'nostr', info: 'npub\u2026' }] })
+    );
+    expect(placeholder.operatorPubkey).toBeUndefined();
+
+    const validHex = parseNut06InfoJson(
+      JSON.stringify({ contact: [{ method: 'nostr', info: hex.toUpperCase() }] })
+    );
+    expect(validHex.operatorPubkey).toBe(hex);
   });
 });

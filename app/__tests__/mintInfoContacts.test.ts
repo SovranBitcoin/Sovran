@@ -68,5 +68,18 @@ describe('mint info contacts', () => {
       const rows = getSortedMintInfoContacts([{ method: 'email', info: 'support@example.com' }]);
       expect(resolveMintInfoNostrContactPubkey(rows, OPERATOR)).toBeUndefined();
     });
+
+    it('rejects a placeholder or malformed discovered operator and decodes valid npub', () => {
+      const rows = getSortedMintInfoContacts([{ method: 'nostr', info: 'npub\u2026' }]);
+      expect(resolveMintInfoNostrContactPubkey(rows, 'npub\u2026')).toBeUndefined();
+      expect(resolveMintInfoNostrContactPubkey(rows, '12345')).toBeUndefined();
+      expect(resolveMintInfoNostrContactPubkey(rows, NPUB)).toBe(PUBKEY);
+    });
+  });
+
+  it('never throws when formatMintInfoNostrFallback receives a non-hex pubkey like "npub…"', () => {
+    expect(() => formatMintInfoNostrFallback('npub\u2026', 'npub\u2026')).not.toThrow();
+    expect(formatMintInfoNostrFallback('npub\u2026', 'npub\u2026')).toBe('npub\u2026');
+    expect(formatMintInfoNostrFallback('custom', '12345')).toBe('custom');
   });
 });
