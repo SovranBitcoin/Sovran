@@ -35,6 +35,7 @@ import { List } from '@/shared/ui/composed/List';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
+import { runAfterNativeSearchDismiss } from './nativeSearchDismiss';
 import { searchListState, type SearchStatus } from './searchListState';
 
 type PaymentFlowMachine = ReturnType<typeof usePaymentFlowMachine>;
@@ -129,7 +130,9 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       trailingVariant="chevron"
       onPress={() => {
         paymentLog.info('contact.geohash.press', { geohash, source: 'search' });
-        router.push({ pathname: '/(user-flow)/geohashChat', params: { geohash } });
+        runAfterNativeSearchDismiss(() => {
+          router.push({ pathname: '/(user-flow)/geohashChat', params: { geohash } });
+        });
       }}
       testID={`contact-row:geohash:${geohash}`}
     />
@@ -154,9 +157,11 @@ function TierRow({ tier }: { tier: TierEntry }) {
           transport: tier.transport,
           source: 'search',
         });
-        router.push({
-          pathname: '/(user-flow)/geohashChat',
-          params: { geohash: tier.geohash, tierLabel: tier.label, transport: tier.transport },
+        runAfterNativeSearchDismiss(() => {
+          router.push({
+            pathname: '/(user-flow)/geohashChat',
+            params: { geohash: tier.geohash, tierLabel: tier.label, transport: tier.transport },
+          });
         });
       }}
       testID={`contact-row:geohash:${tier.geohash}`}
@@ -185,14 +190,16 @@ function MintRow({ mint }: { mint: Extract<SearchListItem, { type: 'mint' }> }) 
         });
         // Hand the destination everything this row is ALREADY showing, so the
         // mint page does not skeleton a name and icon the person can see.
-        router.push(
-          buildMintInfoHref(mint.mintUrl, {
-            displayName,
-            iconUrl: mint.iconUrl,
-            kymScore: mint.kymScore,
-            reviewCount: mint.reviewCount,
-          })
-        );
+        runAfterNativeSearchDismiss(() => {
+          router.push(
+            buildMintInfoHref(mint.mintUrl, {
+              displayName,
+              iconUrl: mint.iconUrl,
+              kymScore: mint.kymScore,
+              reviewCount: mint.reviewCount,
+            })
+          );
+        });
       }}
       testID={`contact-row:mint:${mint.mintUrl}`}
     />
