@@ -1,7 +1,5 @@
 import type { NostrCursor, NostrTier } from '@sovranbitcoin/schemas';
-import { orderedEnvelopeEvents, type NaggEnvelope } from '../envelope';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
 
 // ---------------------------------------------------------------------------
 // DM conversation index surface
@@ -57,38 +55,5 @@ export type ResolvedDmEnvelopes = {
   received?: number;
 };
 
-export interface DmTier {
-  readonly tier: NostrTier;
-  getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>>;
-}
-
 /** The wrap kinds the index serves: NIP-17 gift wrap + NIP-04 legacy. */
 export const DM_ENVELOPE_KINDS = [4, 1059];
-
-/**
- * Bridge a v2 DM envelope into opaque DmEnvelopes. By design the DM routes
- * carry NO aggregates and NO profile hydration (privacy) — only the raw
- * encrypted wraps, ordered by event time. The tail envelope is the next page's
- * cursor.
- */
-export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle {
-  const events = envelope.order.length > 0 ? orderedEnvelopeEvents(envelope) : envelope.events;
-  const envelopes: DmEnvelope[] = events.map((e) => {
-    const sig = (e as { sig?: unknown }).sig;
-    return {
-      id: e.id,
-      pubkey: e.pubkey,
-      kind: e.kind,
-      content: e.content,
-      tags: e.tags,
-      createdAtSec: e.created_at,
-      ...(typeof sig === 'string' && sig ? { sig } : {}),
-    };
-  });
-  const last = envelopes[envelopes.length - 1];
-  return {
-    envelopes,
-    cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null,
-    received: Math.max(envelope.order.length, envelopes.length),
-  };
-}

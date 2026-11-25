@@ -1,7 +1,4 @@
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
-import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
-import type { ThreadBundle, ThreadRequest } from '../thread';
-import type { OwnHistoryBundle, OwnHistoryRequest } from '../own-state';
 import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import {
   profileStatsIsEmpty,
@@ -15,140 +12,24 @@ import {
   type SearchRequest,
 } from '../search';
 import type { NostrTierStrategy } from '../strategy';
-import {
-  demuxPrimalFeed,
-  demuxPrimalThread,
-  demuxPrimalOwnHistory,
-  demuxPrimalProfileStats,
-  demuxPrimalSocialGraph,
-  demuxPrimalNotifications,
-} from './demux';
-import type { NotificationsBundle, NotificationsRequest } from '../notifications';
-import type { PrimalCacheRequest, PrimalConnection } from './protocol';
+import { demuxPrimalProfileStats, demuxPrimalSocialGraph } from './demux';
+import type { PrimalConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
 // Primal tier (tier 2, "almost as good")
 //
-// A client adapter to Primal's public cache server. It owns the algo feed
-// server-side, so For-You is reachable here when nagg is down. A spec this tier
-// can't serve (no Primal equivalent) returns `unsupported` so the facade falls
-// straight through to the raw-relay floor.
-//
-// The mapping from our FeedSpec to Primal's cache directive is the one piece
-// that must be pinned against the live Primal cache, so it's an injectable
-// resolver with a best-effort default — the protocol, demux, and contract
-// mapping around it are exercised independently of any guessed directive string.
+// A client adapter to Primal's public cache server: profiles, profile stats,
+// the social graph and profile search. A request this tier can't serve returns
+// `unsupported` so the facade falls straight through to the raw-relay floor.
 // ---------------------------------------------------------------------------
-
-export type PrimalFeedSpecResolver = (
-  spec: FeedSpec,
-  paging: { until?: number; limit?: number },
-) => PrimalCacheRequest | null;
 
 export type PrimalTierConfig = {
   connection: PrimalConnection;
-  /** Override the FeedSpec → cache-directive mapping (pinned against live Primal). */
-  resolveFeedSpec?: PrimalFeedSpecResolver;
 };
 
 export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
-  const resolveFeedSpec = config.resolveFeedSpec ?? defaultResolveFeedSpec;
-
   return {
     tier: 'primal',
-    async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
-      // `cursor.createdAt` is the previous page's `FeedRange.since` (see
-      // derivePageCursor): the sort-key bound Primal pages by — a score for
-      // ranked directives, a created_at for chronological ones.
-      const cacheRequest = resolveFeedSpec(request.spec, {
-        until: request.cursor?.createdAt,
-        limit: request.limit,
-      });
-      if (!cacheRequest) return unsupported();
-
-      const result = await config.connection.request(cacheRequest, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<FeedBundle>>(
-        (events) => {
-          const bundle = demuxPrimalFeed(events);
-          // Empty page → fall through (e.g. Primal lacks this viewer's data).
-          return bundle.itemsById.size === 0 ? unsupported() : answered(bundle);
-        },
-        (error) => failed(error),
-      );
-    },
-
-    async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
-      // NOTE (capability assumption): `get_notifications` per the primal-server
-      // reference; params modeled as pubkey/user_pubkey/limit/until. Any
-      // network/verb failure → failed(); a batch with no parsable kind-10000132
-      // summaries → unsupported(). Either way a concurrent notifications read
-      // proceeds on the other sources — Primal is additive here, never load-
-      // bearing (see demuxPrimalNotifications).
-      const result = await config.connection.request(
-        {
-          verb: 'get_notifications',
-          params: {
-            pubkey: request.viewerPubkey,
-            user_pubkey: request.viewerPubkey,
-            limit: request.limit ?? 50,
-            ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
-          },
-        },
-        { signal: request.signal, timeoutMs: request.timeoutMs },
-      );
-      return result.match<TierOutcome<NotificationsBundle>>(
-        (events) => {
-          const bundle = demuxPrimalNotifications(events, request.viewerPubkey, {
-            tab: request.tab === 'MENTIONS' ? 'MENTIONS' : 'ALL',
-            replyScope: request.replyScope,
-          });
-          return bundle ? answered(bundle) : unsupported();
-        },
-        (error) => failed(error),
-      );
-    },
-
-    async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
-      const cacheRequest: PrimalCacheRequest = {
-        verb: 'thread_view',
-        params: {
-          event_id: request.noteId,
-          limit: request.limit ?? 100,
-          ...(request.viewerPubkey ? { user_pubkey: request.viewerPubkey } : {}),
-        },
-      };
-      const result = await config.connection.request(cacheRequest, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<ThreadBundle>>(
-        (events) => {
-          const bundle = demuxPrimalThread(events, request.noteId);
-          // No root in the batch → Primal couldn't serve this thread; fall through.
-          return bundle ? answered(bundle) : unsupported();
-        },
-        (error) => failed(error),
-      );
-    },
-
-    async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
-      const cacheRequest = ownHistoryCacheRequest(request);
-      // Primal has no my-likes / my-reposts list verb → fall straight through to the floor.
-      if (!cacheRequest) return unsupported();
-
-      const result = await config.connection.request(cacheRequest, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<OwnHistoryBundle>>(
-        (events) => answered(demuxPrimalOwnHistory(events, request.actionType)),
-        (error) => failed(error),
-      );
-    },
-
     async getProfileStats(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>> {
       // `user_profile` bundles the real kind-0 + the synthetic USER_PROFILE stats
       // (counts + time_joined) for one pubkey. No reputation — that's nagg-only.
@@ -219,81 +100,4 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       );
     },
   };
-}
-
-function ownHistoryCacheRequest(request: OwnHistoryRequest): PrimalCacheRequest | null {
-  const pubkey = request.viewerPubkey;
-  const limit = request.limit ?? 100;
-  const until = request.cursor?.createdAt;
-  const paged = (extra: Record<string, unknown>) => ({ ...extra, limit, ...(until ? { until } : {}) });
-  switch (request.actionType) {
-    case 'authored':
-      return { verb: 'feed', params: paged({ notes: 'authored', pubkey }) };
-    case 'replies':
-      return { verb: 'feed', params: paged({ notes: 'replies', pubkey }) };
-    case 'bookmarks':
-      return { verb: 'feed', params: paged({ notes: 'bookmarks', pubkey }) };
-    case 'zaps-sent':
-      return { verb: 'user_zaps_sent', params: paged({ sender: pubkey }) };
-    case 'follows':
-      return { verb: 'contact_list', params: { pubkey } };
-    case 'mutes':
-      return { verb: 'mutelist', params: { pubkey } };
-    case 'relays':
-      return { verb: 'get_user_relays', params: { pubkey } };
-    case 'likes':
-    case 'reposts':
-      return null;
-  }
-}
-
-function defaultResolveFeedSpec(
-  spec: FeedSpec,
-  paging: { until?: number; limit?: number },
-): PrimalCacheRequest | null {
-  const limit = paging.limit ?? 30;
-  const pagedParams = (feedSpec: object, userPubkey?: string): PrimalCacheRequest['params'] => ({
-    spec: JSON.stringify(feedSpec),
-    limit,
-    ...(paging.until ? { until: paging.until } : {}),
-    ...(userPubkey ? { user_pubkey: userPubkey } : {}),
-  });
-
-  // The `spec` is a Primal `mega_feed_directive` feed spec. Valid notes-feed ids
-  // (primal-server app.jl `mega_feed_directive`): global-trending / all-notes /
-  // latest / most-zapped / … — NOT an arbitrary id. "for-you" is not a Primal
-  // concept; the product decision is that Primal-served For You IS Primal's own
-  // "Trending 24h" home feed (`get_home_feeds`: {id:'global-trending', hours:24}),
-  // so the page matches what the Primal apps show on that tab.
-  switch (spec.kind) {
-    case 'for-you':
-      return {
-        verb: 'mega_feed_directive',
-        params: pagedParams({ id: 'global-trending', kind: 'notes', hours: 24 }, spec.viewerPubkey),
-      };
-    case 'following-popular':
-      // The viewer's follows feed (Primal's `latest`), keyed by their pubkey;
-      // empty when Primal doesn't hold their follow graph → falls to the floor.
-      return {
-        verb: 'mega_feed_directive',
-        params: pagedParams({ id: 'latest', kind: 'notes' }, spec.viewerPubkey),
-      };
-    case 'following-recent':
-      if (spec.authors) return null;
-      return {
-        verb: 'mega_feed_directive',
-        params: pagedParams({ id: spec.viewerPubkey ? 'latest' : 'all-notes', kind: 'notes' }, spec.viewerPubkey),
-      };
-    case 'user':
-      return {
-        verb: 'feed',
-        params: {
-          pubkey: spec.pubkey,
-          notes: 'authored',
-          include_replies: false,
-          limit,
-          ...(paging.until ? { until: paging.until } : {}),
-        },
-      };
-  }
 }

@@ -1,13 +1,12 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNaggClient } from '../src/transport';
+import { answered } from '../src/tiers';
 import {
-  createNaggTier,
   createNostrDataLayer,
   mergeSearchHit,
   profileSearchHitsFromKind0,
 } from '../src/facade';
-import { pendingFeedTier } from './pendingFeedTier';
+import { emptyTier } from './emptyTier';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
 import type { NaggError } from '../src/errors';
@@ -30,47 +29,20 @@ describe('profileSearchHitsFromKind0 — relay floor parse', () => {
 });
 
 describe('searchProfiles through the facade', () => {
-  test('nagg serves ranked hits from /nostr/search', async () => {
-    let lastUrl = '';
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async (url: string) => {
-        lastUrl = String(url);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          // v2 envelope: kind-0 events + ranked pubkeys + per-provider scores.
-          json: async () => ({
-            order: ['9'.repeat(64)],
-            orderBy: 'rank',
-            events: [
-              {
-                id: '9'.repeat(64),
-                kind: 0,
-                pubkey: A,
-                content: JSON.stringify({ name: 'alice', display_name: 'Alice' }),
-                tags: [],
-                created_at: 100,
-              },
-            ],
-            aggregates: {},
-            pubkeys: [A],
-            providers: { [A]: { vertex: { rank: 1, score: 0.9 } } },
-            fromCache: false,
-          }),
-        } as unknown as Response;
-      }) as unknown as typeof fetch,
+  test('ranked hits are written through to the profile-stats owner', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [
+        {
+          tier: 'primal',
+          searchProfiles: async () =>
+            answered({
+              hits: [{ pubkey: A, metadata: { name: 'alice', displayName: 'Alice' }, rank: 1, score: 0.9 }],
+            }),
+        },
+      ],
     });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
-    const result = await layer.searchProfiles({ query: 'ali', limit: 10 });
-    expect(result.isOk()).toBe(true);
-    const out = result._unsafeUnwrap();
-    expect(lastUrl).toContain('/nostr/search');
-    expect(out.tier).toBe('nagg');
-    expect(out.hits[0]?.pubkey).toBe(A);
-    expect(out.hits[0]?.metadata.displayName).toBe('Alice');
+    const out = (await layer.searchProfiles({ query: 'ali', limit: 10 }))._unsafeUnwrap();
     expect(out.hits[0]?.rank).toBe(1);
     // Written through to the single owner: the profile page, a mint row or a
     // provider row for Alice now shows the score the search did.
@@ -101,7 +73,7 @@ describe('searchProfiles through the facade', () => {
     expect(out.hits[0]?.metadata.name).toBe('aria');
   });
 
-  test('relay NIP-50 floor serves unranked kind-0 hits when nagg is down', async () => {
+  test('relay NIP-50 floor serves unranked kind-0 hits when Primal cannot', async () => {
     let captured: unknown;
     const relay: RelayConnection = {
       request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
@@ -112,7 +84,7 @@ describe('searchProfiles through the facade', () => {
       },
     };
     const layer = createNostrDataLayer({
-      tiers: [pendingFeedTier('nagg'), createRelayTier({ connection: relay })],
+      tiers: [emptyTier('primal'), createRelayTier({ connection: relay })],
     });
 
     const result = await layer.searchProfiles({ query: 'bob' });

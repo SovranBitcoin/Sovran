@@ -5,7 +5,7 @@ import {
   profilesFromKind0,
   createNostrDataLayer,
 } from '../src/facade';
-import { pendingFeedTier } from './pendingFeedTier';
+import { emptyTier } from './emptyTier';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
 import type { NaggError } from '../src/errors';
@@ -48,7 +48,7 @@ describe('getProfiles through the facade', () => {
         return Promise.resolve(ok(events));
       },
     };
-    const layer = createNostrDataLayer({ tiers: [pendingFeedTier('nagg'), createRelayTier({ connection })] });
+    const layer = createNostrDataLayer({ tiers: [emptyTier('nagg'), createRelayTier({ connection })] });
     const result = await layer.getProfiles({ pubkeys: [A] });
     expect(result.isOk()).toBe(true);
     const out = result._unsafeUnwrap();

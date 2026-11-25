@@ -1,8 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNaggClient } from '../src/transport';
 import {
-  createNaggTier,
   createNostrDataLayer,
   summarizeReviews,
   dedupeByReviewer,
@@ -80,16 +78,9 @@ describe('mint-reviews through the facade', () => {
     return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
   }
 
-  test('relay floor parses reviews when nagg has no aggregate', async () => {
-    // nagg tier returns a 503 for the aggregate → falls through to relay
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({ ok: false, status: 503, statusText: 'x', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
-    });
+  test('relay floor parses reviews', async () => {
     const layer = createNostrDataLayer({
       tiers: [
-        createNaggTier({ client }),
         createRelayTier({
           connection: fakeRelay([review('1'.repeat(64), A, '4', 200), review('2'.repeat(64), B, '3', 100)]),
         }),
@@ -104,100 +95,4 @@ describe('mint-reviews through the facade', () => {
     expect(out.averageScore).toBe(3.5);
   });
 
-  test('nagg serves the server-side aggregate when available', async () => {
-    let lastUrl = '';
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async (url: string) => {
-        lastUrl = String(url);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ summary: { mintUrl: MINT, averageScore: 4.2, reviewCount: 17 } }),
-        } as unknown as Response;
-      }) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
-
-    const result = await layer.getMintReviews({ mintUrl: MINT });
-    expect(result.isOk()).toBe(true);
-    const out = result._unsafeUnwrap();
-    expect(lastUrl).toContain('/nostr/mint/reviews');
-    expect(out.tier).toBe('nagg');
-    expect(out.averageScore).toBe(4.2);
-    expect(out.reviewCount).toBe(17);
-  });
-
-  test('nagg reviews carry individual items + bundled reviewer identity', async () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({
-            summary: { mintUrl: MINT, averageScore: 5, reviewCount: 1 },
-            reviews: [
-              { eventId: 'e1'.padEnd(64, '0'), reviewerPubkey: A, mintUrl: MINT, score: 5, content: '[5/5] great', createdAt: 100 },
-            ],
-            profiles: { [A]: { name: 'Alice', picture: 'https://a/p.png' } },
-          }),
-        }) as unknown as Response) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
-
-    const out = (await layer.getMintReviews({ mintUrl: MINT }))._unsafeUnwrap();
-    expect(out.reviews).toHaveLength(1);
-    expect(out.reviews[0]).toMatchObject({ score: 5, name: 'Alice', picture: 'https://a/p.png' });
-  });
-
-  test('nagg discoverMints maps the rich card shape + operator identity', async () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({
-            mints: [
-              {
-                mintUrl: MINT,
-                name: 'Mint One',
-                supportedUnits: ['sat', 'usd'],
-                averageScore: 4.5,
-                reviewCount: 3,
-                favouriteCount: 1,
-                hasAudit: true,
-                state: 'OK',
-                nMints: 100,
-                nMelts: 40,
-                nErrors: 2,
-                operatorPubkey: A,
-                followers: 1234,
-              },
-            ],
-            profiles: { [A]: { name: 'Operator', picture: 'https://op/p.png' } },
-          }),
-        }) as unknown as Response) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
-
-    const out = (await layer.discoverMints({}))._unsafeUnwrap();
-    expect(out.mints).toHaveLength(1);
-    expect(out.mints[0]).toMatchObject({
-      mintUrl: MINT,
-      supportedUnits: ['sat', 'usd'],
-      favouriteCount: 1,
-      hasAudit: true,
-      state: 'OK',
-      nMints: 100,
-      operatorPubkey: A,
-      operatorName: 'Operator',
-      operatorPicture: 'https://op/p.png',
-      followers: 1234,
-    });
-  });
 });

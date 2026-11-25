@@ -1,33 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import {
   NaggEnvelopeSchema,
-  NaggNotificationsEnvelopeSchema,
   NaggProfilesEnvelopeSchema,
   aggregateValue,
-  noteMetricsFromAggregates,
-  noteMetricsMapFromAggregates,
-  profileInfoMapFromEnvelope,
   profileMetadataByPubkey,
-  resolveAnchors,
-  orderedFeedItemsFromEnvelope,
-  feedPageFromEnvelope,
-  threadFromEnvelope,
-  NaggThreadEnvelopeSchema,
-  deriveNotificationReason,
-  notificationsPageFromEnvelope,
-  parseEnvelopeCursor,
-  enrichmentFromEnvelope,
-  orderedEnvelopeEvents,
 } from '../src/envelope';
-import { bundleFromDmEnvelope } from '../src/facade/dm';
-import { bundleFromNotifications } from '../src/facade/notifications';
 import { searchHitsFromEnvelope } from '../src/facade/search';
-import { bundleFromFeedPage, statsFromMetrics } from '../src/facade/feed';
 
 const NOTE_ID = 'a'.repeat(64);
 const ROOT_ID = 'b'.repeat(64);
-const REPOST_ID = 'c'.repeat(64);
-const ORIGINAL_ID = 'd'.repeat(64);
 const PUBKEY = 'e'.repeat(64);
 const REPOSTER = 'f'.repeat(64);
 const QUOTED_ID = '1'.repeat(64);
@@ -87,16 +68,10 @@ describe('NaggEnvelopeSchema', () => {
     expect(parsed.data!.cursor ?? null).toBeNull();
   });
 
-  test('parses the feed cursor "<until>|<offset>" and rejects opaque cursors gracefully', () => {
-    expect(parseEnvelopeCursor('1783180778|2')).toEqual({ until: 1_783_180_778, offset: 2 });
-    expect(parseEnvelopeCursor('1783180778')).toEqual({ until: 1_783_180_778, offset: 0 });
-    expect(parseEnvelopeCursor('2026-07-03T23:21:35Z|abc')).toBeNull();
-    expect(parseEnvelopeCursor(undefined)).toBeNull();
-  });
 });
 
 // ---------------------------------------------------------------------------
-// Aggregates → friendly metrics (zero values omitted server-side → default 0)
+// Aggregates → friendly names (zero values omitted server-side)
 // ---------------------------------------------------------------------------
 
 describe('aggregate accessors', () => {
@@ -115,53 +90,18 @@ describe('aggregate accessors', () => {
     },
   };
 
-  test('maps rule names to the friendly note metrics', () => {
-    expect(noteMetricsFromAggregates(aggregates, NOTE_ID)).toEqual({
-      likeCount: 22,
-      repostCount: 4,
-      replyCount: 12,
-      satsZapped: 2514,
-      zapCount: 3,
-      quoteCount: 1,
-    });
+  test('maps friendly names to rule metrics', () => {
+    expect(aggregateValue(aggregates, NOTE_ID, 'likeCount')).toBe(22);
+    expect(aggregateValue(aggregates, NOTE_ID, 'satsZapped')).toBe(2514);
+    expect(aggregateValue(aggregates, PUBKEY, 'followers')).toBe(163);
+    expect(aggregateValue(aggregates, PUBKEY, 'following')).toBe(99);
   });
 
-  test('zero-omitted rules default to 0 for unknown ids', () => {
-    expect(noteMetricsFromAggregates(aggregates, ROOT_ID)).toEqual({
-      likeCount: 0,
-      repostCount: 0,
-      replyCount: 0,
-      satsZapped: 0,
-      zapCount: 0,
-      quoteCount: 0,
-    });
+  test('zero-omitted rules are undefined for unknown ids', () => {
     expect(aggregateValue(aggregates, ROOT_ID, 'likeCount')).toBeUndefined();
+    expect(aggregateValue(aggregates, ROOT_ID, 'followers')).toBeUndefined();
   });
 
-  test('noteMetricsMapFromAggregates rebuilds the per-id stats map (POST /nostr/events/aggregates)', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      events: [],
-      aggregates: { [NOTE_ID]: { k7_e: { actors: 5 }, k9735_e: { sources: 2, value_total: 42 } } },
-    });
-    const stats = noteMetricsMapFromAggregates(envelope.aggregates);
-    expect(stats[NOTE_ID]).toMatchObject({
-      likeCount: 5,
-      repostCount: 0,
-      replyCount: 0,
-      satsZapped: 42,
-      zapCount: 2,
-    });
-    // …and the shared NoteStats bridge now carries the discrete zap count.
-    expect(statsFromMetrics(stats)[NOTE_ID]).toEqual({
-      likes: 5,
-      reposts: 0,
-      replies: 0,
-      zaps: 2,
-      satsZapped: 42,
-    });
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -169,21 +109,6 @@ describe('aggregate accessors', () => {
 // ---------------------------------------------------------------------------
 
 describe('profile extraction', () => {
-  test('builds the {name, picture} side map from kind-0 events (display_name fallback)', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      events: [
-        kind0(PUBKEY, { name: 'alice', picture: 'https://example/pic.png' }),
-        kind0(REPOSTER, { display_name: 'Bob', about: 'hi' }),
-      ],
-      aggregates: {},
-    });
-    expect(profileInfoMapFromEnvelope(envelope)).toEqual({
-      [PUBKEY]: { name: 'alice', picture: 'https://example/pic.png' },
-      [REPOSTER]: { name: 'Bob' },
-    });
-  });
 
   test('keeps the LATEST kind-0 per pubkey and tolerates junk content', () => {
     const envelope = NaggEnvelopeSchema.parse({
@@ -199,271 +124,6 @@ describe('profile extraction', () => {
     const metadata = profileMetadataByPubkey(envelope);
     expect(metadata[PUBKEY]?.name).toBe('new');
     expect(metadata[VIEWER]).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Feed reconstruction — repost anchor resolution
-// ---------------------------------------------------------------------------
-
-describe('feed reconstruction', () => {
-  // The live shape: order anchors the ORIGINAL id; events carry the kind-6
-  // repost, the hydrated original, a plain note (with hydrated root + quoted),
-  // and the authors' kind-0 profiles.
-  const feedEnvelope = NaggEnvelopeSchema.parse({
-    order: [NOTE_ID, ORIGINAL_ID],
-    orderBy: 'rank',
-    events: [
-      event(NOTE_ID, {
-        tags: [
-          ['e', ROOT_ID, '', 'root'],
-          ['q', QUOTED_ID],
-        ],
-      }),
-      event(ROOT_ID, { content: 'root', created_at: 1_699_000_000 }),
-      event(QUOTED_ID, { content: 'quoted' }),
-      event(REPOST_ID, { kind: 6, pubkey: REPOSTER, content: '', tags: [['e', ORIGINAL_ID]] }),
-      event(ORIGINAL_ID, { content: 'original' }),
-      kind0(PUBKEY, { name: 'alice' }),
-    ],
-    aggregates: { [ORIGINAL_ID]: { k7_e: { actors: 7 } } },
-    cursor: '1699999000|2',
-  });
-
-  test('resolves a repost anchor to { repost, original } keyed by the ORIGINAL id', () => {
-    const anchors = resolveAnchors(feedEnvelope);
-    expect(anchors[0]).toMatchObject({ kind: 'note', anchorId: NOTE_ID });
-    const repost = anchors[1];
-    expect(repost).toMatchObject({ kind: 'repost', anchorId: ORIGINAL_ID });
-    if (repost.kind !== 'repost') throw new Error('expected repost anchor');
-    expect(repost.repost.id).toBe(REPOST_ID);
-    expect(repost.original?.id).toBe(ORIGINAL_ID);
-  });
-
-  test('an unhydrated repost original still yields the item (original undefined)', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [ORIGINAL_ID],
-      orderBy: 'created_at',
-      events: [event(REPOST_ID, { kind: 6, pubkey: REPOSTER, content: '', tags: [['e', ORIGINAL_ID]] })],
-      aggregates: {},
-    });
-    const [item] = orderedFeedItemsFromEnvelope(envelope);
-    expect(item).toMatchObject({ type: 'repost', originalEventId: ORIGINAL_ID, originalEvent: null });
-  });
-
-  test('a fully missing anchor is skipped from items but kept in the ordering manifest', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [NOTE_ID, '7'.repeat(64)],
-      orderBy: 'created_at',
-      events: [event(NOTE_ID)],
-      aggregates: {},
-    });
-    const page = feedPageFromEnvelope(envelope);
-    expect(page.items).toHaveLength(1);
-    expect(page.ordering?.elements).toEqual([NOTE_ID, '7'.repeat(64)]);
-    // The facade bundle surfaces the unresolvable id via the manifest.
-    const bundle = bundleFromFeedPage(page);
-    expect(bundle.manifest.elements).toContain('7'.repeat(64));
-    expect(bundle.itemsById.has('7'.repeat(64))).toBe(false);
-  });
-
-  test('rebuilds the canonical NaggFeedPage (root, quoted, profiles, metrics, pagination)', () => {
-    const page = feedPageFromEnvelope(feedEnvelope);
-    expect(page.items).toHaveLength(2);
-    const note = page.items[0];
-    if (note.type !== 'note') throw new Error('expected note');
-    expect(note.rootEventId).toBe(ROOT_ID);
-    expect(note.rootEvent?.content).toBe('root');
-    const repost = page.items[1];
-    if (repost.type !== 'repost') throw new Error('expected repost');
-    expect(repost.reposters?.map((r) => r.pubkey)).toEqual([REPOSTER]);
-    expect(page.quoted[QUOTED_ID]?.content).toBe('quoted');
-    expect(page.profiles[PUBKEY]).toEqual({ name: 'alice' });
-    // Aggregated + zero-defaulted metrics for the rendered ids.
-    expect(page.metrics[ORIGINAL_ID]?.likeCount).toBe(7);
-    expect(page.metrics[NOTE_ID]?.likeCount).toBe(0);
-    expect(page.metrics[ROOT_ID]?.likeCount).toBe(0);
-    expect(page.paginationUntil).toBe(1_699_999_000);
-    expect(page.paginationOffset).toBe(2);
-    expect(page.ordering).toEqual({ orderBy: 'rank', elements: [NOTE_ID, ORIGINAL_ID] });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Thread reconstruction — order[0] is the root
-// ---------------------------------------------------------------------------
-
-describe('threadFromEnvelope', () => {
-  test('splits root (order[0]) from ranked replies and keeps the reply manifest', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [ROOT_ID, NOTE_ID, REPOST_ID],
-      orderBy: 'rank',
-      events: [
-        event(ROOT_ID, { content: 'root' }),
-        event(NOTE_ID, { tags: [['e', ROOT_ID, '', 'root']] }),
-        event(REPOST_ID, { kind: 1, tags: [['e', ROOT_ID, '', 'root']] }),
-        kind0(PUBKEY, { name: 'alice' }),
-      ],
-      aggregates: { [ROOT_ID]: { k1_1111_e_reply: { sources: 2 } } },
-    });
-    const thread = threadFromEnvelope(envelope);
-    expect(thread).not.toBeNull();
-    expect(thread!.root.id).toBe(ROOT_ID);
-    expect(thread!.events.map((e) => e.id)).toEqual([NOTE_ID, REPOST_ID]);
-    expect(thread!.ordering).toEqual({ orderBy: 'rank', elements: [NOTE_ID, REPOST_ID] });
-    expect(thread!.metrics[ROOT_ID]?.replyCount).toBe(2);
-    expect(thread!.metrics[NOTE_ID]?.replyCount).toBe(0);
-    expect(thread!.profiles[PUBKEY]?.name).toBe('alice');
-  });
-
-  test('returns null when the root is missing (caller falls through)', () => {
-    const empty = NaggEnvelopeSchema.parse({ order: [], orderBy: 'rank', events: [], aggregates: {} });
-    expect(threadFromEnvelope(empty)).toBeNull();
-    const unhydrated = NaggEnvelopeSchema.parse({
-      order: [ROOT_ID],
-      orderBy: 'rank',
-      events: [],
-      aggregates: {},
-    });
-    expect(threadFromEnvelope(unhydrated)).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Notifications — kind → reason derivation (no server reason strings in v2)
-// ---------------------------------------------------------------------------
-
-describe('deriveNotificationReason', () => {
-  test('maps the fixed kinds', () => {
-    expect(deriveNotificationReason({ kind: 3 }, undefined)).toBe('follow');
-    expect(deriveNotificationReason({ kind: 6 }, undefined)).toBe('repost');
-    expect(deriveNotificationReason({ kind: 16 }, undefined)).toBe('repost');
-    expect(deriveNotificationReason({ kind: 7 }, undefined)).toBe('reaction');
-    expect(deriveNotificationReason({ kind: 9735 }, undefined)).toBe('zap');
-    expect(deriveNotificationReason({ kind: 30023 }, undefined)).toBeUndefined();
-  });
-
-  test('kind 1 splits on tags: q → quote, e at the target → reply, else mention', () => {
-    expect(
-      deriveNotificationReason({ kind: 1, target: NOTE_ID }, { tags: [['q', NOTE_ID]] }),
-    ).toBe('quote');
-    expect(
-      deriveNotificationReason({ kind: 1, target: NOTE_ID }, { tags: [['e', NOTE_ID, '', 'root']] }),
-    ).toBe('reply');
-    // No target carried: any e tag reads as a reply, a bare p-mention as mention.
-    expect(deriveNotificationReason({ kind: 1 }, { tags: [['e', ROOT_ID]] })).toBe('reply');
-    expect(deriveNotificationReason({ kind: 1 }, { tags: [['p', VIEWER]] })).toBe('mention');
-  });
-});
-
-describe('notificationsPageFromEnvelope', () => {
-  const notifEnvelope = NaggNotificationsEnvelopeSchema.parse({
-    order: [REPOST_ID, NOTE_ID, QUOTED_ID],
-    orderBy: 'created_at',
-    events: [
-      // grouped follow (kind 3)
-      event(REPOST_ID, { kind: 3, pubkey: ACTOR, content: '', created_at: 1_700_000_300 }),
-      // reaction on a viewer post
-      event(NOTE_ID, { kind: 7, pubkey: ACTOR, content: '+', tags: [['e', ROOT_ID]], created_at: 1_700_000_200 }),
-      // reply to a viewer post
-      event(QUOTED_ID, { kind: 1, pubkey: ACTOR, tags: [['e', ROOT_ID, '', 'root']], created_at: 1_700_000_100 }),
-      // the reacted/replied-to viewer post, hydrated
-      event(ROOT_ID, { pubkey: VIEWER, content: 'mine' }),
-      kind0(ACTOR, { name: 'carol' }),
-    ],
-    aggregates: {},
-    entries: [
-      {
-        id: REPOST_ID,
-        kind: 3,
-        actor: ACTOR,
-        actors: [
-          { pubkey: ACTOR, eventId: REPOST_ID, createdAt: 1_700_000_300, actorVertexScore: 0.9 },
-          { pubkey: VIEWER, eventId: '8'.repeat(64), createdAt: 1_700_000_250 },
-        ],
-      },
-      {
-        id: NOTE_ID,
-        kind: 7,
-        actor: ACTOR,
-        target: ROOT_ID,
-        total: 5,
-        totalCapped: true,
-        actors: [{ pubkey: ACTOR, eventId: NOTE_ID, createdAt: 1_700_000_200 }],
-      },
-      { id: QUOTED_ID, kind: 1, actor: ACTOR, target: ROOT_ID },
-      // entry whose event was not hydrated → dropped
-      { id: '7'.repeat(64), kind: 7, actor: ACTOR },
-    ],
-    hasNext: true,
-  });
-
-  test('maps entries to v1 notification nodes with derived reasons + grouping', () => {
-    const page = notificationsPageFromEnvelope(notifEnvelope);
-    expect(page.notifications.nodes.map((n) => n.reason)).toEqual(['follow', 'reaction', 'reply']);
-    const [follow, reaction, reply] = page.notifications.nodes;
-    expect(follow).toMatchObject({ type: 'group', total: 2 });
-    expect(follow.sampleActors?.[0]).toMatchObject({ pubkey: ACTOR, actorVertexScore: 0.9 });
-    expect(follow.actorVertexScore).toBe(0.9);
-    expect(reaction).toMatchObject({
-      type: 'group',
-      total: 5,
-      totalCapped: true,
-      targetEventId: ROOT_ID,
-    });
-    expect(reaction.targetEvent?.content).toBe('mine');
-    expect(reply).toMatchObject({ type: 'single', targetEventId: ROOT_ID });
-    expect(page.notifications.pageInfo?.hasNextPage).toBe(true);
-    expect(page.profiles[ACTOR]?.name).toBe('carol');
-    // Target metrics are zero-defaulted even though aggregates were omitted.
-    expect(page.metrics[ROOT_ID]?.likeCount).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// DM privacy shape — no aggregates, no profiles, raw wraps only
-// ---------------------------------------------------------------------------
-
-describe('DM envelopes', () => {
-  test('bundles raw wraps and never carries aggregates/profile hydration', () => {
-    const wrap = event('8'.repeat(64), { kind: 1059, pubkey: ACTOR, content: 'ciphertext', tags: [['p', VIEWER]] });
-    const envelope = NaggEnvelopeSchema.parse({
-      order: ['8'.repeat(64)],
-      orderBy: 'created_at',
-      events: [wrap],
-      aggregates: {}, // by design: DM envelopes carry no aggregates
-    });
-    expect(envelope.aggregates).toEqual({});
-    expect(envelope.events.some((e) => e.kind === 0)).toBe(false);
-
-    const bundle = bundleFromDmEnvelope(envelope);
-    expect(bundle.envelopes).toHaveLength(1);
-    expect(bundle.envelopes[0]).toMatchObject({
-      id: '8'.repeat(64),
-      kind: 1059,
-      content: 'ciphertext',
-      createdAtSec: 1_700_000_000,
-    });
-    expect(bundle.cursor).toEqual({ createdAt: 1_700_000_000, id: '8'.repeat(64) });
-  });
-
-  test('an empty DM envelope (no order, no cursor) yields an empty bundle', () => {
-    const envelope = NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {} });
-    expect(bundleFromDmEnvelope(envelope)).toEqual({ envelopes: [], cursor: null, received: 0 });
-  });
-
-  test('counts a wrap that did not parse, so a full page is still known to be full', () => {
-    const good = event('8'.repeat(64), { kind: 1059, pubkey: ACTOR, content: 'ciphertext' });
-    const bad = event('9'.repeat(64), { kind: 1059, pubkey: 'not a key', content: 'ciphertext' });
-    const envelope = NaggEnvelopeSchema.parse({
-      order: ['9'.repeat(64), '8'.repeat(64)],
-      orderBy: 'created_at',
-      events: [bad, good],
-      aggregates: {},
-    });
-    const bundle = bundleFromDmEnvelope(envelope);
-    expect(bundle.envelopes.map((wrap) => wrap.id)).toEqual(['8'.repeat(64)]);
-    expect(bundle.received).toBe(2);
   });
 });
 
@@ -504,120 +164,12 @@ describe('profile route reconstruction', () => {
     expect(searchHitsFromEnvelope(envelope).map((h) => h.pubkey)).toEqual([PUBKEY]);
   });
 
-  test('enrichmentFromEnvelope splits profiles from the requested events', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [NOTE_ID],
-      orderBy: 'created_at',
-      events: [event(NOTE_ID), kind0(PUBKEY, { name: 'alice' })],
-      aggregates: { [NOTE_ID]: { k7_e: { actors: 2 } } },
-    });
-    const enrichment = enrichmentFromEnvelope(envelope);
-    expect(enrichment.quoted[NOTE_ID]?.id).toBe(NOTE_ID);
-    expect(Object.keys(enrichment.quoted)).toHaveLength(1); // no kind-0 leakage
-    expect(enrichment.profiles[PUBKEY]?.name).toBe('alice');
-    expect(enrichment.metrics[NOTE_ID]?.likeCount).toBe(2);
-  });
-
-  test('orderedEnvelopeEvents resolves order, skipping unhydrated ids', () => {
-    const envelope = NaggEnvelopeSchema.parse({
-      order: [NOTE_ID, ROOT_ID],
-      orderBy: 'created_at',
-      events: [event(NOTE_ID), kind0(PUBKEY, { name: 'x' })],
-      aggregates: {},
-    });
-    expect(orderedEnvelopeEvents(envelope).map((e) => e.id)).toEqual([NOTE_ID]);
-  });
 });
-
-// ---------------------------------------------------------------------------
-// Thread envelope extension — total / cursor / off-manifest extras
-// ---------------------------------------------------------------------------
-
-describe('threadFromEnvelope — thread envelope extension', () => {
-  const EXTRA_ID = '9'.repeat(64);
-
-  test('keeps off-manifest hydrated events in extraEvents (excluding kind-0 and ordered ids)', () => {
-    const envelope = NaggThreadEnvelopeSchema.parse({
-      order: [ROOT_ID, NOTE_ID],
-      orderBy: 'rank',
-      events: [
-        event(ROOT_ID, { content: 'root' }),
-        event(NOTE_ID, { tags: [['e', ROOT_ID, '', 'root']] }),
-        event(EXTRA_ID, { tags: [['e', NOTE_ID, '', 'reply']] }), // fetched, not ordered
-        kind0(PUBKEY, { name: 'alice' }),
-      ],
-      aggregates: { [EXTRA_ID]: { k7_e: { actors: 4 } } },
-      total: 2,
-    });
-    const thread = threadFromEnvelope(envelope);
-    expect(thread).not.toBeNull();
-    expect(thread!.events.map((e) => e.id)).toEqual([NOTE_ID]);
-    expect(Object.keys(thread!.extraEvents)).toEqual([EXTRA_ID]);
-    // The manifest never absorbs extras (anti-reshuffle).
-    expect(thread!.ordering).toEqual({ orderBy: 'rank', elements: [NOTE_ID] });
-    // Metrics zero-fill covers extras too.
-    expect(thread!.metrics[EXTRA_ID]?.likeCount).toBe(4);
-    expect(thread!.metrics[NOTE_ID]?.likeCount).toBe(0);
-  });
-
-  test('parses total and the thread cursor into totalReplies/nextOffset', () => {
-    const envelope = NaggThreadEnvelopeSchema.parse({
-      order: [ROOT_ID, NOTE_ID],
-      orderBy: 'rank',
-      events: [event(ROOT_ID, {}), event(NOTE_ID, { tags: [['e', ROOT_ID, '', 'root']] })],
-      aggregates: {},
-      total: 42,
-      cursor: '0|10',
-    });
-    const thread = threadFromEnvelope(envelope);
-    expect(thread!.totalReplies).toBe(42);
-    expect(thread!.nextOffset).toBe(10);
-  });
-
-  test('omits nextOffset when the cursor is absent (last page), and totalReplies on old servers', () => {
-    const lastPage = NaggThreadEnvelopeSchema.parse({
-      order: [ROOT_ID],
-      orderBy: 'rank',
-      events: [event(ROOT_ID, {})],
-      aggregates: {},
-      total: 5,
-    });
-    expect(threadFromEnvelope(lastPage)!.nextOffset).toBeUndefined();
-    expect(threadFromEnvelope(lastPage)!.totalReplies).toBe(5);
-
-    // An old server sends no total/cursor: both fields stay undefined and the
-    // envelope still parses (nullish tolerance, not a fallback path).
-    const oldServer = NaggThreadEnvelopeSchema.parse({
-      order: [ROOT_ID],
-      orderBy: 'rank',
-      events: [event(ROOT_ID, {})],
-      aggregates: {},
-    });
-    expect(threadFromEnvelope(oldServer)!.totalReplies).toBeUndefined();
-    expect(threadFromEnvelope(oldServer)!.nextOffset).toBeUndefined();
-    expect(threadFromEnvelope(oldServer)!.extraEvents).toEqual({});
-  });
-
-  test('null order/events still parse on the extended schema (Go nil tolerance)', () => {
-    const parsed = NaggThreadEnvelopeSchema.parse({
-      order: null,
-      orderBy: 'rank',
-      events: null,
-      aggregates: null,
-      total: null,
-    });
-    expect(parsed.order).toEqual([]);
-    expect(parsed.events).toEqual([]);
-    expect(threadFromEnvelope(parsed)).toBeNull();
-  });
-});
-
 
 describe('feed continuation capability', () => {
   test.each([true, false, null, undefined])('preserves hasMore=%s independently of cursor', (hasMore) => {
     const envelope = NaggEnvelopeSchema.parse({ hasMore });
     expect(envelope.hasMore).toBe(hasMore);
-    expect(feedPageFromEnvelope(envelope).hasMore).toBe(hasMore ?? undefined);
     expect(envelope.cursor).toBeUndefined();
   });
   test('rejects malformed continuation hints', () => {
@@ -701,76 +253,4 @@ describe('bounded envelope fields', () => {
     expect(envelope.aggregates).toEqual({ [NOTE_ID]: { k7_e: { count: 3 } } });
   });
 
-  test('a notification entry or actor without hex ids is left out; a bad target is read as none', () => {
-    const entry = { id: NOTE_ID, kind: 7, actor: ACTOR, target: ROOT_ID };
-    const envelope = NaggNotificationsEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      events: [],
-      aggregates: {},
-      entries: [
-        {
-          ...entry,
-          actors: [
-            { pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 },
-            { pubkey: 'not-a-key', eventId: NOTE_ID, createdAt: 6 },
-          ],
-        },
-        { ...entry, id: 'not-an-id' },
-        { ...entry, id: REPOST_ID, actor: 'npub1notHex' },
-        { ...entry, id: ORIGINAL_ID, target: 'naddr1notAnEventId' },
-      ],
-    });
-    expect(envelope.entries.map((each) => each.id)).toEqual([NOTE_ID, ORIGINAL_ID]);
-    expect(envelope.entries[0]?.actors).toEqual([{ pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 }]);
-    expect(envelope.entries[1]?.target).toBeUndefined();
-  });
-});
-
-describe('a notifications page whose events were all left out', () => {
-  const entry = (id: string, createdAt: number) => ({
-    id,
-    kind: 7,
-    actor: ACTOR,
-    target: ROOT_ID,
-    actors: [{ pubkey: ACTOR, eventId: id, createdAt }],
-  });
-  const envelope = (hasNext: boolean) =>
-    NaggNotificationsEnvelopeSchema.parse({
-      order: [],
-      orderBy: 'created_at',
-      // Both triggering events are malformed and left out by the parse.
-      events: [event(NOTE_ID, { pubkey: 'not-a-key' }), event(REPOST_ID, { pubkey: 'not-a-key' })],
-      aggregates: {},
-      entries: [entry(NOTE_ID, 200), entry(REPOST_ID, 100)],
-      hasNext,
-    });
-
-  test('still says where the page ends, so the next page is asked for', () => {
-    const page = notificationsPageFromEnvelope(envelope(true));
-    expect(page.notifications.nodes).toEqual([]);
-    expect(page.notifications.pageInfo).toEqual({
-      hasNextPage: true,
-      endCursor: { createdAt: 100, id: REPOST_ID },
-    });
-    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 100, id: REPOST_ID });
-  });
-
-  test('ends paging when the backend says there is no more', () => {
-    expect(bundleFromNotifications(notificationsPageFromEnvelope(envelope(false)), true).cursor).toBeNull();
-  });
-
-  test('a page with readable events still ends at its last row', () => {
-    const page = notificationsPageFromEnvelope(
-      NaggNotificationsEnvelopeSchema.parse({
-        order: [],
-        orderBy: 'created_at',
-        events: [event(NOTE_ID, { kind: 7, tags: [['e', ROOT_ID], ['p', VIEWER]], created_at: 150 })],
-        aggregates: {},
-        entries: [entry(NOTE_ID, 150)],
-        hasNext: true,
-      }),
-    );
-    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 150, id: NOTE_ID });
-  });
 });

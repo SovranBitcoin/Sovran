@@ -1,6 +1,6 @@
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { RequestControls } from '../timeout';
-import type { ReadProvenance, TierOutcome } from '../tiers';
+import type { ReadProvenance } from '../tiers';
 import type { ProfileMetadata } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -49,11 +49,6 @@ export type ProfileStats = {
 export type ProfileStatsBundle = ProfileStats;
 
 export type ResolvedProfileStats = { tier: NostrTier; provenance?: ReadProvenance } & ProfileStats;
-
-export interface ProfileStatsTier {
-  readonly tier: NostrTier;
-  getProfileStats(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>>;
-}
 
 /** True when a bundle carries nothing worth rendering, so the facade should
  *  fall through to the next tier instead of answering with an empty header. */

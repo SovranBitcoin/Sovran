@@ -55,26 +55,3 @@ export const NaggFeedEventSchema = z
     created_at: z.number(),
   })
   .passthrough();
-
-// The friendly per-note metrics the facade exposes. v2 derives these from the
-// envelope's aggregate rules (see `AGGREGATE_RULES` in `src/envelope.ts`);
-// `zapCount`/`quoteCount` are new in v2 (v1's note stats had no discrete zap
-// count) and optional so hand-built v1-era maps still typecheck.
-export const NaggNoteMetricsSchema = z.object({
-  likeCount: z.number(),
-  repostCount: z.number(),
-  replyCount: z.number(),
-  satsZapped: z.number(),
-  zapCount: z.number().optional(),
-  quoteCount: z.number().optional(),
-});
-
-// A kind-0 is user-authored: an oversized name or picture is a bad field, not
-// a bad profile, so each is dropped on its own (the caps match the identity
-// schema in `src/envelope.ts`).
-export const NaggProfileInfoSchema = z
-  .object({
-    name: z.string().max(256).catch(''),
-    picture: z.string().max(2048).optional().catch(undefined),
-  })
-  .passthrough();

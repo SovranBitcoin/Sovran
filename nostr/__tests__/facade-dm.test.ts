@@ -1,7 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer } from '../src/facade';
+import { createNostrDataLayer } from '../src/facade';
 import {
   createRelayTier,
   type RelayConnection,
@@ -11,49 +10,10 @@ import {
 import type { NaggError } from '../src/errors';
 
 const ME = 'a'.repeat(64);
-const SIG = 'd'.repeat(128);
 
 function wrap(id: string, created_at: number): RawRelayEvent {
   return { id, pubkey: 'b'.repeat(64), kind: 1059, content: 'opaque-ciphertext', tags: [['p', ME]], created_at };
 }
-
-describe('getDmEnvelopes — nagg index', () => {
-  test('returns opaque envelopes (no decryption) with an event-time cursor', async () => {
-    let lastUrl = '';
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async (url: string) => {
-        lastUrl = String(url);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          // v2 envelope: raw wraps in event-time order — and BY DESIGN no
-          // aggregates and no kind-0 profile hydration (privacy).
-          json: async () => ({
-            order: ['1'.repeat(64), '2'.repeat(64)],
-            orderBy: 'created_at',
-            events: [
-              { id: '1'.repeat(64), pubkey: 'b'.repeat(64), kind: 1059, created_at: 222, content: 'ct1', tags: [['p', ME]], sig: SIG },
-              { id: '2'.repeat(64), pubkey: 'c'.repeat(64), kind: 4, created_at: 111, content: 'ct2', tags: [['p', ME]], sig: SIG },
-            ],
-            aggregates: {},
-          }),
-        } as unknown as Response;
-      }) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
-
-    const result = await layer.getDmEnvelopes({ viewerPubkey: ME });
-    expect(result.isOk()).toBe(true);
-    const out = result._unsafeUnwrap();
-    expect(lastUrl).toContain('/nostr/dm/envelopes');
-    expect(out.tier).toBe('nagg');
-    expect(out.envelopes.map((e) => e.kind)).toEqual([1059, 4]); // both wrap + legacy, opaque
-    expect(out.envelopes[0].content).toBe('ct1'); // ciphertext untouched
-    expect(out.cursor).toEqual({ createdAt: 111, id: '2'.repeat(64) }); // tail = next page
-  });
-});
 
 describe('getDmEnvelopes — relay floor', () => {
   test('fetches gift wraps by #p with NO since/limit (randomized created_at)', async () => {
@@ -124,49 +84,17 @@ describe('subscribeDmEnvelopes — relay live', () => {
   });
 
   test('is a no-op when no relay tier is configured', () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () => ({ ok: true, status: 200, json: async () => ({}) })) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const layer = createNostrDataLayer({ tiers: [] });
     const unsubscribe = layer.subscribeDmEnvelopes({ viewerPubkey: ME }, () => {
       throw new Error('should not fire without a relay tier');
     });
     expect(() => unsubscribe()).not.toThrow();
   });
 
-test('getDmEnvelopes: a nagg without the nostr module (404) is unsupported, not a failure', async () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
-    });
-    const outcome = await createNaggTier({ client }).getDmEnvelopes!({ viewerPubkey: ME });
-    expect(outcome.kind).toBe('unsupported');
-  });
 });
 
 
 describe('incremental DM envelopes', () => {
-  test('nagg sends since alongside the existing pagination parameters', async () => {
-    const urls: URL[] = [];
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async (url: string) => {
-        urls.push(new URL(String(url)));
-        return { ok: true, status: 200, json: async () => ({ order: [], orderBy: 'created_at', events: [], aggregates: {} }) } as unknown as Response;
-      }) as unknown as typeof fetch,
-    });
-    const tier = createNaggTier({ client });
-    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 100, cursor: { createdAt: 300, id: '1'.repeat(64) }, limit: 25 });
-    expect(urls[0].searchParams.get('since')).toBe('100');
-    expect(urls[0].searchParams.get('until')).toBe('300');
-    expect(urls[0].searchParams.get('limit')).toBe('25');
-    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 0 });
-    expect(urls[1].searchParams.get('since')).toBe('0');
-    await tier.getDmEnvelopes!({ viewerPubkey: ME });
-    expect(urls[2].searchParams.has('since')).toBe(false);
-  });
 
   test('relay forwards an explicit since, including zero, without adding a limit', async () => {
     const filters: NostrFilter[][] = [];

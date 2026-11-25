@@ -1,7 +1,3 @@
-import type { NaggFeedEvent } from '../../map/feed';
-import type { FeedItem, ResolvedFeedPage } from '../feed';
-import type { ResolvedThread } from '../thread';
-import type { ResolvedNotifications } from '../notifications';
 import type { ResolvedSocialGraph } from '../social-graph';
 import type { ResolvedProfiles } from '../profiles';
 import type { ResolvedProfileStats } from '../profile-stats';
@@ -21,57 +17,10 @@ import type { NostrEntityCache } from './entity-cache';
 
 /**
  * Full kind-0 metadata fetched directly (profiles/profile-stats surfaces) beats
- * a feed/notification seed (`seenAt: 0`) but stays below any real kind-0
+ * a low-confidence seed (`seenAt: 0`) but stays below any real kind-0
  * `created_at` (unix seconds), so a genuinely newer profile event still wins.
  */
 const DIRECT_METADATA_SEEN_AT = 1;
-
-/** Every event a feed/thread item carries (note bodies, roots, reposts, previews). */
-export function eventsFromFeedItem(item: FeedItem): NaggFeedEvent[] {
-  const out: NaggFeedEvent[] = [];
-  if (item.type === 'note') {
-    out.push(item.event);
-    if (item.rootEvent) out.push(item.rootEvent);
-    if (item.replyPreviewEvents) out.push(...item.replyPreviewEvents);
-  } else {
-    out.push(item.repostEvent);
-    if (item.originalEvent) out.push(item.originalEvent);
-    if (item.rootEvent) out.push(item.rootEvent);
-    if (item.reposters) for (const reposter of item.reposters) out.push(reposter.event);
-  }
-  return out;
-}
-
-export function ingestFeedPage(cache: NostrEntityCache, page: ResolvedFeedPage): void {
-  const events: NaggFeedEvent[] = [];
-  for (const item of page.items) events.push(...eventsFromFeedItem(item));
-  events.push(...Object.values(page.quoted));
-  cache.ingestNotes(events);
-  cache.ingestNoteStats(page.stats, page.tier);
-  cache.ingestProfileInfos(page.profiles, page.tier);
-}
-
-export function ingestThread(cache: NostrEntityCache, thread: ResolvedThread): void {
-  const events: NaggFeedEvent[] = [...eventsFromFeedItem(thread.root)];
-  for (const item of thread.parents) events.push(...eventsFromFeedItem(item));
-  for (const item of thread.replies) events.push(...eventsFromFeedItem(item));
-  // Off-manifest hydration (off-page descendants, quote hydration): cached so
-  // tapping one opens instantly, but never rendered in the reply order.
-  for (const item of thread.extras) events.push(...eventsFromFeedItem(item));
-  events.push(...Object.values(thread.quoted));
-  cache.ingestNotes(events);
-  cache.ingestNoteStats(thread.stats, thread.tier);
-  cache.ingestProfileInfos(thread.profiles, thread.tier);
-}
-
-export function ingestNotifications(cache: NostrEntityCache, notifs: ResolvedNotifications): void {
-  const events: NaggFeedEvent[] = [];
-  for (const item of notifs.notifications) if (item.event) events.push(item.event);
-  events.push(...Object.values(notifs.quoted));
-  cache.ingestNotes(events);
-  cache.ingestNoteStats(notifs.stats, notifs.tier);
-  cache.ingestProfileInfos(notifs.profiles, notifs.tier);
-}
 
 export function ingestSocialGraph(cache: NostrEntityCache, graph: ResolvedSocialGraph): void {
   cache.ingestProfileInfos(graph.profiles, graph.tier);

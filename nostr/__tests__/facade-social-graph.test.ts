@@ -1,7 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer, socialGraphFromEvents, type SocialGraph } from '../src/facade';
+import { createNostrDataLayer, socialGraphFromEvents, type SocialGraph } from '../src/facade';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import type { NaggError } from '../src/errors';
 
@@ -38,51 +37,9 @@ describe('getSocialGraph through the facade', () => {
     return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
   }
 
-  test('nagg serves the bundled response (follows + profiles + relays + mutes)', async () => {
-    let lastUrl = '';
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async (url: string) => {
-        lastUrl = String(url);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          // v2 envelope: the raw latest kind-3 / 10002 / 10000 events plus the
-          // follows' kind-0 profiles; the client derives the lists from tags.
-          json: async () => ({
-            order: [],
-            orderBy: 'created_at',
-            events: [
-              CONTACTS,
-              RELAYS,
-              MUTES,
-              { id: '4'.repeat(64), pubkey: F1, kind: 0, content: JSON.stringify({ name: 'f1' }), tags: [], created_at: 100 },
-            ],
-            aggregates: {},
-          }),
-        } as unknown as Response;
-      }) as unknown as typeof fetch,
-    });
-    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
-
-    const result = await layer.getSocialGraph({ pubkey: ME });
-    expect(result.isOk()).toBe(true);
-    const graph = result._unsafeUnwrap();
-    expect(lastUrl).toContain('/nostr/social-graph');
-    expect(graph.tier).toBe('nagg');
-    expect(graph.follows).toEqual([F1, F2]);
-    expect(graph.profiles[F1]).toEqual({ name: 'f1' });
-  });
-
-  test('relay floor serves follows/relays/mutes when nagg is down', async () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({ ok: false, status: 503, statusText: 'x', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
-    });
+  test('relay floor serves follows/relays/mutes', async () => {
     const layer = createNostrDataLayer({
-      tiers: [createNaggTier({ client }), createRelayTier({ connection: fakeRelay([CONTACTS, RELAYS, MUTES]) })],
+      tiers: [createRelayTier({ connection: fakeRelay([CONTACTS, RELAYS, MUTES]) })],
     });
 
     const result = await layer.getSocialGraph({ pubkey: ME });
@@ -130,20 +87,4 @@ describe('getSocialGraph through the facade', () => {
     for (const follows of updates) expect(follows).toEqual([F1]);
   });
 
-test('a nagg without the nostr module (404) is unsupported, not a failure: the floor answers', async () => {
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.test' },
-      fetchImpl: (async () =>
-        ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
-    });
-    const nagg = createNaggTier({ client });
-    const outcome = await nagg.getSocialGraph!({ pubkey: ME });
-    expect(outcome.kind).toBe('unsupported');
-
-    const layer = createNostrDataLayer({
-      tiers: [nagg, createRelayTier({ connection: fakeRelay([CONTACTS, RELAYS, MUTES]) })],
-    });
-    const result = await layer.getSocialGraph({ pubkey: ME });
-    expect(result._unsafeUnwrap().tier).toBe('relay');
-  });
 });

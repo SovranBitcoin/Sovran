@@ -1,12 +1,8 @@
-import { createFeedPager, type FeedPager, type FeedPagerOptions } from './feed-pager';
-import type { NotificationSortKey } from "./notifications";
 import { ok, err, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
   resolveAcrossTiers,
   resolveAllTiers,
-  auditAcrossTiers,
-  applyOrderingManifest,
   tierRank,
   type ReadProvenance,
   type TierAggregate,
@@ -16,30 +12,6 @@ import {
 } from '../tiers';
 import { nostrLog, type NostrLogData } from '../log';
 import type { RequestControls } from '../timeout';
-import type { NaggFeedEvent } from '../map/feed';
-import {
-  assembleFeedPage, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
-import {
-  partitionOpFirst,
-  isDirectReplyTo,
-  type ThreadBundle,
-  type ThreadRequest,
-  type ThreadSort,
-  type ThreadAuditRequest,
-  type ResolvedThread,
-  type ResolvedThreadAudit,
-} from './thread';
-import type {
-  NotificationItem,
-  NotificationsBundle,
-  NotificationsRequest,
-  ResolvedNotifications,
-} from './notifications';
-import {
-  createNotificationsSession,
-  type NotificationsSession,
-} from './session/notifications-session';
-import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
 import {
   dedupeByReviewer,
   type DiscoverMintsRequest,
@@ -61,8 +33,6 @@ import {
   type ResolvedProfileStats,
 } from './profile-stats';
 import type { ProfileSearchBundle, ProfileSearchHit, SearchRequest, ResolvedProfileSearch } from './search';
-import type { NoteStatsRequest, ResolvedNoteStats } from './note-stats';
-import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NostrTierStrategy } from './strategy';
 import {
   createNostrEntityCache,
@@ -70,11 +40,7 @@ import {
   type EntityCacheLimits,
   type CachedProfile,
 } from './cache/entity-cache';
-import { readThread as readThreadFromCache, type CachedThreadView } from './cache/read-thread';
 import {
-  ingestFeedPage,
-  ingestThread,
-  ingestNotifications,
   ingestSocialGraph,
   ingestProfiles,
   ingestProfileStats,
@@ -86,7 +52,7 @@ import {
 // NostrDataLayer — the opinionated facade
 //
 // The single entry point for Nostr reads, expressed in domain terms. It owns
-// tier selection (the fallback engine) and ordering (the manifest applier);
+// tier selection (the fallback engine) and cross-tier merging;
 // callers never choose a tier or assemble events. Each read builds its tier list
 // from the strategies that implement that surface, in the configured order.
 // ---------------------------------------------------------------------------
@@ -107,41 +73,6 @@ export type NostrDataLayerConfig = {
 export interface NostrDataLayer {
   /** The shared additive entity cache this layer populates. Read/subscribe from a binding. */
   readonly cache: NostrEntityCache;
-  /**
-   * Synchronous first-frame projection of a thread from the cache alone: the
-   * tapped note + its cached ancestor chain + author profiles/metrics, with no
-   * network. A binding renders this immediately, then awaits `getThread` for the
-   * ranked reply delta. Returns `root: undefined` when the note isn't cached.
-   */
-  readThread(noteId: string): CachedThreadView;
-  createFeedPager(request: Omit<FeedPagerOptions, 'tiers' | 'ingest'>): FeedPager;
-  getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
-  getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
-  /**
-   * Background "Might be spam" second opinion for a thread: consult only the
-   * tiers BELOW the one that served the primary read, diff their direct
-   * replies against the primary's acknowledged set, and return the extras
-   * (OP-authored ones split out for promotion). Memoized per note (~5 min) so
-   * navigation churn doesn't re-run the Primal/relay fan-out. Never throws;
-   * exhaustion is `{ tier: null }`.
-   */
-  auditThreadReplies(request: ThreadAuditRequest): Promise<ResolvedThreadAudit>;
-  getNotifications(
-    request: NotificationsRequest,
-  ): Promise<Result<ResolvedNotifications, TierResolutionError>>;
-  /**
-   * The CONCURRENT notifications surface: every tier that implements
-   * `notifications` is opened at once and merged into one shift-free page
-   * stream (see createNotificationsSession). nagg may lack history, so
-   * redundancy — not "best tier that works" — is the point here; this is the
-   * one surface that deliberately fans out instead of using the sequential
-   * engine. `getNotifications` above stays the one-shot waterfall (used by the
-   * followers detail screen and any grouped:false consumer).
-   */
-  openNotificationsSession(request: NotificationsRequest): NotificationsSession;
-  getOwnHistory(
-    request: OwnHistoryRequest,
-  ): Promise<Result<ResolvedOwnHistory, TierResolutionError>>;
   getMintReviews(
     request: MintReviewsRequest,
   ): Promise<Result<ResolvedMintReviews, TierResolutionError>>;
@@ -170,13 +101,6 @@ export interface NostrDataLayer {
   searchProfiles(
     request: SearchRequest,
   ): Promise<Result<ResolvedProfileSearch, TierResolutionError>>;
-  /**
-   * Per-note engagement counts for ids a page did not carry. Aggregate: nagg
-   * and the relay floor are asked at once, the first answer resolves, later
-   * ones merge into the entity cache under their own rank. Ids are marked
-   * pending until every tier settled (placeholder vs unknown, for bindings).
-   */
-  getNoteStats(request: NoteStatsRequest): Promise<Result<ResolvedNoteStats, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -186,128 +110,8 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
 
   const dmLiveTier = config.tiers.find((t) => typeof t.dmLiveSubscribe === 'function');
 
-  // Per-note audit memo. Layer-scoped (the app supplies a profile-scoped
-  // layer singleton, so a profile switch drops it with everything else).
-  const auditMemo: ThreadAuditMemo = new Map();
-
   return {
     cache,
-
-    readThread(noteId) {
-      return readThreadFromCache(cache, noteId);
-    },
-
-    createFeedPager(request) {
-      return createFeedPager({
-        ...request,
-        tiers: config.tiers,
-        ingest: (page) => ingestFeedPage(cache, page),
-      });
-    },
-
-    async getFeedPage(request) {
-      return runRead(
-        'feed',
-        request,
-        { spec: request.spec.kind, limit: request.limit ?? null, paged: !!request.cursor },
-        async (ctx) => {
-          const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(request));
-          return (await resolveAcrossTiers<FeedBundle>(candidates, ctx)).map(({ tier, value }) => {
-            const page = assembleFeedPage(tier, value);
-            ingestFeedPage(cache, page);
-            return page;
-          });
-        },
-        (p) => ({ items: p.items.length, missingIds: p.missingIds.length, hasActions: !!p.actions }),
-      );
-    },
-
-    async getThread(request) {
-      const sort: ThreadSort = request.sort ?? 'relevant';
-      return runRead(
-        'thread',
-        request,
-        { noteId: short(request.noteId), sort, offset: request.offset ?? 0 },
-        async (ctx) => {
-          const candidates = candidatesFor(config.tiers, 'thread', (t) => () => t.thread!(request));
-          return (await resolveAcrossTiers<ThreadBundle>(candidates, ctx)).map(({ tier, value }) => {
-            const thread = assembleThread(tier, value, sort);
-            ingestThread(cache, thread);
-            return thread;
-          });
-        },
-        (t) => ({
-          replies: t.replies.length,
-          extras: t.extras.length,
-          hasMore: t.hasMore,
-          missingIds: t.missingIds.length,
-        }),
-      );
-    },
-
-    async auditThreadReplies(request) {
-      return auditThread(config.tiers, cache, auditMemo, request);
-    },
-
-    openNotificationsSession(request) {
-      const sources = config.tiers
-        .filter((t) => typeof t.notifications === 'function')
-        .map((t) => ({
-          tier: t.tier,
-          fetch: (req: NotificationsRequest) => t.notifications!(req),
-        }));
-      const notifLiveTier = config.tiers.find(
-        (t) => typeof t.notificationsLiveSubscribe === 'function',
-      );
-      return createNotificationsSession({
-        request,
-        readId: request.readId ?? mintReadId('notifications'),
-        sources,
-        cache,
-        ...(notifLiveTier
-          ? {
-              liveSubscribe: (
-                req: NotificationsRequest,
-                since: NotificationSortKey | undefined,
-                onItems: (items: readonly NotificationItem[]) => void,
-              ) => notifLiveTier.notificationsLiveSubscribe!(req, since, onItems),
-            }
-          : {}),
-        ...(request.limit ? { pageSize: request.limit } : {}),
-      });
-    },
-
-    async getNotifications(request) {
-      return runRead(
-        'notifications',
-        request,
-        { tab: request.tab ?? 'ALL', grouped: request.grouped !== false, paged: !!request.cursor },
-        async (ctx) => {
-          const candidates = candidatesFor(config.tiers, 'notifications', (t) => () => t.notifications!(request));
-          return (await resolveAcrossTiers<NotificationsBundle>(candidates, ctx)).map(({ tier, value }) => {
-            const notifs = assembleNotifications(tier, value);
-            ingestNotifications(cache, notifs);
-            return notifs;
-          });
-        },
-        (n) => ({ notifications: n.notifications.length, grouped: n.grouped }),
-      );
-    },
-
-    async getOwnHistory(request) {
-      return runRead(
-        'ownHistory',
-        request,
-        { actionType: request.actionType, paged: !!request.cursor },
-        async (ctx) => {
-          const candidates = candidatesFor(config.tiers, 'ownHistory', (t) => () => t.ownHistory!(request));
-          return (await resolveAcrossTiers<OwnHistoryBundle>(candidates, ctx)).map(({ tier, value }) =>
-            assembleOwnHistory(tier, request.actionType, value),
-          );
-        },
-        (h) => ({ entries: h.entries.length }),
-      );
-    },
 
     async getMintReviews(request) {
       return runRead(
@@ -550,47 +354,6 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
     },
 
-    async getNoteStats(request) {
-      return runRead(
-        'noteStats',
-        request,
-        { ids: request.ids.length },
-        async (ctx) => {
-          const ids = [...new Set(request.ids)];
-          if (ids.length === 0) {
-            return ok<ResolvedNoteStats, TierResolutionError>({ tier: 'cache', stats: {} });
-          }
-          cache.pendingNoteStats.begin(ids);
-          const candidates = candidatesFor<NoteStatsMap>(config.tiers, 'getNoteStats', (t) => () => t.getNoteStats!({ ...request, ids }));
-          const resolvedOf = (agg: TierAggregate<NoteStatsMap>): ResolvedNoteStats => ({
-            tier: agg.tier,
-            stats: agg.value,
-            provenance: provenanceOf(ctx.readId, agg),
-          });
-          const first = await resolveAllTiers<NoteStatsMap>(candidates, {
-            ...ctx,
-            gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.noteStats },
-            count: (stats) => Object.keys(stats).length,
-            merge: (acc, next, tier) => {
-              // Each answer lands in the cache under ITS rank (a relay lower
-              // bound never overwrites nagg's aggregate).
-              cache.ingestNoteStats(next, tier);
-              return mergeNoteStatsByRank(acc, next, tier);
-            },
-            onUpdate: (agg) => {
-              if (agg.complete) cache.pendingNoteStats.end(ids);
-            },
-          });
-          if (first.isErr()) {
-            cache.pendingNoteStats.end(ids);
-            return err(first.error);
-          }
-          if (first.value.complete) cache.pendingNoteStats.end(ids);
-          return ok<ResolvedNoteStats, TierResolutionError>(resolvedOf(first.value));
-        },
-        (r) => ({ stats: Object.keys(r.stats).length, ...describeProvenance(r.provenance) }),
-      );
-    },
   };
 }
 
@@ -653,7 +416,6 @@ const AGGREGATE_CAP_MS = {
   searchProfiles: 300,
   mintReviews: 800,
   socialGraph: 800,
-  noteStats: 800,
 } as const;
 
 function provenanceOf<T>(readId: string, agg: TierAggregate<T>): ReadProvenance {
@@ -702,22 +464,6 @@ function rankOwner(metadata: object): NostrTier {
   return rankOwners.get(metadata) ?? 'relay';
 }
 
-/** Union by note id; for each note a better-ranked tier's counts replace a worse one's, a worse one only adds ids. */
-export function mergeNoteStatsByRank(
-  acc: NoteStatsMap | undefined,
-  next: NoteStatsMap,
-  tier: NostrTier,
-): NoteStatsMap {
-  const merged: NoteStatsMap = { ...acc };
-  for (const [id, stats] of Object.entries(next)) {
-    const existing = merged[id];
-    if (!existing || tierRank(tier) <= tierRank(rankOwner(existing))) {
-      merged[id] = stats;
-      rankOwners.set(stats, tier);
-    }
-  }
-  return merged;
-}
 
 /** Fill only the fields the earlier answers left undefined; never overwrite a number with undefined. */
 function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): ProfileStats {
@@ -879,202 +625,3 @@ function candidatesFor<T>(
     .map((tier) => ({ tier: tier.tier, attempt: attempt(tier) }));
 }
 
-const THREAD_AUDIT_TTL_MS = 5 * 60_000;
-const THREAD_AUDIT_MEMO_MAX = 50;
-
-type ThreadAuditMemo = Map<string, { at: number; promise: Promise<ResolvedThreadAudit> }>;
-
-const EMPTY_THREAD_AUDIT: ResolvedThreadAudit = {
-  tier: null,
-  extras: [],
-  opExtras: [],
-  stats: {},
-  profiles: {},
-};
-
-function auditThread(
-  tiers: ReadonlyArray<NostrTierStrategy>,
-  cache: NostrEntityCache,
-  memo: ThreadAuditMemo,
-  request: ThreadAuditRequest,
-): Promise<ResolvedThreadAudit> {
-  // A caller-owned abort must never settle the entry other callers join.
-  if (request.signal) return runThreadAudit(tiers, cache, request);
-  // The consulted tiers are the ones below `primaryTier`, so it is part of the key.
-  const key = `${request.primaryTier}|${request.noteId}`;
-  const cached = memo.get(key);
-  const now = Date.now();
-  if (cached && now - cached.at < THREAD_AUDIT_TTL_MS) {
-    nostrLog.debug('nostr.read.threadAudit.memo', { noteId: short(request.noteId) });
-    return cached.promise;
-  }
-  const promise = runThreadAudit(tiers, cache, request);
-  memo.set(key, { at: now, promise });
-  if (memo.size > THREAD_AUDIT_MEMO_MAX) {
-    const oldest = memo.keys().next().value;
-    if (oldest !== undefined) memo.delete(oldest);
-  }
-  return promise;
-}
-
-async function runThreadAudit(
-  tiers: ReadonlyArray<NostrTierStrategy>,
-  cache: NostrEntityCache,
-  request: ThreadAuditRequest,
-): Promise<ResolvedThreadAudit> {
-  const primaryIndex = tiers.findIndex((t) => t.tier === request.primaryTier);
-  const below =
-    primaryIndex < 0 ? [] : tiers.slice(primaryIndex + 1).filter((t) => typeof t.thread === 'function');
-  if (below.length === 0) {
-    nostrLog.debug('nostr.read.threadAudit.skipped', {
-      reason: 'no_lower_tiers',
-      primary: request.primaryTier,
-    });
-    return EMPTY_THREAD_AUDIT;
-  }
-
-  const readId = request.readId ?? mintReadId('threadAudit');
-  nostrLog.info('nostr.read.threadAudit.request', {
-    readId,
-    noteId: short(request.noteId),
-    primary: request.primaryTier,
-    tiers: below.map((t) => t.tier),
-    known: request.knownReplyIds.length,
-  });
-
-  // Single shot, no retry: the audit can only ADD to an already-rendered
-  // thread, so failure is silent by design.
-  const auditRequest: ThreadRequest = {
-    noteId: request.noteId,
-    limit: 100,
-    ...(request.signal ? { signal: request.signal } : {}),
-    ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
-  };
-  const answer = await auditAcrossTiers<ThreadBundle>(
-    below.map((t) => ({ tier: t.tier, attempt: () => t.thread!(auditRequest) })),
-    { readId, surface: 'threadAudit' },
-  );
-  if (!answer) {
-    nostrLog.info('nostr.read.threadAudit.done', {
-      readId,
-      noteId: short(request.noteId),
-      tier: null,
-      extras: 0,
-    });
-    return EMPTY_THREAD_AUDIT;
-  }
-
-  const { tier, value: bundle } = answer;
-  const known = new Set(request.knownReplyIds);
-  const excluded = new Set<string>([request.noteId]);
-  for (const parent of bundle.parents) {
-    if (parent.type === 'note') excluded.add(parent.event.id);
-  }
-
-  const opExtras: FeedItem[] = [];
-  const extras: FeedItem[] = [];
-  for (const item of bundle.itemsById.values()) {
-    if (item.type !== 'note') continue;
-    const event = item.event;
-    if (known.has(event.id) || excluded.has(event.id)) continue;
-    if (!isDirectReplyTo(event, request.noteId)) continue;
-    (event.pubkey === request.opPubkey ? opExtras : extras).push(item);
-  }
-  // OP promotions read as the author's continuation → chronological; the spam
-  // bucket reads as an appendix → recency-descending, id tiebreak.
-  const createdAtOf = (item: FeedItem) =>
-    item.type === 'note' ? item.event.created_at : 0;
-  const idOf = (item: FeedItem) => (item.type === 'note' ? item.event.id : '');
-  opExtras.sort((a, b) => createdAtOf(a) - createdAtOf(b) || (idOf(a) < idOf(b) ? -1 : 1));
-  extras.sort((a, b) => createdAtOf(b) - createdAtOf(a) || (idOf(a) > idOf(b) ? -1 : 1));
-
-  // Cache the findings (notes + profiles + stats) so tapping one opens instantly.
-  const events: NaggFeedEvent[] = [];
-  for (const item of [...opExtras, ...extras]) {
-    if (item.type === 'note') events.push(item.event);
-  }
-  cache.ingestNotes(events);
-  cache.ingestNoteStats(bundle.stats, tier);
-  cache.ingestProfileInfos(bundle.profiles, tier);
-
-  nostrLog.info('nostr.read.threadAudit.done', {
-    readId,
-    noteId: short(request.noteId),
-    tier,
-    extras: extras.length,
-    opExtras: opExtras.length,
-  });
-  return { tier, extras, opExtras, stats: bundle.stats, profiles: bundle.profiles };
-}
-
-function assembleThread(tier: NostrTier, bundle: ThreadBundle, sort: ThreadSort): ResolvedThread {
-  const missingIds: string[] = [];
-  const ordered = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
-    onMissing: (id) => missingIds.push(id),
-  });
-  // The relevant sort pins the OP's DIRECT replies first across EVERY tier.
-  // Stable partition only, and only over direct replies: nagg's server order
-  // already leads with the OP block (no-op there), and the OP's nested replies
-  // to other commenters must stay where the sort put them — on any page.
-  const opPubkey = bundle.root.type === 'note' ? bundle.root.event.pubkey : undefined;
-  const rootId = bundle.root.type === 'note' ? bundle.root.event.id : undefined;
-  const replies =
-    sort === 'relevant' && opPubkey && rootId
-      ? partitionOpFirst(ordered, opPubkey, (item) =>
-          item.type === 'note' && isDirectReplyTo(item.event, rootId)
-            ? item.event.pubkey
-            : undefined,
-        )
-      : ordered;
-  const knownReplyIds = [
-    ...new Set([
-      ...bundle.manifest.elements,
-      ...bundle.extras.map((item) => (item.type === 'note' ? item.event.id : '')).filter(Boolean),
-    ]),
-  ];
-  return {
-    tier,
-    root: bundle.root,
-    parents: bundle.parents,
-    replies,
-    extras: bundle.extras,
-    hasMore: bundle.hasMore,
-    ...(bundle.nextOffset !== undefined ? { nextOffset: bundle.nextOffset } : {}),
-    knownReplyIds,
-    stats: bundle.stats,
-    ...(bundle.actions ? { actions: bundle.actions } : {}),
-    profiles: bundle.profiles,
-    quoted: bundle.quoted,
-    cursor: bundle.cursor,
-    missingIds,
-  };
-}
-
-function assembleOwnHistory(
-  tier: NostrTier,
-  actionType: ResolvedOwnHistory['actionType'],
-  bundle: OwnHistoryBundle,
-): ResolvedOwnHistory {
-  const missingIds: string[] = [];
-  const entries = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
-    onMissing: (id) => missingIds.push(id),
-  });
-  return { tier, actionType, entries, cursor: bundle.cursor, missingIds };
-}
-
-function assembleNotifications(tier: NostrTier, bundle: NotificationsBundle): ResolvedNotifications {
-  const missingIds: string[] = [];
-  const notifications = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
-    onMissing: (id) => missingIds.push(id),
-  });
-  return {
-    tier,
-    notifications,
-    grouped: bundle.grouped,
-    stats: bundle.stats,
-    profiles: bundle.profiles,
-    quoted: bundle.quoted,
-    cursor: bundle.cursor,
-    missingIds,
-  };
-}
