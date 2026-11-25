@@ -50,8 +50,8 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
   useEffect(() => {
-    // The flow stack's header owns the close action (the same one every modal
-    // page shows); a blocking prompt takes it away along with the gesture.
+    // A blocking prompt takes the dismiss gesture away, and any header close
+    // action with it.
     navigation.setOptions({
       gestureEnabled: !blocking,
       ...(blocking ? { headerLeft: () => null } : {}),
@@ -120,10 +120,10 @@ export function CtaScreen({ id }: { id: CtaId }) {
       return;
     }
     // Starting the backup is never a dismissal; the intro is the next page of
-    // this same prompt flow, so it simply pushes.
+    // the journey and opens over this prompt, which closes with it.
     dismissalHandled.current = true;
     useCtaStore.getState().startBackup();
-    router.navigate('/(prompt-flow)/backup-intro');
+    router.navigate('/backup-intro');
   };
   return (
     <CtaView

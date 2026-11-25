@@ -31,7 +31,7 @@ export function BackupWordsScreen() {
             testID="backup-written"
             text="I've written them down"
             disabled={!revealed}
-            onPress={() => router.navigate('/(prompt-flow)/backup-verify')}
+            onPress={() => router.navigate('/backup-verify')}
           />
         </BottomButtons>
       }>

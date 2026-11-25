@@ -27,6 +27,7 @@ import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { NostrKeysProvider } from '@/shared/providers/NostrKeysProvider';
 import { hasFeature } from '@/shared/config/features';
+import { BackupFlowProvider } from '@/features/backup/BackupFlowProvider';
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useRegisterKeyDerivation } from '@/shared/hooks/useRegisterKeyDerivation';
 import { useProfileBalanceSync } from '@/features/wallet';
@@ -117,7 +118,13 @@ export function AccountScope({
 
   // Ecash sent as a Nostr message is redeemed with no chat screen involved,
   // so the conversation pages can be switched off (ADR 0021).
-  const gated = <Gate>{children}</Gate>;
+  // The backup session sits above the route stack, so one session lasts from
+  // the intro to done; it resets when the journey closes and per account.
+  const gated = (
+    <Gate>
+      <BackupFlowProvider>{children}</BackupFlowProvider>
+    </Gate>
+  );
   return (
     <NostrKeysProvider defaultAccountIndex={accountIndex}>
       <NostrClientLifecycle accountIndex={accountIndex} />

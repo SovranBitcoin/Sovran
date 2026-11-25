@@ -91,7 +91,7 @@ test('shared Settings recovery fields mask before reveal, hide on background, an
   void act(() => {
     screen.root.findByProps({ testID: 'settings-backup-row' }).props.onPress();
   });
-  expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockPush).toHaveBeenCalledWith('/backup-intro');
   expect(input().props.value).not.toBe('test-root-placeholder');
   expect(screen.root.findAllByProps({ testID: 'profile-recovery-written' })).toHaveLength(0);
   void act(() => screen.unmount());

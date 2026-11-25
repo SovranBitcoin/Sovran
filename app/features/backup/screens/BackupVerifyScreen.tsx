@@ -96,7 +96,7 @@ export function BackupVerifyScreen() {
       setProgress(result.state);
       setAccepted(false);
       locked.current = false;
-      if (result.outcome === 'complete') router.replace('/(prompt-flow)/backup-done');
+      if (result.outcome === 'complete') router.replace('/backup-done');
     }, 250);
   };
   return (

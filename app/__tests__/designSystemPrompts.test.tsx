@@ -477,10 +477,7 @@ describe('the Prompts page', () => {
         expect(getActionMenuSnapshot().payload).not.toBeNull();
       } else {
         expect(mockNavigate).toHaveBeenCalledWith({
-          pathname:
-            entry.kind === 'cta'
-              ? '/(prompt-flow)/cta-sample'
-              : '/(settings-flow)/design-system-prompt',
+          pathname: entry.kind === 'cta' ? '/cta-sample' : '/(settings-flow)/design-system-prompt',
           params: { id: entry.id },
         });
         expect(getActionMenuSnapshot().payload).toBeNull();

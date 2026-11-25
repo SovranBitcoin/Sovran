@@ -176,7 +176,7 @@ it('Back up now pushes the backup intro inside the prompt flow without snoozing'
   await press('cta-primary');
   act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed).toEqual({});
-  expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockPush).toHaveBeenCalledWith('/backup-intro');
   expect(mockBack).not.toHaveBeenCalled();
   expect(useCtaStore.getState().backupStartedAt).not.toBeNull();
 });

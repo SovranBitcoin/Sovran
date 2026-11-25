@@ -1,6 +1,7 @@
 import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
 
 import { SettingsDesignSystemCtaSampleScreen, findPromptEntry } from '@/features/settings';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 
 /** A prompt on sample data, opened from the design system. It reads and records nothing. */
 export default function CtaSampleRoute() {
@@ -8,9 +9,9 @@ export default function CtaSampleRoute() {
   const entry = typeof id === 'string' ? findPromptEntry(id) : undefined;
   if (entry?.kind !== 'cta') return <Redirect href="/" />;
   return (
-    <>
+    <AndroidSheetRoot>
       <Stack.Screen options={{ headerShown: false }} />
       <SettingsDesignSystemCtaSampleScreen key={entry.id} entry={entry} />
-    </>
+    </AndroidSheetRoot>
   );
 }

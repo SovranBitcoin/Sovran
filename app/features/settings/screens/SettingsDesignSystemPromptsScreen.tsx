@@ -25,8 +25,7 @@ function openPrompt(entry: PromptEntry): void {
   // A prompt opens in the prompt flow, as it does in the app; a screen opens
   // as a page of its own.
   router.navigate({
-    pathname:
-      entry.kind === 'cta' ? '/(prompt-flow)/cta-sample' : '/(settings-flow)/design-system-prompt',
+    pathname: entry.kind === 'cta' ? '/cta-sample' : '/(settings-flow)/design-system-prompt',
     params: { id: entry.id },
   });
 }

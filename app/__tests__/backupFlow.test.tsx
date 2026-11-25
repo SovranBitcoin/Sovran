@@ -1,7 +1,8 @@
+import { createElement } from 'react';
 import { AppState } from 'react-native';
 import { Redirect } from 'expo-router';
 import TestRenderer, { act } from 'react-test-renderer';
-import { BackupFlowProvider } from '@/features/backup/BackupFlowProvider';
+import { BackupFlowProvider, useBackupSession } from '@/features/backup/BackupFlowProvider';
 import { BackupIntroScreen } from '@/features/backup/screens/BackupIntroScreen';
 import { BackupWordsScreen } from '@/features/backup/screens/BackupWordsScreen';
 import { BackupVerifyScreen } from '@/features/backup/screens/BackupVerifyScreen';
@@ -20,9 +21,23 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockLog = jest.fn();
 const mockMnemonic = jest.fn();
-const mockNavigation = { getParent: () => ({ goBack: mockBack }) };
-jest.mock('expo-router', () => ({ Redirect: 'Redirect', useNavigation: () => mockNavigation }));
-jest.mock('expo-router/react-navigation', () => ({ useIsFocused: () => mockFocused }));
+const mockDispatch = jest.fn();
+// The root stack: the journey's pages over the prompt that opened them.
+const JOURNEY = [{ name: '(drawer)' }, { name: 'cta' }, { name: 'backup-intro' }];
+let mockRootRoutes: { name: string }[] = JOURNEY;
+const mockNavigation = {
+  getState: () => ({ routes: mockRootRoutes }),
+  dispatch: (...args: unknown[]) => mockDispatch(...args),
+};
+jest.mock('expo-router', () => ({
+  Redirect: 'Redirect',
+  useNavigation: () => mockNavigation,
+  useRootNavigationState: () => ({ routes: mockRootRoutes }),
+}));
+jest.mock('expo-router/react-navigation', () => ({
+  useIsFocused: () => mockFocused,
+  StackActions: { pop: (count: number) => ({ type: 'POP', payload: { count } }) },
+}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: {
     push: (...args: unknown[]) => mockPush(...args),
@@ -37,6 +52,15 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
     return { value: autoLoad ? mockValue : null, loading: false };
   },
 }));
+/** What a backup page sees of the session, without asking for the words. */
+function SessionProbe() {
+  const { words, progress } = useBackupSession();
+  return createElement('probe', {
+    testID: 'probe',
+    words: words.length,
+    position: progress.position,
+  });
+}
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (s: { mockMode: boolean }) => unknown) => selector({ mockMode }),
 }));
@@ -113,6 +137,7 @@ beforeEach(() => {
   mockMode = false;
   mockValue = mockPhrase;
   mockFocused = true;
+  mockRootRoutes = JOURNEY;
   jest.clearAllMocks();
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
 });
@@ -157,14 +182,15 @@ it('retries one word, preserves progress on reveal, blocks double taps and certi
     '3 of 12'
   );
   for (const question of plan.slice(2)) answer(question.answerIndex);
-  expect(mockReplace).toHaveBeenCalledWith('/(prompt-flow)/backup-done');
+  expect(mockReplace).toHaveBeenCalledWith('/backup-done');
   expect(mockMark).not.toHaveBeenCalled();
   show(<BackupDoneScreen />);
   expect(mockMark).toHaveBeenCalledTimes(1);
   show(<BackupDoneScreen />);
   expect(mockMark).toHaveBeenCalledTimes(1);
+  // Done closes the journey and the prompt beneath it.
   press('backup-done-button');
-  expect(mockBack).toHaveBeenCalled();
+  expect(mockDispatch).toHaveBeenCalledWith({ type: 'POP', payload: { count: 2 } });
   expect(
     mockLog.mock.calls.every(
       ([event, fields]) =>
@@ -198,7 +224,7 @@ it('practices in Mock Mode without reading or certifying the real mnemonic, and 
   for (const entry of buildVerifyPlan(mockPhrase.split(' '), 0)) answer(entry.answerIndex);
   show(<BackupDoneScreen />);
   expect(mockMark).not.toHaveBeenCalled();
-  expect(mockMnemonic).toHaveBeenCalledWith(false);
+  expect(mockMnemonic).not.toHaveBeenCalled();
   mockMode = false;
   show(<BackupDoneScreen />);
   expect(view.root.findAllByType(Redirect)).toHaveLength(1);
@@ -209,4 +235,36 @@ it('Not now snoozes the reminder and closes the intro', () => {
   press('backup-not-now');
   expect(mockDismiss).toHaveBeenCalledWith('backup-recovery-phrase', false);
   expect(mockMark).not.toHaveBeenCalled();
+  expect(mockDispatch).toHaveBeenCalledWith({ type: 'POP', payload: { count: 2 } });
+});
+it('Not now from Settings closes only the intro', () => {
+  mockRootRoutes = [{ name: '(drawer)' }, { name: '(settings-flow)' }, { name: 'backup-intro' }];
+  show(<BackupIntroScreen />);
+  press('backup-not-now');
+  expect(mockDispatch).toHaveBeenCalledWith({ type: 'POP', payload: { count: 1 } });
+});
+it('keeps one session across the pages and starts afresh once the journey closes', () => {
+  const plan = buildVerifyPlan(mockPhrase.split(' '), 123);
+  show(<BackupIntroScreen />);
+  mockRootRoutes = [...JOURNEY, { name: 'backup-words' }, { name: 'backup-verify' }];
+  show(<BackupWordsScreen />);
+  show(<BackupVerifyScreen />);
+  answer(plan[0].answerIndex);
+  show(<SessionProbe />);
+  expect(view.root.findByProps({ testID: 'probe' }).props).toMatchObject({
+    words: 12,
+    position: 1,
+  });
+  // The last backup page closes: answers and the phrase go with it.
+  mockRootRoutes = [{ name: '(drawer)' }];
+  show(<SessionProbe />);
+  expect(view.root.findByProps({ testID: 'probe' }).props).toMatchObject({
+    words: 0,
+    position: 0,
+  });
+  expect(mockLog).toHaveBeenCalledWith('backup.flow.abandoned');
+  // The next journey opens once and asks again.
+  mockRootRoutes = JOURNEY;
+  show(<BackupIntroScreen />);
+  expect(mockLog.mock.calls.filter(([event]) => event === 'backup.flow.opened')).toHaveLength(2);
 });

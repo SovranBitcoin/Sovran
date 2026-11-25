@@ -13,6 +13,7 @@ import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
 import { useHoldsMoney } from '@/shared/lib/cta/useHoldsMoney';
 import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
+import { isPromptOpen } from '@/features/backup/lib/journey';
 
 export function CtaHost() {
   const navigation = useRootNavigationState();
@@ -68,7 +69,8 @@ export function CtaHost() {
         mockMode,
         automation,
       })?.id;
-    const ctaRoute = navigation.routes.some((route) => route.name === '(prompt-flow)');
+    // A prompt or the backup it led to is open: never present a second one over it.
+    const ctaRoute = isPromptOpen(navigation.routes);
     if (ctaRoute) {
       observedRoute.current = true;
       if (activeId === 'update-required' && !previewOverride && next !== activeId) {
@@ -93,7 +95,7 @@ export function CtaHost() {
     useCtaStore.getState().setActive(next);
     // The queue reserves activeId before pushing; a just-closed CTA may legitimately
     // reopen within the tap guard's cooldown (notably Developer previews).
-    router.raw.push({ pathname: '/(prompt-flow)/cta', params: { id: next } });
+    router.raw.push({ pathname: '/cta', params: { id: next } });
   }, [
     hydrated,
     navigation,

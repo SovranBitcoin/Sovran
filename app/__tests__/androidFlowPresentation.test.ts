@@ -16,7 +16,7 @@ describe('Android flow presentation', () => {
 
   it('keeps the short pick-and-leave surfaces as sheets', () => {
     expect(androidFlowPresentation('filters')).toBe('sheet');
-    expect(androidFlowPresentation('(prompt-flow)')).toBe('sheet');
+    expect(androidFlowPresentation('cta')).toBe('sheet');
   });
 
   it('has every flow layout name its own route group, so root and chrome agree', () => {

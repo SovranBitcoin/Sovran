@@ -5,11 +5,11 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'onboarding-carousel': [], // AppGate before the app routes, also shown in the prompt preview.
   'settings-design-system-headers': ['(settings-flow)/design-system-headers.tsx'],
   'image-viewer': [], // overlay opened from post media, not a route
-  cta: ['(prompt-flow)/cta.tsx'],
-  'backup-intro': ['(prompt-flow)/backup-intro.tsx'],
-  'backup-words': ['(prompt-flow)/backup-words.tsx'],
-  'backup-verify': ['(prompt-flow)/backup-verify.tsx'],
-  'backup-done': ['(prompt-flow)/backup-done.tsx'],
+  cta: ['cta.tsx'],
+  'backup-intro': ['backup-intro.tsx'],
+  'backup-words': ['backup-words.tsx'],
+  'backup-verify': ['backup-verify.tsx'],
+  'backup-done': ['backup-done.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
   wallet: ['(drawer)/(tabs)/index/index.tsx'],
@@ -60,10 +60,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'settings-design-system-loading': ['(settings-flow)/design-system-loading.tsx'],
   'settings-design-system-screens': ['(settings-flow)/design-system-screens.tsx'],
   'settings-design-system-prompts': ['(settings-flow)/design-system-prompts.tsx'],
-  'settings-design-system-prompt': [
-    '(settings-flow)/design-system-prompt.tsx',
-    '(prompt-flow)/cta-sample.tsx',
-  ],
+  'settings-design-system-prompt': ['(settings-flow)/design-system-prompt.tsx', 'cta-sample.tsx'],
   'settings-design-system-variations': ['(settings-flow)/design-system-variations.tsx'],
   'settings-design-system-segmented': ['(settings-flow)/design-system-segmented.tsx'],
   'settings-design-system-skeleton-crossfade': [

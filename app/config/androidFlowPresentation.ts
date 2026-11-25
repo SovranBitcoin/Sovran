@@ -24,7 +24,7 @@ type AndroidFlowPresentation = 'sheet' | 'screen';
  * person picks from or confirms and leaves, with no step after them. Flow
  * groups are named with their parentheses; standalone routes by file name.
  */
-const SHEET_ROUTES: ReadonlySet<string> = new Set(['filters', '(prompt-flow)', 'share']);
+const SHEET_ROUTES: ReadonlySet<string> = new Set(['filters', 'cta', 'cta-sample', 'share']);
 
 /** How the flow group or standalone route `name` presents on Android. */
 export function androidFlowPresentation(name: string): AndroidFlowPresentation {

@@ -157,9 +157,19 @@ const modalTransparent = (name: string, title?: string): ModalConfig => ({
   },
 });
 
-const flowGroups = ['(receive-flow)', '(send-flow)', '(prompt-flow)', '(mint-flow)'].map((name) =>
-  modalFlow(name)
-);
+const flowGroups = ['(receive-flow)', '(send-flow)', '(mint-flow)'].map((name) => modalFlow(name));
+
+/**
+ * A prompt, which draws everything itself: a page sheet on iPhone, a bottom
+ * sheet on Android (`androidFlowPresentation`).
+ */
+const promptSheet = (name: string): ModalConfig => ({
+  name,
+  options:
+    Platform.OS === 'android' && androidFlowPresentation(name) === 'sheet'
+      ? ANDROID_SHEET_OPTIONS
+      : { presentation: 'modal', headerShown: false },
+});
 
 /**
  * A page pushed onto the root stack, with the native header and its back
@@ -181,6 +191,15 @@ const pushedPage = (name: string, title?: string, ownHeader = false): ModalConfi
 
 const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
+  // A prompt, and the backup journey "Back up now" opens over it: on iPhone
+  // each page a sheet over the last, on Android pushed pages. Leaving the
+  // journey closes them all (features/backup/lib/journey.ts).
+  promptSheet('cta'),
+  promptSheet('cta-sample'),
+  modalWithGradient('backup-intro', 'modal'),
+  modalWithGradient('backup-words', 'modal'),
+  modalWithGradient('backup-verify', 'modal'),
+  modalWithGradient('backup-done', 'modal'),
   // A Nostr profile and the BitChat pages it leads to.
   pushedPage('profile', 'Profile'),
   pushedPage('geohashChat', undefined, true),

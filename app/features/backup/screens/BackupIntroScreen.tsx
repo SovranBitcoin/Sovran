@@ -7,13 +7,13 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useEffect } from 'react';
-import { useNavigation } from 'expo-router';
 import { useBackupSession } from '../BackupFlowProvider';
+import { useLeaveBackupJourney } from '../lib/journey';
 import { backupIntroCopy } from 'copy/onboarding';
 
 export function BackupIntroScreen() {
   const { demo, open } = useBackupSession();
-  const navigation = useNavigation();
+  const leaveJourney = useLeaveBackupJourney();
   useEffect(() => open(), [open]);
   return (
     <Screen
@@ -23,7 +23,7 @@ export function BackupIntroScreen() {
           <Button
             testID="backup-show-words"
             text={backupIntroCopy.showWords}
-            onPress={() => router.navigate('/(prompt-flow)/backup-words')}
+            onPress={() => router.navigate('/backup-words')}
           />
           <Button
             testID="backup-not-now"
@@ -31,8 +31,8 @@ export function BackupIntroScreen() {
             variant="secondary"
             onPress={() => {
               if (!demo) useCtaStore.getState().dismiss('backup-recovery-phrase', false);
-              // Close the whole prompt flow, not just this page (a prompt may sit beneath).
-              navigation.getParent()?.goBack();
+              // Close the whole journey, not just this page (a prompt may sit beneath).
+              leaveJourney();
             }}
           />
         </BottomButtons>

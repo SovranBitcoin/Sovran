@@ -84,6 +84,9 @@ jest.mock('@/shared/blocks/AppGate', () => ({
   __esModule: true,
   default: mockRecorder('AppGate'),
 }));
+jest.mock('@/features/backup/BackupFlowProvider', () => ({
+  BackupFlowProvider: mockRecorder('BackupFlow'),
+}));
 jest.mock('@/shared/blocks/popup/PopupHost', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/blocks/popup/ActionMenuHost', () => ({ ActionMenuHost: () => null }));
 jest.mock('@/shared/lib/popup/E2EToastProbe', () => ({ E2EToastProbe: () => null }));
@@ -304,7 +307,7 @@ describe('AccountScope', () => {
     );
   }
 
-  it('nests the account providers in order with AppGate innermost, above the routes', () => {
+  it('nests the account providers in order with the backup session innermost, above the routes', () => {
     mockFeatures.add('nutDrop');
     mockFeatures.add('ecashMessages');
     render(tree(0));
@@ -316,6 +319,7 @@ describe('AccountScope', () => {
       'Colada',
       'DmEcashAutoRedeem',
       'AppGate',
+      'BackupFlow',
       'account',
     ]);
     // The Nostr client sits beside the wallet core, under the keys; BitChat
@@ -334,6 +338,7 @@ describe('AccountScope', () => {
       'WalletContext',
       'Colada',
       'AppGate',
+      'BackupFlow',
       'account',
     ]);
     expect(mockEvents).not.toContain('mount BitchatBLE');
@@ -356,10 +361,12 @@ describe('AccountScope', () => {
         'unmount Colada',
         'unmount AccountRuntime',
         'unmount AppGate',
+        'unmount BackupFlow',
         'unmount routes',
       ])
     );
-    expect(unmounts).toHaveLength(8);
+    // The backup session goes with the account it belongs to.
+    expect(unmounts).toHaveLength(9);
     expect(mounts).toEqual(
       expect.arrayContaining([
         'mount NostrKeys{"defaultAccountIndex":1}',
@@ -368,7 +375,7 @@ describe('AccountScope', () => {
         'mount routes',
       ])
     );
-    expect(mounts).toHaveLength(8);
+    expect(mounts).toHaveLength(9);
     // Every old provider is gone before the first new one mounts.
     expect(mockEvents.findIndex((e) => e.startsWith('mount'))).toBe(unmounts.length);
   });

@@ -65,7 +65,7 @@ describe('AndroidSheetFlowStack', () => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
-        <AndroidSheetFlowStack flow="(prompt-flow)">
+        <AndroidSheetFlowStack flow="cta">
           <Stack.Screen name="example" />
         </AndroidSheetFlowStack>
       );
@@ -115,7 +115,7 @@ describe('AndroidSheetFlowStack', () => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
-        <AndroidSheetFlowStack flow="(prompt-flow)">
+        <AndroidSheetFlowStack flow="cta">
           <Stack.Screen name="example" />
         </AndroidSheetFlowStack>
       );

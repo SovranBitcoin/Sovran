@@ -272,7 +272,7 @@ export function ProfileDetailsScreen({
           accessibilityLabel="Back up recovery phrase"
           onPress={() => {
             setVisibleFields({ mnemonic: false, nsec: false, cashuMnemonic: false });
-            router.push('/(prompt-flow)/backup-intro');
+            router.push('/backup-intro');
           }}
         />
 
