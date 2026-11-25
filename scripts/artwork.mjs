@@ -259,13 +259,28 @@ export async function loadProject() {
       ).matchAll(/^  '([a-z-]+)'/gm),
     ].map((m) => m[1]),
   );
+  // Pages present in the v0.1.3 archived press captures before the slim-down
+  // removed social/AI/old-chat/Contacts-tab routes from CANONICAL_PAGES.
+  const retiredPressPages = new Set([
+    "ai",
+    "contacts",
+    "feed",
+    "thread",
+    "dm-chat",
+    "notification-mint-changes",
+    "notifications",
+    "stories",
+  ]);
   for (const [key, shot] of Object.entries(screenshots)) {
     const [platform, name, extra] = key.split("/");
     assert(
       ["ios", "android"].includes(platform) && slug.test(name) && !extra,
       `Invalid screenshot key: ${key}`,
     );
-    assert(pages.has(shot.page), `Unknown canonical page: ${shot.page}`);
+    assert(
+      pages.has(shot.page) || retiredPressPages.has(shot.page),
+      `Unknown canonical page: ${shot.page}`,
+    );
     assert.equal(shot.file, `source/screenshots/${key}.png`);
     if (shot.wallpaperId)
       assert(wallpapers[shot.wallpaperId], "Unknown screenshot wallpaper");
