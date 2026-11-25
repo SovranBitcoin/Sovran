@@ -25,7 +25,7 @@ function useRenderLoggerLive(
   renderCount.current += 1;
 
   useEffect(() => {
-    if (!logger.isLevelEnabled('debug')) return;
+    if (logger.isLevelEnabled?.('debug') === false) return;
     const count = renderCount.current;
     const aliveMs = Math.round((monotonicNow() - mountTime.current) * 100) / 100;
     const level = count > warnAfter ? 'warn' : 'debug';
@@ -38,10 +38,10 @@ function useRenderLoggerLive(
   });
 
   useEffect(() => {
-    if (!logger.isLevelEnabled('debug')) return;
+    if (logger.isLevelEnabled?.('debug') === false) return;
     logger.debug('component.mount', { component: componentName });
     return () => {
-      if (!logger.isLevelEnabled('debug')) return;
+      if (logger.isLevelEnabled?.('debug') === false) return;
       logger.debug('component.unmount', {
         component: componentName,
         totalRenders: renderCount.current,

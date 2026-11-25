@@ -6852,6 +6852,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "verboseLoggingEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "vertexCreditsEnabled": {
           "default": true,
           "type": "boolean",
@@ -7116,6 +7120,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "verboseLoggingEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "vertexCreditsEnabled": {
           "default": true,
           "type": "boolean",
@@ -7148,6 +7156,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "regenerateP2PKOnReceive",
         "sendLocationEnabled",
         "fileLoggingEnabled",
+        "verboseLoggingEnabled",
         "vertexCreditsEnabled",
         "naggTierEnabled",
         "primalTierEnabled",

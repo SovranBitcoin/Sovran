@@ -71,7 +71,7 @@ function isFrozenProperty(target: object, prop: string | symbol): boolean {
  */
 export function withCallTiming<T extends object>(target: T, options: CallTimingOptions): T {
   const { event, logger, maxDepth = 3 } = options;
-  if (!logger.isLevelEnabled('debug')) return target;
+  if (logger.isLevelEnabled?.('debug') === false) return target;
   const namespaces = new Set<string | symbol>(options.namespaces);
 
   function report(method: string, startedAt: number, async: boolean, ok: boolean): void {
@@ -122,7 +122,7 @@ export function withCallTiming<T extends object>(target: T, options: CallTimingO
 
   function timeFunction(fn: AnyFunction, owner: object, ownerProxy: object, method: string) {
     return function timedCall(this: unknown, ...args: unknown[]): unknown {
-      if (!logger.isLevelEnabled('debug')) {
+      if (logger.isLevelEnabled?.('debug') === false) {
         return Reflect.apply(fn, this === ownerProxy ? owner : this, args);
       }
       const startedAt = monotonicNow();
