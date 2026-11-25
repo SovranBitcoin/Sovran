@@ -138,7 +138,11 @@ describe('route integrity', () => {
         const link = `/${group}${leaf ? `/${leaf}` : ''}?a=1%202`;
         const rewritten = rewriteSystemPath(link);
         const [pathname, query] = rewritten.split('?');
-        if (pathname.includes('(') || query !== 'a=1%202' || !pathExists(pathname)) {
+        const expectedQuery =
+          (group === '(user-flow)' || group === '(profile-flow)') && leaf === 'share'
+            ? 'a=1%202&type=npub'
+            : 'a=1%202';
+        if (pathname.includes('(') || query !== expectedQuery || !pathExists(pathname)) {
           broken.push(`${link} -> ${rewritten}`);
         }
       }

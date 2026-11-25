@@ -26,7 +26,7 @@ describe('mint distribution e2e selectors', () => {
     expect(source).toContain("testID: 'mint-distribution-next'");
     // The switch is AX-invisible without a label on liquid-glass devices.
     expect(source).toContain('testID="mint-distribution-split-evenly"');
-    expect(source).toContain('aria-label="Split evenly"');
+    expect(source).toContain('accessibilityLabel="Split evenly"');
   });
 
   it('pins the rebalance-plan buttons for every run state', () => {
