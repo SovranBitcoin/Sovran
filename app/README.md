@@ -121,63 +121,20 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-04** — legacy encrypted DMs with decrypt cache (`unrecommended` upstream; kept for backwards compatibility)
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
-  - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread, notification, and DM-envelope queries served for fast app views. The default deployment is Nagg (self-hostable); the app queries it through the [`@sovranbitcoin/nagg-ts`](https://github.com/SovranBitcoin/nagg-ts) GraphQL client, with optimized REST app-view endpoints used where available (e.g. DM envelopes). Nagg forwards encrypted DM envelopes without decrypting their content; routing and connection metadata remain observable.
+  - [x] **Direct Nostr client (`nostr/client`)** — WebSocket relay pool, signing, NIP-44 encryption, and NIP-17 payment inbox directly over `nostr-tools` (no NDK)
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities
 - [x] **Profile switcher in drawer** — header avatar opens the drawer; drawer hosts the profile chrome
-- [x] **Feed** (`kind 1` text notes per NIP-01)
-  - [x] **Home timeline** with follow graph (`kind 3` contact lists)
-  - [x] **Threads** with measured exit-shimmer skeletons while replies stream in
-  - [x] **Image overlay** — tap an image in a note to open the fullscreen lightbox with zoom/pan
-  - [x] **Video player** — inline Nostr video posts with autoplay and unmute on overlay
-  - [x] **Reactions (NIP-25, `kind 7`)** — `+` likes and emoji reactions
-  - [x] **Reposts (NIP-18, `kind 6`)** — share a `kind 1` text note to your own followers
-  - [x] **Link parsing** — hyperlinks rendered with preview affordances
-  - [x] **Image grid layout** — multi-image posts with adaptive grid
-  - [x] **Ignore post / person** — mute a note or author from the thread view; the feed reactively hides ignored content
-- [x] **Notifications & follows**
-  - [x] **Notifications tab** — likes, reposts, replies, mentions, and zaps with All / Mentions / App filters and a policy menu
-  - [x] **Follows & followers** — browse a profile's follow graph and open any entry
-- [x] **Unified cross-surface search** — one search box on Wallet, Contacts, and Feed with scope tabs (All / Contacts / Feed / Posts), aggregated results, and recents on an empty query
-
-### AI
-
-<!-- code: features/ai/screens/AiChatScreen.tsx; features/ai/hooks/useAiSend.ts; features/ai/components/AiHeaderTitle.tsx; features/ai/components/ModelChip.tsx; features/ai/lib/format.ts; shared/lib/routstr/api.ts; shared/stores/profile/routstrStore.ts -->
-
-- [x] **Routstr integration** — [Routstr](https://routstr.com) is a decentralized reverse proxy that fronts OpenAI-compatible LLM providers and bills per request in Cashu; Sovran uses your wallet as the funding source so there's no separate billing account
-- [x] **Cashu-token top-up** — `colada` mints a Cashu token from your wallet and deposits it as Routstr balance; subsequent calls are paid out of that balance
-- [x] **Model picker** — switch between models in chat
-- [x] **Streaming responses** — token-by-token rendering
-- [x] **AI chat as a tab** — first-class tab, not a settings page
-- [x] **Pull-to-AI refresh** — pull-down gesture from the wallet surface to jump into AI (currently shipping)
-- [x] **AI wallpaper backdrop** — tiled pattern wallpaper behind the chat surface
 
 ### BitChat (local BLE mesh)
 
-<!-- code: modules/bitchat-module/src/BitChatModule.ts; modules/bitchat-module/ios/BitChatBLEBridge.swift; modules/bitchat-module/ios/BitChatNostrBridge.swift; modules/bitchat-module/ios/ProfileScopedBitchatKeychain.swift; features/bitchat/hooks/useBitChat.ts; features/bitchat/hooks/useBLEPeers.ts; features/bitchat/screens/GeohashChatScreen.tsx; features/user/screens/UserMessagesScreen.tsx; features/bitchat/stores/bitchatDmMessages.ts -->
+<!-- code: modules/bitchat-module/src/BitChatModule.ts; modules/bitchat-module/ios/BitChatBLEBridge.swift; modules/bitchat-module/ios/BitChatNostrBridge.swift; modules/bitchat-module/ios/ProfileScopedBitchatKeychain.swift; features/bitchat/hooks/useBitChat.ts; features/bitchat/hooks/useBLEPeers.ts -->
 
 - [x] **Native BitChat module** — local iOS `bitchat-module` bridging BLE mesh transport; Android exports degrade gracefully while the native bridge remains iOS-focused
-- [x] **Private DMs over BLE** — peer-to-peer encrypted DMs with no relay, no internet
-- [x] **Group chats over BLE** — multi-peer chats on the mesh
-- [x] **Geohash chat rooms** — public location-bound chat rooms keyed by geohash precision
-- [x] **Split-bill over BLE** — settle splits across nearby peers without any server in the path
-- [x] **Nut Drop (ecash over BLE)** — pay a nearby BitChat peer in Cashu ecash from a honeycomb peer picker. The token is broadcast as a single **public** mesh message so any unmodified nearby receiver can reassemble the full token; the amount screen warns that anyone nearby can claim it. A private mesh-DM path is gated on longer mesh-DM payloads.
+- [x] **Nut Drop (ecash over BLE)** — pay a nearby BitChat peer in Cashu ecash from a peer picker
 - [x] **BLE peer discovery in contacts** — nearby mesh peers appear in the contact list with mesh identity
-- [x] **Delivery acks** — delivered / failed delivery state on DMs
 - [x] **Profile-scoped BLE identity** — BLE peer identity is scoped to the active Sovran profile
-
-### Whitenoise
-
-<!-- code: features/whitenoise/WhitenoiseProvider.tsx; features/whitenoise/client/index.ts; features/whitenoise/client/network.ts; features/whitenoise/client/signer.ts; features/whitenoise/hooks/useWhitenoiseDM.ts; features/whitenoise/hooks/useWhitenoiseInbox.ts; features/whitenoise/hooks/useWhitenoiseRequests.ts; features/whitenoise/screens/WhitenoiseDMScreen.tsx; features/whitenoise/screens/WhitenoiseSetupScreen.tsx; features/whitenoise/components/WhitenoiseSetupBanner.tsx; shared/stores/global/settingsStore.ts; features/settings/screens/SettingsScreen.tsx; vendor/marmot-ts -->
-
-- [x] **Whitenoise protocol** — MLS-based end-to-end encrypted Nostr group chat, powered by the vendored [`@internet-privacy/marmot-ts`](https://github.com/internet-privacy/marmot-ts)
-  - [x] **MLS group chats** — forward-secret, post-compromise-secure ratcheting via the Marmot MLS implementation
-  - [x] **Key packages** — publish your Whitenoise key package as a Nostr event so others can invite you
-  - [x] **Invite-driven join** — accept or decline incoming group invites
-  - [x] **Profile-scoped identity** — each Sovran profile has its own Whitenoise identity, isolated from the others
-  - [x] **Dev-gated** — feature is hidden behind the developer toggle while it stabilizes
 
 ### NFC
 
@@ -285,16 +242,6 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Receive flow** — mint selection, BOLT-11 mint quote, live quote status
 - [x] **Lightning melt** — pay an invoice from any mint that can cover it
 - [x] **Multi-rail fallback** — BIP-321 rails dim on failure; remaining rails are offered inline
-
-### Split bill
-
-<!-- code: features/splitBill/hooks/useSplitBillOrchestrator.ts; features/splitBill/hooks/useSplitBillParticipantPicker.ts; features/splitBill/components/ParticipantCard.tsx; features/splitBill/components/ParticipantCardDeck.tsx; features/splitBill/components/ParticipantRow.tsx; features/splitBill/lib/candidateToIdentity.ts; features/splitBill/lib/reconcileSplitBillHistoryUpdate.ts; shared/stores/profile/splitBillTransactionsStore.ts; app/(split-bill-flow)/participants.tsx; app/(split-bill-flow)/detail.tsx; app/(split-bill-flow)/summary.tsx -->
-
-- [x] **Participant picker** — pick from contacts, BLE mesh peers, or Nostr directory
-- [x] **Per-person amount adjust** — split evenly or set custom amounts
-- [x] **BLE-mesh settlement** — settle over BitChat with no relay
-- [x] **NPC / Nostr settlement** — fall back to Lightning address or Nostr DM payment
-- [x] **Settlement tracking** — per-participant paid/owed status
 
 ### Search
 

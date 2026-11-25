@@ -19,18 +19,19 @@ inside**. The root presents the group once; every step after that is a push insi
 So when a screen needs a next step, **add the step to the group you are already in**. If the
 step exists elsewhere, give this group its own thin route file for it. That is why `sendToken`,
 `lightningSend`, `onchainSend`, `receiveToken`, `lightningReceive`, `onchainReceive` and
-`paymentRequest` each exist at the root, in the send or receive flow, and in the transactions
-flow: one feature component, three thin wrappers, and the caller pushes the copy inside its
-own flow.
+`paymentRequest` each exist at the root and in the send or receive flow: one feature component,
+thin wrappers, and the caller pushes the copy inside its own flow.
+
+Sovran keeps **four flow groups** ([ADR 0041](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0041-four-flow-groups-flat-roots.md));
+every other screen is a flat root route in `app/app/`:
 
 | Group | iPhone | Android |
 | --- | --- | --- |
-| send, receive, transactions, mint, ai, map, theme, profile | page sheet | pushed page |
-| filter, prompt (and the standalone `share`) | page sheet | bottom sheet |
-| settings, signer, user | pushed page | pushed page |
-| stories | full screen | full screen |
+| `(send-flow)`, `(receive-flow)`, `(mint-flow)` | page sheet | pushed page |
+| `(settings-flow)` | pushed page | pushed page |
+| Root standalone routes (`transactions`, `share`, `camera`, `filters`, `merchantDetail`, …) | page sheet / pushed / full screen per `MODAL_SCREENS` | pushed page / bottom sheet per `androidFlowPresentation.ts` |
 
-Android's three sheets are listed in `app/config/androidFlowPresentation.ts`. Details and
+Android's bottom sheets are listed in `app/config/androidFlowPresentation.ts`. Details and
 pickers are sheets on iPhone and pages on Android
 ([ADR 0026](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0026-details-and-pickers-are-sheets.md)). A menu opened from
 inside a sheet needs a host above it: [modal menu contract](../review/modal-menu-contract.md).

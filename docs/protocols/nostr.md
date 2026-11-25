@@ -1,8 +1,9 @@
 # Nostr
 
-Sovran uses Nostr for identity, social, and messaging. Keys are derived per
-profile; the feed and app-view queries are served through the in-repo `nostr`
-package (formerly `nagg-ts`).
+Sovran uses Nostr for wallet identity, contact lookup, mint reviews, and encrypted
+payment messages (NIP-17). Relay connections, signing, and NIP-44/NIP-59 gift-wrapping
+run directly on `nostr-tools` through the in-repo `nostr` package (`NostrClient` and
+the tiered data layer).
 
 ## Identity & keys
 
@@ -28,15 +29,17 @@ package (formerly `nagg-ts`).
 - **NIP-04** — legacy encrypted DMs. Their event metadata exposes sender and
   recipient public keys; this is not the same metadata protection as NIP-17.
 
-The client encrypts and decrypts supported DMs; the app-view transports encrypted
+The client encrypts and decrypts supported DMs; relays transport encrypted
 events rather than receiving the message-decryption keys. That boundary is not a
-guarantee about server logging, metadata, device compromise, or recipient behavior.
-Relays and services can observe routing and connection information. Linked media
-can contact a separate host, and recipients can copy decrypted messages.
+guarantee about relay logging, metadata, device compromise, or recipient behavior.
+Relays can observe routing and connection information, and recipients can copy
+decrypted messages.
 
-The current `nip04Cache` and `giftWrapCache` use the app's AsyncStorage-backed
-`createPubkeyScopedCache`. Profile scoping is not encryption at rest. Do not
-describe all locally stored messages as encrypted. See the source-scoped
+`giftWrapCache` uses the app's AsyncStorage-backed `createPubkeyScopedCache`,
+with a persistence filter that keeps decrypted bearer ecash tokens (`cashuA`/`cashuB`,
+NUT-18 proofs) in memory only so they are never written to plaintext AsyncStorage.
+Profile scoping is not encryption at rest; do not describe locally cached non-bearer
+messages as encrypted. See the source-scoped
 [claims review](https://github.com/SovranBitcoin/Sovran/blob/main/CLAIMS.md),
 [NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md),
 [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md), and
@@ -45,56 +48,11 @@ describe all locally stored messages as encrypted. See the source-scoped
 Relay acceptance does not prove that a recipient received or read a message.
 Relays can refuse or remove events, impose access rules, and become unavailable.
 
-## Feed & social
-
-The feed renders `kind 1` text notes (NIP-01) with a follow-graph home timeline
-(`kind 3`), threads, reactions (NIP-25), reposts (NIP-18), image/video, and
-mute/ignore. Relay management uses `@nostr-dev-kit/ndk-mobile`; low-level signing
-and encoding use `nostr-tools`.
-
-### Blocking, reports, and message filtering
-
-Post menus offer **Hide post**, **Block person**, and **Report post**. Profile
-and Nostr/White Noise direct-message headers also offer block and report actions.
-**Settings → Moderation** lists blocked accounts, supports unblocking and retrying
-failed synchronization, and edits an optional message-filter dictionary.
-
-Person blocks use [NIP-51 kind 10000 mute lists](https://github.com/nostr-protocol/nips/blob/master/51.md).
-New entries are encrypted to the account with NIP-44; legacy NIP-04 lists are
-readable. Existing public entries and unfamiliar tags are preserved. Local
-blocking is immediate, including when synchronization fails. The imported
-account's list is fetched at startup, on foreground, and on manual refresh.
-Unreadable lists are never replaced. A first block creates the encrypted list automatically after configured relays
-confirm the read. A timeout or unreadable list keeps the block local for retry;
-there is no separate list-creation prompt.
-As with other Nostr replaceable lists, simultaneous edits in different clients
-cannot be merged atomically across relays. A relay acknowledgment does not promise
-permanent storage; recovery needs access to the relays that hold the list.
-
-Reports are [NIP-56 kind 1984 events](https://github.com/nostr-protocol/nips/blob/master/56.md).
-The reason, reporter, reported account, and selected public post ID are public;
-the confirmation explains this before signing. Reporting a DM contact includes
-only the account and reason, never the private message text or its envelope ID.
-These reports do **not** constitute an operated moderator queue or guarantee
-review, removal, or an answer from Sovran.
-
-The dictionary is off by default and stored locally per account. It matches
-literal case-insensitive words/phrases, hides incoming Nostr, White Noise, and BitChat Nostr-DM
-bubbles until **Reveal censored message** is pressed, and replaces matching
-incoming contact previews with `[censored]`. It does not inspect images, provide
-an age gate, or moderate BitChat BLE/private mesh and public chat rooms. Blocks hide content in
-this account; they cannot prevent other people reading public Nostr posts.
-
-These controls alone do not establish store-policy compliance. Google Play
-[requires ongoing UGC moderation and timely action on reports](https://support.google.com/googleplay/android-developer/answer/9876937),
-and incidental sexual content has additional default-hiding and age-screening
-requirements. A voluntary local word filter must not be described as satisfying
-those requirements.
-
 ## The data layer
 
-The app queries an app-view (the default deployment is **Nagg**)
-through the `nostr` package's GraphQL/REST client, falling back across a tiered
-strategy (nagg → Primal → relay). See [Provider setup](/protocols/provider-setup)
-for how the data layer is assembled, and
-[Navigation and routes](/protocols/navigation-and-routes) for how screens consume it.
+The app reads profiles, contacts, and payment-inbox events directly through
+`nostr/client` (`NostrClient` + `RelayPool`) and the tiered data layer
+(Primal → direct relay) built by `buildNostrDataLayer()`. See
+[Provider setup](/protocols/provider-setup) for how the client and data layer
+are assembled, and [Navigation and routes](/protocols/navigation-and-routes)
+for how screens consume them.

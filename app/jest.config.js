@@ -63,7 +63,6 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-react/dist/index.js',
     ],
-    // ESM-only `exports` map with a React Native build; see the stub's header.
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',

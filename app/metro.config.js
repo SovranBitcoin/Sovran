@@ -137,8 +137,6 @@ config.transformer = {
   }),
 };
 
-const liquidGlassEntryPath = resolvePkgFile('expo-liquid-glass-native', 'build', 'index.js');
-
 // Uniwind internally probes `uniwind/components` (and remaps RN components to
 // `uniwind/components/<Name>`) through the base resolver. Under the nested-app
 // workspace, letting Metro resolve those makes getClosestPackage walk up to the
@@ -172,9 +170,6 @@ const appResolveRequest = (context, moduleName, platform) => {
   const uniwindComponent = resolveUniwindComponent(moduleName);
   if (uniwindComponent) {
     return { type: 'sourceFile', filePath: uniwindComponent };
-  }
-  if (moduleName === 'expo-liquid-glass-native') {
-    return { type: 'sourceFile', filePath: liquidGlassEntryPath };
   }
   // Force the shared, type-bearing libs to the app's single copy. The workspace
   // packages (wallet/nostr) and the `@sovranbitcoin/*` registry packages can each

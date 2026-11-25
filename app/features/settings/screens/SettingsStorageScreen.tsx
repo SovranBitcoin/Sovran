@@ -477,7 +477,7 @@ export const SettingsStorageScreen = () => {
             </View>
             <Text size={12} className="text-foreground/70">
               Mirror logs to a file on the device so they survive offline, when the dev-server
-              console is unreachable. Export the file and evaluate it later with log-doctor.
+              console is unreachable. Export the file to share diagnostics when troubleshooting.
             </Text>
             <Text size={11} className="text-foreground/50">
               {fileLoggingEnabled ? 'Saving logs to file.' : 'Not saving.'}

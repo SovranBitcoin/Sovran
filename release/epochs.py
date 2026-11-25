@@ -19,7 +19,7 @@ import sys
 OUT = "docs/architecture/persistence"
 BUILDS = f"{OUT}/store-builds.tsv"
 DIFF = f"{OUT}/epoch-diff.txt"
-SURFACE = ".agents/skills/persistence-release-safety/surface.sh"
+SURFACE = "release/surface.sh"
 COLUMNS = ("date", "platform", "profile", "version", "build", "commit", "in_repo", "on_main")
 
 
@@ -71,7 +71,10 @@ TABLE = re.compile(r"(CREATE TABLE(?: IF NOT EXISTS)?|ALTER TABLE|DROP TABLE(?: 
 
 def tokens(rev):
     found, section = set(), None
-    for line in run("sh", SURFACE, rev).stdout.split("\n"):
+    proc = run("sh", SURFACE, rev)
+    if proc.returncode != 0:
+        sys.exit(f"{SURFACE} failed on {rev}: {(proc.stderr or proc.stdout).strip()[-400:]}")
+    for line in proc.stdout.split("\n"):
         if line.startswith("## "):
             section = line[3:]
             continue

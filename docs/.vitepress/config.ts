@@ -8,7 +8,7 @@ export default defineConfig({
   base,
   title: 'Sovran Docs',
   description:
-    'Bitcoin wallet docs for Cashu ecash, Lightning, Nostr, offline payments, and AI payments',
+    'Bitcoin wallet docs for Cashu ecash, Lightning, Nostr payments, and offline payments',
   lastUpdated: true,
   cleanUrls: true,
   themeConfig: {

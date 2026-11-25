@@ -7,8 +7,8 @@ build step), so there is no inter-package publishing and no version syncing.
 ```
 Sovran (repo root = bun workspace)
 ├─ app/      Expo / React Native application (the product)
-├─ wallet/   payment UX logic on top of Coco (formerly the colada repo)
-├─ nostr/    Nostr app-view client + tiered data layer (formerly nagg-ts)
+├─ wallet/   payment UX logic on top of Coco
+├─ nostr/    direct Nostr client (nostr-tools), relay pool, and tiered data layer
 └─ docs/     this site (VitePress)
 ```
 
@@ -17,13 +17,14 @@ properties) and resolves from GitHub Packages.
 
 ## App layout
 
-- `app/app/` — Expo Router routes and route-group stacks (Stack → Drawer → Tabs;
-  see [Navigation and routes](/protocols/navigation-and-routes)).
+- `app/app/` — Expo Router routes with four flow groups (`(send-flow)`,
+  `(receive-flow)`, `(mint-flow)`, `(settings-flow)`) and flat root routes
+  (see [Navigation and routes](/protocols/navigation-and-routes)).
 - `app/features/` — domain modules: wallet, send, receive, mint, transactions,
-  feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme,
-  onboarding.
-- `app/shared/` — cross-cutting UI primitives, providers, stores, and
-  Cashu/Nostr/NFC/Routstr helpers, theme and persistence infrastructure.
+  contacts, map, settings, nearby payments (NFC / BitChat), theme, onboarding.
+- `app/shared/` — house UI primitives (`primitives/`, `composed/`, `blocks/`),
+  providers, stores, and Cashu/Nostr/NFC/Routstr-recovery helpers, theme and
+  persistence infrastructure.
 - `app/modules/` — local native modules (BitChat, Liquid Glass text).
 - `app/targets/widget/` — iOS widget target via `@bacons/apple-targets`.
 - `app/patches/` — native dependency patches applied by Bun via root `patchedDependencies`.

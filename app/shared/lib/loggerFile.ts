@@ -4,9 +4,7 @@
  * Mirrors every structured log entry into a persistent NDJSON file on the
  * device so logs survive even when the Metro/dev-server connection drops (going
  * offline kills the console transport's destination, not this one). The file is
- * one compact JSON object per line — exactly the format `log-doctor`'s
- * `parseLogInput` consumes — so an exported file drops straight into the
- * existing `bun run log-doctor` workflow.
+ * one compact JSON object per line (NDJSON) for easy inspection and export.
  *
  * Design:
  * - Never in a store build. Gated on `SHOW_LOGS`; the whole module is inert in
