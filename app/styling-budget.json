@@ -297,14 +297,6 @@
     "inline-style": 7,
     "stack-layout-props": 7
   },
-  "features/settings/screens/SettingsMediaScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3,
-    "stack-layout-props": 2
-  },
-  "features/settings/screens/SettingsNetworkScreen.tsx": {
-    "inline-style": 1
-  },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
     "inline-style": 15,
     "stack-layout-props": 21
@@ -313,7 +305,6 @@
     "stack-layout-props": 3
   },
   "features/settings/screens/SettingsScreen.tsx": {
-    "inline-style": 1,
     "stack-layout-props": 1
   },
   "features/theme/components/AlbumPillTabs.tsx": {

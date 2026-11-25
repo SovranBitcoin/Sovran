@@ -30,14 +30,14 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /** `deleted` is the only ✓ state; everything else renders ✗ on the media page. */
-export type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
+type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
 
 /** Ledger key: a blob is identified by the host it lives on AND its content hash. */
 function blobKey(host: string, sha256: string): string {
   return `${host}|${sha256}`;
 }
 
-export interface OwnedBlobEntry {
+interface OwnedBlobEntry {
   sha256: string;
   url: string;
   host: string;

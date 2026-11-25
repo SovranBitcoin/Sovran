@@ -5,7 +5,7 @@
  * Network, signing, account, storage and heavy visual primitives are fixtures.
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { RelayListSettings } from '@/features/settings/components/RelayListSettings';
 
 import type NDK from '@nostr-dev-kit/ndk-mobile';
@@ -142,6 +142,7 @@ beforeEach(() => {
   mockAsked.length = 0;
   mockPublish.mockReset();
   mockAfterSign.mockReset();
+  mockMenus.length = 0;
   mockPublish.mockImplementation(({ relays }: { relays: string[] }) =>
     okAsync({ accepted: relays.map((url) => ({ url, ok: true })) })
   );
@@ -233,21 +234,50 @@ jest.mock('@/shared/ui/primitives/Switch', () => ({
     return <Switch value={isSelected} onValueChange={onSelectedChange} {...props} />;
   },
 }));
-jest.mock('@/shared/ui/primitives/Badge', () => ({ Badge: jest.requireMock('react-native').Text }));
+jest.mock('@/shared/ui/composed/Notice', () => ({
+  Notice: ({ description, testID }: { description: string; testID?: string }) => {
+    const { Text } = jest.requireMock('react-native');
+    return <Text testID={testID}>{description}</Text>;
+  },
+}));
+jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'black' }));
+type MenuButton = { text: string; testID: string; selected?: boolean; onPress?: () => void };
+const mockMenus: { title?: string; buttons: MenuButton[] }[] = [];
+jest.mock('@/shared/lib/popup', () => ({
+  actionMenuPopup: (payload: { title?: string; buttons: MenuButton[] }) => mockMenus.push(payload),
+}));
 jest.mock('heroui-native', () => {
   const { View, Text, TextInput } = jest.requireMock('react-native');
   const ListGroup = Object.assign(
     ({ children }: React.PropsWithChildren) => <View>{children}</View>,
     {
       Item: Object.assign(({ children }: React.PropsWithChildren) => <View>{children}</View>, {}),
+      ItemPrefix: View,
       ItemContent: View,
       ItemTitle: Text,
       ItemDescription: Text,
       ItemSuffix: View,
     }
   );
-  return { ListGroup, Separator: () => null, TextField: View, Input: TextInput };
+  const PressableFeedback = Object.assign(
+    ({ children, ...props }: React.PropsWithChildren) => <View {...props}>{children}</View>,
+    { Scale: View, Ripple: () => null }
+  );
+  return { ListGroup, PressableFeedback, Separator: () => null, TextField: View, Input: TextInput };
 });
+
+/** Open a relay's menu while editing and press one of its choices. */
+function choose(url: string, testIDPrefix: 'read-write' | 'read' | 'write' | 'remove') {
+  fireEvent.press(screen.getByTestId(`settings-network-relay-row-${url}`));
+  const menu = mockMenus[mockMenus.length - 1]!;
+  const button = menu.buttons.find(
+    (b) => b.testID === `settings-network-relay-${testIDPrefix}-${url}`
+  );
+  expect(button).toBeDefined();
+  act(() => button!.onPress?.());
+  return menu;
+}
 
 function mount() {
   return render(<RelayListSettings ndk={relayFake()} pubkey={OWN} />);
@@ -259,9 +289,10 @@ it.each([undefined, 'connecting'] as const)(
     render(
       <RelayListSettings ndk={relayFake()} pubkey={OWN} health={health ? { [MINE]: health } : {}} />
     );
-    expect(screen.getByText(MINE)).toBeOnTheScreen();
-    expect(screen.queryByText('Offline')).not.toBeOnTheScreen();
-    expect(screen.queryByText('Online')).not.toBeOnTheScreen();
+    // The host, what it is used for, and no health word until there is an answer.
+    expect(screen.getByText('mine.example')).toBeOnTheScreen();
+    expect(screen.getByText('Read and write')).toBeOnTheScreen();
+    expect(screen.getByLabelText(`${MINE}, Read and write`)).toBeOnTheScreen();
   }
 );
 
@@ -269,10 +300,11 @@ it('shows the known connection state for relays with an answer', () => {
   const { rerender } = render(
     <RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'connected' }} />
   );
-  expect(screen.getByText('Online')).toBeOnTheScreen();
+  expect(screen.getByLabelText(`${MINE}, Read and write, Online`)).toBeOnTheScreen();
   rerender(<RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'failed' }} />);
-  expect(screen.getByText('Offline')).toBeOnTheScreen();
-  expect(screen.queryByText('Online')).not.toBeOnTheScreen();
+  expect(screen.getByLabelText(`${MINE}, Read and write, Offline`)).toBeOnTheScreen();
+  // Not pressable outside editing: there is nothing to change yet.
+  expect(screen.queryByTestId(`settings-network-relay-row-${MINE}`)).not.toBeOnTheScreen();
 });
 async function start() {
   fireEvent.press(screen.getByRole('button', { name: 'Edit relays' }));
@@ -372,7 +404,7 @@ it('keeps a failed publication draft in memory, then rereads and requires review
   ]);
   mount();
   await start();
-  fireEvent.press(screen.getByRole('button', { name: `Remove ${OLD}` }));
+  choose(OLD, 'remove');
   fireEvent.press(screen.getByRole('button', { name: 'Review changes' }));
   mockPublish.mockReturnValueOnce(errAsync({ type: 'all-failed' }));
   fireEvent.press(screen.getByRole('button', { name: 'Publish relay list' }));
@@ -393,12 +425,13 @@ it('cancels without saving, then reads the new base on re-entry', async () => {
   ]);
   mount();
   await start();
-  fireEvent.press(screen.getByRole('button', { name: `Remove ${OLD}` }));
+  choose(OLD, 'remove');
+  expect(screen.queryByTestId(`settings-network-relay-row-${OLD}`)).not.toBeOnTheScreen();
   fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
   mockHeld.set(MINE, [remote([['r', OLD]], 'c', 201)]);
   await start();
-  expect(screen.queryByRole('button', { name: `Remove ${MINE}` })).not.toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: `Remove ${OLD}` })).toBeOnTheScreen();
+  expect(screen.queryByTestId(`settings-network-relay-row-${MINE}`)).not.toBeOnTheScreen();
+  expect(screen.getByTestId(`settings-network-relay-row-${OLD}`)).toBeOnTheScreen();
   expect(store().entries).toEqual([mine]);
   expect(mockPublish).not.toHaveBeenCalled();
 });
@@ -429,7 +462,16 @@ it('edits permissions only in memory and refuses a draft with no write relay', a
   mockHeld.set(MINE, [remote([['r', MINE]])]);
   mount();
   await start();
-  fireEvent(screen.getByLabelText(`Write to ${MINE}`), 'valueChange', false);
+  const menu = choose(MINE, 'read');
+  // The menu offers the three uses and Remove, marking the current one.
+  expect(menu.title).toBe('mine.example');
+  expect(menu.buttons.map((b) => [b.text, b.selected ?? false])).toEqual([
+    ['Read and write', true],
+    ['Read only', false],
+    ['Write only', false],
+    ['Remove', false],
+  ]);
+  expect(screen.getByText('Read only')).toBeOnTheScreen();
   fireEvent.press(screen.getByRole('button', { name: 'Review changes' }));
   expect(screen.getByText('Add a relay to write to, or restore defaults.')).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'Publish relay list' })).not.toBeOnTheScreen();

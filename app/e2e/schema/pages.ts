@@ -93,8 +93,6 @@ export const CANONICAL_PAGES = [
   'settings-design-system-timeline',
   'settings-design-system-wallet-controls',
   'settings-keyring',
-  'settings-media',
-  'settings-moderation',
   'settings-network',
   'settings-privacy',
   'settings-profile',

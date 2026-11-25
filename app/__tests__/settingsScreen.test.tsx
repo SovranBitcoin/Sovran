@@ -189,16 +189,31 @@ it('exposes profile switching as a checked switch and toggles in both directions
   expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
 });
 
-it('renders with a malformed saved media server instead of crashing', () => {
-  const { useMediaServerStore } = jest.requireActual(
-    '@/shared/lib/nostr/media/mediaServerStore'
-  ) as typeof import('@/shared/lib/nostr/media/mediaServerStore');
-  const previous = useMediaServerStore.getState().server;
-  useMediaServerStore.setState({ server: 'blossom.example' });
-  try {
-    expect(() => render()).not.toThrow();
-    expect(JSON.stringify(tree.toJSON())).toContain('blossom.example');
-  } finally {
-    useMediaServerStore.setState({ server: previous });
-  }
+it('no longer lists Moderation or Uploaded media', () => {
+  mockDevMode = true;
+  render();
+  const ids = tree.root
+    .findAll((node) => typeof node.type === 'string' && typeof node.props.testID === 'string')
+    .map((node) => node.props.testID as string);
+  expect(ids).not.toContain('settings-moderation-row');
+  expect(ids).not.toContain('settings-media-row');
+  expect(JSON.stringify(tree.toJSON())).not.toContain('Uploaded media');
+});
+
+it('keeps Swap routing, under Developer only', () => {
+  const routingSection = () =>
+    tree.root
+      .findAllByType(Section)
+      .find(
+        (section) =>
+          section.findAll((node) => node.props.testID === 'settings-routing-row').length > 0
+      )?.props.title;
+
+  render();
+  expect(routingSection()).toBeUndefined();
+  act(() => tree.unmount());
+
+  mockDevMode = true;
+  render();
+  expect(routingSection()).toBe('Developer');
 });

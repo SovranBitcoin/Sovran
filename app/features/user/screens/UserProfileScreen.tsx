@@ -111,7 +111,7 @@ const AVATAR_OVERLAP = AVATAR_SIZE / 4;
 const IDENTITY_LINE_HEIGHT = 20;
 
 /**
- * A profile's Nostr address. The checkmark is earned: it shows only once the
+ * A profile's verified name (NIP-05). The checkmark is earned: it shows only once the
  * domain has confirmed the address maps to this key. Printing it beside
  * whatever address a profile claims would let anyone borrow a trusted name.
  * The address takes the verdict's colour, as it does everywhere else.
@@ -219,7 +219,7 @@ function buildProfileInfoItems(
       prefix: <Icon name="mdi:at" size={20} color={iconColor} />,
       title: nip05,
       suffixIcon: 'lets-icons:copy',
-      accessibilityLabel: `Copy Nostr address, ${nip05}`,
+      accessibilityLabel: `Copy verified name, ${nip05}`,
       onPress: () => {
         void handleCopy(nip05, 'nip05');
       },

@@ -29,6 +29,7 @@ jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
 jest.mock('@/shared/styles/appStyle', () => ({
   useStylePaint: () => ({
     text: { primary: 'white', secondary: 'white' },
+    secondary: { content: 'white' },
     style: { space: { pad: 16, item: 12 } },
   }),
 }));
@@ -66,6 +67,12 @@ test('shared Settings recovery fields mask before reveal, hide on background, an
     screen.root.findAll(
       (node) => String(node.type) === 'Button' && node.props.testID === 'profile-reveal-mnemonic'
     )[0];
+  // Plain words, not protocol names.
+  expect(screen.root.findAllByProps({ children: 'Recovery phrase' }).length).toBeGreaterThan(0);
+  expect(screen.root.findAllByProps({ children: 'NIP06:' })).toHaveLength(0);
+  expect(reveal().props.accessibilityLabel).toBe('Show Recovery phrase');
+  expect(reveal().props.accessibilityRole).toBe('switch');
+  expect(reveal().props.accessibilityState).toEqual({ checked: false });
   expect(input().props.value).not.toBe('test-root-placeholder');
   expect(input().props.testID).toBe('profile-secret-value-mnemonic');
   void act(() => reveal().props.onPress());

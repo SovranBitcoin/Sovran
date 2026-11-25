@@ -184,6 +184,11 @@ interface ButtonProps {
   accessibilityLabel?: string;
   /** Optional VoiceOver hint describing the action's outcome. */
   accessibilityHint?: string;
+  /** `switch` for a button that turns something on and off (say which with
+   *  `accessibilityState.checked`). Defaults to `button`. */
+  accessibilityRole?: 'button' | 'switch';
+  /** Merged into the button's own disabled/busy state, e.g. `{ checked }`. */
+  accessibilityState?: { checked?: boolean };
 }
 
 /**
@@ -222,6 +227,8 @@ export const Button = ({
   contentColor,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityRole = 'button',
+  accessibilityState,
 }: ButtonProps) => {
   const paint = useStylePaint();
   // One button in every style, Glass included: radius, height, paint and type
@@ -260,10 +267,10 @@ export const Button = ({
   // explicitly — we cannot read text out of a node tree.
   const a11yLabel = accessibilityLabel ?? (typeof text === 'string' ? text : undefined);
   const a11yProps = {
-    accessibilityRole: 'button' as const,
+    accessibilityRole,
     accessibilityLabel: a11yLabel,
     accessibilityHint,
-    accessibilityState: { disabled: disabled || loading, busy: loading },
+    accessibilityState: { ...accessibilityState, disabled: disabled || loading, busy: loading },
   };
   const [foreground, foregroundSecondary, danger] = useThemeColor([
     'foreground',

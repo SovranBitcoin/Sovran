@@ -461,11 +461,11 @@ function ProfileEditor({
         break;
       case 'no-username':
         setIdentityError(
-          'A custom npub.cash username is needed. Your automatic Lightning address is not a NIP-05 identity.'
+          "Claim a username first. Your automatic address can't be used as a verified name."
         );
         break;
       case 'unverified':
-        setIdentityError('Your npub.cash username could not be verified for this key.');
+        setIdentityError('Your Sovran name could not be verified for this key.');
         break;
       case 'unavailable':
         setIdentityError('Could not check npub.cash. Try again when connected.');
@@ -610,7 +610,7 @@ function ProfileEditor({
             accessibilityLabel="Lightning address"
             value={lud16}
             onChangeText={(value) => setField('lud16', value)}
-            placeholder="name@domain.com"
+            placeholder="you@domain.com"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -651,17 +651,17 @@ function ProfileEditor({
         </TextField>
 
         <TextField isDisabled={fieldsLocked}>
-          <Label>Nostr address</Label>
+          <Label>Verified name</Label>
           <Input
             variant="secondary"
             testID="edit-profile-nip05"
-            accessibilityLabel="Nostr address"
+            accessibilityLabel="Verified name"
             value={nip05}
             onChangeText={(value) => {
               setIdentityError(null);
               setField('nip05', value);
             }}
-            placeholder="name@domain.com"
+            placeholder="you@domain.com"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -672,20 +672,23 @@ function ProfileEditor({
             <Text size={12} className="text-danger mt-1" accessibilityRole="alert">
               {checks.nip05.message}
             </Text>
-          ) : (
+          ) : !nip05.trim() ? (
+            // Explained while empty; once filled, the status row says the rest.
             <Description>
-              A NIP-05 name the domain has published for your key. It only verifies once the domain
-              lists this public key.
+              A name like you@domain.com that proves this profile is yours. It works once that
+              website lists your key.
             </Description>
-          )}
+          ) : null}
           {nip05.trim() && checks.nip05.ok ? (
-            <View className="mt-2 gap-2">
-              <Nip05Status
-                address={nip05}
-                state={nip05Check.state}
-                testID="edit-profile-nip05-status"
-                detail
-              />
+            <View className="mt-2 flex-row items-center gap-2">
+              <View className="min-w-0 flex-1">
+                <Nip05Status
+                  address={nip05}
+                  state={nip05Check.state}
+                  testID="edit-profile-nip05-status"
+                  detail
+                />
+              </View>
               <CapsuleButton
                 label="Check again"
                 icon="mdi:refresh"
@@ -703,7 +706,7 @@ function ProfileEditor({
           ) : null}
           <View className="mt-2">
             <CapsuleButton
-              label={npcLoading ? 'Checking npub.cash…' : 'Use my npub.cash username'}
+              label={npcLoading ? 'Checking your Sovran name…' : 'Use my Sovran name'}
               icon="mdi:at"
               testID="edit-profile-nip05-npc"
               disabled={fieldsLocked}

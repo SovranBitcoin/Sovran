@@ -138,9 +138,11 @@ describe('wallet surface e2e selectors', () => {
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
     // Unconditional, not gated on `testID`: a screen reader needs the role and
     // the checked state on EVERY toggle, not only the three the e2e harness
-    // happens to target.
-    expect(settings).toContain('accessibilityRole="switch"');
-    expect(settings).toContain('accessibilityState={{ checked: isSelected }}');
+    // happens to target. The toggle row is the shared Settings row.
+    const rows = read('shared/ui/composed/SettingsRows.tsx');
+    expect(settings).toContain("from '@/shared/ui/composed/SettingsRows'");
+    expect(rows).toContain('accessibilityRole="switch"');
+    expect(rows).toContain('{ checked: isSelected }');
     for (const state of ['mockOffline', 'mockFailSend', 'mockFailMelt']) {
       expect(settings).toContain(`isSelected={${state}}`);
     }

@@ -95,8 +95,6 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   // `(settings-flow)/index` redirects here.
   settings: ['(drawer)/(tabs)/settings/index.tsx', '(settings-flow)/index.tsx'],
   'settings-keyring': ['(settings-flow)/keyring.tsx'],
-  'settings-media': ['(settings-flow)/media.tsx'],
-  'settings-moderation': ['(settings-flow)/moderation.tsx'],
   'settings-network': ['(settings-flow)/network.tsx'],
   'settings-privacy': ['(settings-flow)/privacy.tsx'],
   'settings-edit-profile': ['(settings-flow)/edit-profile.tsx'],

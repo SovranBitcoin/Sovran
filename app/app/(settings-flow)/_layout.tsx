@@ -18,8 +18,6 @@ const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
-const MODERATION_OPTIONS = { title: 'Moderation' };
-const MEDIA_OPTIONS = { title: 'Uploaded media' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
 const DESIGN_SYSTEM_FOUNDATIONS_OPTIONS = { title: 'Foundations' };
 const DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS = { title: 'Wallet controls' };
@@ -54,8 +52,6 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />
       <Stack.Screen name="terms" options={{ title: 'Terms and Conditions' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
-      <Stack.Screen name="moderation" options={MODERATION_OPTIONS} />
-      <Stack.Screen name="media" options={MEDIA_OPTIONS} />
       <Stack.Screen name="design-system-headers" options={{ title: 'Headers' }} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />
       <Stack.Screen name="design-system-foundations" options={DESIGN_SYSTEM_FOUNDATIONS_OPTIONS} />
