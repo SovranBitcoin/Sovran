@@ -19,6 +19,8 @@ let mockKeys: { pubkey: string; npub: string } | undefined;
 let mockDevMode = false;
 let mockInProcessProfileSwitch = false;
 const mockSetInProcessProfileSwitch = jest.fn();
+let mockVerboseLoggingEnabled = true;
+const mockSetVerboseLoggingEnabled = jest.fn();
 let mockPolicy = 'RELAXED';
 
 jest.mock('@/shared/hooks/useProfileDisplay', () => ({
@@ -33,6 +35,8 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
       experimental: mockDevMode,
       inProcessProfileSwitch: mockInProcessProfileSwitch,
       setInProcessProfileSwitch: mockSetInProcessProfileSwitch,
+      verboseLoggingEnabled: mockVerboseLoggingEnabled,
+      setVerboseLoggingEnabled: mockSetVerboseLoggingEnabled,
     }),
 }));
 jest.mock('@/shared/stores/profile/notificationPolicyStore', () => ({
@@ -47,6 +51,7 @@ jest.mock('@/shared/lib/url', () => ({
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { exportDatabase: jest.fn() } }));
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
+  SHOW_LOGS: true,
   useLifecycleLogger: jest.fn(),
   log: { info: jest.fn(), error: jest.fn() },
   walletLog: { info: jest.fn() },
@@ -117,6 +122,8 @@ beforeEach(() => {
   mockDevMode = false;
   mockInProcessProfileSwitch = false;
   mockSetInProcessProfileSwitch.mockClear();
+  mockVerboseLoggingEnabled = true;
+  mockSetVerboseLoggingEnabled.mockClear();
   mockPolicy = 'RELAXED';
 });
 afterEach(() => act(() => tree?.unmount()));
@@ -216,4 +223,16 @@ it('keeps Swap routing, under Developer only', () => {
   mockDevMode = true;
   render();
   expect(routingSection()).toBe('Developer');
+});
+
+it('exposes the Verbose logging switch under Developer and toggles it', () => {
+  mockDevMode = true;
+  render();
+  const toggle = () => control('settings-verbose-logging-toggle');
+  expect(toggle().props.accessibilityRole).toBe('switch');
+  expect(toggle().props.accessibilityState).toEqual({ checked: true });
+  act(() => {
+    toggle().props.onPress();
+  });
+  expect(mockSetVerboseLoggingEnabled).toHaveBeenLastCalledWith(false);
 });

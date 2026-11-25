@@ -25,7 +25,7 @@ import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, SHOW_LOGS, useLifecycleLogger } from '@/shared/lib/logger';
 import { hasFeature } from '@/shared/config/features';
 import {
   SettingsListActionItem,
@@ -121,6 +121,8 @@ export const SettingsScreen = () => {
   const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
+  const verboseLoggingEnabled = useSettingsStore((state) => state.verboseLoggingEnabled);
+  const setVerboseLoggingEnabled = useSettingsStore((state) => state.setVerboseLoggingEnabled);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -305,6 +307,18 @@ export const SettingsScreen = () => {
                   testID="settings-design-system-row"
                 />
                 <Separator className="mx-4" />
+                {SHOW_LOGS ? (
+                  <>
+                    <SettingsToggleItem
+                      title="Verbose logging"
+                      description="Log renders, layout shifts, and diagnostics. Turn off to reduce dev lag."
+                      testID="settings-verbose-logging-toggle"
+                      isSelected={verboseLoggingEnabled}
+                      onSelectedChange={setVerboseLoggingEnabled}
+                    />
+                    <Separator className="mx-4" />
+                  </>
+                ) : null}
                 <SettingsToggleItem
                   title="Layout guides"
                   testID="settings-layout-guides-toggle"

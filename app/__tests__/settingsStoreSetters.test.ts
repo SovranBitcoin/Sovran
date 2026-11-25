@@ -32,6 +32,7 @@ jest.mock('@/shared/lib/logger', () => ({
   storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
   log: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
   applyFileLogging: jest.fn(),
+  applyVerboseLogging: jest.fn(),
   redactError: (e: unknown) => e,
 }));
 

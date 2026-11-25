@@ -1130,6 +1130,17 @@ export const log = createLogger({
   ringBufferSize: 200,
 });
 
+/**
+ * Runtime switch for verbose dev logging (debug / info / warn + render &
+ * layout-shift probes). Errors and fatals still emit so real crashes never
+ * go silent. No-op in production builds (always off) and E2E log builds
+ * (always on so the test runner sees every step).
+ */
+export function applyVerboseLogging(enabled: boolean): void {
+  if (!SHOW_LOGS || IS_E2E_LOG_BUILD) return;
+  log.setLevel(enabled ? 'debug' : 'error');
+}
+
 // ─── Init Timing Helper ──────────────────────────────────────────────────────
 
 export function initLog(tag: string, msg: string): void {

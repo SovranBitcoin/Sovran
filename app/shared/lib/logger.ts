@@ -34,6 +34,7 @@ export {
   monotonicNow,
   SHOW_LOGS,
   IS_E2E_LOG_BUILD,
+  applyVerboseLogging,
   log,
   initLog,
   initPhase,

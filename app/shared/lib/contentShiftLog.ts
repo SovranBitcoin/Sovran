@@ -54,6 +54,7 @@ function useShiftLoggerLive(component: string): ShiftReporter {
 
   const report = useCallback<ShiftReporter['report']>(
     (event, key, value, extra) => {
+      if (!visualLoggingEnabled()) return;
       if (!Number.isFinite(value)) return;
       const prev = lastRef.current.get(key);
       const firstMeasure = prev === undefined;
@@ -1078,7 +1079,7 @@ function useVisualStateLoggerLive(config: VisualStateConfig): void {
   const lastSignatureRef = useRef<string | null>(null);
   configRef.current = config;
 
-  const signature = visualStateSignature(config.state);
+  const signature = visualLoggingEnabled(config.enabled) ? visualStateSignature(config.state) : '';
 
   useEffect(() => {
     const current = configRef.current;

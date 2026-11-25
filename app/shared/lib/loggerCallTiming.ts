@@ -122,6 +122,9 @@ export function withCallTiming<T extends object>(target: T, options: CallTimingO
 
   function timeFunction(fn: AnyFunction, owner: object, ownerProxy: object, method: string) {
     return function timedCall(this: unknown, ...args: unknown[]): unknown {
+      if (!logger.isLevelEnabled('debug')) {
+        return Reflect.apply(fn, this === ownerProxy ? owner : this, args);
+      }
       const startedAt = monotonicNow();
       let result: unknown;
       try {
