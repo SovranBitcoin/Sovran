@@ -331,7 +331,7 @@ describe('nostr client & pure nostr-tools NIP-17 payment transport', () => {
       onopen: (() => void) | null = null;
       onmessage: ((e: { data: unknown }) => void) | null = null;
       onerror: ((e: unknown) => void) | null = null;
-      onclose: ((e: { code?: number; reason?: string }) => void) | null = null;
+      onclose: ((e: unknown) => void) | null = null;
 
       constructor(_url: string) {
         queueMicrotask(() => {
