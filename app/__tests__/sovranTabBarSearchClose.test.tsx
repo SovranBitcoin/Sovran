@@ -105,6 +105,15 @@ const renderBar = (focusedIndex: number, onCloseRoute = jest.fn()) => {
 beforeEach(() => jest.clearAllMocks());
 
 describe('Search tab', () => {
+  it('keeps the same magnifier glyph open or closed, so the close never pops', () => {
+    renderBar(2);
+    expect(screen.queryByTestId('icon:mingcute:search-3-fill')).toBeNull();
+    expect(screen.getByTestId('icon:mingcute:search-3-line')).toBeTruthy();
+    screen.unmount();
+    renderBar(0);
+    expect(screen.getByTestId('icon:mingcute:search-3-line')).toBeTruthy();
+  });
+
   it('opens Search from another tab as any tab does', () => {
     const onCloseRoute = renderBar(1);
     const search = screen.getByTestId('tab-search');

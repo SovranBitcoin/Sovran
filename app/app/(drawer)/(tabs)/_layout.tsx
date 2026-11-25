@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
 import { View } from 'react-native';
 import type { SFSymbol } from 'expo-symbols';
 import Icon from 'assets/icons';
 import { SearchTabIcon, SovranTabBar } from '@/shared/blocks/SovranTabBar';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -81,11 +81,19 @@ export default function TabLayout() {
   // The last tab other than Search: pressing the open Search tab goes back there.
   const [returnTab, setReturnTab] = useState<ReturnTab>('index');
   const searchOpen = focusedTab === 'search';
+  // The deferred close of an open Search tab (native tabs only).
+  const closeFrame = useRef<number | null>(null);
 
   const onTabFocus = (name: string) => {
     if (!isTabName(name)) return;
     setFocusedTab(name);
-    if (name !== 'search') setReturnTab(name);
+    if (name === 'search') return;
+    setReturnTab(name);
+    // A tab picked before the deferred close ran is where the person is going.
+    if (closeFrame.current !== null) {
+      cancelAnimationFrame(closeFrame.current);
+      closeFrame.current = null;
+    }
   };
 
   // iOS 26+ uses native liquid-glass tabs.
@@ -104,8 +112,14 @@ export default function TabLayout() {
                 tabPress: () => {
                   if (route.name !== 'search' || !searchOpen) return;
                   // The navigator re-selects Search right after this event, so
-                  // leave on the next frame or the re-select would win.
-                  requestAnimationFrame(() => router.navigate(RETURN_TABS[returnTab].href));
+                  // leave on the next frame or the re-select would win. Unguarded:
+                  // the double-tap cooldown would swallow a quick open-then-close
+                  // (the tab bar itself is the only caller, once per press).
+                  if (closeFrame.current !== null) cancelAnimationFrame(closeFrame.current);
+                  closeFrame.current = requestAnimationFrame(() => {
+                    closeFrame.current = null;
+                    guardedRouter.raw.navigate(RETURN_TABS[returnTab].href);
+                  });
                 },
               })}>
               {TAB_DEFS.map((tab) => {
@@ -121,7 +135,9 @@ export default function TabLayout() {
                     disableScrollToTop={tab.name === 'search'}
                     unstable_nativeProps={{
                       tabBarItemTestID: tab.testID,
-                      tabBarItemAccessibilityLabel: closes ? SEARCH_CLOSE_LABEL : tab.title,
+                      tabBarItemAccessibilityLabel: closes
+                        ? `${SEARCH_CLOSE_LABEL}. ${RETURN_TABS[returnTab].hint}`
+                        : tab.title,
                     }}>
                     {/* A `role` item takes the system's own title. */}
                     {tab.role ? null : (

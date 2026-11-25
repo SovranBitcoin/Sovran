@@ -31,4 +31,8 @@ export interface SelectableCheckProps {
    *  1 = selected), so a design-system scrubber can hold any frame. Omitted,
    *  the mark follows `selected` on its own. */
   selectProgress?: SharedValue<number>;
+  /** `circle` only: the identity of the item the mark shows, for a recycled
+   *  list cell. When it changes the mark snaps to the new item's state
+   *  instead of animating from the previous item's. */
+  recycleKey?: string;
 }

@@ -1505,6 +1505,7 @@ exports[`Design System exact structural snapshots renders foundations/button-sta
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -1865,6 +1866,7 @@ exports[`Design System exact structural snapshots renders foundations/button-sta
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -1961,6 +1963,7 @@ exports[`Design System exact structural snapshots renders foundations/button-sta
               ],
               "props": {
                 "style": {
+                  "opacity": 1,
                   "transform": [
                     {
                       "scale": 1,
@@ -2053,6 +2056,7 @@ exports[`Design System exact structural snapshots renders foundations/button-sta
               ],
               "props": {
                 "style": {
+                  "opacity": 1,
                   "transform": [
                     {
                       "scale": 1,
@@ -2174,6 +2178,7 @@ exports[`Design System exact structural snapshots renders foundations/button-var
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -2266,6 +2271,7 @@ exports[`Design System exact structural snapshots renders foundations/button-var
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -2358,6 +2364,7 @@ exports[`Design System exact structural snapshots renders foundations/button-var
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -2450,6 +2457,7 @@ exports[`Design System exact structural snapshots renders foundations/button-var
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -9125,6 +9133,7 @@ exports[`Design System exact structural snapshots renders scrubber/account-row-a
                   ],
                   "props": {
                     "style": {
+                      "opacity": 1,
                       "transform": [
                         {
                           "scale": 1,
@@ -9169,7 +9178,7 @@ exports[`Design System exact structural snapshots renders scrubber/account-row-a
                 },
               ],
               "props": {
-                "aria-label": "Account options",
+                "aria-label": "Account options for Satoshi",
                 "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
                 "data-testid": "drawer-profile-options-0",
                 "dir": null,
@@ -9279,6 +9288,7 @@ exports[`Design System exact structural snapshots renders scrubber/button-press 
               ],
               "props": {
                 "style": {
+                  "opacity": 0.94,
                   "transform": [
                     {
                       "scale": 0.985,
@@ -9344,58 +9354,127 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
                                             {
                                               "children": [
                                                 {
-                                                  "children": null,
+                                                  "children": [
+                                                    {
+                                                      "children": null,
+                                                      "props": {
+                                                        "color": "rgb(8, 8, 8)",
+                                                        "height": 17,
+                                                        "width": 17,
+                                                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                      },
+                                                      "type": "SvgXml",
+                                                    },
+                                                  ],
                                                   "props": {
-                                                    "color": "rgb(8, 8, 8)",
-                                                    "height": 17,
-                                                    "width": 17,
-                                                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                    "className": "css-view-g5y9jx",
+                                                    "dir": null,
                                                   },
-                                                  "type": "SvgXml",
+                                                  "type": "div",
                                                 },
                                               ],
                                               "props": {
+                                                "aria-label": "Sovran Mint icon",
+                                                "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                                "dir": null,
+                                                "role": "img",
+                                                "style": {
+                                                  "backgroundColor": "rgba(96,96,96,1.00)",
+                                                  "borderBottomLeftRadius": "12px",
+                                                  "borderBottomRightRadius": "12px",
+                                                  "borderTopLeftRadius": "12px",
+                                                  "borderTopRightRadius": "12px",
+                                                  "height": "24px",
+                                                  "width": "24px",
+                                                },
+                                              },
+                                              "type": "div",
+                                            },
+                                            {
+                                              "children": null,
+                                              "props": {
+                                                "aria-label": "Online",
                                                 "className": "css-view-g5y9jx",
                                                 "dir": null,
+                                                "style": {
+                                                  "backgroundColor": "rgba(32,128,72,1.00)",
+                                                  "borderBottomColor": "rgba(8,8,8,1.00)",
+                                                  "borderBottomLeftRadius": "4.5px",
+                                                  "borderBottomRightRadius": "4.5px",
+                                                  "borderLeftColor": "rgba(8,8,8,1.00)",
+                                                  "borderRightColor": "rgba(8,8,8,1.00)",
+                                                  "borderTopColor": "rgba(8,8,8,1.00)",
+                                                  "borderTopLeftRadius": "4.5px",
+                                                  "borderTopRightRadius": "4.5px",
+                                                  "height": "9px",
+                                                  "width": "9px",
+                                                },
                                               },
                                               "type": "div",
                                             },
                                           ],
                                           "props": {
-                                            "aria-label": "Sovran Mint icon",
-                                            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                            "className": "css-view-g5y9jx",
                                             "dir": null,
-                                            "role": "img",
-                                            "style": {
-                                              "backgroundColor": "rgba(96,96,96,1.00)",
-                                              "borderBottomLeftRadius": "12px",
-                                              "borderBottomRightRadius": "12px",
-                                              "borderTopLeftRadius": "12px",
-                                              "borderTopRightRadius": "12px",
-                                              "height": "24px",
-                                              "width": "24px",
-                                            },
                                           },
                                           "type": "div",
                                         },
+                                      ],
+                                      "props": {
+                                        "className": "css-view-g5y9jx",
+                                        "dir": null,
+                                        "style": {
+                                          "height": "24px",
+                                          "width": "24px",
+                                        },
+                                      },
+                                      "type": "div",
+                                    },
+                                  ],
+                                  "props": {
+                                    "className": "css-view-g5y9jx",
+                                    "dir": null,
+                                    "style": {
+                                      "marginRight": "4px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                                {
+                                  "children": [
+                                    {
+                                      "children": [
+                                        "Sovran Mint",
+                                      ],
+                                      "props": {
+                                        "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                        "dir": "auto",
+                                        "style": {
+                                          "color": "rgba(16,16,16,1.00)",
+                                          "fontFamily": "OxygenBold",
+                                          "fontSize": "12px",
+                                        },
+                                      },
+                                      "type": "div",
+                                    },
+                                    {
+                                      "children": [
                                         {
-                                          "children": null,
+                                          "children": [
+                                            "₿ 0.00021000",
+                                          ],
                                           "props": {
-                                            "aria-label": "Online",
-                                            "className": "css-view-g5y9jx",
-                                            "dir": null,
+                                            "className": "css-text-146c3p1",
+                                            "dir": "auto",
                                             "style": {
-                                              "backgroundColor": "rgba(32,128,72,1.00)",
-                                              "borderBottomColor": "rgba(8,8,8,1.00)",
-                                              "borderBottomLeftRadius": "4.5px",
-                                              "borderBottomRightRadius": "4.5px",
-                                              "borderLeftColor": "rgba(8,8,8,1.00)",
-                                              "borderRightColor": "rgba(8,8,8,1.00)",
-                                              "borderTopColor": "rgba(8,8,8,1.00)",
-                                              "borderTopLeftRadius": "4.5px",
-                                              "borderTopRightRadius": "4.5px",
-                                              "height": "9px",
-                                              "width": "9px",
+                                              "color": "rgba(16,16,16,1.00)",
+                                              "fontFamily": "MonaSans-Black",
+                                              "fontSize": "12px",
+                                              "marginBottom": "0px",
+                                              "marginLeft": "0px",
+                                              "marginRight": "0px",
+                                              "marginTop": "0px",
+                                              "textAlign": "left",
                                             },
                                           },
                                           "type": "div",
@@ -9411,10 +9490,6 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
                                   "props": {
                                     "className": "css-view-g5y9jx",
                                     "dir": null,
-                                    "style": {
-                                      "height": "24px",
-                                      "width": "24px",
-                                    },
                                   },
                                   "type": "div",
                                 },
@@ -9423,70 +9498,18 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
                                 "style": {
-                                  "marginRight": "4px",
+                                  "minHeight": "40px",
                                 },
-                              },
-                              "type": "div",
-                            },
-                            {
-                              "children": [
-                                {
-                                  "children": [
-                                    "Sovran Mint",
-                                  ],
-                                  "props": {
-                                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                    "dir": "auto",
-                                    "style": {
-                                      "color": "rgba(16,16,16,1.00)",
-                                      "fontFamily": "OxygenBold",
-                                      "fontSize": "12px",
-                                    },
-                                  },
-                                  "type": "div",
-                                },
-                                {
-                                  "children": [
-                                    {
-                                      "children": [
-                                        "₿ 21,000",
-                                      ],
-                                      "props": {
-                                        "className": "css-text-146c3p1",
-                                        "dir": "auto",
-                                        "style": {
-                                          "color": "rgba(16,16,16,1.00)",
-                                          "fontFamily": "MonaSans-Black",
-                                          "fontSize": "12px",
-                                          "marginBottom": "0px",
-                                          "marginLeft": "0px",
-                                          "marginRight": "0px",
-                                          "marginTop": "0px",
-                                          "textAlign": "left",
-                                        },
-                                      },
-                                      "type": "div",
-                                    },
-                                  ],
-                                  "props": {
-                                    "className": "css-view-g5y9jx",
-                                    "dir": null,
-                                  },
-                                  "type": "div",
-                                },
-                              ],
-                              "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
                               },
                               "type": "div",
                             },
                           ],
                           "props": {
-                            "className": "css-view-g5y9jx",
-                            "dir": null,
+                            "style": {
+                              "opacity": 0.5,
+                            },
                           },
-                          "type": "div",
+                          "type": "View",
                         },
                         {
                           "children": [
@@ -9593,6 +9616,9 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
                               "props": {
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
+                                "style": {
+                                  "minHeight": "40px",
+                                },
                               },
                               "type": "div",
                             },
@@ -9680,6 +9706,9 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
           ],
           "props": {
             "accessibilityRole": "button",
+            "accessibilityState": {
+              "busy": false,
+            },
             "style": [
               {
                 "alignSelf": "center",
@@ -33837,6 +33866,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-def
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -33881,7 +33911,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-def
         },
       ],
       "props": {
-        "aria-label": "Account options",
+        "aria-label": "Account options for Satoshi",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
         "data-testid": "drawer-profile-options-0",
         "dir": null,
@@ -34232,6 +34262,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-emp
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -34276,7 +34307,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-emp
         },
       ],
       "props": {
-        "aria-label": "Account options",
+        "aria-label": "Account options for swirling-sparrow",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
         "data-testid": "drawer-profile-options-3",
         "dir": null,
@@ -34662,6 +34693,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-lar
                   ],
                   "props": {
                     "style": {
+                      "opacity": 1,
                       "transform": [
                         {
                           "scale": 1,
@@ -34706,7 +34738,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-lar
                 },
               ],
               "props": {
-                "aria-label": "Account options",
+                "aria-label": "Account options for Satoshi",
                 "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
                 "data-testid": "drawer-profile-options-0",
                 "dir": null,
@@ -35317,6 +35349,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-loa
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -35364,7 +35397,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-loa
       ],
       "props": {
         "aria-disabled": true,
-        "aria-label": "Account options",
+        "aria-label": "Account options for Satoshi",
         "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
         "data-testid": "drawer-profile-options-0",
         "dir": null,
@@ -35732,6 +35765,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-sel
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -35776,7 +35810,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-sel
         },
       ],
       "props": {
-        "aria-label": "Account options",
+        "aria-label": "Account options for Satoshi",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
         "data-testid": "drawer-profile-options-0",
         "dir": null,
@@ -36142,6 +36176,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-wor
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -36186,7 +36221,7 @@ exports[`Design System exact structural snapshots renders ui-kit/account-row-wor
         },
       ],
       "props": {
-        "aria-label": "Account options",
+        "aria-label": "Account options for نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
         "data-testid": "drawer-profile-options-7",
         "dir": null,
@@ -36534,14 +36569,83 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
                                 {
                                   "children": [
                                     {
-                                      "children": null,
+                                      "children": [
+                                        {
+                                          "children": null,
+                                          "props": {
+                                            "color": "rgb(16, 16, 16)",
+                                            "height": 20,
+                                            "width": 20,
+                                            "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"><path d="M21.1009 8.00353C21.0442 7.99996 20.9825 7.99998 20.9186 8L20.9026 8.00001H18.3941C16.3264 8.00001 14.5572 9.62757 14.5572 11.75C14.5572 13.8724 16.3264 15.5 18.3941 15.5H20.9026L20.9186 15.5C20.9825 15.5 21.0442 15.5001 21.1009 15.4965C21.9408 15.4434 22.6835 14.7862 22.746 13.8682C22.7501 13.808 22.75 13.7431 22.75 13.683L22.75 13.6667V9.83334L22.75 9.81702C22.75 9.75688 22.7501 9.69199 22.746 9.6318C22.6835 8.71381 21.9408 8.05657 21.1009 8.00353ZM18.1717 12.75C18.704 12.75 19.1355 12.3023 19.1355 11.75C19.1355 11.1977 18.704 10.75 18.1717 10.75C17.6394 10.75 17.2078 11.1977 17.2078 11.75C17.2078 12.3023 17.6394 12.75 18.1717 12.75Z"/><path d="M20.9179 17C21.067 16.9961 21.1799 17.1342 21.1394 17.2778C20.9387 17.9902 20.62 18.5975 20.1088 19.1088C19.3604 19.8571 18.4114 20.1892 17.239 20.3469C16.0998 20.5 14.6442 20.5 12.8064 20.5H10.6936C8.85583 20.5 7.40019 20.5 6.26098 20.3469C5.08856 20.1892 4.13961 19.8571 3.39124 19.1088C2.64288 18.3604 2.31076 17.4114 2.15314 16.239C1.99997 15.0998 1.99998 13.6442 2 11.8064V11.6936C1.99998 9.85583 1.99997 8.40019 2.15314 7.26098C2.31076 6.08856 2.64288 5.13961 3.39124 4.39124C4.13961 3.64288 5.08856 3.31076 6.26098 3.15314C7.40019 2.99997 8.85582 2.99998 10.6936 3L12.8064 3C14.6442 2.99998 16.0998 2.99997 17.239 3.15314C18.4114 3.31076 19.3604 3.64288 20.1088 4.39124C20.62 4.90252 20.9386 5.50974 21.1394 6.22218C21.1799 6.36575 21.067 6.50387 20.9179 6.5L18.394 6.50001C15.5574 6.50001 13.0571 8.74091 13.0571 11.75C13.0571 14.7591 15.5574 17 18.394 17L20.9179 17ZM5.75 7C5.33579 7 5 7.33579 5 7.75C5 8.16421 5.33579 8.5 5.75 8.5H9.75C10.1642 8.5 10.5 8.16421 10.5 7.75C10.5 7.33579 10.1642 7 9.75 7H5.75Z"/></g></svg>",
+                                          },
+                                          "type": "SvgXml",
+                                        },
+                                      ],
                                       "props": {
-                                        "color": "rgb(16, 16, 16)",
-                                        "height": 20,
-                                        "width": 20,
-                                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"><path d="M21.1009 8.00353C21.0442 7.99996 20.9825 7.99998 20.9186 8L20.9026 8.00001H18.3941C16.3264 8.00001 14.5572 9.62757 14.5572 11.75C14.5572 13.8724 16.3264 15.5 18.3941 15.5H20.9026L20.9186 15.5C20.9825 15.5 21.0442 15.5001 21.1009 15.4965C21.9408 15.4434 22.6835 14.7862 22.746 13.8682C22.7501 13.808 22.75 13.7431 22.75 13.683L22.75 13.6667V9.83334L22.75 9.81702C22.75 9.75688 22.7501 9.69199 22.746 9.6318C22.6835 8.71381 21.9408 8.05657 21.1009 8.00353ZM18.1717 12.75C18.704 12.75 19.1355 12.3023 19.1355 11.75C19.1355 11.1977 18.704 10.75 18.1717 10.75C17.6394 10.75 17.2078 11.1977 17.2078 11.75C17.2078 12.3023 17.6394 12.75 18.1717 12.75Z"/><path d="M20.9179 17C21.067 16.9961 21.1799 17.1342 21.1394 17.2778C20.9387 17.9902 20.62 18.5975 20.1088 19.1088C19.3604 19.8571 18.4114 20.1892 17.239 20.3469C16.0998 20.5 14.6442 20.5 12.8064 20.5H10.6936C8.85583 20.5 7.40019 20.5 6.26098 20.3469C5.08856 20.1892 4.13961 19.8571 3.39124 19.1088C2.64288 18.3604 2.31076 17.4114 2.15314 16.239C1.99997 15.0998 1.99998 13.6442 2 11.8064V11.6936C1.99998 9.85583 1.99997 8.40019 2.15314 7.26098C2.31076 6.08856 2.64288 5.13961 3.39124 4.39124C4.13961 3.64288 5.08856 3.31076 6.26098 3.15314C7.40019 2.99997 8.85582 2.99998 10.6936 3L12.8064 3C14.6442 2.99998 16.0998 2.99997 17.239 3.15314C18.4114 3.31076 19.3604 3.64288 20.1088 4.39124C20.62 4.90252 20.9386 5.50974 21.1394 6.22218C21.1799 6.36575 21.067 6.50387 20.9179 6.5L18.394 6.50001C15.5574 6.50001 13.0571 8.74091 13.0571 11.75C13.0571 14.7591 15.5574 17 18.394 17L20.9179 17ZM5.75 7C5.33579 7 5 7.33579 5 7.75C5 8.16421 5.33579 8.5 5.75 8.5H9.75C10.1642 8.5 10.5 8.16421 10.5 7.75C10.5 7.33579 10.1642 7 9.75 7H5.75Z"/></g></svg>",
+                                        "className": "css-view-g5y9jx",
+                                        "dir": null,
                                       },
-                                      "type": "SvgXml",
+                                      "type": "div",
+                                    },
+                                  ],
+                                  "props": {
+                                    "className": "css-view-g5y9jx",
+                                    "dir": null,
+                                    "style": {
+                                      "height": "24px",
+                                      "width": "24px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx",
+                                "dir": null,
+                                "style": {
+                                  "marginRight": "4px",
+                                },
+                              },
+                              "type": "div",
+                            },
+                            {
+                              "children": [
+                                {
+                                  "children": [
+                                    "Balance",
+                                  ],
+                                  "props": {
+                                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                    "dir": "auto",
+                                    "style": {
+                                      "color": "rgba(16,16,16,1.00)",
+                                      "fontFamily": "OxygenBold",
+                                      "fontSize": "12px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                                {
+                                  "children": [
+                                    {
+                                      "children": [
+                                        "₿ 0.00021000",
+                                      ],
+                                      "props": {
+                                        "className": "css-text-146c3p1",
+                                        "dir": "auto",
+                                        "style": {
+                                          "color": "rgba(16,16,16,1.00)",
+                                          "fontFamily": "MonaSans-Black",
+                                          "fontSize": "12px",
+                                          "marginBottom": "0px",
+                                          "marginLeft": "0px",
+                                          "marginRight": "0px",
+                                          "marginTop": "0px",
+                                          "textAlign": "left",
+                                        },
+                                      },
+                                      "type": "div",
                                     },
                                   ],
                                   "props": {
@@ -36554,10 +36658,6 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
                               "props": {
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
-                                "style": {
-                                  "height": "24px",
-                                  "width": "24px",
-                                },
                               },
                               "type": "div",
                             },
@@ -36566,70 +36666,18 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
                             "className": "css-view-g5y9jx",
                             "dir": null,
                             "style": {
-                              "marginRight": "4px",
+                              "minHeight": "40px",
                             },
-                          },
-                          "type": "div",
-                        },
-                        {
-                          "children": [
-                            {
-                              "children": [
-                                "Balance",
-                              ],
-                              "props": {
-                                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                "dir": "auto",
-                                "style": {
-                                  "color": "rgba(16,16,16,1.00)",
-                                  "fontFamily": "OxygenBold",
-                                  "fontSize": "12px",
-                                },
-                              },
-                              "type": "div",
-                            },
-                            {
-                              "children": [
-                                {
-                                  "children": [
-                                    "₿ 21,000",
-                                  ],
-                                  "props": {
-                                    "className": "css-text-146c3p1",
-                                    "dir": "auto",
-                                    "style": {
-                                      "color": "rgba(16,16,16,1.00)",
-                                      "fontFamily": "MonaSans-Black",
-                                      "fontSize": "12px",
-                                      "marginBottom": "0px",
-                                      "marginLeft": "0px",
-                                      "marginRight": "0px",
-                                      "marginTop": "0px",
-                                      "textAlign": "left",
-                                    },
-                                  },
-                                  "type": "div",
-                                },
-                              ],
-                              "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
-                              },
-                              "type": "div",
-                            },
-                          ],
-                          "props": {
-                            "className": "css-view-g5y9jx",
-                            "dir": null,
                           },
                           "type": "div",
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "style": {
+                          "opacity": 1,
+                        },
                       },
-                      "type": "div",
+                      "type": "View",
                     },
                   ],
                   "props": {
@@ -36697,6 +36745,9 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
       ],
       "props": {
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": false,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -36811,6 +36862,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-default:
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -36903,6 +36955,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-default:
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -37007,6 +37060,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-disabled
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -37101,6 +37155,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-disabled
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -37224,6 +37279,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-large-te
               ],
               "props": {
                 "style": {
+                  "opacity": 1,
                   "transform": [
                     {
                       "scale": 1,
@@ -37316,6 +37372,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-large-te
               ],
               "props": {
                 "style": {
+                  "opacity": 1,
                   "transform": [
                     {
                       "scale": 1,
@@ -37694,6 +37751,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-loading:
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -38054,6 +38112,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-loading:
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -38160,6 +38219,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-worst-ca
           ],
           "props": {
             "style": {
+              "opacity": 1,
               "transform": [
                 {
                   "scale": 1,
@@ -38256,6 +38316,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-worst-ca
                   ],
                   "props": {
                     "style": {
+                      "opacity": 1,
                       "transform": [
                         {
                           "scale": 1,
@@ -38357,6 +38418,7 @@ exports[`Design System exact structural snapshots renders ui-kit/button-worst-ca
                   ],
                   "props": {
                     "style": {
+                      "opacity": 1,
                       "transform": [
                         {
                           "scale": 1,
@@ -38505,7 +38567,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-emp
       "props": {
         "accessibilityElementsHidden": true,
         "accessible": false,
-        "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
         "importantForAccessibility": "no-hide-descendants",
         "style": {
           "opacity": 0,
@@ -38625,7 +38687,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-err
         "accessibilityElementsHidden": false,
         "accessibilityLabel": "Status: Having problems",
         "accessible": true,
-        "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
         "importantForAccessibility": "auto",
         "style": {
           "opacity": 1,
@@ -38764,7 +38826,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-lar
                 "accessibilityElementsHidden": false,
                 "accessibilityLabel": "Status: Operational",
                 "accessible": true,
-                "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+                "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
                 "importantForAccessibility": "auto",
                 "style": {
                   "opacity": 1,
@@ -38899,7 +38961,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-off
         "accessibilityElementsHidden": false,
         "accessibilityLabel": "Status: Offline",
         "accessible": true,
-        "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
         "importantForAccessibility": "auto",
         "style": {
           "opacity": 1,
@@ -39019,7 +39081,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-pop
         "accessibilityElementsHidden": false,
         "accessibilityLabel": "Status: Operational",
         "accessible": true,
-        "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
         "importantForAccessibility": "auto",
         "style": {
           "opacity": 1,
@@ -39139,7 +39201,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-wor
         "accessibilityElementsHidden": false,
         "accessibilityLabel": "Status: Having problems",
         "accessible": true,
-        "className": "mt-1 h-[22px] flex-row items-center justify-center gap-1.5",
+        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
         "importantForAccessibility": "auto",
         "style": {
           "opacity": 1,
@@ -39180,37 +39242,46 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
                                         {
                                           "children": [
                                             {
-                                              "children": null,
+                                              "children": [
+                                                {
+                                                  "children": null,
+                                                  "props": {
+                                                    "color": "rgb(8, 8, 8)",
+                                                    "height": 17,
+                                                    "width": 17,
+                                                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                  },
+                                                  "type": "SvgXml",
+                                                },
+                                              ],
                                               "props": {
-                                                "color": "rgb(8, 8, 8)",
-                                                "height": 17,
-                                                "width": 17,
-                                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                "className": "css-view-g5y9jx",
+                                                "dir": null,
                                               },
-                                              "type": "SvgXml",
+                                              "type": "div",
                                             },
                                           ],
                                           "props": {
-                                            "className": "css-view-g5y9jx",
+                                            "aria-label": "Mint icon",
+                                            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
                                             "dir": null,
+                                            "role": "img",
+                                            "style": {
+                                              "backgroundColor": "rgba(96,96,96,1.00)",
+                                              "borderBottomLeftRadius": "12px",
+                                              "borderBottomRightRadius": "12px",
+                                              "borderTopLeftRadius": "12px",
+                                              "borderTopRightRadius": "12px",
+                                              "height": "24px",
+                                              "width": "24px",
+                                            },
                                           },
                                           "type": "div",
                                         },
                                       ],
                                       "props": {
-                                        "aria-label": "Mint icon",
-                                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                        "className": "css-view-g5y9jx",
                                         "dir": null,
-                                        "role": "img",
-                                        "style": {
-                                          "backgroundColor": "rgba(96,96,96,1.00)",
-                                          "borderBottomLeftRadius": "12px",
-                                          "borderBottomRightRadius": "12px",
-                                          "borderTopLeftRadius": "12px",
-                                          "borderTopRightRadius": "12px",
-                                          "height": "24px",
-                                          "width": "24px",
-                                        },
                                       },
                                       "type": "div",
                                     },
@@ -39218,6 +39289,10 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
                                   "props": {
                                     "className": "css-view-g5y9jx",
                                     "dir": null,
+                                    "style": {
+                                      "height": "24px",
+                                      "width": "24px",
+                                    },
                                   },
                                   "type": "div",
                                 },
@@ -39226,8 +39301,22 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
                                 "style": {
-                                  "height": "24px",
-                                  "width": "24px",
+                                  "marginRight": "4px",
+                                },
+                              },
+                              "type": "div",
+                            },
+                            {
+                              "children": [
+                                "Add a mint",
+                              ],
+                              "props": {
+                                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                "dir": "auto",
+                                "style": {
+                                  "color": "rgba(16,16,16,1.00)",
+                                  "fontFamily": "OxygenBold",
+                                  "fontSize": "14px",
                                 },
                               },
                               "type": "div",
@@ -39237,32 +39326,18 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
                             "className": "css-view-g5y9jx",
                             "dir": null,
                             "style": {
-                              "marginRight": "4px",
-                            },
-                          },
-                          "type": "div",
-                        },
-                        {
-                          "children": [
-                            "Add a mint",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "OxygenBold",
-                              "fontSize": "14px",
+                              "minHeight": "40px",
                             },
                           },
                           "type": "div",
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "style": {
+                          "opacity": 1,
+                        },
                       },
-                      "type": "div",
+                      "type": "View",
                     },
                   ],
                   "props": {
@@ -39330,6 +39405,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
       ],
       "props": {
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": false,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -39415,58 +39493,127 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                                                 {
                                                   "children": [
                                                     {
-                                                      "children": null,
+                                                      "children": [
+                                                        {
+                                                          "children": null,
+                                                          "props": {
+                                                            "color": "rgb(8, 8, 8)",
+                                                            "height": 17,
+                                                            "width": 17,
+                                                            "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                          },
+                                                          "type": "SvgXml",
+                                                        },
+                                                      ],
                                                       "props": {
-                                                        "color": "rgb(8, 8, 8)",
-                                                        "height": 17,
-                                                        "width": 17,
-                                                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                        "className": "css-view-g5y9jx",
+                                                        "dir": null,
                                                       },
-                                                      "type": "SvgXml",
+                                                      "type": "div",
                                                     },
                                                   ],
                                                   "props": {
+                                                    "aria-label": "Sovran Mint icon",
+                                                    "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                                    "dir": null,
+                                                    "role": "img",
+                                                    "style": {
+                                                      "backgroundColor": "rgba(96,96,96,1.00)",
+                                                      "borderBottomLeftRadius": "12px",
+                                                      "borderBottomRightRadius": "12px",
+                                                      "borderTopLeftRadius": "12px",
+                                                      "borderTopRightRadius": "12px",
+                                                      "height": "24px",
+                                                      "width": "24px",
+                                                    },
+                                                  },
+                                                  "type": "div",
+                                                },
+                                                {
+                                                  "children": null,
+                                                  "props": {
+                                                    "aria-label": "Online",
                                                     "className": "css-view-g5y9jx",
                                                     "dir": null,
+                                                    "style": {
+                                                      "backgroundColor": "rgba(32,128,72,1.00)",
+                                                      "borderBottomColor": "rgba(8,8,8,1.00)",
+                                                      "borderBottomLeftRadius": "4.5px",
+                                                      "borderBottomRightRadius": "4.5px",
+                                                      "borderLeftColor": "rgba(8,8,8,1.00)",
+                                                      "borderRightColor": "rgba(8,8,8,1.00)",
+                                                      "borderTopColor": "rgba(8,8,8,1.00)",
+                                                      "borderTopLeftRadius": "4.5px",
+                                                      "borderTopRightRadius": "4.5px",
+                                                      "height": "9px",
+                                                      "width": "9px",
+                                                    },
                                                   },
                                                   "type": "div",
                                                 },
                                               ],
                                               "props": {
-                                                "aria-label": "Sovran Mint icon",
-                                                "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                                "className": "css-view-g5y9jx",
                                                 "dir": null,
-                                                "role": "img",
-                                                "style": {
-                                                  "backgroundColor": "rgba(96,96,96,1.00)",
-                                                  "borderBottomLeftRadius": "12px",
-                                                  "borderBottomRightRadius": "12px",
-                                                  "borderTopLeftRadius": "12px",
-                                                  "borderTopRightRadius": "12px",
-                                                  "height": "24px",
-                                                  "width": "24px",
-                                                },
                                               },
                                               "type": "div",
                                             },
+                                          ],
+                                          "props": {
+                                            "className": "css-view-g5y9jx",
+                                            "dir": null,
+                                            "style": {
+                                              "height": "24px",
+                                              "width": "24px",
+                                            },
+                                          },
+                                          "type": "div",
+                                        },
+                                      ],
+                                      "props": {
+                                        "className": "css-view-g5y9jx",
+                                        "dir": null,
+                                        "style": {
+                                          "marginRight": "4px",
+                                        },
+                                      },
+                                      "type": "div",
+                                    },
+                                    {
+                                      "children": [
+                                        {
+                                          "children": [
+                                            "Sovran Mint",
+                                          ],
+                                          "props": {
+                                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                            "dir": "auto",
+                                            "style": {
+                                              "color": "rgba(16,16,16,1.00)",
+                                              "fontFamily": "OxygenBold",
+                                              "fontSize": "12px",
+                                            },
+                                          },
+                                          "type": "div",
+                                        },
+                                        {
+                                          "children": [
                                             {
-                                              "children": null,
+                                              "children": [
+                                                "₿ 0.00021000",
+                                              ],
                                               "props": {
-                                                "aria-label": "Online",
-                                                "className": "css-view-g5y9jx",
-                                                "dir": null,
+                                                "className": "css-text-146c3p1",
+                                                "dir": "auto",
                                                 "style": {
-                                                  "backgroundColor": "rgba(32,128,72,1.00)",
-                                                  "borderBottomColor": "rgba(8,8,8,1.00)",
-                                                  "borderBottomLeftRadius": "4.5px",
-                                                  "borderBottomRightRadius": "4.5px",
-                                                  "borderLeftColor": "rgba(8,8,8,1.00)",
-                                                  "borderRightColor": "rgba(8,8,8,1.00)",
-                                                  "borderTopColor": "rgba(8,8,8,1.00)",
-                                                  "borderTopLeftRadius": "4.5px",
-                                                  "borderTopRightRadius": "4.5px",
-                                                  "height": "9px",
-                                                  "width": "9px",
+                                                  "color": "rgba(16,16,16,1.00)",
+                                                  "fontFamily": "MonaSans-Black",
+                                                  "fontSize": "12px",
+                                                  "marginBottom": "0px",
+                                                  "marginLeft": "0px",
+                                                  "marginRight": "0px",
+                                                  "marginTop": "0px",
+                                                  "textAlign": "left",
                                                 },
                                               },
                                               "type": "div",
@@ -39482,10 +39629,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                                       "props": {
                                         "className": "css-view-g5y9jx",
                                         "dir": null,
-                                        "style": {
-                                          "height": "24px",
-                                          "width": "24px",
-                                        },
                                       },
                                       "type": "div",
                                     },
@@ -39494,70 +39637,18 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                                     "className": "css-view-g5y9jx",
                                     "dir": null,
                                     "style": {
-                                      "marginRight": "4px",
+                                      "minHeight": "40px",
                                     },
-                                  },
-                                  "type": "div",
-                                },
-                                {
-                                  "children": [
-                                    {
-                                      "children": [
-                                        "Sovran Mint",
-                                      ],
-                                      "props": {
-                                        "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                        "dir": "auto",
-                                        "style": {
-                                          "color": "rgba(16,16,16,1.00)",
-                                          "fontFamily": "OxygenBold",
-                                          "fontSize": "12px",
-                                        },
-                                      },
-                                      "type": "div",
-                                    },
-                                    {
-                                      "children": [
-                                        {
-                                          "children": [
-                                            "₿ 21,000",
-                                          ],
-                                          "props": {
-                                            "className": "css-text-146c3p1",
-                                            "dir": "auto",
-                                            "style": {
-                                              "color": "rgba(16,16,16,1.00)",
-                                              "fontFamily": "MonaSans-Black",
-                                              "fontSize": "12px",
-                                              "marginBottom": "0px",
-                                              "marginLeft": "0px",
-                                              "marginRight": "0px",
-                                              "marginTop": "0px",
-                                              "textAlign": "left",
-                                            },
-                                          },
-                                          "type": "div",
-                                        },
-                                      ],
-                                      "props": {
-                                        "className": "css-view-g5y9jx",
-                                        "dir": null,
-                                      },
-                                      "type": "div",
-                                    },
-                                  ],
-                                  "props": {
-                                    "className": "css-view-g5y9jx",
-                                    "dir": null,
                                   },
                                   "type": "div",
                                 },
                               ],
                               "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
+                                "style": {
+                                  "opacity": 1,
+                                },
                               },
-                              "type": "div",
+                              "type": "View",
                             },
                           ],
                           "props": {
@@ -39625,6 +39716,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
               ],
               "props": {
                 "accessibilityRole": "button",
+                "accessibilityState": {
+                  "busy": false,
+                },
                 "style": [
                   {
                     "alignSelf": "center",
@@ -39796,6 +39890,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                       "props": {
                         "className": "css-view-g5y9jx",
                         "dir": null,
+                        "style": {
+                          "minHeight": "40px",
+                        },
                       },
                       "type": "div",
                     },
@@ -39864,7 +39961,11 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
         },
       ],
       "props": {
+        "accessibilityLabel": "Loading mint",
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": true,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -39931,58 +40032,127 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
                                         {
                                           "children": [
                                             {
-                                              "children": null,
+                                              "children": [
+                                                {
+                                                  "children": null,
+                                                  "props": {
+                                                    "color": "rgb(8, 8, 8)",
+                                                    "height": 17,
+                                                    "width": 17,
+                                                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                  },
+                                                  "type": "SvgXml",
+                                                },
+                                              ],
                                               "props": {
-                                                "color": "rgb(8, 8, 8)",
-                                                "height": 17,
-                                                "width": 17,
-                                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                "className": "css-view-g5y9jx",
+                                                "dir": null,
                                               },
-                                              "type": "SvgXml",
+                                              "type": "div",
                                             },
                                           ],
                                           "props": {
+                                            "aria-label": "Sovran Mint icon",
+                                            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                            "dir": null,
+                                            "role": "img",
+                                            "style": {
+                                              "backgroundColor": "rgba(96,96,96,1.00)",
+                                              "borderBottomLeftRadius": "12px",
+                                              "borderBottomRightRadius": "12px",
+                                              "borderTopLeftRadius": "12px",
+                                              "borderTopRightRadius": "12px",
+                                              "height": "24px",
+                                              "width": "24px",
+                                            },
+                                          },
+                                          "type": "div",
+                                        },
+                                        {
+                                          "children": null,
+                                          "props": {
+                                            "aria-label": "Offline",
                                             "className": "css-view-g5y9jx",
                                             "dir": null,
+                                            "style": {
+                                              "backgroundColor": "rgba(192,48,48,1.00)",
+                                              "borderBottomColor": "rgba(8,8,8,1.00)",
+                                              "borderBottomLeftRadius": "4.5px",
+                                              "borderBottomRightRadius": "4.5px",
+                                              "borderLeftColor": "rgba(8,8,8,1.00)",
+                                              "borderRightColor": "rgba(8,8,8,1.00)",
+                                              "borderTopColor": "rgba(8,8,8,1.00)",
+                                              "borderTopLeftRadius": "4.5px",
+                                              "borderTopRightRadius": "4.5px",
+                                              "height": "9px",
+                                              "width": "9px",
+                                            },
                                           },
                                           "type": "div",
                                         },
                                       ],
                                       "props": {
-                                        "aria-label": "Sovran Mint icon",
-                                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                        "className": "css-view-g5y9jx",
                                         "dir": null,
-                                        "role": "img",
-                                        "style": {
-                                          "backgroundColor": "rgba(96,96,96,1.00)",
-                                          "borderBottomLeftRadius": "12px",
-                                          "borderBottomRightRadius": "12px",
-                                          "borderTopLeftRadius": "12px",
-                                          "borderTopRightRadius": "12px",
-                                          "height": "24px",
-                                          "width": "24px",
-                                        },
                                       },
                                       "type": "div",
                                     },
+                                  ],
+                                  "props": {
+                                    "className": "css-view-g5y9jx",
+                                    "dir": null,
+                                    "style": {
+                                      "height": "24px",
+                                      "width": "24px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx",
+                                "dir": null,
+                                "style": {
+                                  "marginRight": "4px",
+                                },
+                              },
+                              "type": "div",
+                            },
+                            {
+                              "children": [
+                                {
+                                  "children": [
+                                    "Sovran Mint",
+                                  ],
+                                  "props": {
+                                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                    "dir": "auto",
+                                    "style": {
+                                      "color": "rgba(16,16,16,1.00)",
+                                      "fontFamily": "OxygenBold",
+                                      "fontSize": "12px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                                {
+                                  "children": [
                                     {
-                                      "children": null,
+                                      "children": [
+                                        "₿ 0.00021000",
+                                      ],
                                       "props": {
-                                        "aria-label": "Offline",
-                                        "className": "css-view-g5y9jx",
-                                        "dir": null,
+                                        "className": "css-text-146c3p1",
+                                        "dir": "auto",
                                         "style": {
-                                          "backgroundColor": "rgba(192,48,48,1.00)",
-                                          "borderBottomColor": "rgba(8,8,8,1.00)",
-                                          "borderBottomLeftRadius": "4.5px",
-                                          "borderBottomRightRadius": "4.5px",
-                                          "borderLeftColor": "rgba(8,8,8,1.00)",
-                                          "borderRightColor": "rgba(8,8,8,1.00)",
-                                          "borderTopColor": "rgba(8,8,8,1.00)",
-                                          "borderTopLeftRadius": "4.5px",
-                                          "borderTopRightRadius": "4.5px",
-                                          "height": "9px",
-                                          "width": "9px",
+                                          "color": "rgba(16,16,16,1.00)",
+                                          "fontFamily": "MonaSans-Black",
+                                          "fontSize": "12px",
+                                          "marginBottom": "0px",
+                                          "marginLeft": "0px",
+                                          "marginRight": "0px",
+                                          "marginTop": "0px",
+                                          "textAlign": "left",
                                         },
                                       },
                                       "type": "div",
@@ -39998,10 +40168,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
                               "props": {
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
-                                "style": {
-                                  "height": "24px",
-                                  "width": "24px",
-                                },
                               },
                               "type": "div",
                             },
@@ -40010,70 +40176,18 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
                             "className": "css-view-g5y9jx",
                             "dir": null,
                             "style": {
-                              "marginRight": "4px",
+                              "minHeight": "40px",
                             },
-                          },
-                          "type": "div",
-                        },
-                        {
-                          "children": [
-                            {
-                              "children": [
-                                "Sovran Mint",
-                              ],
-                              "props": {
-                                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                "dir": "auto",
-                                "style": {
-                                  "color": "rgba(16,16,16,1.00)",
-                                  "fontFamily": "OxygenBold",
-                                  "fontSize": "12px",
-                                },
-                              },
-                              "type": "div",
-                            },
-                            {
-                              "children": [
-                                {
-                                  "children": [
-                                    "₿ 21,000",
-                                  ],
-                                  "props": {
-                                    "className": "css-text-146c3p1",
-                                    "dir": "auto",
-                                    "style": {
-                                      "color": "rgba(16,16,16,1.00)",
-                                      "fontFamily": "MonaSans-Black",
-                                      "fontSize": "12px",
-                                      "marginBottom": "0px",
-                                      "marginLeft": "0px",
-                                      "marginRight": "0px",
-                                      "marginTop": "0px",
-                                      "textAlign": "left",
-                                    },
-                                  },
-                                  "type": "div",
-                                },
-                              ],
-                              "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
-                              },
-                              "type": "div",
-                            },
-                          ],
-                          "props": {
-                            "className": "css-view-g5y9jx",
-                            "dir": null,
                           },
                           "type": "div",
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "style": {
+                          "opacity": 1,
+                        },
                       },
-                      "type": "div",
+                      "type": "View",
                     },
                   ],
                   "props": {
@@ -40141,6 +40255,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
       ],
       "props": {
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": false,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -40207,58 +40324,127 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
                                         {
                                           "children": [
                                             {
-                                              "children": null,
+                                              "children": [
+                                                {
+                                                  "children": null,
+                                                  "props": {
+                                                    "color": "rgb(8, 8, 8)",
+                                                    "height": 17,
+                                                    "width": 17,
+                                                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                  },
+                                                  "type": "SvgXml",
+                                                },
+                                              ],
                                               "props": {
-                                                "color": "rgb(8, 8, 8)",
-                                                "height": 17,
-                                                "width": 17,
-                                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                "className": "css-view-g5y9jx",
+                                                "dir": null,
                                               },
-                                              "type": "SvgXml",
+                                              "type": "div",
                                             },
                                           ],
                                           "props": {
+                                            "aria-label": "Sovran Mint icon",
+                                            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                            "dir": null,
+                                            "role": "img",
+                                            "style": {
+                                              "backgroundColor": "rgba(96,96,96,1.00)",
+                                              "borderBottomLeftRadius": "12px",
+                                              "borderBottomRightRadius": "12px",
+                                              "borderTopLeftRadius": "12px",
+                                              "borderTopRightRadius": "12px",
+                                              "height": "24px",
+                                              "width": "24px",
+                                            },
+                                          },
+                                          "type": "div",
+                                        },
+                                        {
+                                          "children": null,
+                                          "props": {
+                                            "aria-label": "Online",
                                             "className": "css-view-g5y9jx",
                                             "dir": null,
+                                            "style": {
+                                              "backgroundColor": "rgba(32,128,72,1.00)",
+                                              "borderBottomColor": "rgba(8,8,8,1.00)",
+                                              "borderBottomLeftRadius": "4.5px",
+                                              "borderBottomRightRadius": "4.5px",
+                                              "borderLeftColor": "rgba(8,8,8,1.00)",
+                                              "borderRightColor": "rgba(8,8,8,1.00)",
+                                              "borderTopColor": "rgba(8,8,8,1.00)",
+                                              "borderTopLeftRadius": "4.5px",
+                                              "borderTopRightRadius": "4.5px",
+                                              "height": "9px",
+                                              "width": "9px",
+                                            },
                                           },
                                           "type": "div",
                                         },
                                       ],
                                       "props": {
-                                        "aria-label": "Sovran Mint icon",
-                                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                        "className": "css-view-g5y9jx",
                                         "dir": null,
-                                        "role": "img",
-                                        "style": {
-                                          "backgroundColor": "rgba(96,96,96,1.00)",
-                                          "borderBottomLeftRadius": "12px",
-                                          "borderBottomRightRadius": "12px",
-                                          "borderTopLeftRadius": "12px",
-                                          "borderTopRightRadius": "12px",
-                                          "height": "24px",
-                                          "width": "24px",
-                                        },
                                       },
                                       "type": "div",
                                     },
+                                  ],
+                                  "props": {
+                                    "className": "css-view-g5y9jx",
+                                    "dir": null,
+                                    "style": {
+                                      "height": "24px",
+                                      "width": "24px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx",
+                                "dir": null,
+                                "style": {
+                                  "marginRight": "4px",
+                                },
+                              },
+                              "type": "div",
+                            },
+                            {
+                              "children": [
+                                {
+                                  "children": [
+                                    "Sovran Mint",
+                                  ],
+                                  "props": {
+                                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                    "dir": "auto",
+                                    "style": {
+                                      "color": "rgba(16,16,16,1.00)",
+                                      "fontFamily": "OxygenBold",
+                                      "fontSize": "12px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                                {
+                                  "children": [
                                     {
-                                      "children": null,
+                                      "children": [
+                                        "₿ 0.00021000",
+                                      ],
                                       "props": {
-                                        "aria-label": "Online",
-                                        "className": "css-view-g5y9jx",
-                                        "dir": null,
+                                        "className": "css-text-146c3p1",
+                                        "dir": "auto",
                                         "style": {
-                                          "backgroundColor": "rgba(32,128,72,1.00)",
-                                          "borderBottomColor": "rgba(8,8,8,1.00)",
-                                          "borderBottomLeftRadius": "4.5px",
-                                          "borderBottomRightRadius": "4.5px",
-                                          "borderLeftColor": "rgba(8,8,8,1.00)",
-                                          "borderRightColor": "rgba(8,8,8,1.00)",
-                                          "borderTopColor": "rgba(8,8,8,1.00)",
-                                          "borderTopLeftRadius": "4.5px",
-                                          "borderTopRightRadius": "4.5px",
-                                          "height": "9px",
-                                          "width": "9px",
+                                          "color": "rgba(16,16,16,1.00)",
+                                          "fontFamily": "MonaSans-Black",
+                                          "fontSize": "12px",
+                                          "marginBottom": "0px",
+                                          "marginLeft": "0px",
+                                          "marginRight": "0px",
+                                          "marginTop": "0px",
+                                          "textAlign": "left",
                                         },
                                       },
                                       "type": "div",
@@ -40274,10 +40460,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
                               "props": {
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
-                                "style": {
-                                  "height": "24px",
-                                  "width": "24px",
-                                },
                               },
                               "type": "div",
                             },
@@ -40286,70 +40468,18 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
                             "className": "css-view-g5y9jx",
                             "dir": null,
                             "style": {
-                              "marginRight": "4px",
+                              "minHeight": "40px",
                             },
-                          },
-                          "type": "div",
-                        },
-                        {
-                          "children": [
-                            {
-                              "children": [
-                                "Sovran Mint",
-                              ],
-                              "props": {
-                                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                "dir": "auto",
-                                "style": {
-                                  "color": "rgba(16,16,16,1.00)",
-                                  "fontFamily": "OxygenBold",
-                                  "fontSize": "12px",
-                                },
-                              },
-                              "type": "div",
-                            },
-                            {
-                              "children": [
-                                {
-                                  "children": [
-                                    "₿ 21,000",
-                                  ],
-                                  "props": {
-                                    "className": "css-text-146c3p1",
-                                    "dir": "auto",
-                                    "style": {
-                                      "color": "rgba(16,16,16,1.00)",
-                                      "fontFamily": "MonaSans-Black",
-                                      "fontSize": "12px",
-                                      "marginBottom": "0px",
-                                      "marginLeft": "0px",
-                                      "marginRight": "0px",
-                                      "marginTop": "0px",
-                                      "textAlign": "left",
-                                    },
-                                  },
-                                  "type": "div",
-                                },
-                              ],
-                              "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
-                              },
-                              "type": "div",
-                            },
-                          ],
-                          "props": {
-                            "className": "css-view-g5y9jx",
-                            "dir": null,
                           },
                           "type": "div",
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "style": {
+                          "opacity": 1,
+                        },
                       },
-                      "type": "div",
+                      "type": "View",
                     },
                   ],
                   "props": {
@@ -40417,6 +40547,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
       ],
       "props": {
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": false,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -40483,58 +40616,127 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
                                         {
                                           "children": [
                                             {
-                                              "children": null,
+                                              "children": [
+                                                {
+                                                  "children": null,
+                                                  "props": {
+                                                    "color": "rgb(8, 8, 8)",
+                                                    "height": 17,
+                                                    "width": 17,
+                                                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                  },
+                                                  "type": "SvgXml",
+                                                },
+                                              ],
                                               "props": {
-                                                "color": "rgb(8, 8, 8)",
-                                                "height": 17,
-                                                "width": 17,
-                                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                                                "className": "css-view-g5y9jx",
+                                                "dir": null,
                                               },
-                                              "type": "SvgXml",
+                                              "type": "div",
                                             },
                                           ],
                                           "props": {
+                                            "aria-label": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone icon",
+                                            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                            "dir": null,
+                                            "role": "img",
+                                            "style": {
+                                              "backgroundColor": "rgba(96,96,96,1.00)",
+                                              "borderBottomLeftRadius": "12px",
+                                              "borderBottomRightRadius": "12px",
+                                              "borderTopLeftRadius": "12px",
+                                              "borderTopRightRadius": "12px",
+                                              "height": "24px",
+                                              "width": "24px",
+                                            },
+                                          },
+                                          "type": "div",
+                                        },
+                                        {
+                                          "children": null,
+                                          "props": {
+                                            "aria-label": "Online",
                                             "className": "css-view-g5y9jx",
                                             "dir": null,
+                                            "style": {
+                                              "backgroundColor": "rgba(32,128,72,1.00)",
+                                              "borderBottomColor": "rgba(8,8,8,1.00)",
+                                              "borderBottomLeftRadius": "4.5px",
+                                              "borderBottomRightRadius": "4.5px",
+                                              "borderLeftColor": "rgba(8,8,8,1.00)",
+                                              "borderRightColor": "rgba(8,8,8,1.00)",
+                                              "borderTopColor": "rgba(8,8,8,1.00)",
+                                              "borderTopLeftRadius": "4.5px",
+                                              "borderTopRightRadius": "4.5px",
+                                              "height": "9px",
+                                              "width": "9px",
+                                            },
                                           },
                                           "type": "div",
                                         },
                                       ],
                                       "props": {
-                                        "aria-label": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone icon",
-                                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                                        "className": "css-view-g5y9jx",
                                         "dir": null,
-                                        "role": "img",
-                                        "style": {
-                                          "backgroundColor": "rgba(96,96,96,1.00)",
-                                          "borderBottomLeftRadius": "12px",
-                                          "borderBottomRightRadius": "12px",
-                                          "borderTopLeftRadius": "12px",
-                                          "borderTopRightRadius": "12px",
-                                          "height": "24px",
-                                          "width": "24px",
-                                        },
                                       },
                                       "type": "div",
                                     },
+                                  ],
+                                  "props": {
+                                    "className": "css-view-g5y9jx",
+                                    "dir": null,
+                                    "style": {
+                                      "height": "24px",
+                                      "width": "24px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx",
+                                "dir": null,
+                                "style": {
+                                  "marginRight": "4px",
+                                },
+                              },
+                              "type": "div",
+                            },
+                            {
+                              "children": [
+                                {
+                                  "children": [
+                                    "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone",
+                                  ],
+                                  "props": {
+                                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                                    "dir": "auto",
+                                    "style": {
+                                      "color": "rgba(16,16,16,1.00)",
+                                      "fontFamily": "OxygenBold",
+                                      "fontSize": "12px",
+                                    },
+                                  },
+                                  "type": "div",
+                                },
+                                {
+                                  "children": [
                                     {
-                                      "children": null,
+                                      "children": [
+                                        "₿ 21,000,000.00000000",
+                                      ],
                                       "props": {
-                                        "aria-label": "Online",
-                                        "className": "css-view-g5y9jx",
-                                        "dir": null,
+                                        "className": "css-text-146c3p1",
+                                        "dir": "auto",
                                         "style": {
-                                          "backgroundColor": "rgba(32,128,72,1.00)",
-                                          "borderBottomColor": "rgba(8,8,8,1.00)",
-                                          "borderBottomLeftRadius": "4.5px",
-                                          "borderBottomRightRadius": "4.5px",
-                                          "borderLeftColor": "rgba(8,8,8,1.00)",
-                                          "borderRightColor": "rgba(8,8,8,1.00)",
-                                          "borderTopColor": "rgba(8,8,8,1.00)",
-                                          "borderTopLeftRadius": "4.5px",
-                                          "borderTopRightRadius": "4.5px",
-                                          "height": "9px",
-                                          "width": "9px",
+                                          "color": "rgba(16,16,16,1.00)",
+                                          "fontFamily": "MonaSans-Black",
+                                          "fontSize": "12px",
+                                          "marginBottom": "0px",
+                                          "marginLeft": "0px",
+                                          "marginRight": "0px",
+                                          "marginTop": "0px",
+                                          "textAlign": "left",
                                         },
                                       },
                                       "type": "div",
@@ -40550,10 +40752,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
                               "props": {
                                 "className": "css-view-g5y9jx",
                                 "dir": null,
-                                "style": {
-                                  "height": "24px",
-                                  "width": "24px",
-                                },
                               },
                               "type": "div",
                             },
@@ -40562,70 +40760,18 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
                             "className": "css-view-g5y9jx",
                             "dir": null,
                             "style": {
-                              "marginRight": "4px",
+                              "minHeight": "40px",
                             },
-                          },
-                          "type": "div",
-                        },
-                        {
-                          "children": [
-                            {
-                              "children": [
-                                "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone",
-                              ],
-                              "props": {
-                                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                                "dir": "auto",
-                                "style": {
-                                  "color": "rgba(16,16,16,1.00)",
-                                  "fontFamily": "OxygenBold",
-                                  "fontSize": "12px",
-                                },
-                              },
-                              "type": "div",
-                            },
-                            {
-                              "children": [
-                                {
-                                  "children": [
-                                    "₿ 2,100,000,000,000,000",
-                                  ],
-                                  "props": {
-                                    "className": "css-text-146c3p1",
-                                    "dir": "auto",
-                                    "style": {
-                                      "color": "rgba(16,16,16,1.00)",
-                                      "fontFamily": "MonaSans-Black",
-                                      "fontSize": "12px",
-                                      "marginBottom": "0px",
-                                      "marginLeft": "0px",
-                                      "marginRight": "0px",
-                                      "marginTop": "0px",
-                                      "textAlign": "left",
-                                    },
-                                  },
-                                  "type": "div",
-                                },
-                              ],
-                              "props": {
-                                "className": "css-view-g5y9jx",
-                                "dir": null,
-                              },
-                              "type": "div",
-                            },
-                          ],
-                          "props": {
-                            "className": "css-view-g5y9jx",
-                            "dir": null,
                           },
                           "type": "div",
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "style": {
+                          "opacity": 1,
+                        },
                       },
-                      "type": "div",
+                      "type": "View",
                     },
                   ],
                   "props": {
@@ -40693,6 +40839,9 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
       ],
       "props": {
         "accessibilityRole": "button",
+        "accessibilityState": {
+          "busy": false,
+        },
         "style": [
           {
             "alignSelf": "center",
@@ -41580,7 +41729,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-default: r
             },
           ],
           "props": {
-            "accessibilityLabel": "Sovran Mint",
+            "accessibilityLabel": "Sovran Mint, mint.sovran.example",
             "accessibilityRole": "switch",
             "accessibilityState": {
               "checked": false,
@@ -41994,7 +42143,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-disabled: 
             },
           ],
           "props": {
-            "accessibilityLabel": "Sovran Mint",
+            "accessibilityLabel": "Sovran Mint, Turn on Network first",
             "accessibilityRole": "switch",
             "accessibilityState": {
               "checked": false,
@@ -42425,7 +42574,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-large-text
                     },
                   ],
                   "props": {
-                    "accessibilityLabel": "Sovran Mint",
+                    "accessibilityLabel": "Sovran Mint, mint.sovran.example",
                     "accessibilityRole": "switch",
                     "accessibilityState": {
                       "checked": false,
@@ -42851,7 +43000,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-selected: 
             },
           ],
           "props": {
-            "accessibilityLabel": "Sovran Mint",
+            "accessibilityLabel": "Sovran Mint, mint.sovran.example",
             "accessibilityRole": "switch",
             "accessibilityState": {
               "checked": true,
@@ -43262,7 +43411,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-worst-case
             },
           ],
           "props": {
-            "accessibilityLabel": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone",
+            "accessibilityLabel": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone, https://a-very-long-subdomain-that-keeps-going.mint.example-with-a-long-domain.com/Bitcoin",
             "accessibilityRole": "switch",
             "accessibilityState": {
               "checked": true,

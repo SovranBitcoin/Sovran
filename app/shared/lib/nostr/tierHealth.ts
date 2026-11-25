@@ -20,6 +20,22 @@ import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
 /** Uniform per-tier status the Network screen renders. `disabled` = toggle off. */
 export type TierStatus = 'online' | 'offline' | 'checking' | 'disabled';
 
+/**
+ * One Fast-cache server's status. With Fast cache off no server is used, so
+ * every one is off whatever its last probe said; an unprobed one is checking.
+ */
+export function primalHostStatus({
+  tierEnabled,
+  hostEnabled,
+  health,
+}: {
+  tierEnabled: boolean;
+  hostEnabled: boolean;
+  health: TierStatus | undefined;
+}): TierStatus {
+  return tierEnabled && hostEnabled ? (health ?? 'checking') : 'disabled';
+}
+
 const PRIMAL_HEALTH_TIMEOUT_MS = 5_000;
 
 /**

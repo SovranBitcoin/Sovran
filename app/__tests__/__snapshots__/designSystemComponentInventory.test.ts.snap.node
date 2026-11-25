@@ -63,6 +63,7 @@ exports[`Design System component inventory tracks the complete reusable componen
   ],
   "pending": [
     "features/bitchat/components/BluetoothNotice.tsx",
+    "features/bitchat/components/DmWordFilterStrip.tsx",
     "features/map/components/StatsCard.tsx",
     "features/mint/components/MintCurrencyTabs.tsx",
     "features/mint/components/RatingBarChart.tsx",
@@ -239,6 +240,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 233,
+  "total": 234,
 }
 `;

@@ -21,16 +21,19 @@ import { duration } from '@/shared/styles/tokens';
  *
  * `progressOverride` holds the press at one frame instead (0 = at rest,
  * 1 = fully pressed), so a design-system scrubber can inspect any point of it;
- * touches then leave the scale alone.
+ * touches then leave the scale alone. `activeOpacity` is the dim the parent
+ * Pressable applies on a real press; given, a held frame draws it too.
  */
 export function PressScale({
   children,
   target = 0.9,
   progressOverride,
+  activeOpacity,
 }: {
   children: ReactNode;
   target?: number;
   progressOverride?: SharedValue<number>;
+  activeOpacity?: number;
 }) {
   const scale = useSharedValue(1);
   const reducedMotion = useReducedMotion();
@@ -38,6 +41,10 @@ export function PressScale({
     transform: [
       { scale: progressOverride ? 1 + (target - 1) * progressOverride.get() : scale.get() },
     ],
+    opacity:
+      progressOverride && activeOpacity !== undefined
+        ? 1 + (activeOpacity - 1) * progressOverride.get()
+        : 1,
   }));
 
   const settle = (to: number) => {

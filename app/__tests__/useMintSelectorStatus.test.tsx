@@ -8,6 +8,7 @@ import { act, renderHook } from '@testing-library/react-native';
 
 import {
   ADD_MINT_LABEL,
+  SELECT_MINT_LABEL,
   mintSelectorStatus,
   useMintSelector,
 } from '@/features/wallet/components/MintSelector/useMintSelector';
@@ -115,5 +116,15 @@ describe('useMintSelector on a new account', () => {
     act(() => useDefaultMintSetupStore.getState().markSettled());
     expect(result.current.status).toBe('ready');
     expect(result.current.ctaLabel).toBe(ADD_MINT_LABEL);
+  });
+
+  it('asks to pick a mint when mints exist but none is selected', () => {
+    mockWallet.isLoading = false;
+    mockWallet.mints = [{ mintUrl: MINT, name: 'Mint' }];
+    const { result } = renderHook(() => useMintSelector({}));
+    act(() => useDefaultMintSetupStore.getState().markSettled());
+    expect(result.current.status).toBe('ready');
+    expect(result.current.mintUrl).toBeUndefined();
+    expect(result.current.ctaLabel).toBe(SELECT_MINT_LABEL);
   });
 });

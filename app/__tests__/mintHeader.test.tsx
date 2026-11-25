@@ -66,17 +66,23 @@ describe('MintHeader', () => {
     expect(screen.getByText('mint.minibits.cash')).toBeTruthy();
     const line = screen.getByTestId('mint-info-health');
     expect(line.props.accessibilityLabel).toBe('Status: Operational');
-    expect(line.props.className).toContain('h-[22px]');
+    // At least one line high, and free to grow with large text.
+    expect(line.props.className).toContain('min-h-[22px]');
   });
 
   it('keeps the status line in place, hidden from screen readers, until there is an audit', () => {
     render(<MintHeader name="https://mint.example" mintUrl="https://mint.example" />);
     const line = screen.getByTestId('mint-info-health', { includeHiddenElements: true });
-    expect(line.props.className).toContain('h-[22px]');
+    expect(line.props.className).toContain('min-h-[22px]');
     expect(line.props.accessibilityElementsHidden).toBe(true);
     expect(line.props.importantForAccessibility).toBe('no-hide-descendants');
     // A name that is only the address is not repeated as a host line.
     expect(screen.queryByText('mint.example')).toBeNull();
+  });
+
+  it('keeps the host line while the name is still loading, so it does not appear later', () => {
+    render(<MintHeader name="https://mint.example" mintUrl="https://mint.example" isLoading />);
+    expect(screen.getByText('mint.example')).toBeTruthy();
   });
 
   it.each([

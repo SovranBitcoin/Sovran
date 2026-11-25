@@ -43,4 +43,13 @@ describe('Profile Show and Copy buttons', () => {
     expect(source).not.toContain('HerouiButton');
     expect(source.match(/color=\{paint\.secondary\.content\}/g)).toHaveLength(2);
   });
+
+  it('draws the Edit profile pencil in the primary button ink, like its label', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../features/settings/components/ProfileDetailsScreen.tsx'),
+      'utf8'
+    );
+    // The page background is not the primary button's ink on every palette.
+    expect(source).toMatch(/name="mdi:pencil" size=\{16\} color=\{paint\.primary\.content\}/);
+  });
 });

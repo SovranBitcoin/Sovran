@@ -52,17 +52,20 @@ export interface BalanceDisplayProps {
   /** Holds the skeleton → label fade at one frame (0 skeleton, 1 label), for
    *  a design-system scrubber. Omitted, the fade follows `isLoading`. */
   loadingProgress?: SharedValue<number>;
+  /** BTC/sats display preference for the amount, in place of the saved
+   *  setting: fixtures pass one so they draw the same whatever it is. */
+  displayPreference?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 /** One skeleton bar the height of a 12pt label line, so bars and label share a box. */
-function SkeletonLine({ width }: { width: string }) {
+function SkeletonLine({ width, still }: { width: string; still: boolean }) {
   return (
     <View>
       <Text size={12} bold accessible={false} className="opacity-0">
         {' '}
       </Text>
-      <Skeleton className={`absolute bottom-0.5 left-0 top-0.5 rounded ${width}`} />
+      <Skeleton static={still} className={`absolute bottom-0.5 left-0 top-0.5 rounded ${width}`} />
     </View>
   );
 }
@@ -87,6 +90,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
   iconBoxSize = 32,
   iconRightSpacing = 4,
   loadingProgress,
+  displayPreference,
   style,
 }) => {
   const foreground = useThemeColor('foreground');
@@ -100,6 +104,11 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
   const showCta = !isLoading && ctaLabel != null;
   const iconBoxStyle = { width: iconBoxSize, height: iconBoxSize };
   const iconSlotStyle = { marginRight: iconRightSpacing };
+  // Placeholder, balance and call-to-action rows share one minimum height,
+  // so swapping between them (into "Add a mint") moves nothing vertically.
+  const rowStyle = { minHeight: innerHeight };
+  // A frame held by the scrubber must not pulse.
+  const still = loadingProgress !== undefined;
 
   return (
     <Log name="BalanceDisplay">
@@ -115,25 +124,27 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
           <SkeletonContentCrossfade
             loading={isLoading}
             wave="none"
+            crossfadeContent
             progressOverride={loadingProgress}
             visualKey="balance-display"
             visualComponent="BalanceDisplay"
             renderSkeleton={() => (
               <View
                 className="flex-row items-center"
+                style={rowStyle}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants">
                 <View style={iconSlotStyle}>
-                  <Skeleton className="rounded-full" style={iconBoxStyle} />
+                  <Skeleton static={still} className="rounded-full" style={iconBoxStyle} />
                 </View>
                 <View>
-                  <SkeletonLine width="w-[88px]" />
-                  <SkeletonLine width="w-[56px]" />
+                  <SkeletonLine width="w-[88px]" still={still} />
+                  <SkeletonLine width="w-[56px]" still={still} />
                 </View>
               </View>
             )}
             renderContent={() => (
-              <View className="min-w-0 flex-row items-center">
+              <View className="min-w-0 flex-row items-center" style={rowStyle}>
                 <View style={iconSlotStyle}>
                   {iconNode ? (
                     // Square box around the glyph — defaults to 32 to keep
@@ -179,6 +190,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
                       weight="heavy"
                       amount={balance}
                       unit={unit}
+                      displayPreference={displayPreference}
                     />
                   </View>
                 )}

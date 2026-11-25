@@ -36,15 +36,17 @@ jest.mock('react-native-reanimated', () => {
         ReactActual.createElement(View, props, children),
     },
     useReducedMotion: () => mockReducedMotion,
-    useSharedValue: (initial: number) => ({
-      value: initial,
-      get() {
-        return this.value;
-      },
-      set(next: number) {
-        this.value = next;
-      },
-    }),
+    // Kept across renders, as Reanimated's is: `initial` is read once.
+    useSharedValue: (initial: number) =>
+      ReactActual.useState(() => ({
+        value: initial,
+        get() {
+          return this.value;
+        },
+        set(next: number) {
+          this.value = next;
+        },
+      }))[0],
     // Hold the animation at its start and expose completion to the test,
     // so the exiting frame and content mount lifecycle stay observable.
     withTiming: (_toValue: number, _config: unknown, callback: (finished: boolean) => void) => {
@@ -349,4 +351,83 @@ it.each([
   );
   expect(r.root.findByProps({ testID: 'shimmer' }).props.accessibilityLabel).toBe(expected);
   act(() => r.unmount());
+});
+
+describe('SkeletonContentCrossfade crossfadeContent', () => {
+  const opacityOf = (r: TestRenderer.ReactTestRenderer, testID: string) => {
+    const style = r.root.findByProps({ testID }).parent?.props.style;
+    const flat = Array.isArray(style) ? Object.assign({}, ...style) : (style ?? {});
+    return flat.opacity ?? 1;
+  };
+
+  it('fades content in as the skeleton fades out at a held frame', () => {
+    const progress = { value: 0.25, get: () => 0.25, set: () => {} };
+    const r = render(
+      <SkeletonContentCrossfade
+        loading={false}
+        crossfadeContent
+        progressOverride={progress as never}
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    expect(opacityOf(r, 'ct')).toBe(0.25);
+    expect(opacityOf(r, 'sk')).toBe(0.75);
+    act(() => r.unmount());
+  });
+
+  it('hides content entirely at the placeholder end of a held frame', () => {
+    const progress = { value: 0, get: () => 0, set: () => {} };
+    const r = render(
+      <SkeletonContentCrossfade
+        loading={false}
+        crossfadeContent
+        progressOverride={progress as never}
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    expect(opacityOf(r, 'ct')).toBe(0);
+    expect(opacityOf(r, 'sk')).toBe(1);
+    act(() => r.unmount());
+  });
+
+  it('starts loaded content transparent on the loading→loaded edge', () => {
+    const r = render(
+      <SkeletonContentCrossfade
+        loading
+        crossfadeContent
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    act(() =>
+      r.update(
+        <SkeletonContentCrossfade
+          loading={false}
+          crossfadeContent
+          renderSkeleton={skeletonNode}
+          renderContent={contentNode}
+        />
+      )
+    );
+    // The mocked timing holds the fade at its start.
+    expect(opacityOf(r, 'ct')).toBe(0);
+    expect(opacityOf(r, 'sk')).toBe(1);
+    act(() => r.unmount());
+  });
+
+  it('shows content fully when it mounts already loaded', () => {
+    const r = render(
+      <SkeletonContentCrossfade
+        loading={false}
+        crossfadeContent
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    expect(opacityOf(r, 'ct')).toBe(1);
+    expect(present(r, 'sk')).toBe(false);
+    act(() => r.unmount());
+  });
 });

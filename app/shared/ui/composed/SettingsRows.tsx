@@ -86,7 +86,11 @@ type SettingsToggleItemProps = {
   prefix?: React.ReactNode;
   /** Drawn beside the title, e.g. a health badge. */
   status?: React.ReactNode;
-  /** Read in place of the title, when the title alone is ambiguous. */
+  /** The words a screen reader says for `status` (or for a `prefix` dot):
+   *  the row is one control, so a drawn status is otherwise never heard. */
+  statusLabel?: string;
+  /** Read in place of the title, when the title alone is ambiguous. The
+   *  status and description are still read after it. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
   /** Visible but dimmed; a tap does nothing. Say why with `disabledReason`. */
@@ -103,12 +107,18 @@ export const SettingsToggleItem: React.FC<SettingsToggleItemProps> = ({
   testID,
   prefix,
   status,
+  statusLabel,
   accessibilityLabel,
   accessibilityHint,
   disabled = false,
   disabledReason,
 }) => {
   const shownDescription = disabled && disabledReason ? disabledReason : description;
+  // The row is one accessible element, so its label carries everything drawn
+  // in it: the title (or its stand-in), the status, the line underneath.
+  const spokenLabel = [accessibilityLabel ?? title, statusLabel, shownDescription]
+    .filter(Boolean)
+    .join(', ');
   return (
     <PressableFeedback
       animation={false}
@@ -123,7 +133,7 @@ export const SettingsToggleItem: React.FC<SettingsToggleItemProps> = ({
       // switch role plus `checked`, and Android exposes the checked state.
       accessibilityRole="switch"
       accessibilityState={disabled ? { checked: isSelected, disabled } : { checked: isSelected }}
-      accessibilityLabel={accessibilityLabel ?? (testID ? title : undefined)}
+      accessibilityLabel={spokenLabel}
       accessibilityHint={accessibilityHint}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled className={disabled ? 'opacity-50' : undefined}>

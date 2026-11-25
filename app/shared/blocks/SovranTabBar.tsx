@@ -77,11 +77,9 @@ export function SearchTabIcon({ focused, color, searchCloseProgress }: SearchTab
         testID={focused ? undefined : 'tab-search-icon'}
         className="absolute inset-0 items-center justify-center"
         style={searchStyle}>
-        <Icon
-          name={focused ? 'mingcute:search-3-fill' : 'mingcute:search-3-line'}
-          color={color}
-          size={24}
-        />
+        {/* One glyph throughout: swapping to the filled one on focus would pop
+            on the first frame of the close (and of the reopen). */}
+        <Icon name="mingcute:search-3-line" color={color} size={24} />
       </Animated.View>
       <Animated.View
         testID={focused ? 'tab-search-close-icon' : undefined}

@@ -28,7 +28,16 @@ describe('NUT-02 input_fee_ppk', () => {
     expect(formatInputFee({ unit: 'sat', ppk: 0 })).toBe('sat: no spending fee');
     expect(formatInputFee({ unit: 'sat', ppk: 100 })).toBe('sat: 0.1 sat per coin spent');
     expect(formatInputFee({ unit: 'sat', ppk: 1000 })).toBe('sat: 1 sat per coin spent');
-    expect(formatInputFee({ unit: 'usd', ppk: 1 })).toBe('usd: 0.001 usd per coin spent');
+  });
+
+  it('says a fiat fee in the currency, not in its cents', () => {
+    // A fiat unit's amounts are cents: 100 ppk is a tenth of a cent, $0.001.
+    expect(formatInputFee({ unit: 'usd', ppk: 100 })).toBe('usd: 0.001 USD per coin spent');
+    expect(formatInputFee({ unit: 'usd', ppk: 1000 })).toBe('usd: 0.01 USD per coin spent');
+    expect(formatInputFee({ unit: 'usd', ppk: 1 })).toBe('usd: 0.00001 USD per coin spent');
+    expect(formatInputFee({ unit: 'eur', ppk: 250 })).toBe('eur: 0.0025 EUR per coin spent');
+    expect(formatInputFee({ unit: 'gbp', ppk: 2000 })).toBe('gbp: 0.02 GBP per coin spent');
+    expect(formatInputFee({ unit: 'usd', ppk: 0 })).toBe('usd: no spending fee');
   });
 });
 

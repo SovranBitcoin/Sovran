@@ -41,6 +41,8 @@ type MintSelectorStatus = 'pending' | 'loading' | 'ready';
 
 /** What the pill says once a wallet has settled with no mints at all. */
 export const ADD_MINT_LABEL = 'Add a mint';
+/** What it says when there are mints but none is selected. */
+export const SELECT_MINT_LABEL = 'Select a mint';
 
 interface MintSelectorShared {
   mintUrl: string | undefined;
@@ -93,8 +95,13 @@ export function useMintSelector({
     defaultMintsSettled,
   });
   const isLoading = status !== 'ready';
+  // Settled with nothing selected: never an empty name over "0 sats".
   const ctaLabel =
-    status === 'ready' && !mintUrl && mints.length === 0 ? ADD_MINT_LABEL : undefined;
+    status === 'ready' && !mintUrl
+      ? mints.length === 0
+        ? ADD_MINT_LABEL
+        : SELECT_MINT_LABEL
+      : undefined;
 
   useEffect(() => {
     walletLog.debug('mintSelector.state', {

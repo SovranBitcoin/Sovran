@@ -57,7 +57,7 @@ function StopButtons({
             accessibilityLabel={`${label} at ${stop}%`}
             accessibilityState={{ selected: active }}
             onPress={() => onSelect(stop / 100)}
-            className={`h-9 flex-1 items-center justify-center rounded-full ${
+            className={`h-11 flex-1 items-center justify-center rounded-full ${
               active ? 'bg-accent' : 'bg-surface-secondary'
             }`}>
             <Text
@@ -185,7 +185,9 @@ export function SettingsDesignSystemScrubberScreen() {
             <FrameSlider
               testID="design-system-scrub-all-slider"
               label="Every transition frame"
-              value={master}
+              // Follows the transitions once they agree again (each moved to
+              // the same stop by hand); while they differ it stays put.
+              value={shared ?? master}
               onChange={scrubAll}
             />
           </View>

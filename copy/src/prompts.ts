@@ -48,7 +48,8 @@ export const relayEditCopy = {
   publishing: "Publishing…",
   failed: "Could not publish. Read your latest list and review again.",
   noWrite: "Add a relay to write to, or restore defaults.",
-  success: (count: number) => `Published to ${count} relays.`,
+  success: (count: number) =>
+    count === 1 ? "Published to 1 relay." : `Published to ${count} relays.`,
   readWrite: "Read and write",
   readOnly: "Read only",
   writeOnly: "Write only",

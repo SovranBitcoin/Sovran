@@ -1075,7 +1075,7 @@ export function ContactRow({
       <View style={{ width: 24, height: 24 }} />
     ) : (
       // Visual only: the row is the one control, so VoiceOver reads it once.
-      <SelectableCheck selected={selected ?? false} size={24} />
+      <SelectableCheck selected={selected ?? false} size={24} recycleKey={mint?.mintUrl ?? seed} />
     )
   ) : null;
 
@@ -1297,6 +1297,7 @@ export function ContactRow({
       onPress={trackedPress}
       loading={resolvedLoading}
       disabled={disabled}
+      selected={selectable ? Boolean(selected) : undefined}
       padding={padding}
       accessibilityLabel={typeof titleBase === 'string' ? titleBase : undefined}
       testID={testID}

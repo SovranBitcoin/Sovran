@@ -13,6 +13,7 @@ import { errAsync, okAsync } from 'neverthrow';
 
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { forgetSilentRelays } from '@/shared/lib/nostr/ownReplaceableEvent';
+import { relayEditCopy } from 'copy/prompts';
 
 const OWN = 'a0'.repeat(32);
 type Relay = { url: string };
@@ -250,7 +251,7 @@ jest.mock('@/shared/lib/popup', () => ({
 jest.mock('heroui-native', () => {
   const { View, Text, TextInput } = jest.requireMock('react-native');
   const ListGroup = Object.assign(
-    ({ children }: React.PropsWithChildren) => <View>{children}</View>,
+    ({ children }: React.PropsWithChildren) => <View testID="relay-list-group">{children}</View>,
     {
       Item: Object.assign(({ children }: React.PropsWithChildren) => <View>{children}</View>, {}),
       ItemPrefix: View,
@@ -295,6 +296,17 @@ it.each([undefined, 'connecting'] as const)(
     expect(screen.getByLabelText(`${MINE}, Read and write`)).toBeOnTheScreen();
   }
 );
+
+it('draws no empty relay card when the account has no relays saved', () => {
+  useRelayListStore.setState({ entries: [] });
+  mount();
+  expect(screen.queryByTestId('relay-list-group')).not.toBeOnTheScreen();
+});
+
+it('says "1 relay", not "1 relays"', () => {
+  expect(relayEditCopy.success(1)).toBe('Published to 1 relay.');
+  expect(relayEditCopy.success(3)).toBe('Published to 3 relays.');
+});
 
 it('shows the known connection state for relays with an answer', () => {
   const { rerender } = render(

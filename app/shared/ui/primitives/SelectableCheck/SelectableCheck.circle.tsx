@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -35,14 +35,22 @@ export function SelectableCheckCircle({
   accessibilityHint,
   testID,
   selectProgress,
+  recycleKey,
 }: SelectableCheckProps) {
   const accentForeground = useThemeColor('accent-foreground');
   const reducedMotion = useReducedMotion();
   const ownProgress = useSharedValue(selected ? 1 : 0);
+  // A recycled list cell now showing another item snaps to that item's state;
+  // only a change on the same item (a tap) animates.
+  const shownKey = useRef(recycleKey);
   useEffect(() => {
     const target = selected ? 1 : 0;
-    ownProgress.set(reducedMotion ? target : withTiming(target, { duration: SELECT_MS }));
-  }, [selected, reducedMotion, ownProgress]);
+    const recycled = shownKey.current !== recycleKey;
+    shownKey.current = recycleKey;
+    ownProgress.set(
+      reducedMotion || recycled ? target : withTiming(target, { duration: SELECT_MS })
+    );
+  }, [selected, reducedMotion, ownProgress, recycleKey]);
   const progress = selectProgress ?? ownProgress;
   const fillStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
   const markStyle = useAnimatedStyle(() => ({

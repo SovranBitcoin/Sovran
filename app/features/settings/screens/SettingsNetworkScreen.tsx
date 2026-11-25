@@ -20,7 +20,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRelayHealth } from '@/shared/hooks/useRelayHealth';
 import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
-import { type TierStatus } from '@/shared/lib/nostr/tierHealth';
+import { primalHostStatus, type TierStatus } from '@/shared/lib/nostr/tierHealth';
 import { useLifecycleLogger } from '@/shared/lib/logger';
 import { urlHostLabel } from '@/shared/lib/url';
 import { backendConfig } from '@/shared/config/backend';
@@ -42,6 +42,10 @@ const TIER_STATUS_WORDS: Record<TierStatus, string> = {
   checking: 'Checking',
   disabled: 'Off',
 };
+
+/** What a tier's badge says, for the row's label; a disabled tier draws none. */
+const spokenTierStatus = (status: TierStatus) =>
+  status === 'disabled' ? undefined : TIER_STATUS_WORDS[status];
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
@@ -85,6 +89,7 @@ export function SettingsNetworkScreen() {
                   : 'A public cache that loads profiles quickly'
               }
               status={<TierHealthBadge status={tierHealth.primal} checkingColor={mutedColor} />}
+              statusLabel={spokenTierStatus(tierHealth.primal)}
               accessibilityLabel="Use Fast cache"
               isSelected={primalTierEnabled}
               onSelectedChange={setPrimalTierEnabled}
@@ -95,6 +100,7 @@ export function SettingsNetworkScreen() {
               title="Relays"
               description="Ask relays directly when the cache can't answer"
               status={<TierHealthBadge status={tierHealth.relay} checkingColor={mutedColor} />}
+              statusLabel={spokenTierStatus(tierHealth.relay)}
               accessibilityLabel="Use relays"
               isSelected={relayTierEnabled}
               onSelectedChange={setRelayTierEnabled}
@@ -110,9 +116,11 @@ export function SettingsNetworkScreen() {
               {primalHosts.map((url, index) => {
                 const hostEnabled = !primalHostsDisabled.includes(url);
                 const host = urlHostLabel(url);
-                const hostStatus: TierStatus = hostEnabled
-                  ? (tierHealth.primalHosts[url] ?? 'checking')
-                  : 'disabled';
+                const hostStatus = primalHostStatus({
+                  tierEnabled: primalTierEnabled,
+                  hostEnabled,
+                  health: tierHealth.primalHosts[url],
+                });
                 return (
                   <React.Fragment key={url}>
                     {index > 0 ? <Separator className="mx-4" /> : null}
@@ -121,7 +129,7 @@ export function SettingsNetworkScreen() {
                       title={host}
                       prefix={<StatusDot status={hostStatus} />}
                       accessibilityLabel={`Use ${host}`}
-                      accessibilityHint={TIER_STATUS_WORDS[hostStatus]}
+                      statusLabel={TIER_STATUS_WORDS[hostStatus]}
                       isSelected={hostEnabled}
                       onSelectedChange={(next) => setPrimalHostEnabled(url, next)}
                       disabled={!primalTierEnabled}

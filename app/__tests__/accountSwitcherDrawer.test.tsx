@@ -308,7 +308,13 @@ describe('AccountSwitcherDrawer', () => {
   it('opens the same account menu from the visible options button', async () => {
     renderDrawer();
     const button = screen.getByTestId('drawer-profile-options-1');
-    expect(button.props.accessibilityLabel).toBe('Account options');
+    // Each row's button names its account, so VoiceOver's list of buttons
+    // is not a column of identical "Account options".
+    expect(button.props.accessibilityLabel).toBe('Account options for Second');
+    expect(button.props.accessibilityHint).toBe('Copy public key or view profile');
+    expect(screen.getByTestId('drawer-profile-options-0').props.accessibilityHint).toBe(
+      'Copy public key, view or edit profile'
+    );
     // A 44pt button (h-11 w-11) plus a little slop.
     expect(button.props.className).toContain('h-11 w-11');
     expect(button.props.hitSlop).toBeGreaterThan(0);

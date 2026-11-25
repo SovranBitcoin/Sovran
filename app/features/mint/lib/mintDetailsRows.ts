@@ -140,7 +140,9 @@ export function buildMintDetailsRows({
   );
   const nuts = supportedNutNames(info?.nuts ?? cached?.nuts);
   add('Mint', 'Supported features', nuts.length ? nuts.join('\n') : undefined);
-  add('Mint', 'Message from the mint', text(entry?.motd) ?? text(info?.motd));
+  // Through `mintMotd`, as the banner reads it: Nutshell's shipped default
+  // ("Message to users") is not a message from anyone.
+  add('Mint', 'Message from the mint', mintMotd(entry?.motd) ?? mintMotd(info?.motd));
   add('Mint', 'Summary', text(entry?.description) ?? text(info?.description));
   add('Mint', 'Full description', text(entry?.longDescription) ?? text(info?.description_long));
   const contacts = getSortedMintInfoContacts(

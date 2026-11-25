@@ -16,7 +16,6 @@ import { Description, Input, Label, TextField } from 'heroui-native';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Button } from '@/shared/ui/primitives/Button';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { log } from '@/shared/lib/logger';
@@ -60,7 +59,6 @@ export function ProfileDetailsScreen({
   children?: React.ReactNode;
   onBack?: () => void;
 }) {
-  const backgroundColor = useThemeColor('background');
   const paint = useStylePaint();
   const { pad, item } = paint.style.space;
   const shift = useShiftLogger('SettingsProfileScreen');
@@ -246,7 +244,7 @@ export function ProfileDetailsScreen({
                 <Button
                   variant="primary"
                   text="Edit profile"
-                  icon={<Icon name="mdi:pencil" size={16} color={backgroundColor} />}
+                  icon={<Icon name="mdi:pencil" size={16} color={paint.primary.content} />}
                   testID="settings-profile-edit"
                   accessibilityLabel="Edit profile"
                   onPress={() => router.push('/(settings-flow)/edit-profile')}

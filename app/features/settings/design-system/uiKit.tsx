@@ -165,6 +165,7 @@ export function MintPillFixture({
       iconBoxSize={24}
       width={width}
       loadingProgress={loadingProgress}
+      displayPreference={0}
       onPress={noop}
       iconNode={
         <View className="relative">
@@ -188,6 +189,7 @@ function BalancePillDefault() {
       balance={21_000}
       unit="sat"
       iconBoxSize={24}
+      displayPreference={0}
       onPress={noop}
       iconNode={<Icon name="solar:wallet-bold" size={20} color={foreground} />}
     />

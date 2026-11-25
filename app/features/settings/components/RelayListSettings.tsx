@@ -207,7 +207,8 @@ export function RelayListSettings({
         {editing ? <Notice status="info" description={copy.draft} /> : null}
         {reviewing ? (
           <RelayChanges review={state.review} />
-        ) : (
+        ) : entries.length > 0 ? (
+          // No empty card while the list is loading or has nothing in it.
           <ListGroup variant="secondary">
             {[...entries]
               .sort((a, b) => a.url.localeCompare(b.url))
@@ -222,7 +223,7 @@ export function RelayListSettings({
                 </View>
               ))}
           </ListGroup>
-        )}
+        ) : null}
         {editing ? (
           <>
             {state.editor.savedProposal ? (

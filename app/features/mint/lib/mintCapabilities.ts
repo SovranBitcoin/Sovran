@@ -1,3 +1,5 @@
+import { accountUnitLabel, unitMinorDecimals } from 'wallet/units';
+
 /**
  * What spending a mint's ecash costs, in the words Mint Details uses. Pure:
  * the keysets come from the caller.
@@ -39,11 +41,16 @@ export function activeInputFees(keysets: readonly KeysetFeeFields[]): UnitInputF
 }
 
 /**
- * `sat: no spending fee`, or `sat: 0.1 sat per coin spent` for 100 ppk. The
- * mint rounds the total for a payment up to a whole unit.
+ * `sat: no spending fee`, or `sat: 0.1 sat per coin spent` for 100 ppk. A
+ * fiat unit's amounts are its minor unit (cents), so its fee is said in the
+ * currency: 100 ppk of `usd` is `0.001 USD`, not `0.1`. The mint rounds the
+ * total for a payment up to a whole unit.
  */
 export function formatInputFee({ unit, ppk }: UnitInputFee): string {
   if (ppk <= 0) return `${unit}: no spending fee`;
-  const perInput = Number((ppk / 1000).toFixed(3));
-  return `${unit}: ${perInput} ${unit} per coin spent`;
+  const decimals = unitMinorDecimals(unit);
+  const perInput = Number((ppk / (1000 * 10 ** decimals)).toFixed(3 + decimals));
+  // Sats keep their own name: the account label for `sat` is BTC.
+  const label = decimals > 0 ? accountUnitLabel(unit) : unit;
+  return `${unit}: ${perInput} ${label} per coin spent`;
 }

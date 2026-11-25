@@ -135,6 +135,19 @@ describe('mint details rows', () => {
     expect(row['Vertex rank'].value).toBe('0.000123');
   });
 
+  it('leaves out Nutshell’s placeholder message, from the cache as from the mint', () => {
+    const message = (entryMotd: string | undefined, infoMotd: string) =>
+      buildMintDetailsRows({
+        mintUrl: MINT,
+        entry: { mintUrl: MINT, displayName: 'Mint', motd: entryMotd },
+        cached: { ...cached, info: { ...info, motd: infoMotd } },
+        now: NOW,
+      }).find((row) => row.title === 'Message from the mint')?.value;
+    expect(message(undefined, 'Message to users')).toBeUndefined();
+    expect(message('Message to users', 'Maintenance on Sunday.')).toBe('Maintenance on Sunday.');
+    expect(message(undefined, 'Maintenance on Sunday.')).toBe('Maintenance on Sunday.');
+  });
+
   it('omits rows whose value is unknown', () => {
     const rows = buildMintDetailsRows({
       mintUrl: MINT,

@@ -446,6 +446,23 @@ describe('Animation frame scrubber screen', () => {
     }
   });
 
+  it('draws the held frame dimmed as a real press dims it', () => {
+    const view = render(<SettingsDesignSystemScrubberScreen />, { wrapper: Wrapper });
+    try {
+      // A real press dims the button to 0.88 as it squeezes; the held frame too.
+      const opacities = SCRUB_STOPS.map((stop) => {
+        pressAndFlush(`design-system-scrub-button-press-${stop}`);
+        const values = stylesUnder('design-system-scrub-button-press')
+          .map((style) => style.opacity)
+          .filter((value): value is number => typeof value === 'number');
+        return Number(Math.min(1, ...values).toFixed(4));
+      });
+      expect(opacities).toEqual([1, 0.97, 0.94, 0.91, 0.88]);
+    } finally {
+      view.unmount();
+    }
+  });
+
   it('moves every transition together from Scrub all', () => {
     const view = render(<SettingsDesignSystemScrubberScreen />, { wrapper: Wrapper });
     try {
@@ -460,6 +477,21 @@ describe('Animation frame scrubber screen', () => {
           expect(isSelected(`design-system-scrub-${transition.id}-${stop}`)).toBe(true);
         }
       }
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it('moves the Scrub all slider to the frame every transition agrees on', () => {
+    const view = render(<SettingsDesignSystemScrubberScreen />, { wrapper: Wrapper });
+    try {
+      const master = () =>
+        byTestId('design-system-scrub-all-slider').findByType('Slider' as never).props.value;
+      for (const transition of SCRUB_TRANSITIONS) {
+        pressAndFlush(`design-system-scrub-${transition.id}-50`);
+      }
+      expect(byTestId('design-system-scrub-all-value').props.children).toBe('50.0%');
+      expect(master()).toBe(50);
     } finally {
       view.unmount();
     }

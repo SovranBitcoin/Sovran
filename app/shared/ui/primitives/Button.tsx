@@ -396,7 +396,10 @@ export const Button = ({
         activeOpacity={PRESS_OPACITY}
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
-        <PressScale target={PRESS_SCALE} progressOverride={pressProgress}>
+        <PressScale
+          target={PRESS_SCALE}
+          progressOverride={pressProgress}
+          activeOpacity={PRESS_OPACITY}>
           <View
             style={[
               getButtonStyles(),
@@ -433,7 +436,10 @@ export const Button = ({
       activeOpacity={PRESS_OPACITY}
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
-      <PressScale target={PRESS_SCALE} progressOverride={pressProgress}>
+      <PressScale
+        target={PRESS_SCALE}
+        progressOverride={pressProgress}
+        activeOpacity={PRESS_OPACITY}>
         <View
           style={[getButtonStyles(), { minHeight: sz.minHeight }, style]}
           blur={shouldUseBlur}

@@ -85,7 +85,9 @@ export function MintHeader({
   const statusStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
 
   const host = mintUrl ? urlHostLabel(mintUrl) : '';
-  const showHost = host.length > 0 && name !== mintUrl && name !== host;
+  // Kept while loading too: an unseeded name is the address until the info
+  // arrives, and a host line appearing then would push everything down.
+  const showHost = host.length > 0 && (isLoading || (name !== mintUrl && name !== host));
   // The placeholder holds the longest words, so the line never changes width.
   const shown = health ? MINT_HEALTH[health] : MINT_HEALTH.problems;
 
@@ -108,7 +110,7 @@ export function MintHeader({
       ) : null}
       <Animated.View
         testID="mint-info-health"
-        className="mt-1 h-[22px] flex-row items-center justify-center gap-1.5"
+        className="mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5"
         style={statusStyle}
         accessible={health !== undefined}
         accessibilityLabel={health ? `Status: ${shown.label}` : undefined}

@@ -699,7 +699,7 @@ function ProfileEditor({
                   nip05Check.retry();
                 }}
                 fitContent
-                height={32}
+                height={44}
                 textSize={13}
               />
             </View>
@@ -712,7 +712,7 @@ function ProfileEditor({
               disabled={fieldsLocked}
               onPress={applyNpcIdentity}
               fitContent
-              height={32}
+              height={44}
               textSize={13}
             />
           </View>

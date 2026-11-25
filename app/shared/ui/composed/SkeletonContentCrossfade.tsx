@@ -19,6 +19,10 @@
  * and the skeleton overlay lines up pixel-for-pixel with the content, so the
  * swap shifts nothing.
  *
+ * `crossfadeContent` fades the content in (0 → 1) as the skeleton fades out,
+ * for a region whose skeleton is translucent (bars on Liquid Glass): opaque
+ * content under it would show through at every in-between frame.
+ *
  * `exit="none"` skips the fade entirely (skeleton unmounts, content appears) for
  * FlashList-recycled lists where an exiting overlay would render in a recycled
  * cell's slot, and for footer-only skeletons that have no in-place content to
@@ -82,6 +86,9 @@ interface SkeletonContentCrossfadeProps {
    *  only) instead of following `loading`, so a design-system scrubber can
    *  inspect any point of the fade. Both trees render while it is set. */
   progressOverride?: SharedValue<number>;
+  /** Fade the content in as the skeleton fades out, instead of keeping it
+   *  opaque beneath: for translucent skeletons that would let it show through. */
+  crossfadeContent?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   /** Telemetry passthrough for the region shimmer (see `contentShiftLog`). */
@@ -100,6 +107,7 @@ export function SkeletonContentCrossfade({
   exit = 'fade',
   surfaceColor,
   progressOverride,
+  crossfadeContent = false,
   style,
   testID,
   visualKey,
@@ -122,8 +130,10 @@ export function SkeletonContentCrossfade({
   // recycled FlashList cell rebinding to loaded data) starts in 'content' and
   // never plays a spurious fade.
   const [phase, setPhase] = useState<Phase>(loading ? 'loading' : 'content');
-  // 0 → 1 fades only the skeleton overlay; content remains fully opaque.
-  const progress = useSharedValue(0);
+  // 0 → 1 fades the skeleton overlay out (and, with `crossfadeContent`, the
+  // content in). Seeded at the end for a region that mounts loaded, so its
+  // content is never held transparent.
+  const progress = useSharedValue(loading ? 0 : 1);
 
   const finishExit = useCallback(() => setPhase('content'), []);
 
@@ -172,11 +182,21 @@ export function SkeletonContentCrossfade({
   const skeletonExitStyle = useAnimatedStyle(() => ({
     opacity: 1 - fade.get(),
   }));
+  const contentEnterStyle = useAnimatedStyle(() => ({
+    opacity: fade.get(),
+  }));
+  // Wrapped only when crossfading, so other callers keep their layout as is.
+  const content = () =>
+    crossfadeContent ? (
+      <Animated.View style={contentEnterStyle}>{renderContent()}</Animated.View>
+    ) : (
+      renderContent()
+    );
 
   if (progressOverride) {
     return (
       <View style={style} testID={testID}>
-        {renderContent()}
+        {content()}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skeletonExitStyle]}>
           {renderSkeleton()}
         </Animated.View>
@@ -206,7 +226,7 @@ export function SkeletonContentCrossfade({
   // cannot remount content, restart its effects, or reset local state.
   return (
     <View style={style} testID={testID}>
-      {renderContent()}
+      {content()}
       {phase === 'exiting' ? (
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skeletonExitStyle]}>
           {renderSkeleton()}

@@ -144,7 +144,7 @@ export function AccountRow({
                 {/* The balance never truncates; the handle gives way first. */}
                 <Text
                   size={13}
-                  className="shrink-0 tabular-nums"
+                  className="max-w-full shrink-0 tabular-nums"
                   color={balanceUnknown ? muted : undefined}
                   numberOfLines={1}
                   accessible={false}>
@@ -169,13 +169,18 @@ export function AccountRow({
       <Pressable
         testID={`drawer-profile-options-${profile.accountIndex}`}
         accessibilityRole="button"
-        accessibilityLabel="Account options"
-        accessibilityHint={`Copy, view or edit ${name}`}
+        accessibilityLabel={`Account options for ${name}`}
+        accessibilityHint={
+          isActive ? 'Copy public key, view or edit profile' : 'Copy public key or view profile'
+        }
         accessibilityState={{ disabled: locked }}
         disabled={locked}
         hitSlop={4}
         onPress={() => onOpenMenu(profile, name)}
-        className="h-11 w-11 shrink-0 items-center justify-center rounded-full">
+        // The switching row stays bright, but its menu is locked: dim the button.
+        className={`h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+          locked && isPending ? 'opacity-50' : ''
+        }`}>
         <Icon name="tabler:dots" size={20} color={muted} />
       </Pressable>
     </View>
