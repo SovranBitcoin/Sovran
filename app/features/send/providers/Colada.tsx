@@ -135,7 +135,7 @@ async function resolveRecipientProfileFromRelays(
     const reads = await Promise.all(
       client
         .relayUrls()
-        .map((url) => client.queryRelay(url, [filter], RECIPIENT_PROFILE_TIMEOUT_MS))
+        .map((url) => client.queryRelay(url, [filter], RECIPIENT_PROFILE_TIMEOUT_MS, signal))
     );
     const event = reads
       .flatMap((read) => read.events)

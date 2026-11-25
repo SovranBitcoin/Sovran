@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as nip44 from 'nostr-tools/nip44';
 import {
   finalizeEvent,
@@ -362,5 +362,121 @@ describe('nostr client & pure nostr-tools NIP-17 payment transport', () => {
     expect(frames).toContainEqual(['CLOSE', reqId]);
 
     client.dispose();
+  });
+
+  it('encrypts and decrypts NIP-44 and NIP-04 round-trips and refuses after dispose', () => {
+    const aliceSk = generateSecretKey();
+    const bobSk = generateSecretKey();
+    const alice = createPrivateKeySigner(aliceSk);
+    const bob = createPrivateKeySigner(bobSk);
+
+    const nip44Cipher = alice.encrypt(bob.pubkey, 'private-mute-list', 'nip44');
+    expect(nip44Cipher).not.toContain('private-mute-list');
+    expect(bob.decrypt(alice.pubkey, nip44Cipher, 'nip44')).toBe('private-mute-list');
+
+    const nip04Cipher = alice.encrypt(bob.pubkey, 'legacy-dm', 'nip04');
+    expect(nip04Cipher).not.toContain('legacy-dm');
+    expect(bob.decrypt(alice.pubkey, nip04Cipher, 'nip04')).toBe('legacy-dm');
+
+    alice.dispose();
+    expect(() => alice.encrypt(bob.pubkey, 'x', 'nip44')).toThrow('disposed');
+    expect(() => alice.decrypt(bob.pubkey, nip44Cipher, 'nip44')).toThrow('disposed');
+    bob.dispose();
+  });
+
+  it('reconnects configured relays, settles pending queries on dispose, and releases ephemeral relays', async () => {
+    const sockets: {
+      url: string;
+      sent: unknown[][];
+      closed: boolean;
+      triggerClose: () => void;
+      triggerClosed: (subId: string) => void;
+      triggerOk: (id: string) => void;
+    }[] = [];
+
+    class ScriptedSocket implements WebSocketLike {
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onmessage: ((e: { data: unknown }) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onclose: ((e: unknown) => void) | null = null;
+      sent: unknown[][] = [];
+      closed = false;
+
+      constructor(public url: string) {
+        sockets.push({
+          url,
+          sent: this.sent,
+          closed: false,
+          triggerClose: () => {
+            this.readyState = 3;
+            this.onclose?.({});
+          },
+          triggerClosed: (subId: string) => {
+            this.onmessage?.({ data: JSON.stringify(['CLOSED', subId, 'auth-required']) });
+          },
+          triggerOk: (id: string) => {
+            this.onmessage?.({ data: JSON.stringify(['OK', id, true, '']) });
+          },
+        });
+        queueMicrotask(() => {
+          if (this.closed) return;
+          this.readyState = 1;
+          this.onopen?.();
+        });
+      }
+
+      send(raw: string): void {
+        this.sent.push(JSON.parse(raw) as unknown[]);
+      }
+
+      close(): void {
+        this.closed = true;
+        this.readyState = 3;
+        const rec = sockets.find((s) => s.sent === this.sent);
+        if (rec) rec.closed = true;
+      }
+    }
+
+    const sk = generateSecretKey();
+    const client = new NostrClient({
+      relays: ['wss://pool.test/'],
+      signer: createPrivateKeySigner(sk),
+      WebSocketImpl: ScriptedSocket,
+      reconnectDelayMs: 20,
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(client.getRelayHealth()['wss://pool.test/']).toBe('connected');
+
+    // Ephemeral one-off relay is closed & removed once publish settles.
+    const ev = client.signEvent({ kind: 1, tags: [], content: 'once' });
+    const pub = client.publishToRelay('wss://ephemeral.test/', ev, 2_000);
+    await new Promise((r) => setTimeout(r, 10));
+    sockets.find((s) => s.url === 'wss://ephemeral.test/')!.triggerOk(ev.id);
+    await pub;
+    expect(client.relayUrls()).toEqual(['wss://pool.test/']);
+
+    // Configured relay disconnects -> marks flapping on second drop -> reconnects.
+    sockets[0]!.triggerClose();
+    expect(client.getRelayHealth()['wss://pool.test/']).toBe('disconnected');
+    await new Promise((r) => setTimeout(r, 35));
+    expect(client.getRelayHealth()['wss://pool.test/']).toBe('connected');
+
+    // CLOSED frame surfaces error to subscriber.
+    const onError = vi.fn();
+    client.subscribeRelay('wss://pool.test/', [{ kinds: [1] }], {
+      onEvent: () => {},
+      onEose: () => {},
+      onError,
+    });
+    const latestPool = sockets.filter((s) => s.url === 'wss://pool.test/').at(-1)!;
+    const reqId = latestPool.sent.find((f) => f[0] === 'REQ')![1] as string;
+    latestPool.triggerClosed(reqId);
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'auth-required' }));
+
+    // Pending query settles immediately on dispose() without waiting for timeout.
+    const pendingQuery = client.queryRelay('wss://pool.test/', [{ kinds: [1] }], 30_000);
+    client.dispose();
+    await expect(pendingQuery).resolves.toEqual({ events: [], eose: false });
   });
 });

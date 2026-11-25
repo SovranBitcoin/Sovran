@@ -37,7 +37,22 @@ const RefundSpine = z.looseObject({
 });
 
 function normalizeIssuerBase(base: string): string {
-  return base.trim().replace(/\/+$/, '').replace(/\/v1$/i, '').toLowerCase();
+  const trimmed = base.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+  // Only scheme and authority are case-insensitive; preserve path/query casing
+  // so distinct deployments on one host (e.g. /TeamA vs /teama) never collide.
+  const match = /^([a-z][a-z0-9+.-]*:\/\/[^/?#]*)(.*)$/i.exec(trimmed);
+  return match ? match[1]!.toLowerCase() + match[2] : trimmed;
+}
+
+function redactNodeUrl(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.origin + parsed.pathname;
+  } catch {
+    return '[invalid-url]';
+  }
 }
 
 function refundUrl(base: string): string {
@@ -338,7 +353,7 @@ async function reclaimRoutstrBalancesOnce(
       if (!ownsScope()) break;
       useRoutstrStore.getState().markAccountReclaimed(nodeKey);
       outcome.reclaimed += 1;
-      apiLog.info('routstr.reclaim.collected', { node });
+      apiLog.info('routstr.reclaim.collected', { node: redactNodeUrl(node) });
     } catch {
       // The provider can replay the refund on the next pass.
       apiLog.error('routstr.reclaim.receive_failed');

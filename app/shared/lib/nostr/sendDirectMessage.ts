@@ -37,31 +37,23 @@ import { withTimeout } from 'wallet';
 import { nostrLog } from '@/shared/lib/logger';
 import { createDmRelayResolver } from '@/shared/lib/nostr/dmRelayDiscovery';
 
+import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
 import { buildRecipientGiftWrap } from './nip17';
-
-const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
-
-// Order matters: the first three become our nprofile hints, so they must be
-// relays Sovran reads gift wraps from (nagg ingests damus and nos.lol, and both
-// are in the relay tier). Macadamia ignores hints and publishes only to its own
-// relays, whose defaults also include damus and nos.lol.
-const FALLBACK_PAYMENT_RELAYS = [
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.8333.space/',
-  'wss://relay.nostr.band',
-];
 
 /**
  * The relay set we advertise as our own inbox: embedded as the relay hints in
  * the NUT-18 nostr-transport nprofiles we hand out, and queried when we need to
  * discover somebody else's `kind:10050`.
  *
+ * Derived directly from `DEFAULT_RELAYS` (excluding Vertex, which is a DVM
+ * people-search relay and not read by our payment inbox) so every advertised
+ * hint is a relay Sovran's payment inbox actually listens on.
+ *
  * It is deliberately not a publish target for a counterparty's DM. Our own
  * requests always carry these as hints, so a hint-less nprofile is always
  * somebody else's, and these relays say nothing about where *they* read.
  */
-export const PAYMENT_RELAYS = [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
+export const PAYMENT_RELAYS: readonly string[] = DEFAULT_RELAYS;
 
 /** How long to wait for the first relay OK before failing the publish. */
 const DEFAULT_PUBLISH_TIMEOUT_MS = 15_000;

@@ -68,9 +68,16 @@ export function useRoutstrRecoveryCard(enabled: boolean): {
   useEffect(() => {
     if (!enabled || !pubkey) return;
     const controller = new AbortController();
-    void readSdkRecoveryCounts(pubkey).then((counts) => {
-      if (!controller.signal.aborted) setSdkTotal(counts.total);
-    });
+    void readSdkRecoveryCounts(pubkey)
+      .then((counts) => {
+        if (!controller.signal.aborted) setSdkTotal(counts.total);
+      })
+      .catch((error) => {
+        cashuLog.warn('recovery.ai_reclaim.count_failed', {
+          error: error instanceof Error ? error.name : 'unknown',
+        });
+        if (!controller.signal.aborted) setSdkTotal(0);
+      });
     return () => {
       controller.abort();
     };

@@ -95,6 +95,8 @@ function isVerifiedEvent(raw: unknown): raw is VerifiedEvent {
  */
 export class NostrClient {
   private readonly relays = new Map<string, ManagedRelay>();
+  private readonly configuredRelays = new Set<string>();
+  private readonly activeQueryCancels = new Set<() => void>();
   private readonly listeners = new Map<NostrClientEvent, Set<(url: string) => void>>();
   private readonly wsImpl: (new (url: string) => WebSocketLike) | undefined;
   private readonly reconnectDelayMs: number;
@@ -178,6 +180,7 @@ export class NostrClient {
     for (const raw of urls) {
       const url = tryNormalizeRelayUrl(raw);
       if (!url) continue;
+      this.configuredRelays.add(url);
       if (!this.relays.has(url)) {
         const entry = this.createRelayEntry(url);
         this.relays.set(url, entry);
@@ -222,6 +225,8 @@ export class NostrClient {
         // throughout this publish so the next retry opens a fresh connection.
         if (relay.socket && (relay.status !== 'connected' || relay.frames === framesAtStart)) {
           this.handleDisconnect(relay, timeoutErr);
+        } else {
+          this.maybeReleaseEphemeral(relay);
         }
       }, timeoutMs);
 
@@ -282,6 +287,7 @@ export class NostrClient {
         if (sub.sent && relay.status === 'connected' && relay.socket) {
           sendWebSocket(relay.socket, ['CLOSE', id]);
         }
+        this.maybeReleaseEphemeral(relay);
       },
     };
   }
@@ -292,22 +298,25 @@ export class NostrClient {
     timeoutMs = 10_000,
     signal?: AbortSignal
   ): Promise<RelayQueryResult> {
-    if (signal?.aborted) {
+    if (this._disposed || signal?.aborted) {
       return Promise.resolve({ events: [], eose: false });
     }
     return new Promise<RelayQueryResult>((resolve) => {
       const events: VerifiedEvent[] = [];
       let settled = false;
       let handle: RelaySubscriptionHandle | null = null;
+      const cancel = () => finish(false);
       const finish = (eose: boolean) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
+        this.activeQueryCancels.delete(cancel);
         handle?.stop();
         resolve({ events, eose });
       };
       const onAbort = () => finish(false);
+      this.activeQueryCancels.add(cancel);
       signal?.addEventListener('abort', onAbort, { once: true });
       const timer = setTimeout(() => finish(false), timeoutMs);
       handle = this.subscribeRelay(rawUrl, filters, {
@@ -325,6 +334,11 @@ export class NostrClient {
     this._disposed = true;
     this._signer?.dispose();
     this._signer = undefined;
+
+    for (const cancel of [...this.activeQueryCancels]) {
+      cancel();
+    }
+    this.activeQueryCancels.clear();
 
     for (const relay of this.relays.values()) {
       if (relay.reconnectTimer) {
@@ -344,7 +358,25 @@ export class NostrClient {
       relay.status = 'disconnected';
     }
     this.relays.clear();
+    this.configuredRelays.clear();
     this.listeners.clear();
+  }
+
+  /** Drop one-off (non-configured) relays once their last publish/sub finishes. */
+  private maybeReleaseEphemeral(relay: ManagedRelay): void {
+    if (this.configuredRelays.has(relay.url)) return;
+    if (relay.pendingPublishes.size > 0 || relay.subscriptions.size > 0) return;
+    if (relay.reconnectTimer) {
+      clearTimeout(relay.reconnectTimer);
+      relay.reconnectTimer = null;
+    }
+    if (relay.socket) {
+      const sock = relay.socket;
+      relay.socket = null;
+      closeWebSocket(sock);
+    }
+    relay.status = 'disconnected';
+    this.relays.delete(relay.url);
   }
 
   private getOrCreateRelay(url: string): ManagedRelay {
@@ -443,6 +475,7 @@ export class NostrClient {
           relay.pendingPublishes.delete(eventId);
           if (accepted) pending.resolve();
           else pending.reject(new Error(reason || `Relay rejected event ${eventId}`));
+          this.maybeReleaseEphemeral(relay);
         }
         return;
       }
@@ -470,6 +503,7 @@ export class NostrClient {
         relay.subscriptions.delete(frame[1]);
         const reason = typeof frame[2] === 'string' ? frame[2] : 'Subscription closed';
         sub.handlers.onError?.(new Error(reason));
+        this.maybeReleaseEphemeral(relay);
       }
     };
 
@@ -526,6 +560,11 @@ export class NostrClient {
     relay.disconnectCount += 1;
     this.setStatus(relay, relay.disconnectCount >= 2 ? 'flapping' : 'disconnected');
     this.failPending(relay, error);
+
+    if (!this.configuredRelays.has(relay.url)) {
+      this.maybeReleaseEphemeral(relay);
+      return;
+    }
 
     if (!this._disposed && this.relays.has(relay.url) && !relay.reconnectTimer) {
       relay.reconnectTimer = setTimeout(() => {

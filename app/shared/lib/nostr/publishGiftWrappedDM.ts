@@ -18,6 +18,7 @@ import { buildGiftWrappedDMPair } from './nip17';
 import { nostrLog } from '@/shared/lib/logger';
 import { DM_RELAY_LIST_KIND, readDmRelays } from './outbox/nip17DmRelays';
 import { publishEvent } from './publish';
+import { NoDirectMessageRelaysError } from './sendDirectMessage';
 
 const DM_RELAY_LOOKUP_TIMEOUT_MS = 3_000;
 
@@ -53,11 +54,11 @@ async function resolveRecipientDmRelays(
 
 /**
  * Build and publish a NIP-17 gift-wrapped DM pair. Resolves the recipient's
- * NIP-17 `kind:10050` DM relays when published (falling back to the client's
- * current pool when none are declared) and resolves once the recipient wrap is
- * accepted by a relay; the self-copy publish is best-effort. Rejects if the
- * recipient wrap fails to publish — callers MUST treat a rejection as "not
- * delivered" and keep the funds recoverable.
+ * NIP-17 `kind:10050` DM relays and refuses with `NoDirectMessageRelaysError`
+ * when none are declared (so the send flow keeps the manual copy/share handoff
+ * instead of publishing live proofs to relays the recipient may never read).
+ * Resolves once the recipient wrap is accepted by a relay; the self-copy
+ * publish is best-effort.
  */
 export async function publishGiftWrappedDM(params: {
   client: NostrClient;
@@ -67,6 +68,11 @@ export async function publishGiftWrappedDM(params: {
   extraTags?: string[][];
 }): Promise<{ selfWrapId: string }> {
   const { client, senderPrivateKey, recipientPublicKey, content, extraTags } = params;
+  const recipientRelays = await resolveRecipientDmRelays(client, recipientPublicKey);
+  if (recipientRelays.length === 0) {
+    throw new NoDirectMessageRelaysError(recipientPublicKey);
+  }
+
   const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
     content,
     senderPrivateKey,
@@ -74,11 +80,10 @@ export async function publishGiftWrappedDM(params: {
     ...(extraTags ? { extraTags } : {}),
   });
 
-  const recipientRelays = await resolveRecipientDmRelays(client, recipientPublicKey);
   const delivered = await publishEvent({
     client,
     event: recipientWrap,
-    ...(recipientRelays.length > 0 ? { relays: recipientRelays } : {}),
+    relays: recipientRelays,
     resolveOn: 'first-ok',
   });
   if (delivered.isErr()) {

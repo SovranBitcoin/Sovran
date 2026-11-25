@@ -1,4 +1,5 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
+import { finalizeEvent, generateSecretKey } from 'nostr-tools/pure';
 import {
   createRelayPoolConnection,
   type RawRelayEvent,
@@ -94,4 +95,70 @@ describe('regression — relay pool correctness (Stage-F adversarial review)', (
 
   // Bug 2: NIP-01 until is inclusive; the cursor's own (boundary) event must not
   // re-render at the top of the next page.
+
+  test('live subscribe drops forged kind-1059 wraps before dedup and reconnects after socket close', async () => {
+    vi.useFakeTimers();
+    try {
+      const validWrap = finalizeEvent(
+        { kind: 1059, created_at: 1_700_000_000, tags: [], content: 'real-cipher' },
+        generateSecretKey()
+      );
+      const forgedWrap = { ...validWrap, content: 'tampered', sig: '00'.repeat(64) };
+      const sockets: {
+        sent: unknown[][];
+        emit: (frame: unknown[]) => void;
+        drop: () => void;
+      }[] = [];
+
+      class ReconnectingSocket {
+        onopen: ((ev: unknown) => void) | null = null;
+        onmessage: ((ev: { data: unknown }) => void) | null = null;
+        onerror: ((ev: unknown) => void) | null = null;
+        onclose: ((ev: unknown) => void) | null = null;
+        sent: unknown[][] = [];
+        constructor(public url: string) {
+          sockets.push({
+            sent: this.sent,
+            emit: (frame) => this.onmessage?.({ data: JSON.stringify(frame) }),
+            drop: () => this.onclose?.({}),
+          });
+          queueMicrotask(() => this.onopen?.({}));
+        }
+        send(raw: string) {
+          this.sent.push(JSON.parse(raw) as unknown[]);
+        }
+        close() {}
+      }
+
+      const connection = createRelayPoolConnection({
+        relays: ['wss://inbox.test'],
+        WebSocketImpl: ReconnectingSocket as unknown as new (url: string) => never,
+      });
+
+      const received: RawRelayEvent[] = [];
+      const stop = connection.subscribe!([{ kinds: [1059] }], (ev) => received.push(ev));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const firstSub = sockets[0]!.sent.find((f) => f[0] === 'REQ')![1] as string;
+      // Forged wrap with the same id must NOT be delivered AND must NOT poison dedup for the real wrap.
+      sockets[0]!.emit(['EVENT', firstSub, forgedWrap]);
+      expect(received).toHaveLength(0);
+      sockets[0]!.emit(['EVENT', firstSub, validWrap]);
+      expect(received).toHaveLength(1);
+      expect(received[0]!.content).toBe('real-cipher');
+
+      // Unexpected disconnect schedules a reconnect and sends a fresh REQ.
+      sockets[0]!.drop();
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets.length).toBeGreaterThanOrEqual(2);
+      expect(sockets[1]!.sent.some((f) => f[0] === 'REQ')).toBe(true);
+
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

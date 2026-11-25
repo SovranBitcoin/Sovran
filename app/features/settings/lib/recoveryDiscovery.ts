@@ -128,7 +128,7 @@ interface RelayReader {
     filters: readonly ReturnType<typeof mintBackupFilter>[],
     timeoutMs?: number,
     signal?: AbortSignal
-  ): Promise<{ events: readonly unknown[] }>;
+  ): Promise<{ events: readonly unknown[]; eose?: boolean }>;
 }
 
 /** Upper bound when no relay answers; short enough not to hold the swipe back. */
@@ -174,9 +174,10 @@ export function relayEventsReader(client: RelayReader): FetchRelayEvents {
             if (settled) return;
             collected.push(...result.events);
             remaining -= 1;
+            const answered = result.eose === true || result.events.length > 0;
             if (remaining === 0) {
               finish(collected);
-            } else if (!graceTimer) {
+            } else if (answered && !graceTimer) {
               graceTimer = setTimeout(() => finish(collected), BACKUP_RELAY_GRACE_MS);
             }
           })

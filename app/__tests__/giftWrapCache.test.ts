@@ -168,4 +168,17 @@ describe('across a restart', () => {
     expect(cache.cache.get(ALICE, 'undated')).toBeUndefined();
     expect(cache.unwrap(ALICE, wrap, BOB_SECRET)).toMatchObject({ content: 'saved' });
   });
+
+  it('keeps bearer ecash payment rumors in memory only and never writes them to AsyncStorage', async () => {
+    const cache = loadCache();
+    const tokenWrap = wrapFor(ALICE, 'cashuBo2F0gaJhaUgA1234567890abcdef');
+    const opened = cache.unwrap(ALICE, tokenWrap, ALICE_SECRET);
+    expect(opened?.content).toContain('cashuB');
+    // Cached in memory within this session:
+    expect(cache.cache.get(ALICE, tokenWrap.id)).toBe(opened);
+    await flushSaves();
+    const persisted = stored(`nip17-unwrap-cache:v1:${ALICE}`);
+    expect(persisted?.[tokenWrap.id]).toBeUndefined();
+    expect(JSON.stringify([...mockDisk.values()])).not.toContain('cashuB');
+  });
 });

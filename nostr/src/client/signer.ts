@@ -30,7 +30,13 @@ export function createPrivateKeySigner(privateKey: Uint8Array): NostrSigner {
     throw new RangeError(`Expected 32-byte Nostr secret key, got ${privateKey.length}`);
   }
   const keyCopy = new Uint8Array(privateKey);
-  const pubkey = getPublicKey(keyCopy);
+  let pubkey: string;
+  try {
+    pubkey = getPublicKey(keyCopy);
+  } catch (error) {
+    keyCopy.fill(0);
+    throw error;
+  }
   let disposed = false;
 
   const assertActive = () => {
@@ -66,7 +72,11 @@ export function createPrivateKeySigner(privateKey: Uint8Array): NostrSigner {
         return nip04.encrypt(keyCopy, peerPubkey, plaintext);
       }
       const convKey = nip44.v2.utils.getConversationKey(keyCopy, peerPubkey);
-      return nip44.v2.encrypt(plaintext, convKey);
+      try {
+        return nip44.v2.encrypt(plaintext, convKey);
+      } finally {
+        convKey.fill(0);
+      }
     },
     decrypt(peerPubkey: string, ciphertext: string, scheme: EncryptionScheme = 'nip44'): string {
       assertActive();
@@ -74,7 +84,11 @@ export function createPrivateKeySigner(privateKey: Uint8Array): NostrSigner {
         return nip04.decrypt(keyCopy, peerPubkey, ciphertext);
       }
       const convKey = nip44.v2.utils.getConversationKey(keyCopy, peerPubkey);
-      return nip44.v2.decrypt(ciphertext, convKey);
+      try {
+        return nip44.v2.decrypt(ciphertext, convKey);
+      } finally {
+        convKey.fill(0);
+      }
     },
     dispose(): void {
       if (disposed) return;

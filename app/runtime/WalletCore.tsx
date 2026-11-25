@@ -227,8 +227,10 @@ async function runCocoPhase2({
     });
     // A failure before the default mints ran must not leave the header pill
     // waiting on a setup that will not happen this session.
-    if (isLive()) useDefaultMintSetupStore.getState().markSettled();
-    bgStage.complete();
+    if (isLive()) {
+      useDefaultMintSetupStore.getState().markSettled();
+      bgStage.complete();
+    }
   }
 }
 

@@ -167,7 +167,7 @@ describe('relayEventsReader', () => {
         relayUrls: () => ['wss://fast.example', 'wss://silent.example'],
         queryRelay: (url, _filters, _timeoutMs, signal) => {
           if (url === 'wss://fast.example') {
-            return Promise.resolve({ events: [{ id: 'from-fast' }] });
+            return Promise.resolve({ events: [{ id: 'from-fast' }], eose: true });
           }
           if (signal) stragglerSignals.push(signal);
           return new Promise(() => {});
@@ -179,6 +179,35 @@ describe('relayEventsReader', () => {
       await expect(pending).resolves.toEqual([{ id: 'from-fast' }]);
       expect(stragglerSignals).toHaveLength(1);
       expect(stragglerSignals[0]!.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not let a fast-failing relay cut off a slower live relay with the backup', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveSlow!: (v: { events: readonly unknown[]; eose: boolean }) => void;
+      const slowSignals: AbortSignal[] = [];
+      const read = relayEventsReader({
+        relayUrls: () => ['wss://dead.example', 'wss://live.example'],
+        queryRelay: (url, _filters, _timeoutMs, signal) => {
+          if (url === 'wss://dead.example') {
+            return Promise.resolve({ events: [], eose: false });
+          }
+          if (signal) slowSignals.push(signal);
+          return new Promise((resolve) => {
+            resolveSlow = resolve;
+          });
+        },
+      });
+      const pending = read(filter);
+      await Promise.resolve();
+      // Even after >800ms, the dead relay (eose: false, 0 events) must NOT abort the live relay.
+      jest.advanceTimersByTime(1_500);
+      expect(slowSignals[0]!.aborted).toBe(false);
+      resolveSlow({ events: [{ id: 'from-live' }], eose: true });
+      await expect(pending).resolves.toEqual([{ id: 'from-live' }]);
     } finally {
       jest.useRealTimers();
     }

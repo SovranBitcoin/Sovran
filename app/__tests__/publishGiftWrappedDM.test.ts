@@ -11,6 +11,7 @@
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
+import { NoDirectMessageRelaysError } from '@/shared/lib/nostr/sendDirectMessage';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { fakeClient } from './helpers/fakeNostrClient';
 
@@ -40,9 +41,20 @@ const recipientKey = generateSecretKey();
 const recipientPub = getPublicKey(recipientKey);
 const outsiderKey = generateSecretKey();
 
-/** One relay, which takes each publish's next outcome (by default it accepts). */
+const recipientDmRelayList = finalizeEvent(
+  {
+    kind: 10050,
+    created_at: 1_700_000_000,
+    tags: [['relay', 'wss://relay.example/']],
+    content: '',
+  },
+  recipientKey
+);
+
+/** One relay, which advertises recipientPub's kind-10050 inbox and takes each publish's next outcome. */
 const client = fakeClient({
   relays: ['wss://relay.example/'],
+  queryRelay: async () => ({ events: [recipientDmRelayList], eose: true }),
   publishToRelay: async (_url, event) => {
     mockPublished.push({ ...event });
     const next = mockOutcomes.shift();
@@ -206,4 +218,23 @@ test('routes the recipient wrap to the recipient kind-10050 DM relays when adver
   });
 
   expect(publishedUrls).toEqual(['wss://inbox.recipient.example/', 'wss://sender.pool.example/']);
+});
+
+test('refuses with NoDirectMessageRelaysError when the recipient has no kind-10050 inbox relays', async () => {
+  const publishToRelay = jest.fn(async () => undefined);
+  const noInboxClient = fakeClient({
+    relays: ['wss://sender.pool.example/'],
+    queryRelay: async () => ({ events: [], eose: true }),
+    publishToRelay,
+  });
+
+  await expect(
+    publishGiftWrappedDM({
+      client: noInboxClient,
+      senderPrivateKey: senderKey,
+      recipientPublicKey: recipientPub,
+      content: TOKEN,
+    })
+  ).rejects.toBeInstanceOf(NoDirectMessageRelaysError);
+  expect(publishToRelay).not.toHaveBeenCalled();
 });
