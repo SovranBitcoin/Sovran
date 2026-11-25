@@ -22,7 +22,7 @@ import AppGate from '@/shared/blocks/AppGate';
 import { useInitializationReset } from '@/shared/providers/InitializationProvider';
 import { compose } from '@/shared/lib/utils';
 import { NostrKeysProvider } from '@/shared/providers/NostrKeysProvider';
-import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
+import { NostrClientProvider } from '@/shared/providers/NostrClientProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hasFeature } from '@/shared/config/features';
@@ -57,7 +57,7 @@ export function AccountScopedProviders({
     () =>
       compose([
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
-        [NostrNDKProvider, { accountIndex }],
+        [NostrClientProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
         SovranColadaProvider,

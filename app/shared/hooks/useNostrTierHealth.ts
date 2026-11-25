@@ -3,7 +3,7 @@
  * the Network settings screen.
  *
  * Composes an HTTP probe (nagg), a WebSocket round-trip probe (Primal), and the
- * caller-supplied NDK-pool relay health map into one uniform per-tier status.
+ * caller-supplied Nostr client relay health map into one uniform per-tier status.
  * The relay map is passed in (rather than calling `useRelayHealth` here) so the
  * screen runs a single relay poll for both the per-relay dots and this tier fold.
  *

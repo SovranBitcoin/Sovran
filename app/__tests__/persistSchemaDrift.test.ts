@@ -13,11 +13,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
-// Native/ESM deps pulled in transitively by the completeness-backfill store
-// imports; only the schemas matter here.
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
-  virtual: true,
-});
 
 import { z } from 'zod';
 

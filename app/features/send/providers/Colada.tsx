@@ -20,7 +20,8 @@ import { useHandleCameraPermission } from '@/features/camera/hooks/useHandleCame
 import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
+import { useNostrClient } from '@/shared/providers/NostrClientProvider';
 import { Metadata } from 'nostr-tools/kinds';
 import { getPublicKey } from 'nostr-tools/pure';
 
@@ -101,7 +102,7 @@ const getActiveUnit = () => toRealUnit(useMintStore.getState().activeUnit);
  * Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
  *
  * Stage 1 (NIP-05 → pubkey) is shipped by colada's default operation set; this
- * one has no default because NDK / cache wiring is app-specific. Returning null
+ * one has no default because relay wiring is app-specific. Returning null
  * on any failure is the contract: the machine's resolver treats it as
  * best-effort cosmetic data and does not block the flow.
  *
@@ -109,17 +110,19 @@ const getActiveUnit = () => toRealUnit(useMintStore.getState().activeUnit);
  * React Compiler cannot lower, and inline it kept the whole payment provider
  * from compiling.
  */
-async function resolveRecipientProfileFromNdk(
-  currentNdk: ReturnType<typeof useNDK>['ndk'],
+const RECIPIENT_PROFILE_TIMEOUT_MS = 5_000;
+
+async function resolveRecipientProfileFromRelays(
+  client: NostrClient | undefined,
   pubkey: string,
   signal?: AbortSignal
 ): Promise<RecipientProfile | null> {
   paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
     pubkeyLength: pubkey.length,
   });
-  if (!currentNdk) {
+  if (!client) {
     paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-      reason: 'no_ndk',
+      reason: 'no_client',
     });
     return null;
   }
@@ -130,11 +133,19 @@ async function resolveRecipientProfileFromNdk(
     return null;
   }
   try {
-    const event = await currentNdk.fetchEvent({
-      kinds: [Metadata as number],
-      authors: [pubkey],
-      limit: 1,
-    });
+    const filter = { kinds: [Metadata as number], authors: [pubkey], limit: 1 };
+    const reads = await Promise.all(
+      client
+        .relayUrls()
+        .map((url) => client.queryRelay(url, [filter], RECIPIENT_PROFILE_TIMEOUT_MS))
+    );
+    const event = reads
+      .flatMap((read) => read.events)
+      .filter((e) => e.pubkey === pubkey && e.kind === Metadata)
+      .reduce<(typeof reads)[number]['events'][number] | undefined>(
+        (newest, e) => (!newest || e.created_at > newest.created_at ? e : newest),
+        undefined
+      );
     if (!event) {
       paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
         reason: 'not_found',
@@ -177,7 +188,7 @@ async function resolveRecipientProfileFromNdk(
 }
 
 type ColadaIdentity = {
-  getNdk: () => ReturnType<typeof useNDK>['ndk'];
+  getClient: () => NostrClient | undefined;
   getNpub: () => string | undefined;
   getPubkey: () => string | undefined;
   getPrivateKey: () => Uint8Array | undefined;
@@ -194,7 +205,7 @@ type ColadaIdentity = {
  * in this hook rather than in the provider is what lets the provider compile:
  * React Compiler treats handing a ref-closing closure to a function during
  * render as a render-time ref access, and the provider builds five such
- * factories. NDK in particular changes identity across login/logout, so the
+ * factories. The Nostr client in particular changes identity across login/logout, so the
  * operations closure must always see the latest instance.
  *
  * The subscriber fan-out is a Set, not a single slot: co-mounted receive
@@ -202,10 +213,10 @@ type ColadaIdentity = {
  * the refresh instead of clobbering the prior subscriber.
  */
 function useColadaIdentity(
-  ndk: ReturnType<typeof useNDK>['ndk'],
+  client: NostrClient | undefined,
   keys: ReturnType<typeof useNostrKeysContext>['keys']
 ): ColadaIdentity {
-  const ndkRef = useLatestRef(ndk);
+  const clientRef = useLatestRef(client);
   const npubRef = useLatestRef(keys?.npub);
   const pubkeyRef = useLatestRef(keys?.pubkey);
   const privateKeyRef = useLatestRef(keys?.privateKey);
@@ -213,7 +224,7 @@ function useColadaIdentity(
 
   return useMemo(
     () => ({
-      getNdk: () => ndkRef.current,
+      getClient: () => clientRef.current,
       getNpub: () => npubRef.current,
       getPubkey: () => pubkeyRef.current,
       getPrivateKey: () => privateKeyRef.current,
@@ -227,7 +238,7 @@ function useColadaIdentity(
         for (const subscriber of subscribersRef.current) subscriber(newKey);
       },
     }),
-    [ndkRef, npubRef, pubkeyRef, privateKeyRef]
+    [clientRef, npubRef, pubkeyRef, privateKeyRef]
   );
 }
 
@@ -237,7 +248,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // the screen it is leaving (features/send/lib/amountReturn.ts).
   const navigationRef = useNavigationContainerRef();
   const { keys } = useNostrKeysContext();
-  const { ndk } = useNDK();
+  const { client } = useNostrClient();
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
@@ -269,7 +280,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const { handlePermission } = useHandleCameraPermission();
   const requestCameraPermission = useCallback(() => handlePermission(), [handlePermission]);
 
-  const identity = useColadaIdentity(ndk, keys);
+  const identity = useColadaIdentity(client, keys);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
   const chainAdapter = useMemo(() => createMempoolSpaceChainAdapter(), []);
@@ -558,12 +569,12 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         executeMintQuote: createExecuteMintQuote({ getManager, prepareMintQuote }),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
-        // operation set; this one has no default because NDK / cache wiring
+        // operation set; this one has no default because relay wiring
         // is app-specific. Returning null on any failure is the contract:
         // the machine's resolver treats it as best-effort cosmetic data and
         // does not block the flow.
         resolveRecipientProfile: (pubkey, signal) =>
-          resolveRecipientProfileFromNdk(identity.getNdk(), pubkey, signal),
+          resolveRecipientProfileFromRelays(identity.getClient(), pubkey, signal),
       }) as MachineOperations,
     [getOffline, getManager, instance, identity]
   );
@@ -642,11 +653,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const deliverContactEcashDm = useCallback(
     async ({ recipientPubkey, token }: { recipientPubkey: string; token: string }) => {
       const pk = identity.getPrivateKey();
-      const ndkInstance = identity.getNdk();
+      const client = identity.getClient();
       if (!pk) throw new Error('Nostr keys not available');
-      if (!ndkInstance) throw new Error('NDK not available');
+      if (!client) throw new Error('Nostr client not available');
       const { selfWrapId } = await publishGiftWrappedDM({
-        ndk: ndkInstance,
+        client,
         senderPrivateKey: pk,
         recipientPublicKey: recipientPubkey,
         content: token,

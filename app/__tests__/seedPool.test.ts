@@ -1,19 +1,8 @@
 /**
- * seedPool is additive: it adds missing (wanted ∪ default) relays to the pool
- * and never removes existing ones.
+ * seedPool is additive: it asks the client for missing (wanted ∪ default)
+ * relays and never removes existing ones.
  */
 /* eslint-disable import/first */
-
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  NDKRelay: class NDKRelay {
-    url: string;
-    constructor(url: string) {
-      this.url = url;
-    }
-  },
-  normalizeRelayUrl: (url: string) => url.trim().toLowerCase().replace(/\/+$/, ''),
-}));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -25,43 +14,50 @@ jest.mock('@/shared/lib/nostr/outbox/defaults', () => {
   return { ...actual, DEFAULT_RELAYS: ['wss://default.com'] };
 });
 
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { NostrClient } from 'nostr/client';
 
 import { seedPool } from '@/shared/lib/nostr/outbox/seedPool';
 
-function fakePool(existing: string[]) {
-  const relays = new Map(existing.map((url) => [url, { url }]));
-  return {
-    relays,
-    addRelay: jest.fn((relay: { url: string }) => relays.set(relay.url, relay)),
-  };
+/** A real client over sockets that never open, so pool membership is all that changes. */
+function clientWith(existing: string[]) {
+  class IdleSocket {
+    readyState = 0;
+    onopen = null;
+    onmessage = null;
+    onerror = null;
+    onclose = null;
+    send() {}
+    close() {}
+  }
+  return new NostrClient({ relays: existing, WebSocketImpl: IdleSocket as never });
 }
 
-const asNdk = (value: unknown): NDK => value as unknown as NDK;
+const clients: NostrClient[] = [];
+afterEach(() => clients.splice(0).forEach((client) => client.dispose()));
 
 describe('seedPool', () => {
   it('adds wanted relays missing from the pool, plus defaults', () => {
-    const pool = fakePool(['wss://existing.com']);
-    const ndk = asNdk({ pool });
+    const client = clientWith(['wss://existing.com']);
+    clients.push(client);
 
-    const added = seedPool(ndk, ['wss://existing.com', 'wss://new.com']);
+    const added = seedPool(client, ['wss://existing.com', 'wss://new.com']);
 
-    expect(added.sort()).toEqual(['wss://default.com', 'wss://new.com']);
-    expect(pool.addRelay).toHaveBeenCalledTimes(2);
-    expect(pool.relays.has('wss://existing.com')).toBe(true); // untouched
+    expect(added.sort()).toEqual(['wss://default.com/', 'wss://new.com/']);
+    expect(client.relayUrls()).toContain('wss://existing.com/'); // untouched
+    expect(client.relayUrls()).toHaveLength(3);
   });
 
   it('is a no-op when everything is already present', () => {
-    const pool = fakePool(['wss://default.com', 'wss://a.com']);
-    const ndk = asNdk({ pool });
+    const client = clientWith(['wss://default.com', 'wss://a.com']);
+    clients.push(client);
 
-    const added = seedPool(ndk, ['wss://a.com']);
-
-    expect(added).toEqual([]);
-    expect(pool.addRelay).not.toHaveBeenCalled();
+    expect(seedPool(client, ['wss://a.com'])).toEqual([]);
+    expect(client.relayUrls()).toHaveLength(2);
   });
 
-  it('returns [] when the ndk has no pool', () => {
-    expect(seedPool(asNdk({}), ['wss://a.com'])).toEqual([]);
+  it('adds nothing once the client is disposed', () => {
+    const client = clientWith([]);
+    client.dispose();
+    expect(seedPool(client, ['wss://a.com'])).toEqual([]);
   });
 });

@@ -6,14 +6,14 @@
  * - `useOwnSocialGraphSeed` reads the follow list once per account from the
  *   tiered data layer and seeds the real social store through its
  *   last-writer-wins gate.
- * - `useMuteListSync` restores the mute list once the NDK, keys and the
+ * - `useMuteListSync` restores the mute list once the Nostr client, keys and the
  *   ignore store are ready, and again on every return to the foreground.
  *
  * - `useFollowSync` starts the follow worker once the social store has
  *   loaded, on each tap, when a follow list arrives and on each return to the
  *   foreground.
  *
- * Replaced: the follow worker, the keys provider, the data layer, the NDK hooks, the mute-list
+ * Replaced: the follow worker, the keys provider, the data layer, the Nostr client, the mute-list
  * fetch, the relay list and the ignore store's hydration, and AppState.
  */
 import { act, renderHook } from '@testing-library/react-native';
@@ -26,7 +26,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 
 let mockPubkey: string | undefined;
 let mockLayer: { getSocialGraph: jest.Mock } | null;
-let mockNdk: object | null;
+let mockClient: object | null;
 let mockInitialized = true;
 let mockOffline = false;
 let mockHydrated = true;
@@ -41,9 +41,8 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => mockLayer,
 }));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }));
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  useNostrNDKContext: () => ({ isInitialized: mockInitialized }),
+jest.mock('@/shared/providers/NostrClientProvider', () => ({
+  useNostrClient: () => ({ client: mockClient ?? undefined, isInitialized: mockInitialized }),
 }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
@@ -117,7 +116,7 @@ beforeEach(() => {
   }
   mockPubkey = A;
   mockLayer = { getSocialGraph: jest.fn(async () => graph([F1], 100)) };
-  mockNdk = { id: 'ndk', pool: { on: () => undefined, off: () => undefined } };
+  mockClient = { id: 'client', on: () => () => undefined };
   mockInitialized = true;
   mockOffline = false;
   mockHydrated = true;
@@ -233,15 +232,15 @@ describe('useMuteListSync', () => {
       for (const listener of [...mockAppStateListeners]) listener(state);
     });
 
-  it('restores the mute list once when ready, with the NDK and the account', async () => {
+  it('restores the mute list once when ready, with the client and the account', async () => {
     renderHook(() => useMuteListSync());
     await act(async () => undefined);
-    expect(mockSyncMuteList.mock.calls).toEqual([[mockNdk, A]]);
+    expect(mockSyncMuteList.mock.calls).toEqual([[mockClient, A]]);
   });
 
   it.each([
-    ['the NDK is not initialized', () => (mockInitialized = false)],
-    ['there is no NDK', () => (mockNdk = null)],
+    ['the client is not initialized', () => (mockInitialized = false)],
+    ['there is no client', () => (mockClient = null)],
     ['there is no account', () => (mockPubkey = undefined)],
   ])('does nothing while %s', async (_label, arrange) => {
     arrange();
@@ -323,16 +322,16 @@ describe('useFollowSync', () => {
     });
   });
 
-  const calls = () => mockRequestFollowSync.mock.calls.map(([ndk, pubkey]) => [ndk, pubkey]);
+  const calls = () => mockRequestFollowSync.mock.calls.map(([client, pubkey]) => [client, pubkey]);
   const foreground = (state = 'active') =>
     act(async () => {
       for (const listener of [...mockAppStateListeners]) listener(state);
     });
 
-  it('resumes saved follows once the account is ready, with the NDK and the account', async () => {
+  it('resumes saved follows once the account is ready, with the client and the account', async () => {
     renderHook(() => useFollowSync());
     await act(async () => undefined);
-    expect(calls()).toEqual([[mockNdk, A]]);
+    expect(calls()).toEqual([[mockClient, A]]);
   });
 
   it('waits for the social store to load, then resumes', async () => {
@@ -343,17 +342,17 @@ describe('useFollowSync', () => {
     await act(async () => {
       for (const listener of socialHydrationListeners) listener();
     });
-    expect(calls()).toEqual([[mockNdk, A]]);
+    expect(calls()).toEqual([[mockClient, A]]);
   });
 
-  it('waits for the NDK to initialize', async () => {
+  it('waits for the client to initialize', async () => {
     mockInitialized = false;
     renderHook(() => useFollowSync());
     await act(async () => undefined);
     expect(mockRequestFollowSync).not.toHaveBeenCalled();
   });
 
-  it('starts once the NDK and its signer are ready, without a tap', async () => {
+  it('starts once the client and its signer are ready, without a tap', async () => {
     mockInitialized = false;
     const view = renderHook(() => useFollowSync());
     await act(async () => undefined);
@@ -361,7 +360,7 @@ describe('useFollowSync', () => {
     mockInitialized = true;
     view.rerender({});
     await act(async () => undefined);
-    expect(calls()).toEqual([[mockNdk, A]]);
+    expect(calls()).toEqual([[mockClient, A]]);
   });
 
   it('starts again when the network comes back, without a tap or a return to the foreground', async () => {
@@ -372,7 +371,7 @@ describe('useFollowSync', () => {
     mockOffline = false;
     view.rerender({});
     await act(async () => undefined);
-    expect(calls()).toEqual([[mockNdk, A]]);
+    expect(calls()).toEqual([[mockClient, A]]);
   });
 
   it('starts on a tap and when a follow list arrives, not on other social writes', async () => {

@@ -45,7 +45,7 @@ jest.mock('@/shared/ui/composed/CapsuleButton', () => ({
     onPress: () => void;
   }) => require('react').createElement('capsule', { testID, label, onPress }),
 }));
-const mockNdk = {};
+const mockClient = {};
 jest.mock('@/shared/stores/global/profileStore', () => {
   const useProfileStore = Object.assign(
     (selector: (state: typeof mockState) => unknown) => selector(mockState),
@@ -60,11 +60,8 @@ jest.mock('@/shared/stores/global/profileStore', () => {
       .activeAccountReaders(() => useProfileStore.getState()),
   };
 });
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }), {
-  virtual: true,
-});
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  useNostrNDKContext: () => ({ isInitialized: true }),
+jest.mock('@/shared/providers/NostrClientProvider', () => ({
+  useNostrClient: () => ({ client: mockClient, isInitialized: true }),
 }));
 jest.mock('@/shared/lib/nostr/profile/publishOwnProfileMetadata', () => ({
   loadOwnProfileMetadata: jest.fn(),

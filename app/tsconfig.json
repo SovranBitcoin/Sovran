@@ -40,6 +40,7 @@
       "nostr": ["../nostr/src/index.ts"],
       "nostr/map": ["../nostr/src/map/index.ts"],
       "nostr/recipes": ["../nostr/src/recipes/index.ts"],
+      "nostr/client": ["../nostr/src/client/index.ts"],
       "nostr/schemas": ["../nostr/src/schemas.ts"],
       "wallet": ["../wallet/src/index.ts"],
       "wallet/react": ["../wallet/src/react/index.ts"],

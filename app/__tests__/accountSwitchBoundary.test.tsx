@@ -43,8 +43,8 @@ jest.mock('@/shared/config/features', () => ({ hasFeature: (f: string) => mockFe
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   NostrKeysProvider: mockRecorder('NostrKeys'),
 }));
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  NostrNDKProvider: mockRecorder('NostrNDK'),
+jest.mock('@/shared/providers/NostrClientProvider', () => ({
+  NostrClientProvider: mockRecorder('NostrClient'),
 }));
 jest.mock('@/shared/providers/CocoProvider', () => ({ CocoProvider: mockRecorder('Coco') }));
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
@@ -282,7 +282,7 @@ describe('AccountScopedProviders', () => {
 
     expect(nesting()).toEqual([
       'NostrKeys',
-      'NostrNDK',
+      'NostrClient',
       'Coco',
       'WalletContext',
       'Colada',
@@ -299,7 +299,7 @@ describe('AccountScopedProviders', () => {
 
     expect(nesting()).toEqual([
       'NostrKeys',
-      'NostrNDK',
+      'NostrClient',
       'Coco',
       'WalletContext',
       'Colada',
@@ -320,7 +320,7 @@ describe('AccountScopedProviders', () => {
     expect(unmounts).toEqual(
       expect.arrayContaining([
         'unmount NostrKeys{"defaultAccountIndex":0}',
-        'unmount NostrNDK{"accountIndex":0}',
+        'unmount NostrClient{"accountIndex":0}',
         'unmount Coco',
         'unmount WalletContext',
         'unmount Colada',
@@ -333,7 +333,7 @@ describe('AccountScopedProviders', () => {
     expect(mounts).toEqual(
       expect.arrayContaining([
         'mount NostrKeys{"defaultAccountIndex":1}',
-        'mount NostrNDK{"accountIndex":1}',
+        'mount NostrClient{"accountIndex":1}',
         'mount routes',
       ])
     );

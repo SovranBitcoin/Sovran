@@ -4,16 +4,15 @@
  * What tapping Follow publishes: the tap records an intent in the real social
  * store and the follow worker (`followSync`) turns outstanding intents into one
  * follow list built on the newest list it can vouch for. Replaced: the relays
- * (a fake NDK subscription per write relay), the publish seam, the signer, the
+ * (a fake client subscription per write relay), the publish seam, the signer, the
  * active account, the indexers, the popup and storage; for the hook, also the
- * keys, NDK and offline providers and AppState.
+ * keys, Nostr client and offline providers and AppState.
  *
  * The fakes behave like relays for what is proven here: each relay holds its
  * own lists, a read asks one relay, and a publish lands only on the relays it
  * was sent to (with none named, every relay in the pool, as `publishEvent`
  * does).
  */
-import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { err, ok } from 'neverthrow';
 
@@ -34,6 +33,13 @@ import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
+import {
+  asVerified,
+  fakeClient,
+  fakeSigned,
+  fakeSigner,
+  type FakeClient,
+} from './helpers/fakeNostrClient';
 
 const OWN = 'a0'.repeat(32);
 const OTHER_ACCOUNT = 'e4'.repeat(32);
@@ -54,7 +60,7 @@ type RelayEvent = {
 };
 
 /** The account's write relays. */
-const mockRelays: Relay[] = [{ url: 'wss://one.example' }, { url: 'wss://two.example' }];
+const mockRelays: Relay[] = [{ url: 'wss://one.example/' }, { url: 'wss://two.example/' }];
 /** Relays in the pool that are not write relays. */
 const mockPoolOnly: Relay[] = [];
 /** Each relay's stored kind 3s; a relay missing here never answers. */
@@ -75,40 +81,12 @@ const mockPublish = jest.fn();
 const mockPopup = jest.fn();
 const mockDisk = new Map<string, string>();
 let mockLayer: { getSocialGraph: jest.Mock } | null = null;
-let mockEventSeq = 0;
-let mockHookNdk: NDK | null = null;
+let mockHookClient: FakeClient | null = null;
 let mockOffline = false;
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  default: class {},
-  useNDK: () => ({ ndk: mockHookNdk }),
-  NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
-  NDKRelaySet: {
-    fromRelayUrls: (urls: string[]) => ({
-      relays: new Set([...mockRelays, ...mockPoolOnly].filter((relay) => urls.includes(relay.url))),
-    }),
-  },
-  NDKEvent: class {
-    kind = 0;
-    pubkey = '';
-    created_at = 0;
-    tags: string[][] = [];
-    content = '';
-    id = '';
-    getEventHash() {
-      return this.id;
-    }
-    verifySignature() {
-      return true;
-    }
-    async sign(signer: { sign: () => Promise<void>; user: () => Promise<{ pubkey: string }> }) {
-      await signer.sign();
-      this.pubkey = (await signer.user()).pubkey;
-      this.id = (++mockEventSeq).toString(16).padStart(64, '0');
-    }
-  },
-}));
+jest.mock('nostr-tools/pure', () =>
+  jest.requireActual('./helpers/fakeNostrClient').pureTrustingFakeEvents()
+);
 jest.mock('@/shared/stores/global/profileStore', () => {
   const useProfileStore = {
     getState: () => mockProfile,
@@ -141,8 +119,8 @@ jest.mock('@/shared/lib/logger', () => {
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: { pubkey: 'a0'.repeat(32) } }),
 }));
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  useNostrNDKContext: () => ({ isInitialized: true }),
+jest.mock('@/shared/providers/NostrClientProvider', () => ({
+  useNostrClient: () => ({ client: mockHookClient ?? undefined, isInitialized: true }),
 }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
@@ -174,8 +152,7 @@ function saveList(event: RelayEvent) {
 }
 
 function relayEvent(raw: RelayEvent) {
-  const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
-  return Object.assign(new NDKEvent(), raw);
+  return asVerified({ ...raw, sig: 'sig' });
 }
 
 /** Every write relay answers with these events (none: they answer that they hold no list). */
@@ -212,49 +189,27 @@ function discoverRelays(relays: Relay[], createdAt: number) {
 }
 
 function setup() {
-  const signer = {
-    sign: jest.fn(async () => undefined),
-    user: jest.fn(async () => ({ pubkey: OWN })),
-  };
-  const connectListeners = new Set<(relay: Relay) => void>();
-  const pool = {
-    on: (type: string, listener: (relay: Relay) => void) => {
-      if (type === 'relay:connect') connectListeners.add(listener);
-    },
-    off: (type: string, listener: (relay: Relay) => void) => {
-      if (type === 'relay:connect') connectListeners.delete(listener);
-    },
-    /** A relay in the pool (re)connects. */
-    connect: (relay: Relay) => {
-      for (const listener of connectListeners) listener(relay);
-    },
-  };
-  const ndk = {
+  const signer = fakeSigner(OWN);
+  const client = fakeClient({
     signer,
-    pool,
-    subscribe: (filter: unknown, _options: unknown, relaySet: { relays: Set<Relay> }) => {
-      mockFilters.push(filter);
-      const [relay] = [...relaySet.relays];
-      const listeners: Record<string, (...args: unknown[]) => void> = {};
-      const subscription = {
-        eosesSeen: new Set<Relay>(),
-        stop: jest.fn(),
-        on: (type: string, listener: (...args: unknown[]) => void) => {
-          listeners[type] = listener;
-        },
-        start: jest.fn(async () => {
-          await mockReadGate;
-          const stored = mockStored.get(relay.url);
-          if (!stored) return;
-          for (const event of stored) listeners.event(relayEvent(event));
-          subscription.eosesSeen.add(relay);
-          listeners.eose();
-        }),
-      };
-      return subscription;
+    subscribeRelay: (url, filters, handlers) => {
+      mockFilters.push(filters[0]);
+      const stop = jest.fn();
+      void (async () => {
+        await mockReadGate;
+        const stored = mockStored.get(url);
+        if (!stored) return;
+        for (const event of stored) handlers.onEvent(relayEvent(event));
+        handlers.onEose();
+      })();
+      return { stop };
     },
-  } as unknown as NDK;
-  return { ndk, signer, pool };
+  });
+  const pool = {
+    /** A relay in the pool (re)connects. */
+    connect: (relay: Relay) => client.connect(relay.url),
+  };
+  return { client, signer, pool };
 }
 
 function deferred<V = void>() {
@@ -298,7 +253,7 @@ beforeEach(async () => {
   mockPublish.mockImplementation(acceptOnRelays);
   mockPopup.mockReset();
   mockLayer = null;
-  mockHookNdk = null;
+  mockHookClient = null;
   mockOffline = false;
   mockDisk.clear();
   forgetSilentRelays();
@@ -324,11 +279,11 @@ describe('following someone', () => {
     ];
     saveList(contacts(T, tags, '{"relays":1}'));
     relaysHold(contacts(T, tags, '{"relays":1}'));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
     expect(selectIsFollowingPubkey(Z)(social())).toBe(true);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish.mock.calls[0][0].event).toMatchObject({
@@ -348,10 +303,10 @@ describe('following someone', () => {
 
   it('reads the newest list with no time window from every write relay', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockFilters).toEqual([
       { kinds: [3], authors: [OWN] },
@@ -372,10 +327,10 @@ describe('following someone', () => {
         ['p', W],
       ]),
     ]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([
       ['p', X],
@@ -387,17 +342,17 @@ describe('following someone', () => {
   it('sends the list only to the relays it read, never over a list on another relay in the pool', async () => {
     relaysHold(contacts(T, [['p', X]]));
     // A relay in the pool, not a write relay, holds a newer list the read never asked.
-    const other = { url: 'wss://three.example' };
+    const other = { url: 'wss://three.example/' };
     mockPoolOnly.push(other);
     const newer = contacts(T + 10, [
       ['p', X],
       ['p', W],
     ]);
     mockStored.set(other.url, [newer]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
@@ -413,11 +368,11 @@ describe('following someone', () => {
     ];
     relaysHold(contacts(T, tags));
     saveList(contacts(T, tags));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(X);
     expect(selectIsFollowingPubkey(X)(social())).toBe(false);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([
       ['t', 'bitcoin'],
@@ -428,10 +383,10 @@ describe('following someone', () => {
   it('publishes nothing and keeps the follow when only the nagg or Primal seed is known', async () => {
     social().seedFollowsFromFacade({ follows: [X, Y], createdAtSec: T });
     relaysHold();
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]).toMatchObject({ value: true, pending: true });
@@ -442,9 +397,9 @@ describe('following someone', () => {
   it('publishes the full list plus the change once that list arrives', async () => {
     social().seedFollowsFromFacade({ follows: [X, Y], createdAtSec: T });
     relaysHold();
-    const { ndk } = setup();
+    const { client } = setup();
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish).not.toHaveBeenCalled();
 
     // The own-events subscription delivers the list; the hook asks again.
@@ -460,7 +415,7 @@ describe('following someone', () => {
         ['p', Y],
       ])
     );
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([
       ['p', X, 'wss://hint.example'],
@@ -473,10 +428,10 @@ describe('following someone', () => {
   it('waits rather than build on a list older than the seed', async () => {
     social().seedFollowsFromFacade({ follows: [X, Y], createdAtSec: T + 10 });
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -486,10 +441,10 @@ describe('following someone', () => {
     // A stale seed still lists Y, whom the person unfollowed elsewhere since.
     social().seedFollowsFromFacade({ follows: [X, Y], createdAtSec: T });
     relaysHold(contacts(T + 10, [['p', X]]));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([
       ['p', X],
@@ -501,12 +456,12 @@ describe('following someone', () => {
     relaysHold(contacts(T, [['p', X]]));
     const gate = deferred();
     mockReadGate = gate.promise;
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Y);
-    const first = requestFollowSync(ndk, OWN);
+    const first = requestFollowSync(client, OWN);
     tap(Z);
-    const second = requestFollowSync(ndk, OWN);
+    const second = requestFollowSync(client, OWN);
     gate.resolve();
     await Promise.all([first, second]);
 
@@ -526,14 +481,14 @@ describe('following someone', () => {
       await publish.promise;
       return acceptOnRelays(args);
     });
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Y);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     for (let i = 0; i < 20 && mockPublish.mock.calls.length === 0; i++) await Promise.resolve();
     expect(mockPublish).toHaveBeenCalledTimes(1);
     tap(Z);
-    void requestFollowSync(ndk, OWN);
+    void requestFollowSync(client, OWN);
     await Promise.resolve();
     expect(mockPublish).toHaveBeenCalledTimes(1);
     publish.resolve();
@@ -553,10 +508,10 @@ describe('following someone', () => {
   it('keeps the follow, shown as done, when no relay accepts the list', async () => {
     relaysHold(contacts(T, [['p', X]]));
     mockPublish.mockResolvedValue(err({ type: 'all-failed', relayResults: [] }));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(social().optimisticFollowsByPubkey[Z]).toMatchObject({ value: true, pending: true });
     expect(selectIsFollowingPubkey(Z)(social())).toBe(true);
@@ -567,17 +522,17 @@ describe('following someone', () => {
   it('settles a follow one write relay took, and the next one brings the other relay up to it', async () => {
     relaysHold(contacts(T, [['p', X]]));
     mockRefusing.add(mockRelays[1].url);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(social().optimisticFollowsByPubkey).toEqual({});
     expect(heldBy(mockRelays[1].url)).toHaveLength(1);
 
     mockRefusing.clear();
     tap(Y);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     // Built on the list relay one took, though relay two still answers with the older one.
     expect(publishedTags(1)).toEqual([
@@ -593,13 +548,13 @@ describe('following someone', () => {
     relaysHold(contacts(T, [['p', X]]));
     mockPublish.mockImplementationOnce(async () => {
       tap(Z);
-      void requestFollowSync(ndk, OWN);
+      void requestFollowSync(client, OWN);
       return err({ type: 'all-failed', relayResults: [] });
     });
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Y);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(2);
     expect(publishedTags(1)).toEqual([
@@ -613,10 +568,10 @@ describe('following someone', () => {
   it('keeps the follow while a write relay has not answered and no list is saved', async () => {
     jest.useFakeTimers();
     mockStored.set(mockRelays[0].url, []);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
 
     expect(mockPublish).not.toHaveBeenCalled();
@@ -635,10 +590,10 @@ describe('following someone', () => {
     jest.useFakeTimers();
     // Relay two never answers; relay one holds the list.
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     // Each silent read is followed by another at once, without waiting for a trigger.
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
     await run;
@@ -655,9 +610,9 @@ describe('following someone', () => {
   it('asks a left-out relay again, and reads and publishes with it once it answers', async () => {
     jest.useFakeTimers();
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
-    const { ndk } = setup();
+    const { client } = setup();
     tap(Z);
-    const first = requestFollowSync(ndk, OWN);
+    const first = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
     await first;
     expect(mockPublish.mock.calls[0][0].relays).toEqual([mockRelays[0].url]);
@@ -665,20 +620,20 @@ describe('following someone', () => {
     // Relay two answers the probe the next read sends it, after that read is over.
     mockStored.set(mockRelays[1].url, []);
     tap(Y);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish.mock.calls[1][0].relays).toEqual([mockRelays[0].url]);
 
     tap(W);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish.mock.calls[2][0].relays).toEqual(mockRelays.map((relay) => relay.url));
   });
 
   it('waits on every relay when all of them are silent, and stops reading again', async () => {
     jest.useFakeTimers();
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
     await run;
 
@@ -691,10 +646,10 @@ describe('following someone', () => {
     jest.useFakeTimers();
     saveList(contacts(T, [['p', X]]));
     mockStored.set(mockRelays[0].url, [contacts(T - 5, [])]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
     await run;
 
@@ -707,10 +662,10 @@ describe('following someone', () => {
     jest.useFakeTimers();
     // Relay two holds [X, Y] and never answers; relay one has only the older [X].
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
 
     expect(mockPublish).not.toHaveBeenCalled();
@@ -738,10 +693,10 @@ describe('following someone', () => {
         ['p', Z],
       ]),
     ]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     social().setFollowIntent(Z, true);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
 
@@ -755,10 +710,10 @@ describe('following someone', () => {
   it('waits when the relays hold no list though one was saved before', async () => {
     saveList(contacts(T, [['p', X]]));
     relaysHold();
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -770,10 +725,10 @@ describe('following someone', () => {
     saveList(contacts(T, [['p', X, 'wss://old.example']], 'old'));
     social().seedFollowsFromFacade({ follows: [X], createdAtSec: T + 10 });
     relaysHold(contacts(T, [['p', X, 'wss://old.example']], 'old'));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -782,17 +737,19 @@ describe('following someone', () => {
   it('keeps the follow, without an error, when signing fails', async () => {
     // The app's only signer is the local key: a failure is never a refusal.
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk, signer } = setup();
-    signer.sign.mockRejectedValueOnce(new Error('Signing timed out'));
+    const { client, signer } = setup();
+    signer.sign.mockImplementationOnce(() => {
+      throw new Error('Signing timed out');
+    });
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]).toMatchObject({ value: true, pending: true });
     expect(mockPopup).not.toHaveBeenCalled();
 
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(publishedTags()).toEqual([
       ['p', X],
       ['p', Z],
@@ -804,13 +761,13 @@ describe('following someone', () => {
     relaysHold(contacts(T, [['p', X]]));
     const gate = deferred();
     mockReadGate = gate.promise;
-    const { ndk, signer } = setup();
-    const replacement = { sign: jest.fn(async () => undefined), user: signer.user };
+    const { client, signer } = setup();
+    const replacement = fakeSigner(OWN);
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     for (let i = 0; i < 20 && mockFilters.length < mockRelays.length; i++) await Promise.resolve();
-    (ndk as unknown as { signer: unknown }).signer = replacement;
+    client.signer = replacement;
     gate.resolve();
     await run;
 
@@ -821,14 +778,14 @@ describe('following someone', () => {
 
   it('keeps the follow when the signer is replaced while signing', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk, signer } = setup();
-    signer.sign.mockImplementationOnce(async () => {
-      (ndk as unknown as { signer: unknown }).signer = undefined;
+    const { client, signer } = setup();
+    signer.sign.mockImplementationOnce(() => {
+      client.signer = undefined;
       throw new Error('Signer closed');
     });
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -837,32 +794,32 @@ describe('following someone', () => {
 
   it('does not mark the follow done when the signer is replaced while publishing', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk, signer } = setup();
+    const { client, signer } = setup();
     mockPublish.mockImplementationOnce(async (args: { event: RelayEvent }) => {
-      (ndk as unknown as { signer: unknown }).signer = { ...signer };
+      client.signer = { ...signer };
       return acceptOnRelays(args);
     });
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
     expect(social().followingPubkeys).toEqual({ [X]: true });
 
     // The next pass finds the published list holds the follow.
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(social().optimisticFollowsByPubkey).toEqual({});
   });
 
   it('keeps the follow while the account signer is not ready', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk, signer } = setup();
-    signer.user.mockResolvedValue({ pubkey: OTHER_ACCOUNT });
+    const { client, signer } = setup();
+    signer.pubkey = OTHER_ACCOUNT;
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -879,14 +836,15 @@ describe('following someone', () => {
       ]),
       id: '1'.padStart(64, '0'),
     };
-    const { ndk, signer } = setup();
-    signer.sign.mockImplementationOnce(async () => {
+    const { client, signer } = setup();
+    signer.sign.mockImplementationOnce((template) => {
       mockStored.set(mockRelays[1].url, [contacts(T, [['p', X]]), rival]);
       saveList(rival);
+      return fakeSigned(template, OWN);
     });
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(publishedTags()).toEqual([
@@ -911,10 +869,10 @@ describe('following someone', () => {
       saveList(newer);
       return ok({});
     });
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(2);
     expect(publishedTags(1)).toEqual([
@@ -942,10 +900,10 @@ describe('following someone', () => {
       saveList(rival);
       return ok({});
     });
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(2);
     expect(publishedTags(1)).toEqual([
@@ -968,10 +926,10 @@ describe('following someone', () => {
     // The own-events sync took in the winner from a relay the write relays are not.
     saveList(winner);
     relaysHold(loser);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -998,10 +956,10 @@ describe('following someone', () => {
     );
     await useNostrSocialStore.persist.rehydrate();
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().contactsTags).toEqual([
@@ -1032,16 +990,16 @@ describe('following someone', () => {
     await useNostrSocialStore.persist.rehydrate();
     const other = { ...contacts(T, [['p', X]]), id: '9'.repeat(64) };
     relaysHold(other);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish).not.toHaveBeenCalled();
 
     saveList(other);
     expect(social().contactsTags).toEqual(savedTags);
     expect(social().followingPubkeys).toEqual({ [X]: true, [W]: true });
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1050,10 +1008,10 @@ describe('following someone', () => {
   it('waits rather than build on a list dated in the future', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     relaysHold(contacts(future, [['p', X]]));
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1067,10 +1025,10 @@ describe('following someone', () => {
         ['p', Z],
       ])
     );
-    const { ndk } = setup();
+    const { client } = setup();
 
     social().setFollowIntent(Z, true);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey).toEqual({});
@@ -1096,17 +1054,17 @@ describe("the account's relay list", () => {
       ['p', W],
     ]);
     relaysHold(newer);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockFilters).toEqual([]);
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
 
     discoverRelays(mockRelays, T);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
@@ -1121,7 +1079,7 @@ describe("the account's relay list", () => {
   it("waits after a restart until this session's relay-list discovery has run, then builds on the relays it found", async () => {
     // An earlier session saved the account's relay list; another device has
     // since moved the account to other relays and published a newer follow list there.
-    const old = { url: 'wss://old.example' };
+    const old = { url: 'wss://old.example/' };
     mockPoolOnly.push(old);
     mockStored.set(old.url, [contacts(T - 100, [['p', X]])]);
     relaysHold(
@@ -1147,10 +1105,10 @@ describe("the account's relay list", () => {
     expect(useRelayListStore.getState().entries).toEqual([
       { url: old.url, read: true, write: true },
     ]);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockFilters).toEqual([]);
     expect(mockPublish).not.toHaveBeenCalled();
@@ -1158,7 +1116,7 @@ describe("the account's relay list", () => {
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
 
     discoverRelays(mockRelays, T);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
     expect(publishedTags()).toEqual([
@@ -1176,14 +1134,14 @@ describe("the account's relay list", () => {
       mockStored.set(url, [contacts(T, [['p', X]])]);
     }
     useRelayListStore.getState().markDiscovered(OTHER_ACCOUNT);
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(mockPublish).not.toHaveBeenCalled();
 
     useRelayListStore.getState().markDiscovered(OWN);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish.mock.calls[0][0].relays).toEqual([...DEFAULT_RELAYS]);
     expect(publishedTags()).toEqual([
@@ -1194,24 +1152,25 @@ describe("the account's relay list", () => {
 
   it('reads again when the write relays change between the read and the publish', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const added = { url: 'wss://three.example' };
+    const added = { url: 'wss://three.example/' };
     mockPoolOnly.push(added);
     const newer = contacts(T + 10, [
       ['p', X],
       ['p', W],
     ]);
     mockStored.set(added.url, [newer]);
-    const { ndk, signer } = setup();
+    const { client, signer } = setup();
     // The relay-list sync takes in a newer relay list while the follow is signed.
-    signer.sign.mockImplementationOnce(async () => {
+    signer.sign.mockImplementationOnce((template) => {
       useRelayListStore.getState().setFromRelay(
         [...mockRelays, added].map((relay) => ({ url: relay.url, read: true, write: true })),
         T + 1
       );
+      return fakeSigned(template, OWN);
     });
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish.mock.calls[0][0].relays).toEqual([
@@ -1246,10 +1205,10 @@ describe('an account with no follow list yet', () => {
   it('publishes the first follow once every write relay and the indexers say there is none', async () => {
     relaysHold();
     mockLayer = { getSocialGraph: jest.fn(async () => ok(graph([], 0))) };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([['p', Z]]);
     expect(mockLayer.getSocialGraph).toHaveBeenCalledWith(
@@ -1260,10 +1219,10 @@ describe('an account with no follow list yet', () => {
   it('publishes the first follow when no indexer is enabled and every write relay has none', async () => {
     relaysHold();
     mockLayer = null;
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([['p', Z]]);
   });
@@ -1281,10 +1240,10 @@ describe('an account with no follow list yet', () => {
         })
       ),
     };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(publishedTags()).toEqual([['p', Z]]);
   });
@@ -1292,10 +1251,10 @@ describe('an account with no follow list yet', () => {
   it('waits when an indexer knows a list the relays did not return', async () => {
     relaysHold();
     mockLayer = { getSocialGraph: jest.fn(async () => ok(graph([X, Y], T))) };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1313,10 +1272,10 @@ describe('an account with no follow list yet', () => {
         return ok(graph([], 0, { complete: false, pending: ['primal'] }));
       }),
     };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1332,11 +1291,11 @@ describe('an account with no follow list yet', () => {
         ok(graph([], 0, { complete: false, pending: ['primal'] }))
       ),
     };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
     let stopped = false;
-    void requestFollowSync(ndk, OWN).then(() => (stopped = true));
+    void requestFollowSync(client, OWN).then(() => (stopped = true));
     await jest.advanceTimersByTimeAsync(10_000);
     expect(stopped).toBe(false);
     await jest.advanceTimersByTimeAsync(5_001);
@@ -1358,10 +1317,10 @@ describe('an account with no follow list yet', () => {
         )
       ),
     };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1380,10 +1339,10 @@ describe('an account with no follow list yet', () => {
         })
       ),
     };
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
@@ -1393,8 +1352,8 @@ describe('an account with no follow list yet', () => {
 describe('the follow sync hook with the real worker', () => {
   it('publishes a follow tapped offline once the network is back, and the next tap after it', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const { ndk } = setup();
-    mockHookNdk = ndk;
+    const { client } = setup();
+    mockHookClient = client;
     mockOffline = true;
     const view = renderHook(() => useFollowSync());
 
@@ -1438,8 +1397,8 @@ describe('what wakes a waiting follow', () => {
     await useNostrSocialStore.persist.rehydrate();
     const saved = { ...contacts(T, [['p', W]]), id: '9'.repeat(64) };
     relaysHold({ ...contacts(T, [['p', X]]), id: '1'.repeat(64) });
-    const { ndk } = setup();
-    mockHookNdk = ndk;
+    const { client } = setup();
+    mockHookClient = client;
     const view = renderHook(() => useFollowSync());
 
     act(() => tap(Z));
@@ -1459,8 +1418,8 @@ describe('what wakes a waiting follow', () => {
     jest.useFakeTimers();
     // Neither relay answers, so the worker reads until each is silent four
     // times over and stops.
-    const { ndk, pool } = setup();
-    mockHookNdk = ndk;
+    const { client, pool } = setup();
+    mockHookClient = client;
     const view = renderHook(() => useFollowSync());
 
     act(() => tap(Z));
@@ -1471,7 +1430,7 @@ describe('what wakes a waiting follow', () => {
 
     // Both relays are back and answer now.
     relaysHold(contacts(T, [['p', X]]));
-    await act(async () => pool.connect({ url: 'wss://elsewhere.example' }));
+    await act(async () => pool.connect({ url: 'wss://elsewhere.example/' }));
     expect(mockPublish).not.toHaveBeenCalled();
     await act(async () => pool.connect(mockRelays[1]));
     await act(async () => {
@@ -1517,9 +1476,9 @@ describe('a follow saved before the app closed', () => {
         'fixture'
       )
     );
-    const { ndk } = setup();
+    const { client } = setup();
 
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish.mock.calls[0][0].event).toMatchObject({
       tags: [['p', Y]],
@@ -1529,7 +1488,7 @@ describe('a follow saved before the app closed', () => {
 
     tap(X);
     expect(selectIsFollowingPubkey(X)(social())).toBe(true);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
     expect(publishedTags(1)).toEqual([
       ['p', Y],
       ['p', X],
@@ -1548,10 +1507,10 @@ describe('switching account while a follow is being published', () => {
     saveList(contacts(T, [['p', X]]));
     const gate = deferred();
     mockReadGate = gate.promise;
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    const run = requestFollowSync(ndk, OWN);
+    const run = requestFollowSync(client, OWN);
     for (let i = 0; i < 20 && mockFilters.length < mockRelays.length; i++) await Promise.resolve();
     expect(mockFilters).toHaveLength(mockRelays.length);
     switchAccount();
@@ -1571,10 +1530,10 @@ describe('switching account while a follow is being published', () => {
       before = social();
       return ok({});
     });
-    const { ndk } = setup();
+    const { client } = setup();
 
     tap(Z);
-    await requestFollowSync(ndk, OWN);
+    await requestFollowSync(client, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(social()).toBe(before);

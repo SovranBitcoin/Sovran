@@ -12,15 +12,6 @@ import { LightningSendScreen } from '@/features/send/screens/LightningSendScreen
 const mockCancel = jest.fn(async () => undefined);
 const mockUseScreenActions = jest.fn();
 
-// `LightningSendScreen` reaches ndk-mobile transitively (ZappedPostSection ->
-// useEntityCache -> buildNostrDataLayer -> nostrTierConfig -> outbox/defaults),
-// and the package ships ESM only, which this jest resolver cannot load. Mocked
-// here rather than via moduleNameMapper: mapping it globally drags
-// unrelated native rendering dependencies into the node project.
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
-  virtual: true,
-});
-
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn() },

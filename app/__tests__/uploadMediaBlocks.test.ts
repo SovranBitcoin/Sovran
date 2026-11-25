@@ -23,7 +23,7 @@ jest.mock('@/shared/lib/nostr/media/mediaUpload', () => ({
 
 const uploadMedia = jest.mocked(uploadMediaImpl);
 
-const NDK = undefined as never;
+const CLIENT = undefined as never;
 const descriptor = (n: number): MediaDescriptor => ({
   url: `https://blossom.example/${n}`,
   sha256: `${n}`.repeat(64).slice(0, 64),
@@ -73,7 +73,7 @@ describe('uploadMediaBlocks', () => {
     let registered: AbortController | undefined;
 
     const result = await uploadMediaBlocks({
-      ndk: NDK,
+      client: CLIENT,
       blocks: [block('a'), done],
       uploads,
       patchBlock: (id, patch) => {
@@ -126,7 +126,7 @@ describe('uploadMediaBlocks', () => {
 
     await expect(
       uploadMediaBlocks({
-        ndk: NDK,
+        client: CLIENT,
         blocks: [block('a'), block('b')],
         uploads,
         patchBlock: () => {},
@@ -162,7 +162,7 @@ describe('uploadMediaBlocks', () => {
     const completed: string[] = [];
 
     await uploadMediaBlocks({
-      ndk: NDK,
+      client: CLIENT,
       blocks: [
         block('a'),
         // Already uploaded but its local file is still around — the reply bar
@@ -188,7 +188,7 @@ describe('uploadMediaBlocks', () => {
 
     await expect(
       uploadMediaBlocks({
-        ndk: NDK,
+        client: CLIENT,
         blocks: [block('a')],
         uploads: new Map(),
         patchBlock: () => {},
@@ -205,7 +205,7 @@ describe('uploadMediaBlocks', () => {
 
     await expect(
       uploadMediaBlocks({
-        ndk: NDK,
+        client: CLIENT,
         blocks: [block('a')],
         uploads: new Map(),
         patchBlock: (id, patch) => patches.push([id, patch]),

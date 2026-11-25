@@ -28,13 +28,13 @@ const stages: Record<string, Stage> = {};
 let splashUp = false;
 let reset: ReturnType<typeof useInitializationReset>;
 
-/** The stages GlobalMigrationGate, NostrKeysProvider, CocoProvider and NostrNDKProvider register. */
+/** The stages GlobalMigrationGate, NostrKeysProvider, CocoProvider and NostrClientProvider register. */
 function Providers() {
   stages['global-migrations'] = useInitializationStage('global-migrations');
   stages.nostr = useInitializationStage('nostr');
   stages.coco = useInitializationStage('coco');
   stages['coco-background'] = useInitializationStage('coco-background');
-  stages['nostr-ndk'] = useInitializationStage('nostr-ndk');
+  stages['nostr-client'] = useInitializationStage('nostr-client');
   splashUp = useInitializationState().isInitializing;
   reset = useInitializationReset();
   return null;
@@ -63,17 +63,17 @@ it('starts each stage only after the one it waits on, and holds the splash until
     nostr: false,
     coco: false,
     'coco-background': false,
-    'nostr-ndk': false,
+    'nostr-client': false,
   });
 
   act(() => stages['global-migrations']!.complete());
   expect(canStart()).toMatchObject({ nostr: true, coco: false });
   act(() => stages.nostr!.complete());
-  expect(canStart()).toMatchObject({ coco: true, 'coco-background': false, 'nostr-ndk': false });
+  expect(canStart()).toMatchObject({ coco: true, 'coco-background': false, 'nostr-client': false });
   expect(splashUp).toBe(true);
 
   act(() => stages.coco!.complete());
-  expect(canStart()).toMatchObject({ 'coco-background': true, 'nostr-ndk': true });
+  expect(canStart()).toMatchObject({ 'coco-background': true, 'nostr-client': true });
   // Background work and Nostr never hold the splash.
   expect(splashUp).toBe(false);
 });

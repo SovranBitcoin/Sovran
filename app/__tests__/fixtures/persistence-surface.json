@@ -3,12 +3,11 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo-secure-store": "~56.0.4",
     "expo-sqlite": "~56.0.5",
-    "expo-file-system": "~56.0.8",
+    "expo-file-system": "~56.0.10",
     "zustand": "^5.0.8",
     "@cashu/coco-core": "2.0.0",
     "@cashu/coco-expo-sqlite": "2.0.0",
-    "@cashu/coco-react": "2.0.0",
-    "@nostr-dev-kit/ndk-mobile": "^0.2.2"
+    "@cashu/coco-react": "2.0.0"
   },
   "secureKeys": [
     "cashu_mnemonic_",

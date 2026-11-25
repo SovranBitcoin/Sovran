@@ -1,7 +1,7 @@
 /**
  * @fileoverview Syncs the active profile's NIP-65 relay list with the network.
  *
- * Runs once NDK is initialized: reads the profile's own `kind:10002` from each
+ * Runs once the account's Nostr client is ready: reads the profile's own `kind:10002` from each
  * saved write relay and each default relay, ingests the newest into the
  * relay-list store, and seeds the pool with those relays. If every one of them
  * answers that no list exists yet, it first-run-publishes the default
@@ -23,14 +23,13 @@
  *
  * Ingest-before-publish: defaults are only published when every asked relay
  * says there is NO existing list — an existing list is never clobbered. Deferred via setTimeout
- * (not `runAfterInteractions`, which can stall behind the splash morph, per the
- * NDK provider's note) so it never competes with init.
+ * (not `runAfterInteractions`, which can stall behind the splash morph) so it
+ * never competes with init.
  */
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { readNewestOwnEvent, worthReadingAgain } from '@/shared/lib/nostr/ownReplaceableEvent';
@@ -52,7 +51,7 @@ const SYNC_DEFER_MS = 1_500;
  * only grows: each of them must answer the same attempt.
  */
 async function syncOwnRelayList(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   asked: Set<string>,
   learned: Set<string>,
@@ -65,7 +64,7 @@ async function syncOwnRelayList(
       const current = relayListRelays(pubkey);
       if (!current) return 'unanswered';
       for (const url of current) asked.add(url);
-      read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, {
+      read = await readNewestOwnEvent(client, pubkey, RELAY_LIST_KIND, {
         relays: [...asked],
         leaveOutSilent: true,
       });
@@ -81,7 +80,7 @@ async function syncOwnRelayList(
         if (useRelayListStore.getState().source !== 'local')
           useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
         seedPool(
-          ndk,
+          client,
           entries.map((e) => e.url)
         );
       }
@@ -107,7 +106,7 @@ async function syncOwnRelayList(
     const { hasPublished } = useRelayListStore.getState();
     if (hasPublished) return 'discovered';
     const published = await publishDefaultRelayList(
-      ndk,
+      client,
       pubkey,
       { status: 'read', newest: undefined, relays: read.relays, asked: read.asked },
       () => !isCancelled()
@@ -124,16 +123,18 @@ async function syncOwnRelayList(
 }
 
 /**
+ * @param client  The account's Nostr client, once it is ready.
  * @param pubkey  Active profile hex pubkey.
- * @param enabled Gate on NDK readiness (`isInitialized`).
  */
-export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean): void {
-  const { ndk } = useNDK();
+export function useOwnRelayListSync(
+  client: NostrClient | undefined,
+  pubkey: string | undefined
+): void {
   const { isOffline } = useOfflineStatus();
   const retry = useRef<() => void>(() => undefined);
 
   useEffect(() => {
-    if (!enabled || !ndk || !pubkey) return;
+    if (!client || !pubkey) return;
     let cancelled = false;
     let phase: 'waiting' | 'reading' | 'unanswered' | 'discovered' = 'waiting';
     const asked = new Set<string>();
@@ -141,15 +142,14 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
     const untrack = trackRelaysAsked(pubkey, asked, learned);
     const run = async () => {
       phase = 'reading';
-      phase = await syncOwnRelayList(ndk, pubkey, asked, learned, () => cancelled);
+      phase = await syncOwnRelayList(client, pubkey, asked, learned, () => cancelled);
     };
     const again = () => {
       if (!cancelled && phase === 'unanswered') void run();
     };
 
     const timer = setTimeout(() => void run(), SYNC_DEFER_MS);
-    const onRelayConnect = () => again();
-    ndk.pool.on('relay:connect', onRelayConnect);
+    const offRelayConnect = client.on('relay:connect', () => again());
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') again();
     });
@@ -160,10 +160,10 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
       untrack();
       clearTimeout(timer);
       subscription.remove();
-      ndk.pool.off('relay:connect', onRelayConnect);
+      offRelayConnect();
       retry.current = () => undefined;
     };
-  }, [enabled, ndk, pubkey]);
+  }, [client, pubkey]);
 
   useEffect(() => {
     if (!isOffline) retry.current();

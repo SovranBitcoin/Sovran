@@ -6,10 +6,9 @@
  * and PUTs the file via `expo-file-system` with the `Authorization: Nostr …`
  * header. Returns the blob descriptor used to build the post's `imeta` tag.
  */
+import type { NostrClient } from 'nostr/client';
 import * as FileSystem from 'expo-file-system/legacy';
 import { base64 } from '@scure/base';
-import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { ResultAsync, err, ok, type Result } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -87,7 +86,7 @@ function parseDescriptor(body: string): BlobDescriptor | null {
 }
 
 interface UploadOptions {
-  ndk: NDK;
+  client: NostrClient;
   server: string;
   fileUri: string;
   mimeType: string;
@@ -140,7 +139,7 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
   // 3. Sign the kind:24242 authorization event.
   let authHeader: string;
   try {
-    authHeader = await signAuthHeader(opts.ndk, 'upload', sha256);
+    authHeader = await signAuthHeader(opts.client, 'upload', sha256);
   } catch {
     nostrLog.warn('nostr.media.auth_sign_failed');
     return err({ type: 'sign-failed' });
@@ -164,7 +163,7 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
 
 /** Signs a `kind:24242` authorization event and encodes the `Authorization: Nostr …` header. */
 async function signAuthHeader(
-  ndk: NDK,
+  client: NostrClient,
   action: 'upload' | 'delete',
   sha256: string
 ): Promise<string> {
@@ -173,13 +172,7 @@ async function signAuthHeader(
     sha256,
     createdAtSec: Math.floor(Date.now() / 1000),
   });
-  const authEvent = new NDKEvent(ndk);
-  authEvent.kind = unsigned.kind;
-  authEvent.content = unsigned.content;
-  authEvent.created_at = unsigned.created_at;
-  authEvent.tags = unsigned.tags;
-  await authEvent.sign();
-  return encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
+  return encodeAuthHeader(JSON.stringify(client.signEvent(unsigned)));
 }
 
 /** One PUT attempt: progress callbacks, timeout, and abort all wired to the task. */
@@ -239,7 +232,7 @@ async function putOnce(
 }
 
 interface DeleteOptions {
-  ndk: NDK;
+  client: NostrClient;
   /**
    * Origin the blob lives on (scheme + host of the blob URL), e.g.
    * `https://blossom.primal.net`. A blob can only be deleted from the server it
@@ -272,7 +265,7 @@ async function runDelete(opts: DeleteOptions): Promise<Result<void, BlossomDelet
   // Fresh delete auth (5-min expiry) signed for THIS blob.
   let authHeader: string;
   try {
-    authHeader = await signAuthHeader(opts.ndk, 'delete', opts.sha256);
+    authHeader = await signAuthHeader(opts.client, 'delete', opts.sha256);
   } catch {
     nostrLog.warn('nostr.media.delete_auth_sign_failed');
     return err({ type: 'sign-failed' });

@@ -157,8 +157,8 @@
     },
     {
       "what": "Nostr cache database name per account",
-      "file": "shared/providers/NostrNDKProvider.tsx",
-      "text": "activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`"
+      "file": "shared/lib/profile/profileRemovalStorage.ts",
+      "text": "index === 0 ? 'nostr' : `nostr-${index}`"
     },
     {
       "what": "per-profile storage key format",

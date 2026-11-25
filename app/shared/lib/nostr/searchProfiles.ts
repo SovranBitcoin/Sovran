@@ -1,7 +1,7 @@
+import type { NostrClient } from 'nostr/client';
 import * as nip19 from 'nostr-tools/nip19';
 import { ok, err, type Result } from 'neverthrow';
 import { facade } from 'nostr';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { refreshVertex } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { NostrSearchResult, type SearchUsersResponse } from '@sovranbitcoin/schemas';
 
@@ -126,7 +126,7 @@ export async function searchProfilesViaFacade(args: {
   query: string;
   limit?: number;
   signal?: AbortSignal;
-  ndk?: NDK;
+  client?: NostrClient;
   /** Read-lifecycle correlation id, forwarded to the facade. */
   readId?: string;
   onCached?: (data: SearchUsersResponse) => void;
@@ -185,7 +185,7 @@ export async function searchProfilesViaFacade(args: {
       query: args.query.trim().toLowerCase(),
       limit: args.limit ?? 10,
       stale: true,
-      ndk: args.ndk,
+      client: args.client,
       signal: args.signal,
     });
     if (refreshed && !args.signal?.aborted) {

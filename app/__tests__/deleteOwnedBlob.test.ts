@@ -45,10 +45,10 @@ const { setDeleteState } = (
 const HOST = 'https://blossom.example';
 const SHA256 = 'a'.repeat(64);
 const URL = `${HOST}/${SHA256}`;
-const ndk = Object.create(null) as never;
+const client = Object.create(null) as never;
 
 function args() {
-  return { ndk, host: HOST, sha256: SHA256, url: URL };
+  return { client, host: HOST, sha256: SHA256, url: URL };
 }
 
 beforeEach(() => {

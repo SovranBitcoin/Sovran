@@ -330,7 +330,7 @@ export function createPaymentRequestNostrTransportPlugin(
         const viewerPubkey = getPublicKey(secretKey);
         const session = sessionFor(viewerPubkey);
         // Lazy import: the data-layer chain pulls native-only modules
-        // (ndk-mobile) that must not load at manager-module import time
+        // that must not load at manager-module import time
         // (node-side tests import the manager).
         const layer = await loadDataLayer();
         if (!layer) {

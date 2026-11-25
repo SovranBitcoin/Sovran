@@ -1,3 +1,4 @@
+import { useNostrClient } from '@/shared/providers/NostrClientProvider';
 import { useNip05Verification } from '@/shared/hooks/useNip05Verification';
 import { Nip05Status } from '@/shared/ui/composed/Nip05Identity';
 import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';
@@ -5,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import * as ImagePicker from 'expo-image-picker';
 import { Description, Input, Label, TextField } from 'heroui-native';
 import * as nip19 from 'nostr-tools/nip19';
@@ -20,7 +20,6 @@ import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import {
@@ -192,8 +191,7 @@ function ProfileEditor({
   cachedName?: string;
   cachedPicture?: string;
 }) {
-  const { ndk } = useNDK();
-  const { isInitialized } = useNostrNDKContext();
+  const { client, isInitialized } = useNostrClient();
   const foreground = useThemeColor('foreground');
   // The last confirmed kind-0 stored for this profile (persisted per profile,
   // kept fresh by useOwnEventsSync). The editor opens on it, unlocked, while
@@ -238,8 +236,8 @@ function ProfileEditor({
   }, []);
   useEffect(() => {
     let canceled = false;
-    if (!ndk || !isInitialized) return;
-    void loadOwnProfileMetadata(ndk, pubkey).then((loaded) => {
+    if (!client || !isInitialized) return;
+    void loadOwnProfileMetadata(client, pubkey).then((loaded) => {
       if (canceled) return;
       setInitialLoad(loaded);
       const snapshot = loaded.status === 'found' ? loaded.snapshot : null;
@@ -268,12 +266,12 @@ function ProfileEditor({
     };
     // Cached display updates must not overwrite an in-progress draft, so the
     // effect reads them through a ref instead of depending on them.
-  }, [ndk, pubkey, isInitialized, accountIndex, cached, baseRef]);
+  }, [client, pubkey, isInitialized, accountIndex, cached, baseRef]);
 
   const retryBase = useSingleFlight(async () => {
-    if (!ndk || saving || !isOwner()) return;
+    if (!client || saving || !isOwner()) return;
     setRetrying(true);
-    const loaded = await loadOwnProfileMetadata(ndk, pubkey);
+    const loaded = await loadOwnProfileMetadata(client, pubkey);
     if (!isOwner()) return;
     setInitialLoad(loaded);
     if (loaded.status === 'found') ingestOwnProfileMetadata(loaded.snapshot, pubkey, accountIndex);
@@ -309,12 +307,12 @@ function ProfileEditor({
       popup({ message: 'Couldn’t open your photo library. Try again.', type: 'error' });
       return;
     }
-    if (picked.value.canceled || !picked.value.assets[0] || !ndk) return;
+    if (picked.value.canceled || !picked.value.assets[0] || !client) return;
     const asset = picked.value.assets[0];
     setUpload({ uri: asset.uri, progress: 0 });
     nostrLog.info('nostr.media.avatar.upload', { phase: 'start' });
     const result = await uploadMedia({
-      ndk,
+      client,
       asset: { ...asset, mimeType: asset.mimeType ?? 'image/jpeg' },
       server: getMediaServer(),
       forceImageReencode: true,
@@ -416,7 +414,7 @@ function ProfileEditor({
   const npub = nip19.npubEncode(pubkey);
   const npcAddress = getNpcAddress(undefined, npub);
   const save = useSingleFlight(async () => {
-    if (!ndk || !ready || upload || invalid || needsVerification || npcLoading || !isOwner())
+    if (!client || !ready || upload || invalid || needsVerification || npcLoading || !isOwner())
       return;
     setIdentityError(null);
     setSaving(true);
@@ -428,7 +426,7 @@ function ProfileEditor({
       about: checks.about.ok ? checks.about.value : about,
     };
     const result = await publishOwnProfileMetadata({
-      ndk,
+      client,
       pubkey,
       accountIndex,
       initialLoad,
@@ -447,12 +445,12 @@ function ProfileEditor({
       });
   });
   const applyNpcIdentity = useSingleFlight(async () => {
-    if (!ndk || !ready || saving || !isOwner()) return;
+    if (!client || !ready || saving || !isOwner()) return;
     const request = new AbortController();
     npcController.current = request;
     setNpcLoading(true);
     setIdentityError(null);
-    const result = await loadNpcIdentity(ndk, pubkey, request.signal);
+    const result = await loadNpcIdentity(client, pubkey, request.signal);
     if (!isOwner() || request.signal.aborted) return;
     setNpcLoading(false);
     switch (result.status) {

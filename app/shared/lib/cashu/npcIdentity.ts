@@ -1,4 +1,4 @@
-import NDK, { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
 import { validateEvent } from 'nostr-tools/pure';
 import { getToken } from 'nostr-tools/nip98';
 import { z } from 'zod';
@@ -16,16 +16,16 @@ type NpcIdentityResult =
 
 /** Read an existing username; this never registers or purchases one. */
 export async function loadNpcIdentity(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   signal: AbortSignal
 ): Promise<NpcIdentityResult> {
-  const signer = ndk.signer;
+  const signer = client.signer;
   if (!signer || signal.aborted) return { status: 'unavailable' };
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal.addEventListener('abort', abort, { once: true });
-  const current = () => !controller.signal.aborted && ndk.signer === signer;
+  const current = () => !controller.signal.aborted && client.signer === signer;
   try {
     return await withTimeout(
       (async (): Promise<NpcIdentityResult> => {
@@ -34,23 +34,11 @@ export async function loadNpcIdentity(
           url,
           'GET',
           async (template) => {
-            if ((await signer.user()).pubkey !== pubkey || !current())
-              throw new Error('Profile changed');
-            const event = new NDKEvent(ndk, { ...template, pubkey });
-            await event.sign(signer);
+            if (signer.pubkey !== pubkey || !current()) throw new Error('Profile changed');
+            const event = signer.sign({ ...template, pubkey });
             if (!current() || event.pubkey !== pubkey) throw new Error('Profile changed');
-            const raw = event.rawEvent();
-            if (!validateEvent(raw) || typeof raw.id !== 'string' || typeof raw.sig !== 'string')
-              throw new Error('Invalid signed event');
-            return {
-              kind: raw.kind,
-              created_at: raw.created_at,
-              pubkey: raw.pubkey,
-              content: raw.content,
-              tags: raw.tags,
-              id: raw.id,
-              sig: raw.sig,
-            };
+            if (!validateEvent(event)) throw new Error('Invalid signed event');
+            return event;
           },
           true
         );

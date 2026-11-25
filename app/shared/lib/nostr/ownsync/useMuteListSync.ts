@@ -1,7 +1,6 @@
-import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
+import { useNostrClient } from '@/shared/providers/NostrClientProvider';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { syncMuteList } from '../moderation';
 import { useRelayListStore } from '../outbox/relayListStore';
@@ -9,8 +8,7 @@ import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
 
 /** Restore imported-account lists at startup and refresh cross-client edits on foreground. */
 export function useMuteListSync() {
-  const { ndk } = useNDK();
-  const { isInitialized } = useNostrNDKContext();
+  const { client, isInitialized } = useNostrClient();
   const pubkey = useNostrKeysContext().keys?.pubkey;
   const writeRelays = useRelayListStore((s) =>
     s.entries
@@ -19,12 +17,12 @@ export function useMuteListSync() {
       .join('\n')
   );
   useEffect(() => {
-    if (!isInitialized || !ndk || !pubkey) return;
+    if (!isInitialized || !client || !pubkey) return;
     let loading = false;
     const refresh = () => {
       if (loading || !useFeedIgnoreStore.persist.hasHydrated()) return;
       loading = true;
-      void syncMuteList(ndk, pubkey)
+      void syncMuteList(client, pubkey)
         .catch(() => undefined)
         .finally(() => {
           loading = false;
@@ -39,5 +37,5 @@ export function useMuteListSync() {
       subscription.remove();
       stopHydration();
     };
-  }, [ndk, pubkey, isInitialized, writeRelays]);
+  }, [client, pubkey, isInitialized, writeRelays]);
 }

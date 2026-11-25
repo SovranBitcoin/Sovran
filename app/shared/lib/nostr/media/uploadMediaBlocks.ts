@@ -1,5 +1,4 @@
-import type NDK from '@nostr-dev-kit/ndk-mobile';
-
+import type { NostrClient } from 'nostr/client';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
 import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
 import type { OwnedBlob } from '@/shared/lib/nostr/media/ownedBlobs';
@@ -41,14 +40,14 @@ interface UploadableMediaBlock {
  * the orphan protocol has run.
  */
 export async function uploadMediaBlocks<B extends UploadableMediaBlock>(params: {
-  ndk: NDK;
+  client: NostrClient;
   blocks: readonly B[];
   uploads: Map<string, AbortController>;
   patchBlock: (id: string, patch: Partial<UploadableMediaBlock>) => void;
   onBlockUploaded?: (block: B) => void;
   onOrphans: (orphans: OwnedBlob[]) => void;
 }): Promise<B[]> {
-  const { ndk, blocks, uploads, patchBlock, onBlockUploaded, onOrphans } = params;
+  const { client, blocks, uploads, patchBlock, onBlockUploaded, onOrphans } = params;
   // Descriptors that uploaded before any sibling failed — reported as orphans
   // if the batch aborts.
   const uploadedDescriptors: MediaDescriptor[] = [];
@@ -59,7 +58,7 @@ export async function uploadMediaBlocks<B extends UploadableMediaBlock>(params: 
     uploads.set(block.id, controller);
     patchBlock(block.id, { uploadProgress: 0 });
     const upload = await uploadMedia({
-      ndk,
+      client,
       asset: {
         uri: block.localUri,
         mimeType: block.mimeType ?? 'image/jpeg',

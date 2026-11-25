@@ -1,4 +1,5 @@
-import NDK, { type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
+import type { VerifiedEvent } from 'nostr-tools/pure';
 import { z } from 'zod';
 import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/shared/stores/profile/ignoreStore';
 import {
@@ -25,26 +26,30 @@ import { publishEvent } from './publish';
 import { getOwnWriteRelays } from './outbox/relayListStore';
 
 const Tags = z.array(z.array(z.string())).max(20_000);
-const queues = new WeakMap<NDK, Promise<unknown>>();
+const queues = new WeakMap<NostrClient, Promise<unknown>>();
 
-export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string): Promise<MuteList> {
+export async function decodeMuteList(
+  client: NostrClient,
+  event: VerifiedEvent,
+  pubkey: string
+): Promise<MuteList> {
   if (!validOwnEvent(event, pubkey, 10000)) throw new Error('Invalid mute list');
   if (
     event.content.length > 1_000_000 ||
-    event.created_at! > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC
+    event.created_at > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC
   )
     throw new Error('Unsupported mute list');
   let privateTags: string[][] = [];
   if (event.content) {
-    const signer = await matchingSigner(ndk, pubkey);
-    const plaintext = await signer.decrypt(
-      ndk.getUser({ pubkey }),
+    const signer = await matchingSigner(client, pubkey);
+    const plaintext = signer.decrypt(
+      pubkey,
       event.content,
       event.content.includes('?iv=') ? 'nip04' : 'nip44'
     );
     privateTags = Tags.parse(JSON.parse(plaintext));
   }
-  return { id: event.id, createdAt: event.created_at!, tags: Tags.parse(event.tags), privateTags };
+  return { id: event.id, createdAt: event.created_at, tags: Tags.parse(event.tags), privateTags };
 }
 
 const WAITING: Record<Extract<ReadForEdit, { status: 'waiting' }>['reason'], string> = {
@@ -55,21 +60,21 @@ const WAITING: Record<Extract<ReadForEdit, { status: 'waiting' }>['reason'], str
 };
 
 /** Restore the list from the write relays held now, waiting for each of them. */
-async function readMuteList(ndk: NDK, pubkey: string): Promise<MuteList | null> {
-  const read = await readNewestOwnEvent(ndk, pubkey, 10000);
+async function readMuteList(client: NostrClient, pubkey: string): Promise<MuteList | null> {
+  const read = await readNewestOwnEvent(client, pubkey, 10000);
   if (read.outcome !== 'complete') throw new Error(WAITING[read.outcome]);
-  return read.newest ? decodeMuteList(ndk, read.newest, pubkey) : null;
+  return read.newest ? decodeMuteList(client, read.newest, pubkey) : null;
 }
 
-export async function syncMuteList(ndk: NDK, pubkey: string): Promise<void> {
+export async function syncMuteList(client: NostrClient, pubkey: string): Promise<void> {
   const scope = captureActiveProfile(pubkey);
   try {
     if (!useFeedIgnoreStore.persist.hasHydrated())
       throw new Error('Moderation preferences are loading');
     scope.check();
-    await matchingSigner(ndk, pubkey);
+    await matchingSigner(client, pubkey);
     scope.check();
-    const list = await readMuteList(ndk, pubkey);
+    const list = await readMuteList(client, pubkey);
     scope.check();
     if (list) useFeedIgnoreStore.getState().receiveMuteList(list);
   } finally {
@@ -81,7 +86,7 @@ export async function syncMuteList(ndk: NDK, pubkey: string): Promise<void> {
 export class BlockSyncError extends Error {}
 
 export function setPersonBlocked(
-  ndk: NDK,
+  client: NostrClient,
   ownPubkey: string,
   target: string,
   blocked: boolean
@@ -105,19 +110,19 @@ export function setPersonBlocked(
     scope.dispose();
     return Promise.reject(error);
   }
-  const work = (queues.get(ndk) ?? Promise.resolve())
+  const work = (queues.get(client) ?? Promise.resolve())
     .catch(() => undefined)
     .then(async () => {
       scope.check();
-      const signer = await matchingSigner(ndk, ownPubkey);
+      const signer = await matchingSigner(client, ownPubkey);
       scope.check();
       // The edit waits until this session knows the account's relays and has
       // read them all, a relay silent read after read left out.
-      const read = await readForEdit(ndk, ownPubkey, 10000);
+      const read = await readForEdit(client, ownPubkey, 10000);
       scope.check();
       if (read.status === 'waiting') throw new Error(WAITING[read.reason]);
       // Never replace unreadable encrypted entries.
-      const fetched = read.newest ? await decodeMuteList(ndk, read.newest, ownPubkey) : null;
+      const fetched = read.newest ? await decodeMuteList(client, read.newest, ownPubkey) : null;
       scope.check();
       const cached = useFeedIgnoreStore.getState().muteList;
       const base = (fetched && isNewerMuteList(fetched, cached) ? fetched : cached) ?? {
@@ -134,13 +139,9 @@ export function setPersonBlocked(
         next = changeMute(next, key, true);
       const overrides = useFeedIgnoreStore.getState().blockOverrides;
       for (const [key, value] of Object.entries(overrides)) next = changeMute(next, key, value);
-      const content = await signer.encrypt(
-        ndk.getUser({ pubkey: ownPubkey }),
-        JSON.stringify(next.privateTags),
-        'nip44'
-      );
+      const content = signer.encrypt(ownPubkey, JSON.stringify(next.privateTags), 'nip44');
       scope.check();
-      const event = await signReplacement(ndk, signer, scope, {
+      const event = await signReplacement(client, signer, scope, {
         kind: 10000,
         pubkey: ownPubkey,
         replaces: base.createdAt,
@@ -150,7 +151,7 @@ export function setPersonBlocked(
       const latestKnown = useFeedIgnoreStore.getState().muteList;
       if (latestKnown && isNewerMuteList(latestKnown, base))
         throw new Error('Mute list changed; retry sync');
-      const published = await publishToRelaysRead(ndk, event, read.relays);
+      const published = await publishToRelaysRead(client, event, read.relays);
       scope.check();
       if (published.isErr()) throw new Error('No relay accepted the mute list');
       const accepted = {
@@ -168,12 +169,12 @@ export function setPersonBlocked(
       );
     })
     .finally(scope.dispose);
-  queues.set(ndk, work);
+  queues.set(client, work);
   return work;
 }
 
 export async function publishReport(
-  ndk: NDK,
+  client: NostrClient,
   ownPubkey: string,
   target: NostrPubkeyHex,
   reason: ReportReason,
@@ -183,16 +184,16 @@ export async function publishReport(
   try {
     scope.check();
     const tags = reportTags(target, reason, publicEventId);
-    const signer = await matchingSigner(ndk, ownPubkey);
+    const signer = await matchingSigner(client, ownPubkey);
     scope.check();
-    const event = await signOwnEvent(ndk, signer, scope, {
+    const event = await signOwnEvent(client, signer, scope, {
       kind: 1984,
       pubkey: ownPubkey,
       tags,
       content: '',
     });
     const result = await publishEvent({
-      ndk,
+      client,
       event,
       relays: getOwnWriteRelays(),
       resolveOn: 'all-settled',

@@ -21,13 +21,15 @@ import {
   ingestOwnProfileMetadata,
   parseOwnProfileSnapshot,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Filter } from 'nostr-tools/filter';
+import type { VerifiedEvent } from 'nostr-tools/pure';
+import type { NostrClient, RelaySubscriptionHandle } from 'nostr/client';
 import { useFollowSync } from './useFollowSync';
 import { useMuteListSync } from './useMuteListSync';
 
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-
 import { nostrLog } from '@/shared/lib/logger';
+import { useNostrClient } from '@/shared/providers/NostrClientProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -39,10 +41,41 @@ import { partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
 import { Contacts, Metadata } from 'nostr-tools/kinds';
 import { supersedes } from 'nostr';
 
-// Module-level so the reference is stable across renders — a fresh opts object
-// makes useSubscribe tear down on EOSE and re-render-loop (see
-// useNostrProfileMetadata). closeOnEose:false keeps it live for cross-client updates.
-const OWN_SUBSCRIBE_OPTS = { closeOnEose: false } as const;
+/**
+ * Keeps `filters` open on every pool relay, live for cross-client updates: a
+ * relay that drops is asked again when it reconnects, and a relay added later
+ * is asked when it first connects. Each event id is delivered once.
+ */
+function subscribeEveryRelay(
+  client: NostrClient,
+  filters: Filter[],
+  onEvent: (event: VerifiedEvent) => void
+): () => void {
+  const open = new Map<string, RelaySubscriptionHandle>();
+  const seen = new Set<string>();
+  const ask = (url: string) => {
+    if (open.has(url)) return;
+    const handle = client.subscribeRelay(url, filters, {
+      onEvent: (event) => {
+        if (seen.has(event.id)) return;
+        seen.add(event.id);
+        onEvent(event);
+      },
+      onEose: () => undefined,
+      onError: () => {
+        open.delete(url);
+      },
+    });
+    if (!client.disposed) open.set(url, handle);
+  };
+  client.relayUrls().forEach(ask);
+  const offConnect = client.on('relay:connect', ask);
+  return () => {
+    offConnect();
+    for (const handle of open.values()) handle.stop();
+    open.clear();
+  };
+}
 
 function toOwnSyncEvent(raw: {
   id: string;
@@ -117,7 +150,19 @@ export function useOwnEventsSync(): void {
     ];
   }, [pubkey]);
 
-  const { events } = useSubscribe({ filters, opts: OWN_SUBSCRIBE_OPTS });
+  const { client } = useNostrClient();
+  // Keyed by the filters they answer, so a new account starts with no events.
+  const [received, setReceived] = useState<{ filters: Filter[]; events: VerifiedEvent[] }>();
+  const events = received && received.filters === filters ? received.events : undefined;
+  useEffect(() => {
+    if (!client || !filters) return;
+    return subscribeEveryRelay(client, filters, (event) =>
+      setReceived((prev) => ({
+        filters,
+        events: prev?.filters === filters ? [...prev.events, event] : [event],
+      }))
+    );
+  }, [client, filters]);
 
   const sessionRef = useRef<OwnSyncSession | null>(null);
 
@@ -132,9 +177,9 @@ export function useOwnEventsSync(): void {
     if (!active || active.pubkey !== session.owner) return;
     const fresh: OwnSyncEvent[] = [];
     for (const raw of events) {
-      const id = (raw as { id?: string }).id;
+      const id = raw.id;
       if (!id || session.seen.has(id)) continue;
-      const event = toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]);
+      const event = toOwnSyncEvent(raw);
       // An event still held from the previous account's subscription.
       if (event.pubkey !== session.owner) continue;
       session.seen.add(id);

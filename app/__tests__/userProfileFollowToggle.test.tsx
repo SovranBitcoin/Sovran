@@ -33,7 +33,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 // The screen's unrelated imports (navigation, wallet, UI), as in
 // userProfileIdentityRow.test.tsx.
 jest.mock('expo-router', () => ({}));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({}));
 jest.mock('wallet/react', () => ({}), { virtual: true });
 jest.mock('heroui-native', () => ({}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({}));

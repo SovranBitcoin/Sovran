@@ -61,8 +61,8 @@ const STAGES = {
   coco: { dependsOn: ['nostr'] },
   /** CocoProvider: background work once the wallet is open. */
   'coco-background': { dependsOn: ['coco'], blocking: false },
-  /** NostrNDKProvider. */
-  'nostr-ndk': { dependsOn: ['coco'], blocking: false },
+  /** NostrClientProvider. */
+  'nostr-client': { dependsOn: ['coco'], blocking: false },
 } as const satisfies Record<string, StageConfig>;
 
 type StageId = keyof typeof STAGES;

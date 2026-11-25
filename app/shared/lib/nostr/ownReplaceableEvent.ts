@@ -10,10 +10,10 @@
  * and its signer are held fixed across each wait so a switch never writes to
  * the wrong account.
  */
-import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
-import type { NDKSigner } from '@nostr-dev-kit/ndk-mobile';
 import { errAsync } from 'neverthrow';
 import { supersedes } from 'nostr';
+import type { NostrClient, NostrSigner, RelaySubscriptionHandle } from 'nostr/client';
+import { getEventHash, verifyEvent, type VerifiedEvent } from 'nostr-tools/pure';
 import { nostrLog } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import type { PublishOptions } from '@/shared/lib/nostr/publish/types';
@@ -22,25 +22,24 @@ import { getKnownOwnWriteRelays, getOwnWriteRelays } from './outbox/relayListSto
 const READ_TIMEOUT_MS = 12_000;
 
 /** Signed by `pubkey`, of `kind`, with an id and signature that verify. */
-export function validOwnEvent(event: NDKEvent, pubkey: string, kind: number): boolean {
+export function validOwnEvent(event: VerifiedEvent, pubkey: string, kind: number): boolean {
   try {
     return (
       event.kind === kind &&
       event.pubkey === pubkey &&
       Number.isSafeInteger(event.created_at) &&
-      (event.created_at ?? -1) >= 0 &&
-      event.id === event.getEventHash() &&
-      event.verifySignature(false) === true
+      event.created_at >= 0 &&
+      event.id === getEventHash(event) &&
+      verifyEvent(event)
     );
   } catch {
     return false;
   }
 }
 
-export async function matchingSigner(ndk: NDK, pubkey: string) {
-  const signer = ndk.signer;
-  if (!signer || (await signer.user()).pubkey !== pubkey || ndk.signer !== signer)
-    throw new Error('Account signer is not ready');
+export async function matchingSigner(client: NostrClient, pubkey: string) {
+  const signer = client.signer;
+  if (!signer || signer.pubkey !== pubkey) throw new Error('Account signer is not ready');
   return signer;
 }
 
@@ -57,18 +56,17 @@ export const nextReplaceableCreatedAt = (base = 0, now = Math.floor(Date.now() /
 
 /** Sign an own event with its pinned signer; refuse it if the account or signer changed meanwhile. */
 export async function signOwnEvent(
-  ndk: NDK,
-  signer: NDKSigner,
+  client: NostrClient,
+  signer: NostrSigner,
   scope: { check: () => void },
   fields: { kind: number; pubkey: string; created_at?: number; tags: string[][]; content: string }
-) {
-  const event = Object.assign(new NDKEvent(ndk), fields);
-  await event.sign(signer);
-  scope.check();
-  if (event.pubkey !== fields.pubkey || ndk.signer !== signer)
-    throw new Error('Account signer changed');
+): Promise<VerifiedEvent> {
   // Signing dates an event that was not dated.
-  return event as NDKEvent & { created_at: number };
+  const event = signer.sign(fields);
+  scope.check();
+  if (event.pubkey !== fields.pubkey || client.signer !== signer)
+    throw new Error('Account signer changed');
+  return event;
 }
 
 /**
@@ -80,7 +78,7 @@ export type OwnEventReadOutcome = 'complete' | 'timed-out' | 'failed' | 'no-rela
 type OwnEventRead = {
   outcome: OwnEventReadOutcome;
   /** The newest valid event any relay returned, also when the read did not complete. */
-  newest: NDKEvent | undefined;
+  newest: VerifiedEvent | undefined;
   /**
    * The relays that answered: on `complete`, every relay asked except those
    * left out as silent. Only these may receive an event built on the read.
@@ -157,7 +155,7 @@ export function worthReadingAgain(read: OwnEventRead, attempts = 1): boolean {
  * is silent there is nothing to read without them, so all are waited for.
  */
 export async function readNewestOwnEvent(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   kind: number,
   options: { relays?: readonly string[]; leaveOutSilent?: boolean } = {}
@@ -170,15 +168,14 @@ export async function readNewestOwnEvent(
   if (probes.size > 0) nostrLog.info('nostr.own_event.read_without', { kind, relays: [...probes] });
   const startedOrder = ++readOrder;
   return new Promise<OwnEventRead>((resolve) => {
-    let newest: NDKEvent | undefined;
+    let newest: VerifiedEvent | undefined;
     let settled = false;
     const answered = new Set<string>();
     const pending = new Set(relayUrls.filter((url) => !probes.has(url)));
-    const waitedFor: ReturnType<NDK['subscribe']>[] = [];
-    const probing = new Map<string, ReturnType<NDK['subscribe']>>();
-    type Dated = { created_at: number; id: string }; // checked by `validOwnEvent`
-    const offer = (event: NDKEvent) => {
-      if (!newest || supersedes(event as Dated, newest as Dated)) newest = event;
+    const waitedFor: RelaySubscriptionHandle[] = [];
+    const probing = new Map<string, RelaySubscriptionHandle>();
+    const offer = (event: VerifiedEvent) => {
+      if (!newest || supersedes(event, newest)) newest = event;
     };
     const stopProbe = (url: string) => {
       probing.get(url)?.stop();
@@ -205,43 +202,50 @@ export async function readNewestOwnEvent(
       probes.size > 0
         ? setTimeout(() => [...probing.keys()].forEach(stopProbe), READ_TIMEOUT_MS)
         : undefined;
+    // Relays whose socket failed after the request was made: silent for this read.
+    const dropped = new Set<string>();
     try {
       for (const url of relayUrls) {
+        if (settled) break;
         const probe = probes.has(url);
         // A probe's events count only once it has answered in full.
-        const held: NDKEvent[] = [];
-        // A multi-relay NDK subscription may emit EOSE before all relays finish,
-        // and emits it only once. Independent reads require every relay's actual
-        // response before a replaceable list can safely be edited.
-        const relays = NDKRelaySet.fromRelayUrls([url], ndk);
-        const subscription = ndk.subscribe(
-          { kinds: [kind], authors: [pubkey] },
-          { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY, closeOnEose: false },
-          relays,
-          false
-        );
-        if (probe) probing.set(url, subscription);
+        const held: VerifiedEvent[] = [];
+        let subscribing = true;
+        // One subscription per relay: a replaceable list can only be edited
+        // safely on every relay's own EOSE.
+        const subscription = client.subscribeRelay(url, [{ kinds: [kind], authors: [pubkey] }], {
+          onEvent: (event) => {
+            if (settled || !validOwnEvent(event, pubkey, kind)) return;
+            if (probe) held.push(event);
+            else offer(event);
+          },
+          onEose: () => {
+            heardFrom(url);
+            if (probe) stopProbe(url);
+            if (settled) return;
+            held.forEach(offer);
+            answered.add(url);
+            pending.delete(url);
+            if (pending.size === 0) finish('complete');
+          },
+          onError: () => {
+            if (probe) return stopProbe(url);
+            if (settled) return;
+            // The request could not be made at all: the read fails.
+            if (subscribing) {
+              notHeardFrom(url, startedOrder);
+              return finish('failed');
+            }
+            // A dropped socket will not answer this read: once every relay
+            // still waited for has dropped, end it as their silence would.
+            dropped.add(url);
+            if ([...pending].every((waiting) => dropped.has(waiting))) finish('timed-out');
+          },
+        });
+        subscribing = false;
+        if (settled && !probe) subscription.stop();
+        else if (probe) probing.set(url, subscription);
         else waitedFor.push(subscription);
-        subscription.on('event', (event: NDKEvent) => {
-          if (settled || !validOwnEvent(event, pubkey, kind)) return;
-          if (probe) held.push(event);
-          else offer(event);
-        });
-        subscription.on('eose', () => {
-          if (![...relays.relays].every((relay) => subscription.eosesSeen.has(relay))) return;
-          heardFrom(url);
-          if (probe) stopProbe(url);
-          if (settled) return;
-          held.forEach(offer);
-          answered.add(url);
-          pending.delete(url);
-          if (pending.size === 0) finish('complete');
-        });
-        void subscription.start().catch(() => {
-          if (probe) return stopProbe(url);
-          if (!settled) notHeardFrom(url, startedOrder);
-          finish('failed');
-        });
       }
     } catch {
       finish('failed');
@@ -252,7 +256,7 @@ export async function readNewestOwnEvent(
 /** The base an edit of an own event stands on, or why the edit waits. */
 export type ReadForEdit =
   | { status: 'waiting'; reason: 'relay-list-unknown' | Exclude<OwnEventReadOutcome, 'complete'> }
-  | { status: 'read'; newest: NDKEvent | undefined; relays: string[]; asked: string[] };
+  | { status: 'read'; newest: VerifiedEvent | undefined; relays: string[]; asked: string[] };
 
 /**
  * Read the newest own event of `kind` to build an edit on: only once this
@@ -262,7 +266,7 @@ export type ReadForEdit =
  * read again at once until that is decided.
  */
 export async function readForEdit(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   kind: number,
   relays: readonly string[] | null = getKnownOwnWriteRelays(pubkey)
@@ -271,7 +275,7 @@ export async function readForEdit(
   let read: OwnEventRead;
   let attempts = 0;
   do {
-    read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
+    read = await readNewestOwnEvent(client, pubkey, kind, { relays, leaveOutSilent: true });
     attempts++;
   } while (worthReadingAgain(read, attempts));
   if (read.outcome !== 'complete') return { status: 'waiting', reason: read.outcome };
@@ -285,14 +289,14 @@ export async function readForEdit(
  * signer changed.
  */
 export function signReplacement(
-  ndk: NDK,
-  signer: NDKSigner,
+  client: NostrClient,
+  signer: NostrSigner,
   scope: { check: () => void },
   fields: { kind: number; pubkey: string; replaces?: number; tags: string[][]; content: string }
 ) {
   const { replaces, ...event } = fields;
-  if (ndk.signer !== signer) return Promise.reject(new Error('Account signer changed'));
-  return signOwnEvent(ndk, signer, scope, {
+  if (client.signer !== signer) return Promise.reject(new Error('Account signer changed'));
+  return signOwnEvent(client, signer, scope, {
     ...event,
     created_at: nextReplaceableCreatedAt(replaces),
   });
@@ -305,11 +309,11 @@ export function signReplacement(
  * the pool.
  */
 export function publishToRelaysRead(
-  ndk: NDK,
-  event: NDKEvent,
+  client: NostrClient,
+  event: VerifiedEvent,
   relays: readonly string[],
   resolveOn: PublishOptions['resolveOn'] = 'all-settled'
 ) {
   if (relays.length === 0) return errAsync({ type: 'no-relays' } as const);
-  return publishEvent({ ndk, event, relays: [...relays], resolveOn });
+  return publishEvent({ client, event, relays: [...relays], resolveOn });
 }

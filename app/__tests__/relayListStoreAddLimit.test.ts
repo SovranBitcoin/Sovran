@@ -21,7 +21,7 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: (error: unknown) => error,
 }));
 
-const relay = (i: number) => `wss://relay${i}.example.com`;
+const relay = (i: number) => `wss://relay${i}.example.com/`;
 const BOTH = { read: true, write: true };
 const urls = () => useRelayListStore.getState().entries.map((e) => e.url);
 

@@ -2,12 +2,12 @@
  * @fileoverview Types for the central publish seam (`publishEvent`).
  *
  * Every Nostr write in the app routes through `publishEvent`, which collects a
- * per-relay outcome rather than the all-or-nothing boolean that
- * `NDKEvent.publish()` returns. Callers get enough detail to drive a
- * "published to N/M relays" UI and a meaningful retry affordance.
+ * per-relay outcome rather than an all-or-nothing boolean. Callers get enough
+ * detail to drive a "published to N/M relays" UI and a meaningful retry
+ * affordance.
  */
-import type NDK from '@nostr-dev-kit/ndk-mobile';
-import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient, UnsignedNostrEvent } from 'nostr/client';
+import type { VerifiedEvent } from 'nostr-tools/pure';
 
 /** Outcome of publishing one event to one relay. */
 export type PublishRelayResult =
@@ -45,13 +45,13 @@ export interface RetryPolicy {
 }
 
 export interface PublishOptions {
-  ndk: NDK;
-  /** Signed or unsigned. Unsigned events are signed with `ndk.signer`. */
-  event: NDKEvent;
+  client: NostrClient;
+  /** Signed or unsigned. Unsigned events are signed with `client.signer`. */
+  event: UnsignedNostrEvent | VerifiedEvent;
   /**
-   * Explicit relay-url set. When omitted, the event publishes to the NDK pool's
-   * current relays (preserving `NDKEvent.publish()` reach). Phase 1's
-   * `resolveWriteRelays` is the source for outbox-aware sets.
+   * Explicit relay-url set. When omitted, the event publishes to the client's
+   * current relays. Phase 1's `resolveWriteRelays` is the source for
+   * outbox-aware sets.
    */
   relays?: readonly string[];
   /** Per-relay timeout (ms). Defaults to {@link PUBLISH_TIMEOUT_MS}. */

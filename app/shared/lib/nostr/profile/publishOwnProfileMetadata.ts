@@ -1,6 +1,6 @@
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { verifyNip05 } from 'wallet';
-import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
 import { Result, ResultAsync, err, ok, type Result as ResultType } from 'neverthrow';
 import { parseProfileMetadata, supersedes } from 'nostr';
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
@@ -95,53 +95,47 @@ export type OwnProfileLoadResult =
  * does not build on this alone: it reads the account's relays in full first.
  */
 export async function loadOwnProfileMetadata(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string
 ): Promise<OwnProfileLoadResult> {
   const remote = await ResultAsync.fromPromise(
     new Promise<OwnProfileLoadResult>((resolve) => {
-      const subscription = ndk.subscribe(
-        { kinds: [0], authors: [pubkey] },
-        { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY, closeOnEose: false },
-        undefined,
-        false
-      );
+      const relays = client.relayUrls();
+      const answered = new Set<string>();
       let snapshot: OwnProfileSnapshot | null = null;
       let sawEvent = false;
       let settled = false;
-      const complete = () =>
-        !!subscription.relayFilters?.size &&
-        [...subscription.relayFilters.keys()].every((url) =>
-          [...subscription.eosesSeen].some((relay) => relay.url === url)
-        );
-      const finish = (failed = false) => {
+      const subscriptions: { stop(): void }[] = [];
+      const complete = () => relays.length > 0 && answered.size === relays.length;
+      const finish = () => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        subscription.stop();
+        for (const subscription of subscriptions) subscription.stop();
         resolve(
           snapshot
             ? { status: 'found', snapshot }
-            : {
-                status: !failed && !sawEvent && complete() ? 'absent' : 'unavailable',
-              }
+            : { status: !sawEvent && complete() ? 'absent' : 'unavailable' }
         );
       };
       const timer = setTimeout(finish, 3000);
-      subscription.on('event', (event: NDKEvent) => {
-        if (settled) return;
-        sawEvent = true;
-        const parsed =
-          event.pubkey === pubkey && event.kind === 0 ? parseOwnProfileSnapshot(event) : null;
-        if (parsed && (!snapshot || standsOver(parsed, snapshot))) snapshot = parsed;
-      });
-      subscription.on('eose', () => {
-        if (complete()) finish();
-      });
-      void ResultAsync.fromPromise(
-        Promise.resolve().then(() => subscription.start()),
-        () => null
-      ).mapErr(() => finish(true));
+      for (const url of relays) {
+        subscriptions.push(
+          client.subscribeRelay(url, [{ kinds: [0], authors: [pubkey] }], {
+            onEvent: (event) => {
+              if (settled) return;
+              sawEvent = true;
+              const parsed =
+                event.pubkey === pubkey && event.kind === 0 ? parseOwnProfileSnapshot(event) : null;
+              if (parsed && (!snapshot || standsOver(parsed, snapshot))) snapshot = parsed;
+            },
+            onEose: () => {
+              answered.add(url);
+              if (complete()) finish();
+            },
+          })
+        );
+      }
     }),
     () => null
   ).unwrapOr({ status: 'unavailable' } as const);
@@ -160,13 +154,13 @@ type OwnProfilePublishError =
 const inFlight = new Map<string, ResultAsync<PublishResult, OwnProfilePublishError>>();
 
 export function publishOwnProfileMetadata({
-  ndk,
+  client,
   pubkey,
   accountIndex,
   patch,
   initialLoad,
 }: {
-  ndk: NDK;
+  client: NostrClient;
   pubkey: string;
   accountIndex: number;
   patch: OwnProfilePatch;
@@ -190,19 +184,13 @@ export function publishOwnProfileMetadata({
     }
   });
   const run = async (): Promise<ResultType<PublishResult, OwnProfilePublishError>> => {
-    const signer = ndk.signer;
+    const signer = client.signer;
     if (!signer) return err({ type: 'no-signer' });
-    const signerUser = await ResultAsync.fromPromise(
-      signer.user(),
-      (cause): OwnProfilePublishError => ({ type: 'sign-failed', cause })
-    );
-    if (signerUser.isErr()) return err(signerUser.error);
-    if (!isOwner() || signerUser.value.pubkey !== pubkey || ndk.signer !== signer)
-      return err({ type: 'profile-changed' });
+    if (!isOwner() || signer.pubkey !== pubkey) return err({ type: 'profile-changed' });
     // Build only on a complete read of the account's relays (a relay silent
     // read after read left out), as for every own list; anything less waits.
-    const read = await readForEdit(ndk, pubkey, 0);
-    if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
+    const read = await readForEdit(client, pubkey, 0);
+    if (!isOwner() || client.signer !== signer) return err({ type: 'profile-changed' });
     if (read.status === 'waiting') return err({ type: 'base-unavailable' });
     const remote = read.newest ? parseOwnProfileSnapshot(read.newest) : null;
     if (read.newest && !remote) return err({ type: 'base-unavailable' });
@@ -229,11 +217,8 @@ export function publishOwnProfileMetadata({
         profile?.cachedPicture !== undefined)
     )
       return err({ type: 'base-unavailable' });
-    const event = new NDKEvent(ndk);
-    event.kind = 0;
-    event.pubkey = pubkey;
     const nowSeconds = Math.floor(Date.now() / 1000);
-    event.created_at = nextReplaceableCreatedAt(base?.createdAt, nowSeconds);
+    const createdAt = nextReplaceableCreatedAt(base?.createdAt, nowSeconds);
     // A base dated ahead is still superseded by +1 (and logged): refusing it
     // would make every later edit unpublishable.
     if (base && base.createdAt > nowSeconds + MAX_FUTURE_SEC)
@@ -245,19 +230,25 @@ export function publishOwnProfileMetadata({
     // claim and signing key afresh before creating any signed/public event.
     if (patch.nip05) {
       const verification = await verifyNip05(patch.nip05, pubkey);
-      if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
+      if (!isOwner() || client.signer !== signer) return err({ type: 'profile-changed' });
       if (verification.status !== 'verified') return err({ type: 'nip05-unverified' });
       content.nip05 = verification.identifier;
     }
     if (!baseIsCurrent()) return err({ type: 'base-unavailable' });
-    event.content = JSON.stringify(content);
-    event.tags = [];
-    const signed = await ResultAsync.fromPromise(
-      event.sign(signer),
+    const signed = Result.fromThrowable(
+      () =>
+        signer.sign({
+          kind: 0,
+          pubkey,
+          created_at: createdAt,
+          content: JSON.stringify(content),
+          tags: [],
+        }),
       (cause): OwnProfilePublishError => ({ type: 'sign-failed', cause })
-    );
+    )();
     if (signed.isErr()) return err(signed.error);
-    if (!isOwner() || event.pubkey !== pubkey || ndk.signer !== signer)
+    const event = signed.value;
+    if (!isOwner() || event.pubkey !== pubkey || client.signer !== signer)
       return err({ type: 'profile-changed' });
     if (!baseIsCurrent()) return err({ type: 'base-unavailable' });
     eventId = event.id;
@@ -271,8 +262,8 @@ export function publishOwnProfileMetadata({
         patch.name !== (base?.content.display_name ?? base?.content.name),
     });
     // Exactly the relays read: one that was not read may hold a newer profile.
-    const result = await publishToRelaysRead(ndk, event, read.relays, 'optimistic');
-    if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
+    const result = await publishToRelaysRead(client, event, read.relays, 'optimistic');
+    if (!isOwner() || client.signer !== signer) return err({ type: 'profile-changed' });
     if (result.isErr()) return err(result.error);
     if (isOwner())
       ingestOwnProfileMetadata(

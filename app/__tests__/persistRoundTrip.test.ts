@@ -26,9 +26,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
-  virtual: true,
-});
 
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative, resolve } from 'path';

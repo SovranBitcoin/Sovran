@@ -1,12 +1,11 @@
-import type NDK from '@nostr-dev-kit/ndk-mobile';
-
+import type { NostrClient } from 'nostr/client';
 import { nostrLog } from '@/shared/lib/logger';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 
 import { checkBlobExists, deleteFromBlossom } from './blossomClient';
 
 interface DeleteOwnedBlobArgs {
-  ndk: NDK;
+  client: NostrClient;
   /** Blossom origin the blob lives on, e.g. 'https://blossom.primal.net'. */
   host: string;
   sha256: string;
@@ -36,10 +35,10 @@ interface DeleteOwnedBlobResult {
  * The single source of truth for "delete one blob and record the outcome",
  * shared by the post-delete flow (one leg per image) and the Settings → My
  * media ledger (one row per blob). Pure of React so both call sites just supply
- * `ndk`.
+ * `client`.
  */
 export async function deleteOwnedBlob({
-  ndk,
+  client,
   host,
   sha256,
   url,
@@ -48,7 +47,7 @@ export async function deleteOwnedBlob({
   const ownedMedia = useOwnedMediaStore.getState();
   ownedMedia.setDeleteState(host, sha256, 'delete-requested');
 
-  const res = await deleteFromBlossom({ ndk, server: host, sha256, signal });
+  const res = await deleteFromBlossom({ client, server: host, sha256, signal });
 
   let deleted = res.isOk();
   if (!deleted && res.isErr() && res.error.type === 'delete-failed') {

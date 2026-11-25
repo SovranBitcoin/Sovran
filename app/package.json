@@ -93,7 +93,6 @@
     "@gorhom/bottom-sheet": "5.2.14",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "2.3.0",
-    "@nostr-dev-kit/ndk-mobile": "^0.2.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@react-native-menu/menu": "^2.0.0",

@@ -67,6 +67,7 @@ const localPackageEntryPaths = {
   nostr: path.join(nostrPath, 'src', 'index.ts'),
   'nostr/map': path.join(nostrPath, 'src', 'map', 'index.ts'),
   'nostr/recipes': path.join(nostrPath, 'src', 'recipes', 'index.ts'),
+  'nostr/client': path.join(nostrPath, 'src', 'client', 'index.ts'),
   'nostr/schemas': path.join(nostrPath, 'src', 'schemas.ts'),
 };
 
@@ -122,7 +123,7 @@ config.transformer = {
   },
   // Defer `require()` evaluation per module until first use. With this
   // disabled, Metro evaluates every top-of-file require() at bundle parse
-  // time, which on cold boot adds ~250ms of crypto/NDK/Cashu module init
+  // time, which on cold boot adds ~250ms of crypto/Nostr/Cashu module init
   // even when first paint never reaches that code. The few top-level
   // side-effect imports that actually need eager evaluation (`SplashScreen.
   // preventAutoHideAsync()` in `app/_layout.tsx`, polyfills) are still
@@ -180,21 +181,6 @@ const appResolveRequest = (context, moduleName, platform) => {
   const uniwindComponent = resolveUniwindComponent(moduleName);
   if (uniwindComponent) {
     return { type: 'sourceFile', filePath: uniwindComponent };
-  }
-  // `@nostr-dev-kit/ndk-mobile`'s entry re-exports its hooks barrel, whose
-  // `hooks/session.js` statically imports `walletFromLoadingString` from
-  // `@nostr-dev-kit/ndk-wallet`. That single unconditional import dragged NDK's
-  // whole Cashu/NWC wallet — plus its `@cashu/crypto` peer, and that package's
-  // `@noble/hashes@1` / `@scure/bip39@1` beside our pinned `2.3.0` — into every
-  // bundle. Sovran's wallet is coco + cashu-ts + colada and references none of
-  // it (`useNDKSession`, `useNDKWallet`, `useFollows`, `useMuteList`, `useWOT`,
-  // `useSessionEvents`, `useNDKSessionEvent(s|Kind)` have zero call sites), so
-  // resolve the package to nothing. Upgrading is not an escape: `ndk-mobile`
-  // through at least `0.8.43` still depends on `ndk-wallet` and pulls a second
-  // copy via `ndk-hooks`, on top of pinning SDK-53-era Expo packages.
-  // Guarded by `__tests__/ndkMobileBundleSurface.test.ts`.
-  if (moduleName === '@nostr-dev-kit/ndk-wallet') {
-    return { type: 'empty' };
   }
   if (moduleName === 'expo-liquid-glass-native') {
     return { type: 'sourceFile', filePath: liquidGlassEntryPath };

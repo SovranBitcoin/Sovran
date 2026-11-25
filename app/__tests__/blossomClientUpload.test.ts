@@ -1,7 +1,7 @@
 /**
  * Blossom upload resilience: size cap, transient-failure retry with backoff,
  * no-retry on 4xx, and abort/cancel. The native file-system, auth signing,
- * NDK event, and logger are mocked so the control flow can be asserted without
+ * and logger are mocked so the control flow can be asserted without
  * touching disk or network.
  */
 /* eslint-disable import/first */
@@ -29,31 +29,17 @@ jest.mock('@/shared/lib/nostr/media/blossomAuth', () => ({
   sha256Hex: () => 'deadbeef',
 }));
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  NDKEvent: class {
-    kind = 0;
-    content = '';
-    created_at = 0;
-    tags: string[][] = [];
-    async sign(): Promise<void> {}
-    rawEvent(): object {
-      return {};
-    }
-  },
-}));
-
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   nostrLog: { info: jest.fn(), warn: jest.fn() },
 }));
 
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { fakeClient, fakeSigner } from './helpers/fakeNostrClient';
 
 import { uploadToBlossom } from '@/shared/lib/nostr/media/blossomClient';
 
-// The client never touches the NDK beyond passing it to the (mocked) NDKEvent.
-const ndkStub: NDK = Object.create(null);
+// The account's client only signs the (mocked) auth event.
+const clientStub = fakeClient({ signer: fakeSigner('a'.repeat(64)) });
 
 const { getInfoAsync, createUploadTask } = (
   jest.requireMock('expo-file-system/legacy') as {
@@ -78,7 +64,7 @@ function queueUploads(outcomes: { status?: number; body?: string; throw?: boolea
 }
 
 const baseOpts = () => ({
-  ndk: ndkStub,
+  client: clientStub,
   server: 'https://b',
   fileUri: 'file:///x.jpg',
   mimeType: 'image/jpeg',
