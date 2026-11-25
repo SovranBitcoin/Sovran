@@ -5,8 +5,8 @@ first artifact of the [persistence release safety](https://github.com/SovranBitc
 procedure. Rebuild it with:
 
 ```sh
-python3 .agents/skills/persistence-release-safety/epochs.py builds   # needs `eas login`
-python3 .agents/skills/persistence-release-safety/epochs.py diff
+python3 release/epochs.py builds   # needs `eas login`
+python3 release/epochs.py diff
 ```
 
 Last rebuilt 2026-10-10 against candidate `5651d4720` (0.1.4).

@@ -66,7 +66,3 @@ assets, vendored and generated code.
 persistence and React](conventions-state.md), [TypeScript](conventions-typescript.md), [async,
 errors, network and tests](conventions-async-tests.md)) are the rules people and agents follow
 while writing. [contracts.md](contracts.md) defines the domain meanings the checks rely on.
-
-The [sweep protocol](sweep-protocol.md), its [ledger](sweep-ledger.md), the fixtures in
-`fixtures/` and the two dated JSON records are the history of the reviewer these checks
-replaced. Their verdicts on individual findings still stand.

@@ -36,6 +36,10 @@ const RefundSpine = z.looseObject({
   msats: z.string().max(32).optional(),
 });
 
+function normalizeIssuerBase(base: string): string {
+  return base.trim().replace(/\/+$/, '').replace(/\/v1$/i, '').toLowerCase();
+}
+
 function refundUrl(base: string): string {
   const trimmed = base.trim().replace(/\/+$/, '').replace(/\/v1$/, '');
   return `${trimmed}/v1/balance/refund`;
@@ -558,17 +562,29 @@ async function recoverSdkRecordsOnce(
       }
     }
 
-    // Hosted balances. A key the store's legacy sweep already banked is
-    // settled by that evidence; one it still holds is left to that sweep.
-    const legacy = Object.values(useRoutstrStore.getState().legacyAccounts);
+    // Hosted balances. A key the store's legacy sweep already banked on the
+    // SAME issuing node is settled by that evidence; one it still holds is left
+    // to that sweep. Matching both bearer key and normalized issuing URL ensures
+    // identical keys on distinct nodes never suppress or erase each other.
+    const legacyEntries = Object.entries(useRoutstrStore.getState().legacyAccounts);
+    const hadParent = (c: { parentBaseUrl: string }) => childKeyHasParent(records, c.parentBaseUrl);
     let apiKeys = records.apiKeys;
+    let childKeys = records.childKeys;
     for (const row of records.apiKeys) {
       if (!ownsScope()) return outcome;
-      const twin = legacy.find((account) => account.apiKey === row.key);
+      const rowBase = isHttpUrl(row.baseUrl) ? normalizeIssuerBase(row.baseUrl) : null;
+      const twinEntry = rowBase
+        ? legacyEntries.find(([nodeKey, account]) => {
+            if (account.apiKey !== row.key) return false;
+            const legacyBase = account.nodeBaseUrl ?? nodeKey;
+            return isHttpUrl(legacyBase) && normalizeIssuerBase(legacyBase) === rowBase;
+          })
+        : undefined;
+      const twin = twinEntry?.[1];
       let settled = false;
       if (twin?.reclaimedAt != null) settled = true;
       else if (twin) outcome.retryable += 1;
-      else if (!isHttpUrl(row.baseUrl)) outcome.unknownIssuer += 1;
+      else if (!rowBase) outcome.unknownIssuer += 1;
       else {
         const result = await askNode(row.baseUrl, row.key, controls);
         if (!ownsScope()) return outcome;
@@ -577,19 +593,26 @@ async function recoverSdkRecordsOnce(
         else settled = tally(await bank(result));
       }
       if (!settled) continue;
-      apiKeys = apiKeys.filter((r) => r !== row);
-      await save('api_keys', apiKeys);
+      const nextApiKeys = apiKeys.filter((r) => r !== row);
+      // Persist dependent child-key cleanup BEFORE removing the settled parent
+      // so an interruption between the two writes never orphans child keys as
+      // unknown-issuer records on the next launch.
+      const nextChildKeys = childKeys.filter(
+        (c) => !hadParent(c) || childKeyHasParent({ ...records, apiKeys: nextApiKeys }, c.parentBaseUrl)
+      );
+      if (nextChildKeys.length !== childKeys.length) {
+        if (!ownsScope()) return outcome;
+        await save('child_keys', nextChildKeys);
+        childKeys = nextChildKeys;
+      }
+      if (!ownsScope()) return outcome;
+      await save('api_keys', nextApiKeys);
+      apiKeys = nextApiKeys;
     }
 
-    // Child keys hold no balance of their own. Once the parent is gone the
-    // child has nothing left; without one ever recorded there is no node to ask.
-    const hadParent = (c: { parentBaseUrl: string }) => childKeyHasParent(records, c.parentBaseUrl);
-    const childKeys = records.childKeys.filter(
-      (c) => !hadParent(c) || childKeyHasParent({ ...records, apiKeys }, c.parentBaseUrl)
-    );
+    // Child keys hold no balance of their own; ones without any recorded parent
+    // have no node to ask and stay visible as unknown-issuer.
     outcome.unknownIssuer += records.childKeys.filter((c) => !hadParent(c)).length;
-    if (childKeys.length !== records.childKeys.length && ownsScope())
-      await save('child_keys', childKeys);
   } catch (error) {
     // A row whose removal could not be saved is re-read next pass; the spent
     // probe then keeps it from being banked twice.

@@ -302,4 +302,57 @@ describe('abort and account switch', () => {
     expect(useRoutstrStore.getState().pendingPayments.p).toBeDefined();
     expect(sdk('api_keys')).toHaveLength(1);
   });
+
+  it('does not deduplicate an SDK bearer key against a legacy entry on a different issuing node', async () => {
+    const OTHER_NODE = 'https://other-node.example';
+    useRoutstrStore.setState({
+      legacyAccounts: {
+        [OTHER_NODE]: {
+          apiKey: 'sk-shared',
+          nodeBaseUrl: OTHER_NODE,
+          reclaimedAt: 1_700_000_000,
+        },
+      },
+    });
+    seed('api_keys', [{ baseUrl: NODE, key: 'sk-shared', balance: 42, lastUsed: null }]);
+    const transport = stubFetch(() => json(200, { token: 'cashuB-node-refund' }));
+
+    const result = await recoverSdkRecords();
+
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(result.collected).toBe(1);
+    expect(sdk('api_keys')).toEqual([]);
+  });
+
+  it('persists child_keys cleanup before removing the settled parent api_keys entry', async () => {
+    seed('api_keys', [{ baseUrl: NODE, key: 'sk-parent', balance: 10, lastUsed: null }]);
+    seed('child_keys', [{ childKey: 'sk-child', parentBaseUrl: NODE, balance: 0 }]);
+    stubFetch(() => json(200, { token: 'cashuB-parent-refund' }));
+
+    const writes: string[] = [];
+    const driver = require('@/shared/lib/routstr/sdk/driver');
+    const orig = driver.createSdkStorageDriver;
+    jest.spyOn(driver, 'createSdkStorageDriver').mockImplementation((...args: unknown[]) => {
+      const inner = orig(...args);
+      const origSet = inner.setItem.bind(inner);
+      const origRemove = inner.removeItem.bind(inner);
+      inner.setItem = async (k: string, v: unknown) => {
+        writes.push(k);
+        return origSet(k, v);
+      };
+      inner.removeItem = async (k: string) => {
+        writes.push(k);
+        return origRemove(k);
+      };
+      return inner;
+    });
+
+    const result = await recoverSdkRecords();
+    jest.restoreAllMocks();
+
+    expect(result.collected).toBe(1);
+    expect(writes).toEqual(['child_keys', 'api_keys']);
+    expect(sdk('child_keys')).toEqual([]);
+    expect(sdk('api_keys')).toEqual([]);
+  });
 });
