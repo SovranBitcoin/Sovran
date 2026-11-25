@@ -15,10 +15,7 @@ interface RestoreReadyStore {
  * — the safe-to-mint signal — or immediately when `signal` aborts (so an
  * account switch mid-restore unsubscribes instead of leaking the listener).
  */
-export function awaitRestoreReady(
-  store: RestoreReadyStore,
-  signal?: AbortSignal
-): Promise<void> {
+export function awaitRestoreReady(store: RestoreReadyStore, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.resolve();
   return new Promise<void>((resolve) => {
     let settled = false;
