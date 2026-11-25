@@ -2,7 +2,8 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 
 import { DESIGN_SYSTEM_CATALOG } from '@/features/settings/design-system/catalog';
 import type { DesignSystemFamily } from '@/features/settings/design-system/types';

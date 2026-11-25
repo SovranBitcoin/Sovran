@@ -1,16 +1,9 @@
 /**
  * Generic action-menu custom sheet — a "pick one of N" list routed through
- * `PopupHost`'s FullWindowOverlay-backed `<BottomSheet>` so it stacks ABOVE
- * iOS/Android route modals.
- *
- * Why this exists: `actionMenuPopup` → `<ActionMenuHost>` renders with
- * `disableFullWindowOverlay` (heroui `<Menu presentation="bottom-sheet">`
- * silently fails to mount under FWO). That's fine for menus opened from
- * regular screens, but the send-flow amount screen is itself an iOS route
- * modal — a menu-lane sheet paints in the root window, *below* the modal, and
- * is invisible. `ActionMenuButton presentation="bottom-sheet"` dispatches here
- * instead so the chooser (e.g. "as Lightning" / "as Ecash") appears on top.
- * Same lane, same reason as `paymentOptionsSheet`.
+ * `PopupHost`'s sheet, so it shares the popup lane's open/close sequencing
+ * (a follow-on sheet opened from an item replaces this one). The send-flow
+ * amount screen's "as Lightning" / "as Ecash" chooser opens here through
+ * `ActionMenuButton presentation="bottom-sheet"`.
  *
  * Renders plain `ActionMenuItem`s (no inputs / sections — those stay in the
  * `actionMenuPopup` lane). Each item's `onPress` receives the sheet `close`.
@@ -18,10 +11,9 @@
 
 import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { BottomSheet, Menu } from 'heroui-native';
 
 import Icon from 'assets/icons';
-import { MenuRowTint, SheetMenuRowContent } from './sheetMenuRow';
+import { MenuItem, MenuRowTint, MenuTitle, SheetMenuRowContent } from './sheetMenuRow';
 import { log } from '@/shared/lib/logger';
 import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
 
@@ -73,52 +65,43 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
   return (
     <View>
       <E2EActionMenuRenderMarker presentationKey={payload} />
-      {title ? (
-        <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-          {title}
-        </BottomSheet.Title>
-      ) : null}
-      {/* A bare `<Menu>` gives `Menu.Item` the contexts it reads via
-          `useMenu()` — no Trigger/Portal/Content needed; Menu.Root is just a
-          context Provider. Same trick as `paymentOptionsSheet` / `modelPicker`. */}
-      <Menu>
-        {buttons.map((button) => {
-          const disabled = button.disabled === true || button.isFailed === true;
-          const description = button.disabled
-            ? (button.reason ?? button.description)
-            : button.description;
-          const isDanger = button.isFailed === true || button.variant === 'dangerous';
-          return (
-            <MenuRowTint
-              key={button.testID}
-              tone={button.isFailed ? 'failed' : button.isCaution ? 'caution' : undefined}
-              disabled={button.disabled === true}>
-              <Menu.Item
-                testID={button.testID}
-                accessibilityLabel={button.accessibilityLabel}
-                accessibilityHint={button.accessibilityHint}
-                isDisabled={disabled}
-                isSelected={button.selected}
-                variant={isDanger ? 'danger' : 'default'}
-                onPress={() => {
-                  if (disabled) return;
-                  pickedRef.current = true;
-                  void runSheetAction(button, close);
-                }}>
-                <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
-                <SheetMenuRowContent
-                  icon={
-                    button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)
-                  }
-                  title={button.text}
-                  description={description || null}
-                  trailing={button.suffix ? <View>{button.suffix}</View> : null}
-                />
-              </Menu.Item>
-            </MenuRowTint>
-          );
-        })}
-      </Menu>
+      {title ? <MenuTitle>{title}</MenuTitle> : null}
+      {buttons.map((button) => {
+        const disabled = button.disabled === true || button.isFailed === true;
+        const description = button.disabled
+          ? (button.reason ?? button.description)
+          : button.description;
+        const isDanger = button.isFailed === true || button.variant === 'dangerous';
+        return (
+          <MenuRowTint
+            key={button.testID}
+            tone={button.isFailed ? 'failed' : button.isCaution ? 'caution' : undefined}
+            disabled={button.disabled === true}>
+            <MenuItem
+              testID={button.testID}
+              accessibilityLabel={button.accessibilityLabel}
+              accessibilityHint={button.accessibilityHint}
+              isDisabled={disabled}
+              isSelected={button.selected}
+              variant={isDanger ? 'danger' : 'default'}
+              onPress={() => {
+                if (disabled) return;
+                pickedRef.current = true;
+                void runSheetAction(button, close);
+              }}>
+              <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
+              <SheetMenuRowContent
+                icon={
+                  button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)
+                }
+                title={button.text}
+                description={description || null}
+                trailing={button.suffix ? <View>{button.suffix}</View> : null}
+              />
+            </MenuItem>
+          </MenuRowTint>
+        );
+      })}
     </View>
   );
 }

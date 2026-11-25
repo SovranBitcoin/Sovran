@@ -191,7 +191,6 @@ jest.mock('@/shared/ui/primitives/View/HStack', () => ({
   HStack: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: () => null }));
-jest.mock('heroui-native', () => ({ Alert: () => null }));
 
 describe('SendTokenScreen Copy menu', () => {
   beforeEach(() => {

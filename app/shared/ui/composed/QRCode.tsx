@@ -7,7 +7,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useAnimatedQrFrames } from '@/shared/hooks/useAnimatedQrFrames';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { log, Log } from '@/shared/lib/logger';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { View } from '@/shared/ui/primitives/View/View';

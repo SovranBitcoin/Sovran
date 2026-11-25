@@ -102,13 +102,18 @@ jest.mock('@/shared/lib/popup', () => ({
   copyPopup: jest.fn(),
 }));
 
-jest.mock('heroui-native', () => {
+// The house press feedback and list group stand in exactly as heroui's did, so
+// these snapshots keep pinning the scenario components rather than the press
+// layer underneath them.
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   const Scale = ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
     ReactActual.createElement(View, { testID: 'pressable-feedback-scale', ...props }, children);
   const Ripple = (props: Record<string, unknown>) =>
     ReactActual.createElement(View, { testID: 'pressable-feedback-ripple', ...props });
+  const Highlight = (props: Record<string, unknown>) =>
+    ReactActual.createElement(View, { testID: 'pressable-feedback-highlight', ...props });
   const PressableFeedback = Object.assign(
     ({
       animation: _animation,
@@ -119,9 +124,13 @@ jest.mock('heroui-native', () => {
       children?: React.ReactNode;
       [key: string]: unknown;
     }) => ReactActual.createElement(View, props, children),
-    { Scale, Ripple }
+    { Scale, Ripple, Highlight }
   );
+  return { PressableFeedback };
+});
 
+jest.mock('@/shared/ui/composed/ListGroup', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
   const host =
     (name: string) =>
     ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
@@ -134,9 +143,14 @@ jest.mock('heroui-native', () => {
     ItemSuffix: host('ListGroupItemSuffix'),
     ItemTitle: host('ListGroupItemTitle'),
   });
-  const Switch = Object.assign(host('Switch'), { Thumb: host('SwitchThumb') });
-
-  return { ListGroup, PressableFeedback, Switch };
+  return {
+    ListGroup,
+    Separator: host('Separator'),
+    Card: Object.assign(host('Card'), {
+      Body: host('CardBody'),
+      Description: host('CardDescription'),
+    }),
+  };
 });
 
 jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
@@ -254,6 +268,7 @@ jest.mock('react-native-reanimated', () => {
     },
     withDelay: <T,>(_delayMs: number, value: T) => value,
     withRepeat: <T,>(value: T) => value,
+    withSpring: <T,>(value: T) => value,
     withSequence: <T,>(...values: T[]) => values[values.length - 1],
     withTiming: <T,>(value: T) => value,
   };

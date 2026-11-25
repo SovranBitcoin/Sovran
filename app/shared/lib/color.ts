@@ -115,7 +115,7 @@ function hslToRgb({ h, s, l }: Hsl): Rgb {
 }
 
 /** HSL of a hex colour, each component 0-1. */
-export function toHsl(hex: string): Hsl {
+function toHsl(hex: string): Hsl {
   return rgbToHsl(hexToRgb(hex));
 }
 

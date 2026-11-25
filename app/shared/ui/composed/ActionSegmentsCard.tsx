@@ -8,7 +8,7 @@
 
 import React, { memo } from 'react';
 import { withAlpha } from '@/shared/lib/color';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 
 import Icon from 'assets/icons';
 import { Surface } from '@/shared/ui/composed/Surface';

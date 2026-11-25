@@ -10,11 +10,6 @@ import { HistoryEntryTimeline } from '@/features/transactions/components/detail/
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock('heroui-native', () => {
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  return { Alert: Object.assign(View, { Content: View, Title: View, Description: View }) };
-});
-
 jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
   useVisualActivityEffect: (effect: () => void | (() => void)) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');

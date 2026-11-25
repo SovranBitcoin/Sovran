@@ -3,7 +3,8 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { withAlpha } from '@/shared/lib/color';
 import { getHistoryEntryRefreshLabel } from 'wallet';
 

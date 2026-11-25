@@ -156,8 +156,7 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
     '--surface-tertiary': palette[700],
     '--surface-tertiary-foreground': palette[100],
 
-    // Aliased to `--surface` so menu-lane surfaces (heroui Menu/BottomSheet/
-    // Dialog/Popover/Sub-menu, plus PopupHost's custom snapPoints sheets) sit
+    // Aliased to `--surface` so sheets and menus (`bg-overlay`) sit
     // at the same depth as the drawer and the page canvas. `--surface-
     // secondary` (palette[800]) remains the next layer up for cards that need
     // to stand out from the canvas they're on.

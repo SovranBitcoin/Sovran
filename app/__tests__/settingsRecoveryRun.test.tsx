@@ -157,32 +157,17 @@ jest.mock('@/shared/blocks/status', () => ({
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'MockButton' }));
+jest.mock('@/shared/ui/primitives/Switch', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
+  };
+});
 jest.mock('@/shared/ui/composed/Surface', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
     Surface: ({ children }: React.PropsWithChildren) =>
       ReactActual.createElement('MockSurface', null, children),
-  };
-});
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const Button = Object.assign(
-    ({
-      children,
-      ...props
-    }: React.PropsWithChildren<{
-      onPress?: () => void;
-      testID?: string;
-      isDisabled?: boolean;
-    }>) => ReactActual.createElement('MockButton', props, children),
-    {
-      Label: ({ children }: React.PropsWithChildren) =>
-        ReactActual.createElement('MockButtonLabel', null, children),
-    }
-  );
-  return {
-    Button,
-    Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
   };
 });
 

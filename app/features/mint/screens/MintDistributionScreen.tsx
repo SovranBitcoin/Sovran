@@ -8,7 +8,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { ListGroup } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
 import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';

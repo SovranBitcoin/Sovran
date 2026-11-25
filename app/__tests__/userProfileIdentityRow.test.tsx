@@ -25,8 +25,8 @@ jest.mock('@/shared/lib/contentShiftLog', () => ({
 // render test. The identity row uses the real Text, stack, View, and icon.
 jest.mock('expo-router', () => ({}));
 jest.mock('wallet/react', () => ({}), { virtual: true });
-jest.mock('heroui-native', () => ({}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({}));
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({}));
 jest.mock('@/shared/lib/nav/useRouteParams', () => ({}));
 jest.mock('@/shared/ui/composed/TierBadge', () => ({}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({}));

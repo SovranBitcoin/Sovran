@@ -3,9 +3,8 @@ import { twMerge, type ClassNameValue } from 'tailwind-merge';
 /**
  * Merge Tailwind class strings, resolving conflicts in favour of the last one.
  *
- * `tailwind-merge` is not optional here — `heroui-native` peer-depends on it and
- * its compiled component styles import `tailwind-variants`, which peer-depends
- * on it in turn. So this is the one class utility that costs nothing extra.
+ * The house primitives build their classes from a base plus the caller's
+ * `className`; merging lets the caller's win (`px-3` over a base `p-5`).
  *
  * Accepts strings, arrays, and the falsy values a conditional produces
  * (`cond && 'class'`). It does **not** accept clsx's object form

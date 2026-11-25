@@ -1,14 +1,3 @@
-import type { ActionSheetPayloads } from '../actionSheetTypes';
-
-export type CustomSheetId = keyof ActionSheetPayloads;
-
-export type CustomSheetPage<K extends CustomSheetId = CustomSheetId> = {
-  sheetId: K;
-  payload: ActionSheetPayloads[K];
-};
-
-export type CustomSheetNavDirection = 'forward' | 'back';
-
 type CustomSheetFooterButton = {
   testID?: string;
   label: string;
@@ -19,26 +8,9 @@ type CustomSheetFooterButton = {
 
 export type CustomSheetFooterConfig = {
   buttons: CustomSheetFooterButton[];
-  layout?: 'column' | 'row';
 };
 
 export type CustomSheetSharedProps = {
   close: () => void;
-  pushCustomPage: <K extends CustomSheetId>(sheetId: K, payload: ActionSheetPayloads[K]) => void;
-  popCustomPage: () => void;
-  canPop: boolean;
   setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
 };
-
-export type SheetLayoutConfig =
-  | { mode: 'snapPoints'; snapPoints: readonly string[] }
-  | {
-      mode: 'contentHeight';
-      /**
-       * Render the content in gorhom's BottomSheetScrollView (patched heroui
-       * `useScrollableContainer` flag): the sheet still auto-fits short
-       * content, but scrolls instead of clipping once expandable sections
-       * push it past maxDynamicContentSize.
-       */
-      scrollable?: boolean;
-    };

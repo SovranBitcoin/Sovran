@@ -12,7 +12,7 @@ import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Description, Input, Label, TextField } from 'heroui-native';
+import { Description, Input, Label, TextField } from '@/shared/ui/primitives/Field';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Button } from '@/shared/ui/primitives/Button';

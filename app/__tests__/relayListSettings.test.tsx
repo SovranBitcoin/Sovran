@@ -228,25 +228,6 @@ const mockMenus: { title?: string; buttons: MenuButton[] }[] = [];
 jest.mock('@/shared/lib/popup', () => ({
   actionMenuPopup: (payload: { title?: string; buttons: MenuButton[] }) => mockMenus.push(payload),
 }));
-jest.mock('heroui-native', () => {
-  const { View, Text, TextInput } = jest.requireMock('react-native');
-  const ListGroup = Object.assign(
-    ({ children }: React.PropsWithChildren) => <View testID="relay-list-group">{children}</View>,
-    {
-      Item: Object.assign(({ children }: React.PropsWithChildren) => <View>{children}</View>, {}),
-      ItemPrefix: View,
-      ItemContent: View,
-      ItemTitle: Text,
-      ItemDescription: Text,
-      ItemSuffix: View,
-    }
-  );
-  const PressableFeedback = Object.assign(
-    ({ children, ...props }: React.PropsWithChildren) => <View {...props}>{children}</View>,
-    { Scale: View, Ripple: () => null }
-  );
-  return { ListGroup, PressableFeedback, Separator: () => null, TextField: View, Input: TextInput };
-});
 
 /** Open a relay's menu while editing and press one of its choices. */
 function choose(url: string, testIDPrefix: 'read-write' | 'read' | 'write' | 'remove') {

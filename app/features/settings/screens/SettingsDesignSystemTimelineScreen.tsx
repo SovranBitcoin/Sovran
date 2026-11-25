@@ -2,7 +2,8 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { Button as HerouiButton, Card } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { Card } from '@/shared/ui/composed/ListGroup';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -212,7 +213,7 @@ export function SettingsDesignSystemTimelineScreen() {
 
             <HStack gap={8}>
               <View className="flex-1">
-                <HerouiButton
+                <PillButton
                   variant={timelineAuto ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-timeline-auto"
@@ -220,8 +221,8 @@ export function SettingsDesignSystemTimelineScreen() {
                   accessibilityLabel="Auto-play"
                   accessibilityState={{ checked: timelineAuto }}
                   onPress={() => setTimelineAuto((value) => !value)}>
-                  <HerouiButton.Label>{timelineAuto ? 'Pause' : 'Play'}</HerouiButton.Label>
-                </HerouiButton>
+                  <PillButton.Label>{timelineAuto ? 'Pause' : 'Play'}</PillButton.Label>
+                </PillButton>
               </View>
               <View className="flex-1">
                 <Button

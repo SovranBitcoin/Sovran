@@ -32,10 +32,10 @@ jest.mock('@/features/settings/lib/readRecoveryInformation', () => ({
 }));
 jest.mock('nostr-tools/nip19', () => ({ npubEncode: () => 'test-public-placeholder' }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PillButton', () => {
   const React = require('react');
   return {
-    Button: Object.assign(
+    PillButton: Object.assign(
       (props: Record<string, unknown>) => React.createElement('Button', props),
       { Label: 'Label' }
     ),

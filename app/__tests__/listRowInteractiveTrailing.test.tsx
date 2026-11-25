@@ -18,7 +18,7 @@ jest.mock('@/shared/lib/color', () => ({
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View: RNView } = jest.requireActual<typeof import('react-native')>('react-native');
   const Pressable = (props: Record<string, unknown> & { testID?: string }) =>
@@ -26,6 +26,7 @@ jest.mock('heroui-native', () => {
   Pressable.Scale = (props: Record<string, unknown>) =>
     ReactActual.createElement(RNView, { ...props, testID: 'scale' });
   Pressable.Ripple = () => ReactActual.createElement(RNView, { testID: 'ripple' });
+  Pressable.Highlight = () => ReactActual.createElement(RNView, { testID: 'highlight' });
   return { PressableFeedback: Pressable };
 });
 

@@ -91,33 +91,54 @@ jest.mock('@/shared/ui/composed/GlassSearchBar/searchTextInput', () => ({
   SearchTextInput: 'SearchTextInput',
 }));
 
-jest.mock('heroui-native', () => {
+// The house press feedback, list group and slider stand in as host elements,
+// as heroui's did: the scrubber drives the frames, not these wrappers. The
+// slider is one element now (no track/fill/thumb children).
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const host =
     (name: string) =>
     ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
       ReactActual.createElement(name, props, children);
-  const PressableFeedback = Object.assign(
-    ({ animation: _animation, ...props }: { animation?: unknown; [key: string]: unknown }) =>
-      host('PressableFeedback')(props),
-    { Scale: host('PressableFeedbackScale'), Ripple: host('PressableFeedbackRipple') }
-  );
-  const ListGroup = Object.assign(host('ListGroup'), {
-    Item: host('ListGroupItem'),
-    ItemContent: host('ListGroupItemContent'),
-    ItemDescription: host('ListGroupItemDescription'),
-    ItemPrefix: host('ListGroupItemPrefix'),
-    ItemSuffix: host('ListGroupItemSuffix'),
-    ItemTitle: host('ListGroupItemTitle'),
-  });
-  const Switch = Object.assign(host('Switch'), { Thumb: host('SwitchThumb') });
-  const Slider = Object.assign(host('Slider'), {
-    Track: host('SliderTrack'),
-    Fill: host('SliderFill'),
-    Thumb: host('SliderThumb'),
-  });
-
-  return { ListGroup, PressableFeedback, Slider, Switch };
+  return {
+    PressableFeedback: Object.assign(
+      ({ animation: _animation, ...props }: { animation?: unknown; [key: string]: unknown }) =>
+        host('PressableFeedback')(props),
+      {
+        Scale: host('PressableFeedbackScale'),
+        Ripple: host('PressableFeedbackRipple'),
+        Highlight: host('PressableFeedbackHighlight'),
+      }
+    ),
+  };
+});
+jest.mock('@/shared/ui/composed/ListGroup', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host =
+    (name: string) =>
+    ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
+      ReactActual.createElement(name, props, children);
+  return {
+    ListGroup: Object.assign(host('ListGroup'), {
+      Item: host('ListGroupItem'),
+      ItemContent: host('ListGroupItemContent'),
+      ItemDescription: host('ListGroupItemDescription'),
+      ItemPrefix: host('ListGroupItemPrefix'),
+      ItemSuffix: host('ListGroupItemSuffix'),
+      ItemTitle: host('ListGroupItemTitle'),
+    }),
+    Separator: host('Separator'),
+    Card: Object.assign(host('Card'), {
+      Body: host('CardBody'),
+      Description: host('CardDescription'),
+    }),
+  };
+});
+jest.mock('@/shared/ui/primitives/Slider', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Slider: (props: Record<string, unknown>) => ReactActual.createElement('Slider', props),
+  };
 });
 
 jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
@@ -212,6 +233,7 @@ jest.mock('react-native-reanimated', () => {
     },
     withDelay: <T,>(_delayMs: number, value: T) => value,
     withRepeat: <T,>(value: T) => value,
+    withSpring: <T,>(value: T) => value,
     withSequence: <T,>(...values: T[]) => values[values.length - 1],
     withTiming: <T,>(value: T) => value,
   };

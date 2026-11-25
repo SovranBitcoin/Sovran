@@ -57,7 +57,7 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
   // pops this toast, so a missing slot means it was cleared out from under a
   // still-mounted persistent toast (e.g. terminal `onHide` raced, or the store
   // reset). Rendering `null` here would leave an EMPTY toast slab pinned on
-  // screen forever (heroui keeps the slot until it's explicitly hidden). Hide
+  // screen forever (ToastHost keeps it until it's hidden). Hide
   // it instead of lingering as a contentless duplicate.
   const isPresent = view.present;
   useEffect(() => {

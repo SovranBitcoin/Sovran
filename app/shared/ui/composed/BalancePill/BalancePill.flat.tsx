@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import BalanceDisplay from './BalanceDisplay';

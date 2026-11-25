@@ -8,7 +8,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from '@/shared/ui/primitives/Image';
 import { View } from '@/shared/ui/primitives/View/View';

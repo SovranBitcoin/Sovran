@@ -4,7 +4,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
-import { Card } from 'heroui-native';
+import { Card } from '@/shared/ui/composed/ListGroup';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import {

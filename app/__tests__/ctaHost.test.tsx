@@ -33,17 +33,6 @@ const mockScreenNavigation = {
 let mockBalance = 100;
 /** What the wallet holds in units other than sat, in each unit's smallest part. */
 let mockOtherUnits: Record<string, number> = {};
-jest.mock('heroui-native', () => {
-  const React = require('react');
-  const host = (name: string) =>
-    function MockHost(props: Record<string, unknown>) {
-      return React.createElement(name, props);
-    };
-  return {
-    ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
-    Label: Object.assign(host('Label'), { Text: 'LabelText' }),
-  };
-});
 jest.mock('expo-router', () => ({
   router: {
     push: (...args: unknown[]) => mockPush(...args),

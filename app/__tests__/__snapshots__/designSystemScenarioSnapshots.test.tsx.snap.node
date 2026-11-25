@@ -41654,20 +41654,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-default: r
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 2,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "#bfbfbf",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": false,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -42067,20 +42103,57 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-disabled: 
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 2,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "#bfbfbf",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": true,
-                                "isSelected": false,
+                              ],
+                              "props": {
+                                "aria-disabled": true,
+                                "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 0.5,
+                                },
+                                "tabIndex": -1,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -42499,20 +42572,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-large-text
                                 {
                                   "children": [
                                     {
-                                      "children": null,
-                                      "props": {
-                                        "animation": {
-                                          "backgroundColor": {
-                                            "value": [
-                                              "#bfbfbf",
-                                              "rgb(32, 128, 72)",
+                                      "children": [
+                                        {
+                                          "children": [
+                                            {
+                                              "children": null,
+                                              "props": {
+                                                "className": "shadow-field",
+                                                "style": [
+                                                  {
+                                                    "backgroundColor": "white",
+                                                    "borderRadius": 999,
+                                                    "height": 20,
+                                                    "position": "absolute",
+                                                    "width": 28,
+                                                  },
+                                                  {
+                                                    "left": 2,
+                                                  },
+                                                ],
+                                              },
+                                              "type": "View",
+                                            },
+                                          ],
+                                          "props": {
+                                            "style": [
+                                              {
+                                                "borderRadius": 999,
+                                                "height": 24,
+                                                "justifyContent": "center",
+                                                "overflow": "hidden",
+                                                "width": 48,
+                                              },
+                                              {
+                                                "backgroundColor": "#bfbfbf",
+                                              },
                                             ],
                                           },
+                                          "type": "View",
                                         },
-                                        "isDisabled": false,
-                                        "isSelected": false,
+                                      ],
+                                      "props": {
+                                        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                        "dir": null,
+                                        "role": "switch",
+                                        "style": {
+                                          "opacity": 1,
+                                        },
+                                        "tabIndex": 0,
                                       },
-                                      "type": "Switch",
+                                      "type": "div",
                                     },
                                   ],
                                   "props": {
@@ -42925,20 +43034,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-selected: 
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 18,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "rgb(32, 128, 72)",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": true,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -43336,20 +43481,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-worst-case
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 18,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "rgb(32, 128, 72)",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": true,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -43758,20 +43939,56 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-defau
       "type": "div",
     },
     {
-      "children": null,
-      "props": {
-        "animation": {
-          "backgroundColor": {
-            "value": [
-              "#bfbfbf",
-              "rgb(32, 128, 72)",
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "shadow-field",
+                "style": [
+                  {
+                    "backgroundColor": "white",
+                    "borderRadius": 999,
+                    "height": 20,
+                    "position": "absolute",
+                    "width": 28,
+                  },
+                  {
+                    "left": 2,
+                  },
+                ],
+              },
+              "type": "View",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "borderRadius": 999,
+                "height": 24,
+                "justifyContent": "center",
+                "overflow": "hidden",
+                "width": 48,
+              },
+              {
+                "backgroundColor": "#bfbfbf",
+              },
             ],
           },
+          "type": "View",
         },
-        "isDisabled": false,
-        "isSelected": false,
+      ],
+      "props": {
+        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "dir": null,
+        "role": "switch",
+        "style": {
+          "opacity": 1,
+        },
+        "tabIndex": 0,
       },
-      "type": "Switch",
+      "type": "div",
     },
   ],
   "props": {
@@ -43942,20 +44159,57 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-disab
           "type": "div",
         },
         {
-          "children": null,
-          "props": {
-            "animation": {
-              "backgroundColor": {
-                "value": [
-                  "#bfbfbf",
-                  "rgb(32, 128, 72)",
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "className": "shadow-field",
+                    "style": [
+                      {
+                        "backgroundColor": "white",
+                        "borderRadius": 999,
+                        "height": 20,
+                        "position": "absolute",
+                        "width": 28,
+                      },
+                      {
+                        "left": 18,
+                      },
+                    ],
+                  },
+                  "type": "View",
+                },
+              ],
+              "props": {
+                "style": [
+                  {
+                    "borderRadius": 999,
+                    "height": 24,
+                    "justifyContent": "center",
+                    "overflow": "hidden",
+                    "width": 48,
+                  },
+                  {
+                    "backgroundColor": "rgb(32, 128, 72)",
+                  },
                 ],
               },
+              "type": "View",
             },
-            "isDisabled": true,
-            "isSelected": true,
+          ],
+          "props": {
+            "aria-disabled": true,
+            "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "dir": null,
+            "role": "switch",
+            "style": {
+              "opacity": 0.5,
+            },
+            "tabIndex": -1,
           },
-          "type": "Switch",
+          "type": "div",
         },
       ],
       "props": {
@@ -44131,20 +44385,56 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-selec
       "type": "div",
     },
     {
-      "children": null,
-      "props": {
-        "animation": {
-          "backgroundColor": {
-            "value": [
-              "#bfbfbf",
-              "rgb(32, 128, 72)",
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "shadow-field",
+                "style": [
+                  {
+                    "backgroundColor": "white",
+                    "borderRadius": 999,
+                    "height": 20,
+                    "position": "absolute",
+                    "width": 28,
+                  },
+                  {
+                    "left": 18,
+                  },
+                ],
+              },
+              "type": "View",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "borderRadius": 999,
+                "height": 24,
+                "justifyContent": "center",
+                "overflow": "hidden",
+                "width": 48,
+              },
+              {
+                "backgroundColor": "rgb(32, 128, 72)",
+              },
             ],
           },
+          "type": "View",
         },
-        "isDisabled": false,
-        "isSelected": true,
+      ],
+      "props": {
+        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "dir": null,
+        "role": "switch",
+        "style": {
+          "opacity": 1,
+        },
+        "tabIndex": 0,
       },
-      "type": "Switch",
+      "type": "div",
     },
   ],
   "props": {

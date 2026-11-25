@@ -5,11 +5,10 @@
  * - Named popups: typed functions for every popup scenario (copyPopup, paymentStatusPopup, etc.)
  * - fmt: tagged template for inline amount formatting
  * - resolvePopupIcon: declarative icon resolution (emoji:, icon:, custom:)
- * - registerToast: called once by PopupHost to connect the HeroUI toast manager
  */
 
 export { popup } from './popups/engine';
-export { registerToast, showActionSheet } from './popups/bridge';
+export { showActionSheet } from './popups/bridge';
 export type { ActionSheetPayloads } from './actionSheetTypes';
 export { isAmountSegment } from './format';
 export type { PopupTextSegment } from './format';

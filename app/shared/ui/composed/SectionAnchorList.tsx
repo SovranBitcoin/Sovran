@@ -30,10 +30,9 @@
  *     search-results mode). When non-null, the FlashList unmounts and
  *     the anchor bar hides — caller is responsible for any inner
  *     virtualization in this branch (typically another list).
- *   - `ScrollComponent` injection lets hosts pass
- *     `BottomSheetScrollView` so gorhom's pan gestures + keyboard
- *     handling stay coherent inside a sheet. FlashList wires it via
- *     its `renderScrollComponent` prop.
+ *   - `ScrollComponent` injection lets hosts pass `SheetScrollView`
+ *     so the sheet's drag-to-dismiss waits for the list to reach its
+ *     top. FlashList wires it via its `renderScrollComponent` prop.
  */
 
 import React, {
@@ -126,10 +125,9 @@ interface SectionAnchorListProps<T> {
   onLayout?: (event: LayoutChangeEvent) => void;
   /**
    * Injected scroll container. Defaults to react-native's `ScrollView`.
-   * Pass `BottomSheetScrollView` when rendering inside @gorhom/bottom-sheet
-   * to preserve gesture + keyboard handling — FlashList uses this as
-   * its `renderScrollComponent` so the sheet sees the same scroll node
-   * it would for a plain `<BottomSheetScrollView>`.
+   * Pass `SheetScrollView` inside a `Sheet` so the sheet only takes a
+   * downward drag once the list is at its top; FlashList uses this as its
+   * `renderScrollComponent`.
    */
   ScrollComponent?: ComponentType<ScrollViewProps & { ref?: React.Ref<unknown> }>;
   /** Color the top fade tapers to. Defaults to theme `background`. */
@@ -483,7 +481,7 @@ export function SectionAnchorList<T>({
   };
 
   // `renderScrollComponent` lets the host inject its scroll container
-  // (e.g. `BottomSheetScrollView` for gorhom integration). Default to
+  // (e.g. `SheetScrollView` inside a sheet). Default to
   // the standard react-native ScrollView when no host wraps us.
   // KEPT as an explicit useMemo: this creates a component type — if its
   // identity ever changed between renders FlashList would remount its

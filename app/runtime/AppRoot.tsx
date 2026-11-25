@@ -2,7 +2,7 @@
  * The app root: everything that outlives an account.
  *
  * Starts the headless `appRuntime` for the process, applies the theme, and
- * mounts the third-party root adapters (gestures, keyboard, HeroUI) and the
+ * mounts the third-party root adapters (gestures, keyboard) and the
  * review overlays. Below it, the splash and migration gates hold the account
  * scope until fonts, the native layout and the global migrations are done.
  * Nothing here remounts on a profile switch.
@@ -11,7 +11,6 @@ import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { HeroUINativeProvider } from 'heroui-native/provider';
 
 import { useFonts } from '@/shared/hooks/useFonts';
 import { IS_E2E_LOG_BUILD, initLog } from '@/shared/lib/logger';
@@ -47,9 +46,7 @@ function ProcessChrome({ children }: { children: React.ReactNode }) {
           {/* The outermost layer covers whatever is not inside a screen, a
               sheet or a popup of its own (the wallet home, tab bar, drawer). */}
           <TouchIndicatorLayer>
-            <HeroUINativeProvider>
-              <HeroTransitionProvider>{children}</HeroTransitionProvider>
-            </HeroUINativeProvider>
+            <HeroTransitionProvider>{children}</HeroTransitionProvider>
           </TouchIndicatorLayer>
         </TouchIndicatorEnabled.Provider>
         <LayoutGuides enabled={guides} />

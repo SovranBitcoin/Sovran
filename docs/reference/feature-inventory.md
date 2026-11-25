@@ -131,8 +131,8 @@ This reorganizes the claims in the app `README.md`; it does not add new ones.
 
 ## Navigation & UX primitives
 
-- [x] Expo Router, modal flow stacks, drawer + bottom tabs, `@gorhom/bottom-sheet`,
-  `heroui-native`, project `Button`/`SelectableCheck` primitives, underline tabs,
+- [x] Expo Router, modal flow stacks, drawer + bottom tabs, the house `Sheet` and
+  `ToastHost`, project `Button`/`SelectableCheck` primitives, underline tabs,
   `number-flow-react-native`, `react-native-keyboard-controller`,
   `@shopify/flash-list` (v2) across feed/DMs/AI chat, Iconify + internal SVG
   namespace, design tokens, anchored color ramps, haptics, locale-aware dates

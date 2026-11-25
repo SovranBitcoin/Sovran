@@ -49,20 +49,6 @@ jest.mock('@/shared/ui/primitives/Text', () => ({ Text: element('Text') }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: element('View') }));
 jest.mock('@/shared/ui/primitives/Switch', () => ({ Switch: element('Switch') }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: element('Icon') }));
-jest.mock('heroui-native', () => {
-  const PressableFeedback = Object.assign(element('PressableFeedback'), {
-    Scale: element('PressableFeedback.Scale'),
-    Ripple: element('PressableFeedback.Ripple'),
-  });
-  const ListGroup = Object.assign(element('ListGroup'), {
-    Item: element('ListGroup.Item'),
-    ItemContent: element('ListGroup.ItemContent'),
-    ItemTitle: element('ListGroup.ItemTitle'),
-    ItemDescription: element('ListGroup.ItemDescription'),
-    ItemSuffix: element('ListGroup.ItemSuffix'),
-  });
-  return { PressableFeedback, ListGroup };
-});
 
 function render(node: React.ReactElement) {
   let tree!: TestRenderer.ReactTestRenderer;

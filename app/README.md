@@ -350,8 +350,8 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Expo Router** — file-based routing under `app/`
 - [x] **Flow stacks** — `(send-flow)`, `(receive-flow)`, `(mint-flow)`, `(settings-flow)`; every other page is a root route (ADR 0041)
 - [x] **Drawer + bottom tabs** — drawer for profiles/settings, tabs for top-level surfaces
-- [x] **`@gorhom/bottom-sheet`** — native bottom sheets for pickers and confirmations
-- [x] **`heroui-native`** — in-card buttons, dialogs, segmented chips
+- [x] **House `Sheet` and `ToastHost`** — bottom sheets for pickers and confirmations, top toasts
+- [x] **House primitives** — `ListGroup`, `Card`, `PillButton`, `Field`, `Slider`, `Switch`, `PressableFeedback`
 - [x] **Project `Button` primitive** — hero CTAs in `BottomButtons` footers
 - [x] **`SelectableCheck` primitive** — canonical selection checkmark
 - [x] **Underline tabs** — replaced capsule tabs across the app

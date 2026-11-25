@@ -31,7 +31,7 @@ means it is assembled from the parts they use, not designed fresh.
    | Text, a tap target, a button | `Text`, `Pressable`, `Button` (the shared pill) |
    | Footer actions, including the overflow menu | `BottomButtons` with `ButtonHandler` |
    | A grouped container; a titled group | `Surface`; `Section` |
-   | Settings-style rows | `ListGroup` from `heroui-native`; `ListRow`, `ContactRow` |
+   | Settings-style rows | `ListGroup` (`shared/ui/composed/ListGroup`); `ListRow`, `ContactRow` |
    | Choosing one of several | `actionMenuPopup`; `actionMenuSheet` when already inside a sheet |
    | A table of facts | `GroupedTable`, `DetailsSection` |
    | A status message | `Notice` |

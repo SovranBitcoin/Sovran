@@ -1,7 +1,7 @@
 import { getCornerStyle } from './CapsuleButton.corners';
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

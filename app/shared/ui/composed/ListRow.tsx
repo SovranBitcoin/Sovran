@@ -21,7 +21,7 @@
 
 import { ReactNode, useState } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -129,7 +129,7 @@ interface ListRowProps {
 
   /**
    * Horizontal inset of the row content. Defaults to the style's screen
-   * gutter, which also matches heroui `ListGroup.Item` (p-4 = 16). NOTE: the `style` prop lands on the OUTER wrapper —
+   * gutter, which also matches `ListGroup.Item` (p-4 = 16). NOTE: the `style` prop lands on the OUTER wrapper —
    * padding there stacks on top of this inset instead of replacing it.
    */
   paddingHorizontal?: number;
@@ -186,7 +186,7 @@ export function ListRow({
   const paddingHorizontal = paddingHorizontalProp ?? paint.style.space.gutter;
 
   // Same double-tap guard the project Pressable provided before the press
-  // surface moved to heroui PressableFeedback — rows routinely await payment
+  // surface moved to PressableFeedback — rows routinely await payment
   // actions, so a rapid second tap must drop synchronously.
   const guardedPress = useSingleFlight(async () => {
     if (!onPress) return;

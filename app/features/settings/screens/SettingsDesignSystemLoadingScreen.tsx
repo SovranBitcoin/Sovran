@@ -1,7 +1,8 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useRef, useState } from 'react';
 
-import { Button, Card } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { Card } from '@/shared/ui/composed/ListGroup';
 
 import {
   LOADING_INDICATOR_PREVIEW_SIZE,
@@ -134,24 +135,24 @@ export function SettingsDesignSystemLoadingScreen() {
             </Text>
             <HStack gap={8}>
               <View className="flex-1">
-                <Button
+                <PillButton
                   variant={!auto && phase === 'idle' ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-loading-phase-idle"
                   accessibilityState={{ selected: !auto && phase === 'idle' }}
                   onPress={() => onLockPhase('idle')}>
-                  <Button.Label>Idle</Button.Label>
-                </Button>
+                  <PillButton.Label>Idle</PillButton.Label>
+                </PillButton>
               </View>
               <View className="flex-1">
-                <Button
+                <PillButton
                   variant={!auto && phase === 'loading' ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-loading-phase-loading"
                   accessibilityState={{ selected: !auto && phase === 'loading' }}
                   onPress={() => onLockPhase('loading')}>
-                  <Button.Label>Loading</Button.Label>
-                </Button>
+                  <PillButton.Label>Loading</PillButton.Label>
+                </PillButton>
               </View>
             </HStack>
 
@@ -159,7 +160,7 @@ export function SettingsDesignSystemLoadingScreen() {
               RESOLVE TO
             </Text>
             <VStack gap={8}>
-              <Button
+              <PillButton
                 variant={
                   !auto && phase === 'done' && result === 'success' ? 'primary' : 'secondary'
                 }
@@ -167,17 +168,17 @@ export function SettingsDesignSystemLoadingScreen() {
                 testID="design-system-loading-result-success"
                 accessibilityState={{ selected: !auto && phase === 'done' && result === 'success' }}
                 onPress={() => onLockResult('success')}>
-                <Button.Label>Success</Button.Label>
-              </Button>
-              <Button
+                <PillButton.Label>Success</PillButton.Label>
+              </PillButton>
+              <PillButton
                 variant={!auto && phase === 'done' && result === 'error' ? 'primary' : 'secondary'}
                 size="sm"
                 testID="design-system-loading-result-error"
                 accessibilityState={{ selected: !auto && phase === 'done' && result === 'error' }}
                 onPress={() => onLockResult('error')}>
-                <Button.Label>Error</Button.Label>
-              </Button>
-              <Button
+                <PillButton.Label>Error</PillButton.Label>
+              </PillButton>
+              <PillButton
                 variant={
                   !auto && phase === 'done' && result === 'reverted' ? 'primary' : 'secondary'
                 }
@@ -187,19 +188,19 @@ export function SettingsDesignSystemLoadingScreen() {
                   selected: !auto && phase === 'done' && result === 'reverted',
                 }}
                 onPress={() => onLockResult('reverted')}>
-                <Button.Label>Reverted</Button.Label>
-              </Button>
+                <PillButton.Label>Reverted</PillButton.Label>
+              </PillButton>
             </VStack>
 
-            <Button
+            <PillButton
               variant={auto ? 'primary' : 'secondary'}
               size="sm"
               testID="design-system-loading-auto"
               accessibilityRole="switch"
               accessibilityState={{ checked: auto }}
               onPress={() => setAuto((v) => !v)}>
-              <Button.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</Button.Label>
-            </Button>
+              <PillButton.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</PillButton.Label>
+            </PillButton>
           </Card.Body>
         </Card>
 

@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Toast } from 'heroui-native';
 
 import { BlurView } from 'expo-blur';
 import { useCapabilities } from '@/shared/ui/capability';
@@ -12,10 +11,10 @@ import {
 
 /**
  * Frosted-glass toast frame shared by every custom toast (CompactToast,
- * PaymentStatusToast, SwapStatusToast). The slab owns the heroui Toast root
- * props, the optional BlurView at the back, and the standard content row
- * container — callers only render the tint layer (animated or static) and
- * the row content.
+ * PaymentStatusToast, SwapStatusToast). The slab owns the rounded frame, the
+ * optional BlurView at the back, and the standard content row container —
+ * callers only render the tint layer (animated or static) and the row
+ * content. `ToastHost` positions, animates and dismisses it.
  */
 
 const BLUR_INTENSITY = 60;
@@ -50,13 +49,9 @@ export const SUCCESS_DARK_BG = TOAST_SUCCESS_DARK_BG;
 export const DANGER_DARK_BG = TOAST_DANGER_DARK_BG;
 export const WARNING_DARK_BG = TOAST_WARNING_DARK_BG;
 
-type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
-
 type ToastSlabProps = {
-  /** Forwarded from the heroui toast manager (carries `hide`, ids, etc.). */
-  toastProps: Record<string, unknown>;
-  /** heroui Toast `variant` for callers that semantically tint via heroui. */
-  variant?: ToastVariant;
+  /** From `ToastHost` (`id`, `hide`); only `testID` is applied to the frame. */
+  toastProps?: Record<string, unknown>;
   /**
    * The absolute-fill tint layer rendered above the BlurView. Static toasts
    * pass a plain `<View backgroundColor={...} />`; animated toasts pass an
@@ -67,17 +62,13 @@ type ToastSlabProps = {
   children: ReactNode;
 };
 
-export function ToastSlab({ toastProps, variant, tint, children }: ToastSlabProps) {
+export function ToastSlab({ toastProps, tint, children }: ToastSlabProps) {
   const frosted = useToastFrosted();
   return (
-    <Toast
-      placement="top"
-      variant={variant}
-      className="overflow-hidden bg-transparent p-0"
-      isAnimatedStyleActive={false}
-      // toastProps carries manager-injected props (index, total, heights,
-      // show, hide) that aren't part of the public Toast type.
-      {...(toastProps as any)}>
+    <View
+      testID={typeof toastProps?.testID === 'string' ? toastProps.testID : undefined}
+      className="shadow-overlay overflow-hidden rounded-3xl"
+      style={{ borderCurve: 'continuous' }}>
       {frosted && (
         <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
       )}
@@ -92,6 +83,6 @@ export function ToastSlab({ toastProps, variant, tint, children }: ToastSlabProp
         }}>
         {children}
       </View>
-    </Toast>
+    </View>
   );
 }

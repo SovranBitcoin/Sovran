@@ -54,13 +54,13 @@ const noop = () => undefined;
 
 /**
  * The parts the fixtures draw, loaded on first render rather than when the
- * catalog is imported: several reach `heroui-native` or platform modules, and
+ * catalog is imported: several reach native or platform modules, and
  * the catalog's metadata is read where neither can load.
  */
 function ui() {
   return {
     Icon: (require('@/assets/icons') as typeof import('@/assets/icons')).default,
-    ListGroup: (require('heroui-native') as typeof import('heroui-native')).ListGroup,
+    ...(require('@/shared/ui/composed/ListGroup') as typeof import('@/shared/ui/composed/ListGroup')),
     ...(require('@/features/mint/components/MintHeader') as typeof import('@/features/mint/components/MintHeader')),
     ...(require('@/shared/ui/composed/AmountFormatter') as typeof import('@/shared/ui/composed/AmountFormatter')),
     ...(require('@/shared/ui/composed/ListRow') as typeof import('@/shared/ui/composed/ListRow')),

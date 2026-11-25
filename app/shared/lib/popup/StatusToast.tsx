@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
-import { Button, Toast } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
 import Animated, {
   Easing,
   interpolateColor,
@@ -67,8 +67,7 @@ type StatusToastProps = {
   /** Structured lifecycle context for log-doctor toast audits. */
   debugFields?: Record<string, unknown>;
   /**
-   * From the heroui toast manager — `hide` plus internal positioning props.
-   * Spread onto the underlying `<Toast>` root.
+   * From `ToastHost` — `hide` (this toast) and its id; `testID` lands on the frame.
    */
   toastProps: Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void };
 };
@@ -182,12 +181,13 @@ export function StatusToast({
         )}
       </View>
       {action ? (
-        <Toast.Action
+        <PillButton
           testID={action.testID}
+          size="sm"
           style={{ backgroundColor: surfaceFg }}
           onPress={action.onPress}>
-          <Button.Label style={{ color: surfaceBg }}>{action.label}</Button.Label>
-        </Toast.Action>
+          <PillButton.Label style={{ color: surfaceBg }}>{action.label}</PillButton.Label>
+        </PillButton>
       ) : null}
     </ToastSlab>
   );

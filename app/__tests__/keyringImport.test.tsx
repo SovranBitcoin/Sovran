@@ -69,26 +69,6 @@ jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => {
       ReactActual.createElement('HeaderAction', props),
   };
 });
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const host =
-    (name: string) =>
-    ({ children, ...props }: { children?: React.ReactNode }) =>
-      ReactActual.createElement(name, props, children);
-  return {
-    Button: Object.assign(host('Button'), { Label: host('ButtonLabel') }),
-    ListGroup: Object.assign(host('ListGroup'), {
-      Item: host('ListItem'),
-      ItemContent: host('ListItemContent'),
-      ItemTitle: host('ListItemTitle'),
-      ItemDescription: host('ListItemDescription'),
-      ItemSuffix: host('ListItemSuffix'),
-    }),
-    PressableFeedback: Object.assign(host('PressableFeedback'), { Highlight: host('Highlight') }),
-    Separator: host('Separator'),
-    Switch: host('Switch'),
-  };
-});
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children }: { children?: React.ReactNode }) => children,
 }));

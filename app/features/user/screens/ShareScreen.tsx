@@ -16,7 +16,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { Surface } from '@/shared/ui/composed/Surface';
-import { ListGroup } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
 import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';

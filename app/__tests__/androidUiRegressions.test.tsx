@@ -85,12 +85,19 @@ jest.mock('@/shared/ui/primitives/View/VStack', () => ({
   },
 }));
 
-jest.mock('@/shared/blocks/popup/MenuScrim', () => ({
-  MenuScrim: () => {
-    const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('MenuScrim');
-  },
-}));
+// The house bottom sheet, as a host element: an inline sheet would show here.
+jest.mock('@/shared/ui/composed/Sheet', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host = (name: string) =>
+    function MockSheetPart({ children, ...props }: { children?: React.ReactNode }) {
+      return ReactActual.createElement(name, props, children);
+    };
+  return {
+    Sheet: host('Sheet'),
+    SheetScrollView: host('SheetScrollView'),
+    OverlayWindow: host('OverlayWindow'),
+  };
+});
 
 jest.mock('assets/icons', () => ({
   __esModule: true,
@@ -132,27 +139,6 @@ jest.mock('expo-maps', () => {
   };
 });
 
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const Menu = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu', props, children);
-
-  Menu.Trigger = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Trigger', props, children);
-  Menu.Portal = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Portal', props, children);
-  Menu.Content = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Content', props, children);
-  Menu.Label = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Label', props, children);
-  Menu.Item = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Item', props, children);
-  Menu.ItemTitle = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.ItemTitle', props, children);
-
-  return { Menu };
-});
-
 function findAllByType(renderer: TestRenderer.ReactTestRenderer, type: string) {
   return renderer.root.findAll((node) => node.type === type);
 }
@@ -178,15 +164,13 @@ describe('Android UI regressions', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
     act(() => {
-      renderer = TestRenderer.create(
-        <FiatCurrencyPillAndroidMenu displayText="≈ $12.34" enableCurrencyMenu />
-      );
+      renderer = TestRenderer.create(<FiatCurrencyPillAndroidMenu displayText="≈ $12.34" />);
     });
 
     // Regression: the pill renders NO inline bottom-sheet (which paints at rest
     // on Android). The pick-one surface is the picker sheet.
-    expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
-    expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
+    expect(findAllByType(renderer!, 'Sheet')).toHaveLength(0);
+    expect(findAllByType(renderer!, 'OverlayWindow')).toHaveLength(0);
     expect(mockPickOption).not.toHaveBeenCalled();
 
     // The pill is the trigger — pressing it opens the picker; the person picks EUR.

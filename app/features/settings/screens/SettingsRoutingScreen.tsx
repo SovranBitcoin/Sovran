@@ -10,15 +10,10 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Section } from '@/shared/ui/composed/Section';
 import { Notice } from '@/shared/ui/composed/Notice';
-import {
-  Card,
-  Label,
-  ListGroup,
-  RadioGroup,
-  Separator,
-  Slider,
-  Switch as HeroSwitch,
-} from 'heroui-native';
+import { Card, ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { Label, RadioGroup } from '@/shared/ui/primitives/Field';
+import { Slider } from '@/shared/ui/primitives/Slider';
+import { Switch } from '@/shared/ui/primitives/Switch';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
@@ -40,7 +35,6 @@ export function SettingsRoutingScreen() {
     [setMiddlemanRouting]
   );
 
-  const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
   // Snap to slider step so a stored rate that isn't a multiple of 5 doesn't
   // display as e.g. "73%" while the thumb sits between stops.
   const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
@@ -61,15 +55,10 @@ export function SettingsRoutingScreen() {
                   minValue={1}
                   maxValue={50}
                   step={1}
-                  onChangeEnd={(value) => setMinTransferThreshold(asNumber(value))}>
-                  <Slider.Track>
-                    <Slider.Fill />
-                    <Slider.Thumb
-                      testID="settings-routing-min-transfer"
-                      accessibilityLabel="Min transfer amount"
-                    />
-                  </Slider.Track>
-                </Slider>
+                  onChangeEnd={(value) => setMinTransferThreshold(value)}
+                  testID="settings-routing-min-transfer"
+                  accessibilityLabel="Min transfer amount"
+                />
                 <Card.Description>
                   Transfers below this amount are skipped during rebalancing to avoid noisy,
                   fee-inefficient steps.
@@ -92,15 +81,10 @@ export function SettingsRoutingScreen() {
                   minValue={1}
                   maxValue={3}
                   step={1}
-                  onChangeEnd={(value) => update({ maxHops: asNumber(value) })}>
-                  <Slider.Track>
-                    <Slider.Fill />
-                    <Slider.Thumb
-                      testID="settings-routing-max-hops"
-                      accessibilityLabel="Max intermediaries"
-                    />
-                  </Slider.Track>
-                </Slider>
+                  onChangeEnd={(value) => update({ maxHops: value })}
+                  testID="settings-routing-max-hops"
+                  accessibilityLabel="Max intermediaries"
+                />
                 <Card.Description>
                   How many middleman mints can be chained together (1 = A→via→B, 2 = A→via1→via2→B).
                 </Card.Description>
@@ -118,12 +102,10 @@ export function SettingsRoutingScreen() {
                   minValue={1}
                   maxValue={50}
                   step={1}
-                  onChangeEnd={(value) => update({ maxFee: asNumber(value) })}>
-                  <Slider.Track>
-                    <Slider.Fill />
-                    <Slider.Thumb testID="settings-routing-max-fee" accessibilityLabel="Max fee" />
-                  </Slider.Track>
-                </Slider>
+                  onChangeEnd={(value) => update({ maxFee: value })}
+                  testID="settings-routing-max-fee"
+                  accessibilityLabel="Max fee"
+                />
                 <Card.Description>
                   Maximum total fee (in sats) allowed across all hops of an intermediary route.
                 </Card.Description>
@@ -141,15 +123,10 @@ export function SettingsRoutingScreen() {
                   minValue={50}
                   maxValue={100}
                   step={5}
-                  onChangeEnd={(value) => update({ minSuccessRate: asNumber(value) / 100 })}>
-                  <Slider.Track>
-                    <Slider.Fill />
-                    <Slider.Thumb
-                      testID="settings-routing-min-success-rate"
-                      accessibilityLabel="Min success rate"
-                    />
-                  </Slider.Track>
-                </Slider>
+                  onChangeEnd={(value) => update({ minSuccessRate: value / 100 })}
+                  testID="settings-routing-min-success-rate"
+                  accessibilityLabel="Min success rate"
+                />
                 <Card.Description>
                   Minimum percentage of successful swaps required for each edge in the route.
                 </Card.Description>
@@ -165,7 +142,7 @@ export function SettingsRoutingScreen() {
                   </ListGroup.ItemDescription>
                 </ListGroup.ItemContent>
                 <ListGroup.ItemSuffix>
-                  <HeroSwitch
+                  <Switch
                     testID="settings-routing-require-last-ok"
                     accessibilityLabel="Last swap must be OK"
                     isSelected={middlemanRouting.requireLastOk}

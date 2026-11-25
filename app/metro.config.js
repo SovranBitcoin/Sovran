@@ -138,15 +138,6 @@ config.transformer = {
 };
 
 const liquidGlassEntryPath = resolvePkgFile('expo-liquid-glass-native', 'build', 'index.js');
-const herouiNativeEntryPath = resolvePkgFile('heroui-native', 'lib', 'module', 'index.js');
-const herouiNativeProviderPath = resolvePkgFile(
-  'heroui-native',
-  'lib',
-  'module',
-  'providers',
-  'hero-ui-native',
-  'index.js'
-);
 
 // Uniwind internally probes `uniwind/components` (and remaps RN components to
 // `uniwind/components/<Name>`) through the base resolver. Under the nested-app
@@ -184,12 +175,6 @@ const appResolveRequest = (context, moduleName, platform) => {
   }
   if (moduleName === 'expo-liquid-glass-native') {
     return { type: 'sourceFile', filePath: liquidGlassEntryPath };
-  }
-  if (moduleName === 'heroui-native') {
-    return { type: 'sourceFile', filePath: herouiNativeEntryPath };
-  }
-  if (moduleName === 'heroui-native/provider') {
-    return { type: 'sourceFile', filePath: herouiNativeProviderPath };
   }
   // Force the shared, type-bearing libs to the app's single copy. The workspace
   // packages (wallet/nostr) and the `@sovranbitcoin/*` registry packages can each

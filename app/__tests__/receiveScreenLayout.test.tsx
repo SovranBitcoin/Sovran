@@ -365,7 +365,7 @@ jest.mock('assets/icons', () => ({
   },
 }));
 
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/composed/ListGroup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
 
   const ListGroup = ({ children, ...props }: { children?: React.ReactNode }) =>
@@ -378,8 +378,16 @@ jest.mock('heroui-native', () => {
     ReactActual.createElement('ListGroup.ItemContent', props, children);
   ListGroup.ItemTitle = ({ children, ...props }: { children?: React.ReactNode }) =>
     ReactActual.createElement('ListGroup.ItemTitle', props, children);
+  ListGroup.ItemDescription = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemDescription', props, children);
   ListGroup.ItemSuffix = ({ children, ...props }: { children?: React.ReactNode }) =>
     ReactActual.createElement('ListGroup.ItemSuffix', props, children);
+
+  return { ListGroup, Separator: () => null };
+});
+
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
 
   const PressableFeedback = ({ children, ...props }: { children?: React.ReactNode }) =>
     ReactActual.createElement('PressableFeedback', props, children);
@@ -387,8 +395,10 @@ jest.mock('heroui-native', () => {
     ReactActual.createElement('PressableFeedback.Scale', props, children);
   PressableFeedback.Ripple = (props: Record<string, unknown>) =>
     ReactActual.createElement('PressableFeedback.Ripple', props);
+  PressableFeedback.Highlight = (props: Record<string, unknown>) =>
+    ReactActual.createElement('PressableFeedback.Highlight', props);
 
-  return { ListGroup, PressableFeedback };
+  return { PressableFeedback };
 });
 
 function action(available = true) {

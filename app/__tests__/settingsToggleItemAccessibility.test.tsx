@@ -20,21 +20,14 @@ function mockHost(name: string) {
       .createElement(name, props, props.children as React.ReactNode);
 }
 
-jest.mock('heroui-native', () => {
-  const ListGroup = Object.assign(mockHost('ListGroup'), {
-    Item: mockHost('Item'),
-    ItemPrefix: mockHost('ItemPrefix'),
-    ItemContent: mockHost('ItemContent'),
-    ItemTitle: mockHost('ItemTitle'),
-    ItemDescription: mockHost('ItemDescription'),
-    ItemSuffix: mockHost('ItemSuffix'),
-  });
-  const PressableFeedback = Object.assign(mockHost('Row'), {
+// The row's pressable surface, as a host element whose props the test reads.
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({
+  PressableFeedback: Object.assign(mockHost('Row'), {
     Scale: mockHost('Scale'),
     Ripple: () => null,
-  });
-  return { ListGroup, PressableFeedback };
-});
+    Highlight: () => null,
+  }),
+}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'c' }));
 jest.mock('@/shared/ui/primitives/Switch', () => ({ Switch: () => null }));

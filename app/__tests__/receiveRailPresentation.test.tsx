@@ -153,30 +153,39 @@ jest.mock('@/features/transactions', () => ({ HistoryEntryRefresh: () => null })
 jest.mock('@/features/receive/components/ReceiveRailPlaceholder', () => ({
   ReceiveRailPlaceholder: () => null,
 }));
-jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/composed/ListGroup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const host =
     (name: string) =>
     ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) =>
       ReactActual.createElement(name, props, children);
-  const ListGroup = Object.assign(host('ListGroup'), {
-    Item: host('Item'),
-    ItemPrefix: host('Prefix'),
-    ItemContent: host('Content'),
-    ItemSuffix: host('Suffix'),
-    ItemTitle: host('Title'),
-    ItemDescription: host('Description'),
-  });
   return {
-    ListGroup,
+    ListGroup: Object.assign(host('ListGroup'), {
+      Item: host('Item'),
+      ItemPrefix: host('Prefix'),
+      ItemContent: host('Content'),
+      ItemSuffix: host('Suffix'),
+      ItemTitle: host('Title'),
+      ItemDescription: host('Description'),
+    }),
     Separator: () => null,
+  };
+});
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host =
+    (name: string) =>
+    ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) =>
+      ReactActual.createElement(name, props, children);
+  return {
     PressableFeedback: Object.assign(host('Pressable'), {
       Scale: host('Scale'),
       Ripple: () => null,
+      Highlight: () => null,
     }),
   };
 });
+jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 
 const action = () => ({ available: true, loading: false, execute: jest.fn() });
 const actions = {

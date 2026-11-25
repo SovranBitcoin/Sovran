@@ -14,7 +14,7 @@ import { create as createQrCode } from 'qrcode';
 export const QR_PLACEHOLDER_FRAME_COUNT = 6;
 /** The live QR's error-correction level (`QrMatrix`), so the junk lands in
  * the same QR version as the live code encoded from a payload of equal length. */
-export const QR_ECL = 'M';
+const QR_ECL = 'M';
 /** Byte mode caps out at ~2.3k chars for version 40 at ECL M; the live QR
  * splits anything longer into UR fragments anyway. */
 const MAX_PLACEHOLDER_LENGTH = 2000;

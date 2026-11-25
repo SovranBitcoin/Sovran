@@ -10,7 +10,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Button } from '@/shared/ui/primitives/Button';
-import { ControlField, Label } from 'heroui-native';
+import { ControlField, Label } from '@/shared/ui/primitives/Field';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';

@@ -83,6 +83,12 @@ jest.mock('@/shared/lib/nostr/media/mediaServerStore', () => ({ getMediaServer: 
 jest.mock('@/shared/lib/nostr/media/ownedBlobs', () => ({
   extractOwnedBlobsFromDescriptors: jest.fn(),
 }));
+jest.mock('@/shared/ui/primitives/Field', () => ({
+  TextField: ({ children }: React.PropsWithChildren) => children,
+  Label: ({ children }: React.PropsWithChildren) => children,
+  Description: ({ children }: React.PropsWithChildren) => children,
+  Input: () => null,
+}));
 jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('react-native-svg', () => ({
   __esModule: true,
@@ -107,12 +113,6 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children }: React.PropsWithChildren) => children,
-}));
-jest.mock('heroui-native', () => ({
-  TextField: ({ children }: React.PropsWithChildren) => children,
-  Label: ({ children }: React.PropsWithChildren) => children,
-  Description: ({ children }: React.PropsWithChildren) => children,
-  Input: () => null,
 }));
 
 let renderer: TestRenderer.ReactTestRenderer;

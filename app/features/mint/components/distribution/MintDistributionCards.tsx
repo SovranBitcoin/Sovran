@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import { Slider } from 'heroui-native';
+import { Slider } from '@/shared/ui/primitives/Slider';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
@@ -96,14 +96,10 @@ function MintDistributionCard({
   const [previewPct, setPreviewPct] = useState<number | null>(null);
   const displayBp = previewPct !== null ? previewPct * 100 : distributionBp;
 
-  const handleChange = useCallback((value: number | number[]) => {
-    const pct = Array.isArray(value) ? (value[0] ?? 0) : value;
-    setPreviewPct(pct);
-  }, []);
+  const handleChange = useCallback((pct: number) => setPreviewPct(pct), []);
 
   const handleChangeEnd = useCallback(
-    (value: number | number[]) => {
-      const pct = Array.isArray(value) ? (value[0] ?? 0) : value;
+    (pct: number) => {
       setPreviewPct(null);
       onDistributionChange(mintUrl, Math.round(pct * 100));
     },
@@ -159,14 +155,10 @@ function MintDistributionCard({
           maxValue={100}
           step={1}
           isDisabled={sliderDisabled}
-          aria-label={`${displayName} share`}
+          accessibilityLabel={`${displayName} share`}
           onChange={handleChange}
-          onChangeEnd={handleChangeEnd}>
-          <Slider.Track>
-            <Slider.Fill />
-            <Slider.Thumb />
-          </Slider.Track>
-        </Slider>
+          onChangeEnd={handleChangeEnd}
+        />
       ) : null}
     </Surface>
   );

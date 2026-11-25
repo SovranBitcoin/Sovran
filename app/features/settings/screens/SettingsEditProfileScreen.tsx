@@ -7,7 +7,7 @@ import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as ImagePicker from 'expo-image-picker';
-import { Description, Input, Label, TextField } from 'heroui-native';
+import { Description, Input, Label, TextField } from '@/shared/ui/primitives/Field';
 import * as nip19 from 'nostr-tools/nip19';
 import { ResultAsync } from 'neverthrow';
 import { z } from 'zod';

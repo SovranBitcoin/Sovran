@@ -1,5 +1,14 @@
 # Dependency surface audit
 
+**November 25, 2026 follow-up:** `heroui-native` (and its patch),
+`@gorhom/bottom-sheet`, `@react-native-menu/menu`, `react-native-fast-squircle`,
+`react-native-image-colors` and `react-native-qrcode-svg` have been removed. Their
+call sites use house primitives (`shared/ui/primitives/{PressableFeedback,
+PillButton,Field,Slider,Switch,QrMatrix}`, `shared/ui/composed/{ListGroup,Sheet,
+ToastHost}`); `qrcode` is the only QR encoder, the profile header always uses
+its seeded palette, and Skia remains only in the nearPay canvases. The sections
+below that weigh these packages are historical.
+
 **September 9, 2026 follow-up:** `@monicon/native` and `patch-package` have
 also been removed. `app/assets/icons/generated.json` now feeds the existing
 `react-native-svg` renderer directly; Bun applies the five exact-version patches

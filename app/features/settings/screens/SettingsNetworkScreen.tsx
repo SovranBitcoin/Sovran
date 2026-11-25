@@ -14,7 +14,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React from 'react';
 import { RefreshControl } from 'react-native';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { ListGroup, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

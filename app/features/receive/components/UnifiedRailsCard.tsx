@@ -8,7 +8,7 @@
  */
 
 import { Fragment } from 'react';
-import { ListGroup, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
 
 import Icon from '@/assets/icons';
 import type { Bip321RailSelection } from '@/features/receive/lib/bip321RailSelection';

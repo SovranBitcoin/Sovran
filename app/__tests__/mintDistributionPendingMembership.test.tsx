@@ -59,17 +59,6 @@ jest.mock('@/shared/ui/primitives/Text', () => ({ Text: () => null }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({
   View: ({ children }: { children?: React.ReactNode }) => children ?? null,
 }));
-jest.mock('heroui-native', () => {
-  const Pass = ({ children }: { children?: React.ReactNode }) => children ?? null;
-  const ListGroup = Object.assign(Pass, {
-    Item: Pass,
-    ItemContent: Pass,
-    ItemTitle: () => null,
-    ItemDescription: () => null,
-    ItemSuffix: Pass,
-  });
-  return { ListGroup };
-});
 let capturedSwitchProps: { isDisabled?: boolean; onSelectedChange?: (next: boolean) => void } = {};
 jest.mock('@/shared/ui/primitives/Switch', () => ({
   Switch: (props: { isDisabled?: boolean; onSelectedChange?: (next: boolean) => void }) => {

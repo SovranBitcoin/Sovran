@@ -78,7 +78,7 @@ jest.mock('@/shared/ui/primitives/View/HStack', () => ({ HStack: mockHost('HStac
 jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: mockHost('Spinner') }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: mockHost('Button') }));
 jest.mock('assets/icons', () => mockHost('Icon'));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/composed/ListGroup', () => {
   const host = (name: string) => (props: Record<string, unknown>) => {
     const R = jest.requireActual<typeof import('react')>('react');
     return R.createElement(name, props, props.children as React.ReactNode);
@@ -89,11 +89,22 @@ jest.mock('heroui-native', () => {
       ItemPrefix: host('ListGroup.ItemPrefix'),
       ItemContent: host('ListGroup.ItemContent'),
       ItemTitle: host('ListGroup.ItemTitle'),
+      ItemDescription: host('ListGroup.ItemDescription'),
       ItemSuffix: host('ListGroup.ItemSuffix'),
     }),
+    Separator: host('Separator'),
+  };
+});
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const host = (name: string) => (props: Record<string, unknown>) => {
+    const R = jest.requireActual<typeof import('react')>('react');
+    return R.createElement(name, props, props.children as React.ReactNode);
+  };
+  return {
     PressableFeedback: Object.assign(host('PressableFeedback'), {
       Scale: host('PressableFeedback.Scale'),
       Ripple: host('PressableFeedback.Ripple'),
+      Highlight: host('PressableFeedback.Highlight'),
     }),
   };
 });

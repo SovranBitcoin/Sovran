@@ -4,7 +4,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,

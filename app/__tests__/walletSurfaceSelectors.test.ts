@@ -123,10 +123,18 @@ describe('wallet surface e2e selectors', () => {
 
   it('pins the unit switcher pill AX identity', () => {
     const source = read('features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx');
-    // LiquidGlassMenu is AX-invisible without accessible+label — both render
-    // branches must carry the id AND the label or the wallet scenarios break.
-    expect(source.match(/testID="wallet-unit-switcher"/g)?.length).toBe(2);
-    expect(source.match(/accessibilityLabel="Switch wallet account"/g)?.length).toBe(2);
+    // LiquidGlassMenu is AX-invisible without accessible+label — the glass
+    // branch must carry the id AND the label or the wallet scenarios break.
+    expect(source.match(/testID="wallet-unit-switcher"/g)?.length).toBe(1);
+    expect(source.match(/accessibilityLabel="Switch wallet account"/g)?.length).toBe(1);
+    // Without the glass module the liquid tier renders the fallback pill,
+    // which must carry the same identity on its own branches.
+    expect(source).toContain('return <UnitSwitcherPillFallback {...props} />;');
+    const fallback = read(
+      'features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback.tsx'
+    );
+    expect(fallback).toContain('testID="wallet-unit-switcher"');
+    expect(fallback).toContain('Switch wallet account');
   });
 
   it('pins the offline banner and the Mock Offline dev toggle', () => {
