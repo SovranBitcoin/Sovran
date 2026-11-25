@@ -7,7 +7,6 @@
     "**/*.liquid.{ts,tsx}": ["files"],
     "**/*.blur.{ts,tsx}": ["files"],
     "app/assets/icons/index.tsx": ["exports"],
-    "app/codereview/log-doctor/test-dsl/cashu-decode.ts": ["exports"],
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
     "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
     "scripts/lib/phone-frame.mjs": ["exports"],
@@ -31,7 +30,7 @@
         "expo-screen-corner-radius",
         "react-native-fast-squircle"
       ],
-      "ignoreBinaries": ["eas", "gh", "tsx"]
+      "ignoreBinaries": ["eas", "gh"]
     },
     "wallet": {
       "project": ["src/**/*.{ts,tsx}", "__tests__/**/*.ts"],

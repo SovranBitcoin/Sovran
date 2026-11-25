@@ -1,134 +1,60 @@
 # Sovran
 
-Monorepo for the Sovran Bitcoin wallet and its self-contained packages. Managed
-with [Bun](https://bun.sh) workspaces — no inter-package publishing; everything
-links directly.
+A private Bitcoin and Cashu ecash wallet for iOS and Android, built with Expo, React Native,
+[Coco](https://github.com/cashubtc/coco), and [nostr-tools](https://github.com/nbd-wtf/nostr-tools).
 
-## Layout
+## Features
 
-| Package    | Path      | What it is |
-|------------|-----------|------------|
-| **app**    | [`app/`](app/)       | The Expo / React Native application (the product). |
-| **wallet** | [`wallet/`](wallet/) | Payment UX logic for Coco-based Cashu wallets — parsing, classification, routing, annotation, offline suggestions. UI- and navigation-agnostic. (Formerly the `colada` repo.) |
-| **nostr**  | [`nostr/`](nostr/)   | Typed, UI-agnostic client helpers for the Nagg GraphQL / app-view APIs and the tiered Nostr data layer. (Formerly the `nagg-ts` repo.) |
-| **docs**   | [`docs/`](docs/)     | The documentation site ([VitePress](https://vitepress.dev)). |
-| **copy**   | [`copy/`](copy/)     | Dependency-free claims policy, onboarding copy and canonical legal documents. |
-| **site**   | [`site/`](site/)     | Public website source, built separately with Astro and its own locked dependencies. Not a Bun workspace. |
-| **press**  | [`press/`](press/)   | Retained marketing captures, artwork sources and generated exports. Not bundled in the app. |
-
-`app` depends on `wallet` and `nostr` via `workspace:*`; both ship raw TypeScript
-(no build step). `@sovranbitcoin/schemas` remains an external package (shared with
-the web properties) and resolves from GitHub Packages — see [`.npmrc`](.npmrc).
-
-The public site does not need that private package or the native dependency graph.
-Use `bun run site:install`, then `bun run site:build` and `bun run site:test`.
-Its content comes from `copy/`; its confirmed download versions come from live
-per-channel metadata, not `app/app.json`. Source consolidation does not migrate
-artifact hosting: read the [migration boundaries](docs/architecture/site-consolidation.md)
-before switching delivery or retiring the old website repository.
-
-## Documentation map
-
-The [task harness](harness/README.md) owns the persistent agent workflow and its evidence gates.
-
-This README is the entry point; every other document in the repository hangs off
-this table.
-
-| Document | What it covers |
-|----------|----------------|
-| [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent entry point: layout, commands, testing and skills. CLAUDE.md imports AGENTS.md. |
-| [`.jevlint/checks`](docs/review/README.md) | Questions about what the code does that linting and type checks can't decide, run with `jevlint check`. |
-| [`CLAIMS.md`](CLAIMS.md) | What the product may claim, and the scoped source review behind each claim. |
-| [`FEEDBACK.md`](FEEDBACK.md) | Upstream feedback ledger for the coco v2 integration. |
-| [`app/README.md`](app/README.md) | The Expo / React Native application package. |
-| [`wallet/README.md`](wallet/README.md) | Colada — payment sequencing, payment-state copy, adapter-shaped side effects. |
-| [`nostr/`](nostr/) | Nagg GraphQL / app-view client helpers and the tiered Nostr data layer (no package README; start at [`nostr/src`](nostr/src)). |
-| [`copy/README.md`](copy/README.md) | Shared claims, onboarding, legal and site copy. |
-| [`docs/README.md`](docs/README.md) | The VitePress documentation site. See also the [architecture overview](docs/architecture/overview.md) and the [ADRs](app/docs/adr). |
-| [`site/README.md`](site/README.md) | Public Astro website and the local-only dev workbench (`bun run site:dev` → <http://localhost:4321/dev>). |
-| [`press/README.md`](press/README.md) | Screenshots and artwork: capture refresh, device profiles, evidence classes, retention, social/mockup editing. |
-| [`app/e2e/capture/README.md`](app/e2e/capture/README.md) | Capture library internals — planning, attestation, import validation, privacy gaps. |
-| [`app/e2e/press/README.md`](app/e2e/press/README.md) | Screenshot content contract: the semantic context and retained-image registry JSON. |
-| [`release/README.md`](release/README.md) | Production release pipeline, credentials, signing continuity, operator validation. |
-| [`artifacts/README.md`](artifacts/README.md) | Security review index for this workspace. |
-| [`docs/architecture/site-consolidation.md`](docs/architecture/site-consolidation.md) | Migration boundaries: website source lives here, artifact hosting does not move. |
+- **Cashu ecash & Lightning** — send, receive, swap, and multi-mint balance management powered by
+  Coco and SQLite proof storage, including exact offline sends and NUT-18 / NUT-26 payment requests.
+- **NFC & Nearby payments** — tap-to-pay over Type 4 NDEF NFC (Numo-compatible payer flow) and
+  proximity transfers via BitChat BLE.
+- **Nostr contacts & NIP-17 delivery** — direct relay search (Vertex + NIP-50), NIP-17
+  gift-wrapped ecash delivery, NIP-05 verification, and multi-account support from a BIP-39
+  recovery phrase (with NUT-27 mint-list discovery).
+- **Bitcoin Near You** — local merchant map backed by BTCMap.
+- **Customization** — native iOS Liquid Glass styling, themes, and bundled wallpapers.
 
 ## Getting started
 
-```bash
-bun install            # installs the whole workspace
-bun run dev            # start the app (delegates to app/)
-bun run docs:dev       # start the docs site
-```
-
-Run `bun run dev` from the checkout containing the changes you want to try. It
-starts Metro for the installed development client and uses the shared Nagg host,
-`https://nagg.up.railway.app`, unless your environment overrides it. Scan the QR
-code on a phone on the same network. Extra Expo options are forwarded, for example
-`bun run dev -- --port 8082`. Device automation remains an optional, separately
-configured `bun run dev:wda` command.
-
-Each Git worktree has its own source files. Updating a branch in another worktree
-does not update an already running Metro server or a detached checkout. Use the
-normal checkout for device development, with its own installed dependencies;
-sharing `node_modules` across worktrees can load two copies of native modules.
-
-`bun run test` and `bun run type-check` at the root cover the WHOLE workspace —
-they fan out with `bun run --filter '*'`, so app (both platform passes), wallet
-and nostr all run. That is what CI runs. To scope to one package, filter it
-(`bun --filter wallet run test`) or run it inside the package; focused Jest with
-arguments has its own root alias, since arguments would otherwise be forwarded to
-every package's runner:
+Requires [Bun](https://bun.sh) and Node 22+.
 
 ```bash
-bun run test:app -- <files> --runInBand
+bun install        # install all workspaces
+bun run dev        # start Expo dev server for a dev client
+bun run ios        # build and run on iOS simulator / device
+bun run android    # build and run on Android emulator / device
 ```
 
-The remaining app commands (`lint`, `knip`, `build:*`, …) are still `cd app`
-delegators at the root, or run them inside `app/` directly. `lint` covers `app/`
-only — wallet and nostr are not in its ESLint project. EAS builds run from
-`app/` (where `eas.json` lives).
-
-## Releases
-
-Production automation, credentials, signing continuity, and operator validation
-are documented in [`release/README.md`](release/README.md). Publication is disabled
-until explicitly configured and enabled.
-
-### Refresh the marketing material first
-
-Once a release is decided — before the version bump is merged and the pipeline
-runs — refresh the native capture library. The website's phone scenes and its
-generated social/OG rasters build directly from `press/screenshots/`, selected by
-[`press/website.json`](press/website.json); there is no separate landing-page
-image script. A public `site:build` fails outright when a selected capture is not
-`current`, so a stale library blocks the release instead of shipping the previous
-release's screens.
+### Verification
 
 ```bash
-bun run screenshots:refresh:plan both   # read-only: what would be captured
-bun run screenshots:refresh both        # the full run
-bun run screenshots:status --strict     # coverage and freshness afterwards
+bun run check                   # type-check, lint, knip, copy:lint, followups, metrics, and tests
+bun run type-check              # TypeScript across app (iOS + Android), wallet, and nostr
+bun run test                    # Jest (app) + Vitest (wallet, nostr)
+bun run --cwd app test:upgrade  # 20-epoch persisted upgrade compatibility suite (E01–E20)
+bun run --cwd app lint          # ESLint
 ```
 
-The full run builds or verifies each native host, runs the approved capture
-scenarios on both platforms, imports passing evidence into `press/screenshots/`,
-then regenerates the logos, the website assets and the site build. It never runs
-the whole functional suite, and a simulator lane does not authorize publishing or
-spending. Add `--resume` after an interruption; `--render-only` regenerates the
-derived website outputs without touching a device.
+### Public website
 
-Commit the refreshed captures together with the regenerated `site/public/`
-outputs and the version bump — the release publishes committed bytes, not a local
-render. [`press/README.md`](press/README.md) has the capture profile, focused
-reruns, blockers and retention rules.
-
-## Docs
+The marketing site in [`site/`](site/) is built independently with Astro:
 
 ```bash
-bun run docs:dev       # local dev server
-bun run docs:build     # static build → docs/.vitepress/dist
-bun run docs:preview   # preview the build
+bun run site:install
+bun run site:build
+bun run site:test
 ```
 
-See [`docs/README.md`](docs/README.md) for more.
+## Workspace layout
+
+- [`app/`](app/) — Expo / React Native mobile app
+- [`wallet/`](wallet/) — UI-agnostic payment intent, sequencing, and operations
+- [`nostr/`](nostr/) — Pure `nostr-tools` client, relay pool, and profile/search tiers
+- [`copy/`](copy/) — Shared app wording, legal text, and claims linter ([`CLAIMS.md`](CLAIMS.md))
+- [`site/`](site/) & [`press/`](press/) — Public website and marketing assets
+- [`release/`](release/) — Release verification and pipeline scripts
+
+## License
+
+[MPL-2.0](LICENSE)
