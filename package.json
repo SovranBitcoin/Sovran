@@ -64,7 +64,8 @@
     "site:assets:prune": "node site/scripts/prune-obsolete-assets.mjs",
     "site:scenes": "bun run --cwd site dev --open /scenes",
     "assets:wallpapers": "node scripts/fetch-wallpapers.mjs",
-    "persistence": "bun app/scripts/persistence.ts"
+    "persistence": "bun app/scripts/persistence.ts",
+    "rebuild:metrics": "node scripts/rebuild-metrics.mjs --check"
   },
   "devDependencies": {
     "opentype.js": "2.0.0",
