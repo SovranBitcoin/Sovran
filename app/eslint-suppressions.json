@@ -173,11 +173,6 @@
       "count": 1
     }
   },
-  "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "shared/ui/primitives/View/HStack.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1

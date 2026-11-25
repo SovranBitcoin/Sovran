@@ -1,3 +1,5 @@
+import type { SharedValue } from 'react-native-reanimated';
+
 type SelectableCheckStyle = 'circle' | 'square';
 
 type SelectableCheckVariant = 'default' | 'primary' | 'success' | 'warning' | 'error';
@@ -25,4 +27,8 @@ export interface SelectableCheckProps {
   /** Stable e2e selector derived from the option's identity (e.g.
    *  `split-participant-check-${pubkey}`). Applied to the tap target. */
   testID?: string;
+  /** `circle` only: drives the fill and check from outside (0 = empty,
+   *  1 = selected), so a design-system scrubber can hold any frame. Omitted,
+   *  the mark follows `selected` on its own. */
+  selectProgress?: SharedValue<number>;
 }

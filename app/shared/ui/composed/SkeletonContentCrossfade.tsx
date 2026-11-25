@@ -39,6 +39,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -77,6 +78,10 @@ interface SkeletonContentCrossfadeProps {
    *  `surface-secondary` Card). This is the only thing that should set the wave
    *  color — never a brand/accent tint. */
   surfaceColor?: string;
+  /** Holds the crossfade at one frame (0 = skeleton over content, 1 = content
+   *  only) instead of following `loading`, so a design-system scrubber can
+   *  inspect any point of the fade. Both trees render while it is set. */
+  progressOverride?: SharedValue<number>;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   /** Telemetry passthrough for the region shimmer (see `contentShiftLog`). */
@@ -94,6 +99,7 @@ export function SkeletonContentCrossfade({
   wave = 'region',
   exit = 'fade',
   surfaceColor,
+  progressOverride,
   style,
   testID,
   visualKey,
@@ -162,9 +168,21 @@ export function SkeletonContentCrossfade({
     return () => cancelAnimation(progress);
   }, [phase, durationMs, progress, finishExit]);
 
+  const fade = progressOverride ?? progress;
   const skeletonExitStyle = useAnimatedStyle(() => ({
-    opacity: 1 - progress.get(),
+    opacity: 1 - fade.get(),
   }));
+
+  if (progressOverride) {
+    return (
+      <View style={style} testID={testID}>
+        {renderContent()}
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skeletonExitStyle]}>
+          {renderSkeleton()}
+        </Animated.View>
+      </View>
+    );
+  }
 
   if (loading || phase === 'loading') {
     return (

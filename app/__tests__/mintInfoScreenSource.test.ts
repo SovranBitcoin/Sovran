@@ -72,16 +72,27 @@ describe('mint info screen source', () => {
     expect(chart).toContain('No ratings yet');
   });
 
-  it('draws the icon ring without a mount fade or a fake half score', () => {
-    const ringStart = source.indexOf('function ProgressRing(');
-    const ring = source.slice(ringStart, source.indexOf('function AnimatedAvatar(', ringStart));
-    expect(ringStart).toBeGreaterThan(-1);
-    expect(ring).not.toContain('fadeAnim');
-    expect(ring).not.toContain('withTiming');
-    expect(ring).toContain('progress === undefined ? trackColor : errorColor');
+  it('heads the page with the plain mint header: no ring, no badge, a status line', () => {
+    const header = readFileSync(resolve(ROOT, 'features/mint/components/MintHeader.tsx'), 'utf8');
+    expect(source).not.toContain('function ProgressRing(');
+    expect(source).not.toContain('react-native-svg');
+    expect(source).not.toContain('AvatarStatusDot');
+    expect(source).toContain('<MintHeader');
+    expect(source).toContain('health={mintHealthFromAudit(audit?.state)}');
+    expect(source).toContain('collapseAt: 98');
+    // A 72pt icon alone, and a status line that always takes its 22pt.
+    expect(header).toContain('const ICON_SIZE = 72;');
+    expect(header).toContain('h-[22px]');
+    expect(header).toContain('const STATUS_FADE_MS = 200;');
+    // The success rate is never invented for an unaudited mint.
     expect(source).not.toContain('progress = 0.5');
     expect(source).not.toContain('?? 0.5');
-    expect(source).toContain('progress={audit?.successRate}');
+  });
+
+  it('shows no capability pills; the spending fee is in Details', () => {
+    expect(source).not.toContain('What this mint supports');
+    expect(source).not.toContain('mint-info-capabilities');
+    expect(source).toContain('inputFees,\n          })}');
   });
 
   it('replaces Close with Details in the footer', () => {
@@ -105,10 +116,5 @@ describe('mint info screen source', () => {
     // One thing on the page is called Details: the long description is not.
     expect(source).not.toContain('title="Details"');
     expect(source).toContain('testID="mint-info-details"');
-  });
-
-  it('renders the shared status dot for every audit state', () => {
-    expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
-    expect(source).not.toContain('STATUS_BADGE_CONFIG');
   });
 });

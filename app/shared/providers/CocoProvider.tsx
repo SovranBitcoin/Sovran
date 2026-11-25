@@ -18,6 +18,7 @@ import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -204,6 +205,9 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     log.warn('coco.phase2.failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    // A failure before the default mints ran must not leave the header pill
+    // waiting on a setup that will not happen this session.
+    if (isLive()) useDefaultMintSetupStore.getState().markSettled();
     bgStage.complete();
   }
 }

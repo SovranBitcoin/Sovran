@@ -292,7 +292,6 @@ function MintItem({
       selectable
       selected={selected}
       onToggle={() => onToggle(mint.url)}
-      selectionVariant="checkbox"
       disabled={globalLoading}
       testID={loading ? `contact-row:mint-skeleton:${mint.url}` : `contact-row:mint:${mint.url}`}
     />

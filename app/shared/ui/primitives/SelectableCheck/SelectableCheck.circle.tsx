@@ -1,4 +1,10 @@
-import { withAlpha } from '@/shared/lib/color';
+import { useEffect } from 'react';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
@@ -7,10 +13,14 @@ import { View } from '@/shared/ui/primitives/View/View';
 
 import type { SelectableCheckProps } from './types';
 
+/** The fill and check settle fast: a selection is feedback, not a show. */
+const SELECT_MS = 150;
+
 /**
- * In-app accent selection mark — a filled circle with a white check when
- * selected. The split-bill participant picker is the canonical surface; the
- * goal is a brand-feeling tap target rather than a native checkbox.
+ * In-app accent selection mark — a filled circle with a check when selected.
+ * The split-bill participant picker is the canonical surface; the goal is a
+ * brand-feeling tap target rather than a native checkbox. The check is drawn
+ * in `accent-foreground`, so it keeps its contrast on a light accent.
  *
  * Pure visual when `onChange` is omitted (the parent row owns the press,
  * which is the ContactRow pattern). When `onChange` is provided the mark
@@ -24,23 +34,36 @@ export function SelectableCheckCircle({
   accessibilityLabel,
   accessibilityHint,
   testID,
+  selectProgress,
 }: SelectableCheckProps) {
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
+  const accentForeground = useThemeColor('accent-foreground');
+  const reducedMotion = useReducedMotion();
+  const ownProgress = useSharedValue(selected ? 1 : 0);
+  useEffect(() => {
+    const target = selected ? 1 : 0;
+    ownProgress.set(reducedMotion ? target : withTiming(target, { duration: SELECT_MS }));
+  }, [selected, reducedMotion, ownProgress]);
+  const progress = selectProgress ?? ownProgress;
+  const fillStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
+  const markStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ scale: 0.6 + progress.get() * 0.4 }],
+  }));
 
   const visual = (
     <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        borderWidth: 1.5,
-        borderColor: selected ? accent : withAlpha(foreground, 0.25),
-        backgroundColor: selected ? accent : 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-        opacity: disabled ? 0.5 : 1,
-      }}>
-      {selected ? <Icon name="mdi:check" size={Math.round(size * 0.65)} color="#FFFFFF" /> : null}
+      className={`items-center justify-center rounded-full ${disabled ? 'opacity-50' : ''}`}
+      style={{ width: size, height: size }}>
+      {/* Ring, then the accent fill fading over it, then the check. */}
+      <View className="border-foreground/25 absolute inset-0 rounded-full border-[1.5px]" />
+      <Animated.View
+        pointerEvents="none"
+        className="bg-accent absolute inset-0 rounded-full"
+        style={fillStyle}
+      />
+      <Animated.View pointerEvents="none" style={markStyle}>
+        <Icon name="mdi:check" size={Math.round(size * 0.65)} color={accentForeground} />
+      </Animated.View>
     </View>
   );
 

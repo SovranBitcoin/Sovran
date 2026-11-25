@@ -1,4 +1,5 @@
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import { ensureTrustedDefaultMint } from './defaultMintInitialization';
 import { DEFAULT_MINT_URL, DEFAULT_MINT_URLS } from './defaultMints';
@@ -62,5 +63,8 @@ export async function initializeDefaultMints(
     log.info('coco.init_default_mints_done');
   } catch (error) {
     log.error('coco.init_default_mints_failed', { error });
+  } finally {
+    // Done or given up: a wallet still without a mint now reads as one.
+    if (isLive()) useDefaultMintSetupStore.getState().markSettled();
   }
 }

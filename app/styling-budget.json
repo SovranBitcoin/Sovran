@@ -70,7 +70,6 @@
   },
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 2,
     "stack-layout-props": 1
   },
   "features/mint/screens/MintListScreen.tsx": {
@@ -560,8 +559,7 @@
     "inline-style": 1
   },
   "shared/ui/composed/BalancePill/BalanceDisplay.tsx": {
-    "inline-style": 4,
-    "stack-layout-props": 3
+    "stack-layout-props": 1
   },
   "shared/ui/composed/BalancePill/BalancePill.flat.tsx": {
     "stylesheet-create": 1

@@ -7,6 +7,7 @@
 import * as nip19 from 'nostr-tools/nip19';
 
 import { selectMintAudit } from '@/features/mint/lib/auditInfo';
+import { formatInputFee, type UnitInputFee } from '@/features/mint/lib/mintCapabilities';
 import { NUT_TITLES } from '@/features/mint/lib/mintChanges/nuts';
 import { getSortedMintInfoContacts } from '@/features/mint/lib/mintInfoContacts';
 import { selectMintLiveness } from '@/features/mint/lib/mintLiveness';
@@ -23,6 +24,8 @@ interface MintDetailsSource {
   cached?: MintMetadataEntry;
   /** The operator's Nostr identity, as the page resolved it. */
   operator?: { pubkey?: string; name?: string };
+  /** What spending each unit costs, from the active keysets; omitted until known. */
+  inputFees?: readonly UnitInputFee[] | null;
   now?: number;
 }
 
@@ -69,7 +72,7 @@ function when(value: unknown, now: number): string | undefined {
  * settings are an object that is not `disabled` and, where it says, is
  * `supported` (a NUT-17 list of subscriptions counts when it is not empty).
  */
-export function supportedNuts(nuts: unknown): string[] {
+function supportedNuts(nuts: unknown): string[] {
   if (!nuts || typeof nuts !== 'object') return [];
   return Object.entries(nuts as Record<string, unknown>)
     .filter(([, setting]) => {
@@ -108,6 +111,7 @@ export function buildMintDetailsRows({
   entry,
   cached,
   operator,
+  inputFees,
   now = Date.now(),
 }: MintDetailsSource): DetailsSheetItem[] {
   const rows: DetailsSheetItem[] = [];
@@ -129,6 +133,11 @@ export function buildMintDetailsRows({
   add('Mint', 'Mint public key', text(info?.pubkey));
   const units = cached?.supportedUnits?.map(text).filter((u) => u !== undefined);
   add('Mint', 'Units', units?.length ? units.join(', ') : undefined);
+  add(
+    'Mint',
+    'Spending fee',
+    inputFees?.length ? inputFees.map(formatInputFee).join('\n') : undefined
+  );
   const nuts = supportedNutNames(info?.nuts ?? cached?.nuts);
   add('Mint', 'Supported features', nuts.length ? nuts.join('\n') : undefined);
   add('Mint', 'Message from the mint', text(entry?.motd) ?? text(info?.motd));

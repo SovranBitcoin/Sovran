@@ -209,7 +209,6 @@ describe('ContactRow loading reservation', () => {
         })}
         subtitle="mint.example.com"
         selectable
-        selectionVariant="checkbox"
         disabled
       />
     );
@@ -247,7 +246,6 @@ describe('ContactRow loading reservation', () => {
         })}
         subtitle="mint.example.com"
         selectable
-        selectionVariant="checkbox"
       />
     );
 

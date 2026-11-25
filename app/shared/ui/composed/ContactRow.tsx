@@ -353,7 +353,6 @@ interface ContactRowProps {
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
-  selectionVariant?: 'circle-check' | 'checkbox';
 
   /** Forwarded to ListRow. `'below'` moves the stats row beneath the
    *  main HStack, indented past the avatar — used by the Select Mint row. */
@@ -801,7 +800,6 @@ export function ContactRow({
   selectable = false,
   selected = false,
   onToggle,
-  selectionVariant = 'circle-check',
   accentPosition,
   trailing: trailingOverride,
   trailingInteractive = false,
@@ -1076,13 +1074,8 @@ export function ContactRow({
       // interactive checkbox (mirrors PostCardGutterHeader's empty-box approach).
       <View style={{ width: 24, height: 24 }} />
     ) : (
-      <SelectableCheck
-        style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
-        selected={selected ?? false}
-        onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
-        size={24}
-        variant="success"
-      />
+      // Visual only: the row is the one control, so VoiceOver reads it once.
+      <SelectableCheck selected={selected ?? false} size={24} />
     )
   ) : null;
 

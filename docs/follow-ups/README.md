@@ -213,7 +213,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F248](F248.md) | medium | decision | Privacy policy still names Settings → My media, now Uploaded media |
 | [F249](F249.md) | low | decision | useNip17RecentContacts and the DM conversation readers have no screen after the Contacts tab |
 | [F250](F250.md) | high | device | Run the new tabs, Search tab and account drawer on iPhone and Android |
-| [F251](F251.md) | medium | device | Mint Info stats/capabilities and Mint history states not yet seen on a device or covered by a native scenario |
+| [F251](F251.md) | medium | device | Mint Info stats/header and Mint history states not yet seen on a device or covered by a native scenario |
 | [F252](F252.md) | medium | device | Look at the sectioned Search tab on both platforms and add its native scenario |
 | [F253](F253.md) | medium | decision | Wire NUT-27 backed-up mint discovery into the recovery screen |
 | [F254](F254.md) | low | fix | Make the rebalance engine run its direct legs through SingleLegTransferPort |

@@ -49,6 +49,7 @@ import { useTransactionLocationStore } from '@/shared/stores/profile/transaction
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useDebugTierStore } from '@/shared/stores/runtime/debugTierStore';
+import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
 import { useDeleteStatusStore } from '@/shared/stores/runtime/deleteStatusStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
@@ -114,6 +115,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/notePickerStore': useNotePickerStore,
   'runtime/pickerSheetStore': usePickerSheetStore,
   'runtime/debugTierStore': useDebugTierStore,
+  'runtime/defaultMintSetupStore': useDefaultMintSetupStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,
   'runtime/nearPayStore': useNearPaySessionStore,

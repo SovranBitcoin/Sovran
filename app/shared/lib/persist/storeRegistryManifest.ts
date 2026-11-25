@@ -481,6 +481,14 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
+    file: 'shared/stores/runtime/defaultMintSetupStore.ts',
+    name: 'useDefaultMintSetupStore',
+    scope: 'session',
+    persisted: false,
+    queryCache: false,
+    profileStorage: false,
+  },
+  {
     file: 'shared/stores/runtime/detailsSheetStore.ts',
     name: 'useDetailsSheetStore',
     scope: 'session',

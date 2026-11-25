@@ -1,55 +1,5 @@
-import {
-  activeInputFees,
-  formatInputFee,
-  mintCapabilityPills,
-} from '@/features/mint/lib/mintCapabilities';
-import { supportedNutNames } from '@/features/mint/lib/mintDetailsRows';
-
-// The Minibits mint's `nuts` as uCash's directory served it on 2026-11-24.
-const NUTS = {
-  '4': { methods: [{ method: 'bolt11', unit: 'sat' }], disabled: false },
-  '5': { methods: [{ method: 'bolt11', unit: 'sat' }], disabled: false },
-  '7': { supported: true },
-  '8': { supported: true },
-  '9': { supported: true },
-  '10': { supported: true },
-  '11': { supported: true },
-  '12': { supported: true },
-  '14': { supported: false },
-  '17': { supported: [{ method: 'bolt11', unit: 'sat', commands: ['proof_state'] }] },
-  '19': { ttl: 604800, cached_endpoints: [] },
-  '20': { supported: true },
-  '29': { max_batch_size: 1000, methods: ['bolt11'] },
-  '31': { supported: true },
-};
-
-describe('NUT capability pills', () => {
-  it('names each advertised capability once, in NUT order, skipping the baseline and plumbing', () => {
-    expect(mintCapabilityPills(NUTS)).toEqual([
-      'Lightning fee refunds',
-      'Backup restore',
-      'Locked ecash',
-      'Offline verification',
-      'Live payment updates',
-      'Safer retries',
-      'Signed mint quotes',
-      'Batched deposits',
-      'NUT-31',
-    ]);
-  });
-
-  it('uses the same NUT table as the Details sheet, so the two cannot drift', () => {
-    expect(supportedNutNames({ '12': { supported: true } })).toEqual(['DLEQ proofs (NUT-12)']);
-    expect(mintCapabilityPills({ '12': { supported: true } })).toEqual(['Offline verification']);
-  });
-
-  it('reads nothing from a missing or hostile map', () => {
-    expect(mintCapabilityPills(undefined)).toEqual([]);
-    expect(mintCapabilityPills('nuts')).toEqual([]);
-    // Only numbered NUTs are capabilities; a prototype name is not one.
-    expect(mintCapabilityPills({ constructor: { supported: true }, '9': null })).toEqual([]);
-  });
-});
+import { activeInputFees, formatInputFee } from '@/features/mint/lib/mintCapabilities';
+import { buildMintDetailsRows } from '@/features/mint/lib/mintDetailsRows';
 
 describe('NUT-02 input_fee_ppk', () => {
   it('reads the active keysets per unit, from Coco (feePpk) or the mint (input_fee_ppk)', () => {
@@ -79,5 +29,31 @@ describe('NUT-02 input_fee_ppk', () => {
     expect(formatInputFee({ unit: 'sat', ppk: 100 })).toBe('sat: 0.1 sat per coin spent');
     expect(formatInputFee({ unit: 'sat', ppk: 1000 })).toBe('sat: 1 sat per coin spent');
     expect(formatInputFee({ unit: 'usd', ppk: 1 })).toBe('usd: 0.001 usd per coin spent');
+  });
+});
+
+describe('Spending fee in Mint Details', () => {
+  const row = (inputFees?: Parameters<typeof buildMintDetailsRows>[0]['inputFees']) =>
+    buildMintDetailsRows({ mintUrl: 'https://mint.example', inputFees, now: 0 }).find(
+      (item) => item.title === 'Spending fee'
+    );
+
+  it('lists each unit on its own line, in the same words as before', () => {
+    expect(
+      row([
+        { unit: 'sat', ppk: 100 },
+        { unit: 'usd', ppk: 0 },
+      ])
+    ).toEqual({
+      group: 'Mint',
+      title: 'Spending fee',
+      value: 'sat: 0.1 sat per coin spent\nusd: no spending fee',
+    });
+  });
+
+  it('leaves the row out until the keysets are known', () => {
+    expect(row(undefined)).toBeUndefined();
+    expect(row(null)).toBeUndefined();
+    expect(row([])).toBeUndefined();
   });
 });

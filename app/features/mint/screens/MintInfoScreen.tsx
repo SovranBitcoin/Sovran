@@ -1,19 +1,11 @@
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { Screen } from '@/shared/ui/composed/Screen';
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withSpring,
-} from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -26,14 +18,12 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { buildMintHistoryHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
-import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
+import { MintHeader, mintHealthFromAudit } from '@/features/mint/components/MintHeader';
 import { StatsGrid as StatsGridBlock } from '@/shared/ui/composed/StatsGrid';
-import { Badge } from '@/shared/ui/primitives/Badge';
-import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import Svg, { Circle } from 'react-native-svg';
 import { useScreenActions } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -55,7 +45,6 @@ import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
 import { useMintInputFees } from '../hooks/useMintInputFees';
-import { formatInputFee, mintCapabilityPills } from '../lib/mintCapabilities';
 import { mintInfoStatCards, type MintInfoStats } from '../lib/mintInfoStats';
 import { buildMintDetailsRows, mintMotd } from '../lib/mintDetailsRows';
 import {
@@ -68,111 +57,6 @@ import {
 const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
 });
-
-/**
- * The audit success rate as a ring around the mint's icon, drawn on the first
- * frame: it used to fade in after the content mounted, so it blinked into a
- * page that was already showing. With no audit it is a plain track, not a
- * half-green, half-red ring that read as a 50% score.
- */
-function ProgressRing({
-  size = 84,
-  strokeWidth = 3,
-  progress,
-  successColor,
-  errorColor,
-  trackColor,
-  children,
-}: {
-  size?: number;
-  strokeWidth?: number;
-  /** Share of operations that succeeded, 0..1; `undefined` when not audited. */
-  progress: number | undefined;
-  successColor: string;
-  errorColor: string;
-  trackColor: string;
-  children?: React.ReactNode;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const center = size / 2;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke={progress === undefined ? trackColor : errorColor}
-          strokeWidth={strokeWidth}
-          fill="transparent"
-        />
-        {progress !== undefined && (
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={successColor}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - progress)}
-            strokeLinecap="round"
-          />
-        )}
-      </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.centered]}>{children}</View>
-    </View>
-  );
-}
-
-function AnimatedAvatar({
-  picture,
-  name,
-  alt,
-  status,
-  size = 70,
-  isLoading = false,
-}: {
-  picture?: string;
-  name?: string;
-  alt?: string;
-  status?: string;
-  size?: number;
-  isLoading?: boolean;
-}) {
-  const reducedMotion = useReducedMotion();
-  // 0 → 1: the dot fades in from just under its size, never from nothing, and
-  // settles without overshoot. It sits absolutely, so nothing around it moves.
-  const badgeAnim = useSharedValue(0);
-  const badgeStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    opacity: badgeAnim.get(),
-    transform: [{ scale: 0.92 + 0.08 * badgeAnim.get() }],
-  }));
-
-  useEffect(() => {
-    if (!status || isLoading) return;
-    if (reducedMotion) badgeAnim.set(1);
-    else badgeAnim.set(withDelay(80, withSpring(1, { duration: 200, dampingRatio: 1 })));
-  }, [status, isLoading, badgeAnim, reducedMotion]);
-
-  const badgeSize = size * 0.33;
-
-  return (
-    <View>
-      <MintIcon iconUrl={picture} size={size} name={name} alt={alt} isLoading={isLoading} />
-      {status && (
-        <Animated.View style={badgeStyle}>
-          <AvatarStatusDot status={status} size={badgeSize} />
-        </Animated.View>
-      )}
-    </View>
-  );
-}
 
 function StatsGrid({
   status,
@@ -238,11 +122,6 @@ function StatsGrid({
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const [danger, success, ringTrack] = useThemeColor([
-    'danger',
-    'green-300',
-    'surface-tertiary',
-  ] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
@@ -273,7 +152,8 @@ export function MintInfoScreen() {
       picture: iconUrl,
     },
     title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
-    collapseAt: 110,
+    // Past the 72pt icon, the name goes up into the header.
+    collapseAt: 98,
   });
   // The inspect paths seed mintInfoEntry with only { mintUrl }, so KYM review
   // data never arrives via the entry on that route. Fall back to the same
@@ -297,8 +177,6 @@ export function MintInfoScreen() {
   // rows use. The entry's audit fields are a snapshot of that store taken at
   // navigation, so reading them here let the page lag behind its own row.
   const audit = detail.meta.audit;
-  // Capabilities from the cached NUT-06 info, else the map discovery carried (as Details reads them).
-  const capabilityPills = mintCapabilityPills(cachedMeta?.info?.nuts ?? cachedMeta?.nuts);
   const inputFees = useMintInputFees(mintUrl, isTrusted);
   const identityError = detail.identityError;
   const contact = entry?.contact as
@@ -515,30 +393,19 @@ export function MintInfoScreen() {
               pubkey: nostrContactPubkey,
               name: getMintInfoNostrDisplayName(nostrContactProfile, ''),
             },
+            inputFees,
           })}
         />
         <View className="pt-4">
           <VStack align="center" className="w-full pb-8 pt-6">
-            <Animated.View className="items-center" style={morph.contentStyle}>
-              <ProgressRing
-                size={84}
-                progress={audit?.successRate}
-                successColor={success}
-                errorColor={danger}
-                trackColor={ringTrack}>
-                <AnimatedAvatar
-                  picture={iconUrl}
-                  name={displayName}
-                  alt={`${displayName} icon`}
-                  status={audit?.state}
-                  size={70}
-                  isLoading={detail.identity === 'loading'}
-                />
-              </ProgressRing>
-              <Text bold size={22} numberOfLines={2} className="mt-3 text-center">
-                {displayName}
-              </Text>
-            </Animated.View>
+            <MintHeader
+              name={displayName}
+              mintUrl={mintUrl}
+              iconUrl={iconUrl}
+              health={mintHealthFromAudit(audit?.state)}
+              isLoading={detail.identity === 'loading'}
+              style={morph.contentStyle}
+            />
 
             {/* The two things a reader does with a mint page besides trusting it,
               as the same labelled circles the profile page uses for Send Money /
@@ -643,40 +510,6 @@ export function MintInfoScreen() {
               />
               <Spacer size={12} />
             </>
-          ) : null}
-
-          {capabilityPills.length > 0 || (inputFees?.length ?? 0) > 0 ? (
-            <Section title="What this mint supports">
-              <View className="flex-row flex-wrap gap-2 px-1" testID="mint-info-capabilities">
-                {/* Foreground text on the neutral fill: readable in both themes. A
-                    fee is a fact about the mint, not a warning, so it reads the same. */}
-                {capabilityPills.map((label) => (
-                  <Badge key={label} variant="primary" size={12}>
-                    {label}
-                  </Badge>
-                ))}
-                {inputFees?.map((fee) => (
-                  <Badge
-                    key={`fee:${fee.unit}`}
-                    variant="primary"
-                    icon="mdi:cash-multiple"
-                    size={12}>
-                    {formatInputFee(fee)}
-                  </Badge>
-                )) ?? (
-                  // Holds the fee pill's place while the keysets load, so the
-                  // row does not reflow when it arrives.
-                  <View
-                    className="opacity-0"
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants">
-                    <Badge variant="primary" icon="mdi:cash-multiple" size={12}>
-                      {formatInputFee({ unit: 'sat', ppk: 0 })}
-                    </Badge>
-                  </View>
-                )}
-              </View>
-            </Section>
           ) : null}
 
           {mintUrl && (
@@ -856,10 +689,6 @@ export function MintInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   statsSlot: {
     width: '100%',
     alignSelf: 'stretch',
