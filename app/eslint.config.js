@@ -2,6 +2,7 @@
 const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
+const viewStatePlugin = require('./eslint-plugin-view-state');
 
 // The `.tsx` files the React Compiler cannot compile, straight from the ratchet
 // `check:react-compiler` maintains. Used to scope the `react-perf` rules — see
@@ -500,5 +501,12 @@ module.exports = defineConfig([
     ignores: ['shared/lib/persist/defineStore.ts', '**/__tests__/**'],
     plugins: { 'store-registry': storeRegistryPlugin },
     rules: { 'store-registry/require-factory': 'error' },
+  },
+  // Async feature surfaces render from a ViewState<T> (<StateSwitch>), not a
+  // `{isLoading && …}` branch that leaves empty and failed states implicit.
+  {
+    files: ['features/**/*.tsx'],
+    plugins: { 'view-state': viewStatePlugin },
+    rules: { 'view-state/no-jsx-loading-branch': 'error' },
   },
 ]);

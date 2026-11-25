@@ -198,6 +198,9 @@ export function SkeletonLoadingShimmer({
         ref={hostRef}
         collapsable={false}
         onLayout={handleLayout}
+        // An idle overlay covers its region: it must never take a tap meant
+        // for what sits under it.
+        pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
     );

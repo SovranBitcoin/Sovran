@@ -35,11 +35,13 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/Nip05Identity.tsx",
     "shared/ui/composed/Notice.tsx",
     "shared/ui/composed/PillTabs.tsx",
+    "shared/ui/composed/RollingAmountText.tsx",
     "shared/ui/composed/RowStatsAccent.tsx",
     "shared/ui/composed/SettingsRows.tsx",
     "shared/ui/composed/SheetGrabber.tsx",
     "shared/ui/composed/SkeletonContentCrossfade.tsx",
     "shared/ui/composed/SkeletonExitShimmer.tsx",
+    "shared/ui/composed/StateSwitch.tsx",
     "shared/ui/composed/StatsGrid.tsx",
     "shared/ui/composed/Surface.tsx",
     "shared/ui/composed/chat/ChatSkeleton.tsx",
@@ -247,6 +249,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 241,
+  "total": 243,
 }
 `;

@@ -53,6 +53,8 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import { StateSwitch } from '@/shared/ui/composed/StateSwitch';
+import { toViewState } from '@/shared/lib/viewState';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
@@ -445,7 +447,13 @@ function TopFollowers({
     deadlineMs: 1400,
   });
 
-  if (!isLoading && followersWithProfiles.length === 0) return null;
+  // Loading until the follower list lands; then the followers that have a
+  // name or picture, or nothing (the whole section steps aside).
+  const followersState = toViewState({
+    data: isLoading ? undefined : followersWithProfiles,
+    isLoading,
+  });
+  if (followersState.status === 'empty') return null;
 
   const handleFollowerPress = (follower: TopFollower) => {
     // push (not navigate) so each profile pushes a new stack entry; tapping
@@ -527,16 +535,24 @@ function TopFollowers({
         style={{ color: withAlpha(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
       </Text>
-      {isLoading ? (
-        <View style={styles.topFollowersGrid}>
-          {TOP_FOLLOWER_SKELETON_INDICES.map(renderSkeleton)}
-          <SkeletonLoadingShimmer active />
-        </View>
-      ) : (
-        <Animated.View style={fadeSettled ? styles.settledReveal : fadeStyle}>
-          <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
-        </Animated.View>
-      )}
+      {/* The region wave sweeps the skeleton grid; the loaded grid keeps its
+          own fade-in, so the switch itself swaps without a crossfade. */}
+      <StateSwitch
+        state={followersState}
+        exit="none"
+        renderLoading={() => (
+          <View style={styles.topFollowersGrid}>
+            {TOP_FOLLOWER_SKELETON_INDICES.map(renderSkeleton)}
+          </View>
+        )}
+        renderData={(followers) => (
+          <Animated.View style={fadeSettled ? styles.settledReveal : fadeStyle}>
+            <View style={styles.topFollowersGrid}>{followers.map(renderItem)}</View>
+          </Animated.View>
+        )}
+        visualKey="profile.topFollowers"
+        visualSurface="profile"
+      />
       <Spacer size={16} />
     </VisualLayoutProbe>
   );
@@ -875,7 +891,7 @@ function BannerWithAvatar({
                 testID="profile-edit-button"
               />
             ))}
-          {isLoading && <SkeletonLoadingShimmer active />}
+          <SkeletonLoadingShimmer active={isLoading} />
         </View>
 
         {/* Send Money / Message / QR Code — the wallet circle-action
