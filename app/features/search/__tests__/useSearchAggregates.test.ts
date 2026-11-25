@@ -23,7 +23,7 @@ jest.mock('@/shared/config/features', () => ({
   ...jest.requireActual('@/shared/config/features'),
   hasFeature: () => true,
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => {
+jest.mock('@/runtime/WalletProjection', () => {
   const { WALLETS: wallets } = jest.requireActual('../../../../wallet/__tests__/_harness/fixtures');
   return { useWalletContext: () => wallets.default };
 });

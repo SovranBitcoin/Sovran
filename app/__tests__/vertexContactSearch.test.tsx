@@ -5,7 +5,7 @@ import { SEARCH_DEBOUNCE_MS, useContactSearch } from '@/features/payments/hooks/
 import { profileSearchCache } from '@/features/payments/data/profileSearchCache';
 
 const mockSearch = jest.fn();
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: undefined, isInitialized: false }),
 }));
 jest.mock('@/shared/lib/nostr/searchProfiles', () => ({

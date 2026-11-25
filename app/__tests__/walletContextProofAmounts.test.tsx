@@ -1,6 +1,6 @@
 import { useLayoutEffect, type PropsWithChildren } from 'react';
 import { act, renderHook } from '@testing-library/react-native';
-import { WalletContextProvider, useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { WalletProjection, useWalletContext } from '@/runtime/WalletProjection';
 
 let mockUnit = 'sat';
 let mockTestnutAccount = false;
@@ -63,7 +63,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 const wrapper = ({ children }: PropsWithChildren) => (
-  <WalletContextProvider>{children}</WalletContextProvider>
+  <WalletProjection>{children}</WalletProjection>
 );
 type ProofAmount = { amount: number; unit?: string; usedByOperationId?: string };
 

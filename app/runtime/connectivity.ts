@@ -1,20 +1,23 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { AppState, Platform, StyleSheet, View } from 'react-native';
+/**
+ * Whether the phone can reach the internet, owned by the app runtime.
+ *
+ * One connectivity engine runs while the app root is mounted
+ * (`startConnectivity`); its verdict lives here, outside React, so the
+ * payment machine, the price feed and every screen read the same answer.
+ * Going offline must be confirmed; coming back online is instant.
+ */
+import { useMemo, useSyncExternalStore } from 'react';
+import { AppState, Platform } from 'react-native';
 import * as Network from 'expo-network';
-import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import { log } from '@/shared/lib/logger';
 import {
   resolveOfflineReachability,
   type OfflineReachabilityResult,
 } from '@/shared/lib/offlineReachability';
 
-initLog('Module', 'OfflineProvider loaded');
-
-type OfflineContextValue = {
+type OfflineStatus = {
   /** Confirmed offline: no network, or no reachability target answered. */
   isOffline: boolean;
   /**
@@ -25,13 +28,18 @@ type OfflineContextValue = {
   isDisconnected: boolean;
 };
 
-const OfflineContext = createContext<OfflineContextValue>({
-  isOffline: false,
-  isDisconnected: false,
-});
+type NetworkVerdict = { offline: boolean; disconnected: boolean };
 
-const BORDER_WIDTH = 2;
-const BANNER_HEIGHT = 14;
+const ONLINE: NetworkVerdict = { offline: false, disconnected: false };
+let network: NetworkVerdict = ONLINE;
+const listeners = new Set<() => void>();
+
+function setNetwork(next: NetworkVerdict): void {
+  if (next.offline === network.offline && next.disconnected === network.disconnected) return;
+  network = next;
+  listeners.forEach((listener) => listener());
+}
+
 const CONNECTIVITY_POLL_MS = 60_000;
 const OFFLINE_RETRY_MS = 3000;
 // Offline hysteresis: going offline must be CONFIRMED (consecutive failed
@@ -43,36 +51,6 @@ const OFFLINE_CONFIRM_CHECKS = 2;
 const OFFLINE_CONFIRM_MS = 5000;
 const OFFLINE_RECHECK_DELAY_MS = 1200;
 const MIN_EVAL_INTERVAL_MS = 750;
-
-// iOS uses continuous corners. React Native doesn't expose the exact hardware corner radius,
-// so this is a best-effort map by point height for modern rounded-corner iPhones.
-const IOS_PHONE_CORNER_RADIUS_BY_HEIGHT: readonly { height: number; radius: number }[] = [
-  { height: 812, radius: 39 },
-  { height: 844, radius: 47.33 },
-  { height: 852, radius: 55 },
-  { height: 874, radius: 62 },
-  { height: 896, radius: 41.5 },
-  { height: 926, radius: 53.33 },
-  { height: 932, radius: 55 },
-];
-
-function getIosCornerRadius(frameWidth: number, frameHeight: number): number {
-  if (Platform.OS !== 'ios') return 0;
-  if (Platform.isPad) return 18;
-
-  const longEdge = Math.round(Math.max(frameWidth, frameHeight));
-  const nearest = IOS_PHONE_CORNER_RADIUS_BY_HEIGHT.reduce((best, candidate) => {
-    const bestDistance = Math.abs(best.height - longEdge);
-    const candidateDistance = Math.abs(candidate.height - longEdge);
-    return candidateDistance < bestDistance ? candidate : best;
-  }, IOS_PHONE_CORNER_RADIUS_BY_HEIGHT[0]);
-
-  // Tighter match for known screens, sensible fallback for newer iPhones.
-  if (Math.abs(nearest.height - longEdge) <= 3) {
-    return nearest.radius;
-  }
-  return longEdge >= 850 ? 55 : 47.33;
-}
 
 function summarizeReachability(result: OfflineReachabilityResult) {
   const successfulProbe = result.probes.find((probe) => probe.ok);
@@ -99,15 +77,9 @@ function summarizeReachability(result: OfflineReachabilityResult) {
   };
 }
 
-// The connectivity engine, hoisted to module scope: the closure state
-// (++checkId, ??= hysteresis writes, try/finally mutex) is syntax the React
-// Compiler can't lower, and inside the component it bailed the whole provider.
-// Verbatim former effect body; returns the effect's cleanup function.
-function startConnectivityEngine(ctx: {
-  setNetworkOffline: React.Dispatch<React.SetStateAction<boolean>>;
-  setNetworkDisconnected: React.Dispatch<React.SetStateAction<boolean>>;
-}): () => void {
-  const { setNetworkOffline, setNetworkDisconnected } = ctx;
+// The connectivity engine: polls and listens, applying the offline
+// hysteresis above, and writes its verdict to the store. Returns its stop.
+function startConnectivityEngine(): () => void {
   let mounted = true;
   let active = AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
   let checking = false;
@@ -128,17 +100,15 @@ function startConnectivityEngine(ctx: {
     reachabilityLog: ReturnType<typeof summarizeReachability>,
     disconnected: boolean
   ) => {
-    setNetworkDisconnected(disconnected);
-    setNetworkOffline((prev) => {
-      if (prev !== nowOffline) {
-        log.info('provider.offline.transition', {
-          from: prev ? 'offline' : 'online',
-          to: nowOffline ? 'offline' : 'online',
-          ...reachabilityLog,
-        });
-      }
-      return nowOffline;
-    });
+    const prev = network.offline;
+    if (prev !== nowOffline) {
+      log.info('provider.offline.transition', {
+        from: prev ? 'offline' : 'online',
+        to: nowOffline ? 'offline' : 'online',
+        ...reachabilityLog,
+      });
+    }
+    setNetwork({ offline: nowOffline, disconnected });
   };
 
   const applyState = async (state: Network.NetworkState, checkId: number) => {
@@ -270,8 +240,7 @@ function startConnectivityEngine(ctx: {
 
   const onWebOffline = () => {
     log.info('provider.offline.web_event', { event: 'offline' });
-    setNetworkDisconnected(true);
-    setNetworkOffline(true);
+    setNetwork({ offline: true, disconnected: true });
   };
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -297,121 +266,67 @@ function startConnectivityEngine(ctx: {
   };
 }
 
-// Context-only provider. Mount above any consumer that needs to react to live
-// network state — including colada's machine, which derives the
-// offline send-flow branch from getOffline(). The visual offline banner lives
-// in <OfflineShell> below and consumes this context like any other UI.
-export function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
-  useInitMount('OfflineStatusProvider');
-  const [networkOffline, setNetworkOffline] = useState(false);
-  const [networkDisconnected, setNetworkDisconnected] = useState(false);
+let engineUsers = 0;
+let stopEngine: (() => void) | null = null;
+
+/**
+ * Starts the connectivity engine (once, however many callers) and returns the
+ * stop. The verdict resets to online when the last caller stops.
+ */
+export function startConnectivity(): () => void {
+  engineUsers += 1;
+  if (engineUsers === 1) stopEngine = startConnectivityEngine();
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    engineUsers -= 1;
+    if (engineUsers > 0) return;
+    stopEngine?.();
+    stopEngine = null;
+    setNetwork(ONLINE);
+  };
+}
+
+function resolveStatus(verdict: NetworkVerdict, mockOffline: boolean): OfflineStatus {
+  return {
+    isOffline: mockOffline || verdict.offline,
+    isDisconnected: mockOffline || (verdict.offline && verdict.disconnected),
+  };
+}
+
+/** The current status, for code outside React. */
+export function getOfflineStatus(): OfflineStatus {
+  return resolveStatus(network, useSettingsStore.getState().mockOffline);
+}
+
+/** Calls `listener` whenever the network verdict or the mock-offline setting changes. */
+export function subscribeOfflineStatus(listener: () => void): () => void {
+  listeners.add(listener);
+  const unsubscribeSettings = useSettingsStore.subscribe((state, previous) => {
+    if (state.mockOffline !== previous.mockOffline) listener();
+  });
+  return () => {
+    listeners.delete(listener);
+    unsubscribeSettings();
+  };
+}
+
+function subscribeNetwork(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+const getNetwork = () => network;
+
+export function useOfflineStatus(): OfflineStatus {
+  const verdict = useSyncExternalStore(subscribeNetwork, getNetwork, getNetwork);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
-  const isOffline = mockOffline || networkOffline;
-  const isDisconnected = mockOffline || (networkOffline && networkDisconnected);
-
-  useEffect(() => startConnectivityEngine({ setNetworkOffline, setNetworkDisconnected }), []);
-
-  // Context provider `value` — consumers can't opt out of identity churn, so
-  // this stays manually memoized even under the React Compiler (hazard class).
+  const { isOffline, isDisconnected } = resolveStatus(verdict, mockOffline);
+  // Consumers destructure or depend on the whole object; keep its identity
+  // tied to the two booleans.
   // ast-grep-ignore: no-manual-memo-tsx
-  const contextValue = useMemo(() => ({ isOffline, isDisconnected }), [isOffline, isDisconnected]);
-
-  return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
+  return useMemo(() => ({ isOffline, isDisconnected }), [isOffline, isDisconnected]);
 }
-
-// Visual wrapper that renders the blue "YOU ARE OFFLINE" banner + screen
-// border around its children. Consumes the context from <OfflineStatusProvider>
-// — which must be mounted above this component. Lives inside RootLayoutContent
-// so the banner overlays the navigation Stack without affecting providers above.
-export function OfflineShell({ children }: { children: React.ReactNode }) {
-  const { isOffline } = useOfflineStatus();
-  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
-  const insets = useSafeAreaInsets();
-  const frame = useSafeAreaFrame();
-  const offlineAccentColor = info;
-  const offlineTextColor = foreground;
-  const screenCornerRadius = getIosCornerRadius(frame.width, frame.height);
-  const shellCornerStyle = {
-    borderRadius: screenCornerRadius,
-    ...(Platform.OS === 'ios'
-      ? ({
-          borderCurve: 'continuous',
-        } as const)
-      : null),
-  };
-  const outerShellStyle = {
-    backgroundColor: isOffline ? offlineAccentColor : 'transparent',
-  };
-  const topSectionStyle = {
-    height: isOffline ? BANNER_HEIGHT + insets.top : 0,
-  };
-  const contentShellInset = isOffline ? BORDER_WIDTH : 0;
-  const contentShellStyle = {
-    marginTop: contentShellInset,
-    marginBottom: contentShellInset,
-    marginHorizontal: contentShellInset,
-    borderRadius: Math.max(0, screenCornerRadius - contentShellInset),
-  };
-
-  return (
-    <View style={[styles.outerShell, shellCornerStyle, outerShellStyle]}>
-      <View style={[styles.topSection, topSectionStyle]}>
-        {isOffline ? (
-          <View
-            testID="offline-banner"
-            style={[
-              styles.banner,
-              { paddingTop: insets.top, backgroundColor: offlineAccentColor },
-            ]}>
-            <Text style={[styles.bannerText, { color: offlineTextColor }]}>YOU ARE OFFLINE</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.contentShell}>
-        <View style={[styles.contentContainer, contentShellStyle]}>
-          <View style={styles.contentFill}>{children}</View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-export function useOfflineStatus(): OfflineContextValue {
-  return useContext(OfflineContext);
-}
-
-const styles = StyleSheet.create({
-  outerShell: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  topSection: {
-    overflow: 'hidden',
-  },
-  contentShell: {
-    flex: 1,
-  },
-  contentContainer: {
-    flex: 1,
-    overflow: 'hidden',
-    ...(Platform.OS === 'ios'
-      ? ({
-          borderCurve: 'continuous',
-        } as const)
-      : null),
-  },
-  contentFill: {
-    flex: 1,
-  },
-  banner: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  bannerText: {
-    fontSize: 11,
-    fontFamily: 'OxygenBold',
-    letterSpacing: 0.8,
-  },
-});

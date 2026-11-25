@@ -1,4 +1,4 @@
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useMemo } from 'react';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';

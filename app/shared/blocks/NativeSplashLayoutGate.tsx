@@ -17,7 +17,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE, SPLASH_QR_BASE } from '@/shared/lib/brandColors';
 import { initLog, log, useInitMount } from '@/shared/lib/logger';
-import { useInitializationState } from '@/shared/providers/InitializationProvider';
+import { useInitializationState } from '@/runtime/initializationStages';
 import {
   getQRButtonAnchor,
   getWalletTabFocused,

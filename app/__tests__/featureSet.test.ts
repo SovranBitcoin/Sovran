@@ -40,11 +40,8 @@ describe('feature set', () => {
     // No build ships conversation pages, so ecash sent as a message is only
     // claimed because a provider mounts with `ecashMessages`. If that mount is
     // ever gated on anything else, money could arrive that nobody claims.
-    const layout = readFileSync(
-      join(__dirname, '..', 'shared', 'providers', 'AccountProviders.tsx'),
-      'utf8'
-    );
-    expect(layout).toContain("hasFeature('ecashMessages') ? [DmEcashAutoRedeemProvider] : []");
+    const layout = readFileSync(join(__dirname, '..', 'runtime', 'AccountScope.tsx'), 'utf8');
+    expect(layout).toMatch(/hasFeature\('ecashMessages'\) \? \(\s*<DmEcashAutoRedeemProvider>/);
     expect(resolveFeatureSet('payments').ecashMessages).toBe(true);
   });
 

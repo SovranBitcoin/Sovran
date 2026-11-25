@@ -1,33 +1,34 @@
+/**
+ * The active account's Nostr client: created by the account scope once the
+ * keys are loaded, held by the app runtime, read anywhere with
+ * `useNostrClient`.
+ */
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { createPrivateKeySigner, NostrClient } from 'nostr/client';
+
 import {
   profileSwitchQuiescing,
   registerAccountScoped,
   registerProfileSwitchService,
 } from '@/shared/lib/account/accountRegistry';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { createPrivateKeySigner, NostrClient } from 'nostr/client';
 import { relays } from '@/shared/ndk';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
-import { useInitializationStage } from './InitializationProvider';
-import { useNostrKeysContext } from './NostrKeysProvider';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { nostrLog, useInitMount } from '@/shared/lib/logger';
+import { useInitializationStage } from './initializationStages';
+import { accountHandle } from './accountHandle';
 
-interface NostrClientContextValue {
-  client: NostrClient | undefined;
-  isInitialized: boolean;
-}
-
-const NostrClientContext = createContext<NostrClientContextValue>({
-  client: undefined,
-  isInitialized: false,
-});
+const getClient = () => accountHandle.get().nostrClient;
 
 /**
- * The active account's Nostr client, once its keys are loaded. Outside the
- * provider this returns no client (`isInitialized: false`), which fails safe.
+ * The active account's Nostr client, once its keys are loaded. Before then,
+ * and outside an account, there is no client (`isInitialized: false`), which
+ * fails safe.
  */
-export function useNostrClient(): NostrClientContextValue {
-  return useContext(NostrClientContext);
+export function useNostrClient(): { client: NostrClient | undefined; isInitialized: boolean } {
+  const client = useSyncExternalStore(accountHandle.subscribe, getClient, getClient);
+  return useMemo(() => ({ client, isInitialized: client !== undefined }), [client]);
 }
 
 /**
@@ -35,18 +36,12 @@ export function useNostrClient(): NostrClientContextValue {
  * signer for the account's key. Account switching and Delete All dispose it,
  * which closes every socket and zeroes the signer's key copy.
  */
-export function NostrClientProvider({
-  children,
-  accountIndex = 0,
-}: {
-  children: ReactNode;
-  accountIndex?: number;
-}) {
+export function useNostrClientLifecycle(accountIndex: number): void {
   useInitMount('NostrClientProvider');
   const { keys: nostrKeys } = useNostrKeysContext();
   const privateKey = nostrKeys?.privateKey;
   const pubkey = nostrKeys?.pubkey;
-  const [client, setClient] = useState<NostrClient>();
+  const { client } = useNostrClient();
 
   // Non-blocking: starts after the wallet is open so it never competes with splash.
   const stage = useInitializationStage('nostr-client');
@@ -82,7 +77,7 @@ export function NostrClientProvider({
       () => created.disposed && created.signer === undefined
     );
     nostrLog.info('provider.nostr_client.ready', { relayCount: relays.length, accountIndex });
-    setClient(created);
+    accountHandle.setNostrClient(created);
     stage.complete();
     return () => {
       const switching = profileSwitchQuiescing();
@@ -90,14 +85,11 @@ export function NostrClientProvider({
       // While switching, the registry disposes and verifies the holder itself.
       if (!switching) unregisterHolder();
       created.dispose();
-      setClient((current) => (current === created ? undefined : current));
+      accountHandle.clearNostrClient(created);
     };
   }, [stage, privateKey, accountIndex]);
 
   // Ingest the profile's NIP-65 relay list (or first-run-publish the defaults)
   // and seed the pool, once the client is ready. Self-deferred internally.
   useOwnRelayListSync(client, pubkey);
-
-  const value = useMemo(() => ({ client, isInitialized: client !== undefined }), [client]);
-  return <NostrClientContext.Provider value={value}>{children}</NostrClientContext.Provider>;
 }

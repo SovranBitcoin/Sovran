@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import * as Application from 'expo-application';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useStoreLoadOutcome } from '@/shared/lib/persist/hydrationOutcome';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 

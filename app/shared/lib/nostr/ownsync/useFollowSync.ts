@@ -1,11 +1,11 @@
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { requestFollowSync } from '@/shared/lib/nostr/followSync';
 import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 
 /**

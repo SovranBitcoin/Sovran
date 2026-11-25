@@ -29,7 +29,7 @@ import {
 } from '@/shared/lib/nostr/accountIntegrity';
 import { AccountIntegrityError } from '@/shared/lib/nostr/derivationIntegrity';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { useInitializationStage } from './InitializationProvider';
+import { useInitializationStage } from '@/runtime/initializationStages';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { log, initLog, initPhase, redactError, useInitMount } from '@/shared/lib/logger';
 

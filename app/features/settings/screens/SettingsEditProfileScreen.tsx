@@ -1,4 +1,4 @@
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useNip05Verification } from '@/shared/hooks/useNip05Verification';
 import { Nip05Status } from '@/shared/ui/composed/Nip05Identity';
 import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';

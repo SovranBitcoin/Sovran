@@ -29,7 +29,7 @@ import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { isTokenSpent } from '@/shared/lib/cashu/spentProbe';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';

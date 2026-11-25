@@ -9,11 +9,19 @@
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {
-  InitializationProvider,
-  useInitializationReset,
+  initializationStages,
   useInitializationStage,
   useInitializationState,
-} from '@/shared/providers/InitializationProvider';
+} from '@/runtime/initializationStages';
+
+/** A fresh stage graph, as a freshly mounted app root starts with. */
+function freshStageGraph() {
+  act(() => {
+    initializationStages.resetStages();
+    initializationStages.cancelResetStages();
+  });
+}
+beforeEach(freshStageGraph);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -26,7 +34,7 @@ jest.mock('@/shared/lib/logger', () => ({
 type Stage = ReturnType<typeof useInitializationStage>;
 const stages: Record<string, Stage> = {};
 let splashUp = false;
-let reset: ReturnType<typeof useInitializationReset>;
+let reset: typeof initializationStages;
 
 /** The stages GlobalMigrationGate, NostrKeysProvider, CocoProvider and NostrClientProvider register. */
 function Providers() {
@@ -36,7 +44,7 @@ function Providers() {
   stages['coco-background'] = useInitializationStage('coco-background');
   stages['nostr-client'] = useInitializationStage('nostr-client');
   splashUp = useInitializationState().isInitializing;
-  reset = useInitializationReset();
+  reset = initializationStages;
   return null;
 }
 
@@ -47,9 +55,9 @@ let renderer: TestRenderer.ReactTestRenderer;
 beforeEach(() => {
   act(() => {
     renderer = TestRenderer.create(
-      <InitializationProvider>
+      <>
         <Providers />
-      </InitializationProvider>
+      </>
     );
   });
 });

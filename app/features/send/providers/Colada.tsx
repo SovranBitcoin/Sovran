@@ -21,7 +21,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
 import type { NostrClient } from 'nostr/client';
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { Metadata } from 'nostr-tools/kinds';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
@@ -74,7 +74,7 @@ import {
 import { createNfcAdapter } from '@/shared/lib/nfc';
 import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactionAnnotationStore';

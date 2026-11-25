@@ -52,7 +52,7 @@ jest.mock('@/shared/blocks/StartupFailedScreen', () => ({ StartupFailedScreen: (
 jest.mock('@cashu/coco-react', () => ({
   CocoCashuProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/shared/providers/InitializationProvider', () => {
+jest.mock('@/runtime/initializationStages', () => {
   const coco = {
     canStart: true,
     log: () => undefined,
@@ -119,7 +119,7 @@ jest.mock('@/shared/lib/cashu/initializeDefaultMints', () => ({
 
 import { act, render } from '@testing-library/react-native';
 
-import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { WalletCore } from '@/runtime/WalletCore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
@@ -146,7 +146,7 @@ async function settle(): Promise<void> {
 }
 
 async function mountProvider() {
-  const view = render(<CocoProvider>{null}</CocoProvider>);
+  const view = render(<WalletCore>{null}</WalletCore>);
   await settle();
   return view;
 }

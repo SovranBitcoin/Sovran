@@ -87,7 +87,7 @@ jest.mock('@/shared/lib/color', () => ({
   withAlpha: (c: string) => c,
 }));
 jest.mock('expo-router/react-navigation', () => ({ useHeaderHeight: () => 0 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({ useWalletContext: () => ({}) }));
+jest.mock('@/runtime/WalletProjection', () => ({ useWalletContext: () => ({}) }));
 jest.mock('@/features/camera', () => ({
   useHandleCameraPermission: () => ({ handlePermission: jest.fn().mockResolvedValue(true) }),
 }));

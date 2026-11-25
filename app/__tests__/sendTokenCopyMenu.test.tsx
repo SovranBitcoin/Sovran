@@ -132,7 +132,7 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/lib/currency', () => ({ formatAmount: jest.fn(() => '63 sats') }));
 jest.mock('@/shared/lib/strings', () => ({ truncateMiddle: (value: string) => value }));
 jest.mock('@/shared/lib/apiClient', () => ({ fetchMintInfo: jest.fn() }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: jest.fn(() => ({ isOffline: false })),
 }));
 jest.mock('@/shared/stores/profile/sendReachabilityStore', () => ({

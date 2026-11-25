@@ -10,7 +10,7 @@ Persisted stores hydrate asynchronously here (AsyncStorage behind the migration 
 
 Does `hunk` take an irreversible or user-visible decision — a redirect or `router.*` call, showing a terms, onboarding, backup or CTA prompt, starting a network request, or publishing — from the value of a persisted Zustand store inside an effect or at mount, with no check of that store's load (`useStoreLoad`, `useStoreLoadLatched`, `useStoreLoadOutcome`, `onceLoaded` / `whenLoaded` from `shared/lib/persist/hydrationOutcome.ts`, `persist.hasHydrated()`), a `_hasHydrated` field, or an ancestor gate that the hunk shows?
 
-Allowed cases: The component renders below a gate that already waits for that store (`AppGate` for `settingsStore`, `ThemeProvider` for wallpaper/theme, `CtaHost`, `RestoreGate`); the hook gates on `useStoreLoad`, `useStoreLoadLatched` or `useStoreLoadOutcome`; purely presentational reads where showing the default for a frame is harmless (theme, sort order, toggles); non-persisted runtime stores; `createQueryCacheStore` reads, whose `hydrate(key)` is awaited explicitly.
+Allowed cases: The component renders below a gate that already waits for that store (`AppGate` for `settingsStore`, `AppRoot` (the theme applier) for wallpaper/theme, `CtaHost`, `RestoreGate`); the hook gates on `useStoreLoad`, `useStoreLoadLatched` or `useStoreLoadOutcome`; purely presentational reads where showing the default for a frame is harmless (theme, sort order, toggles); non-persisted runtime stores; `createQueryCacheStore` reads, whose `hydrate(key)` is awaited explicitly.
 
 ## persist/early-write
 

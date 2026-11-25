@@ -1,4 +1,4 @@
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';

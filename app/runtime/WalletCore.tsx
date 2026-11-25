@@ -1,7 +1,12 @@
-import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
-import { useEffect, useState, ReactNode, useRef } from 'react';
+/**
+ * The account's wallet core: opens the Coco manager and provides it to
+ * `@cashu/coco-react`. Coco is the only owner of mints, proofs and balances;
+ * `WalletProjection` derives the payment machine's view from it.
+ */
+import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
+import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
 import {
@@ -10,7 +15,6 @@ import {
   recoverSdkRecords,
 } from '@/shared/lib/routstr/reclaim';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
-import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintTestnutToManager } from '@/shared/lib/mintTestnutRefresh';
@@ -18,20 +22,15 @@ import { attachMintHistoryToManager } from '@/features/mint/lib/mintHistorySync'
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
-import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
-
-initLog('Module', 'CocoProvider loaded');
-
-interface CocoProviderProps {
-  children: ReactNode;
-}
+import { awaitRestoreReady } from './awaitRestoreReady';
+import { useInitializationStage } from './initializationStages';
 
 /**
- * CocoProvider initializes the Coco Manager for normal runtime use.
+ * The wallet core initializes the Coco Manager for normal runtime use.
  *
  * Startup is split into two phases:
  *  - **Blocking** (`coco` stage): Manager init. The app stays on the splash
@@ -244,7 +243,13 @@ function restageWalletCredentials(cashuMnemonic: string | null): void {
   if (cashuMnemonic) CocoManager.setCashuMnemonic(cashuMnemonic);
 }
 
-export function CocoProvider({ children }: CocoProviderProps) {
+/**
+ * The account's wallet core: opens the Coco manager (phase 1, blocking the
+ * splash), runs its background startup (phase 2), attaches the manager-scoped
+ * caches, and hands the manager to Coco's React bindings. Shows a retry when
+ * the wallet cannot be opened.
+ */
+export function WalletCore({ children }: { children: ReactNode }) {
   useInitMount('CocoProvider');
   const stage = useInitializationStage('coco');
   const bgStage = useInitializationStage('coco-background');

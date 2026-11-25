@@ -8,7 +8,7 @@ import { markWallpaperLoaded, markWallpaperFailed } from '@/shared/lib/theme/wal
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
-import { useTheme } from '@/shared/providers/ThemeProvider';
+import { useTheme } from '@/runtime/theme';
 import { Log, log } from '@/shared/lib/logger';
 import { describeImageLoadError } from '@/shared/lib/imageError';
 

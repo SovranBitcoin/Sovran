@@ -16,7 +16,7 @@
 import { useMemo } from 'react';
 import { useColadaTrustedMintUrls } from 'wallet/react';
 
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 /**

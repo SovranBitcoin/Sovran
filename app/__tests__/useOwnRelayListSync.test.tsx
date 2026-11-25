@@ -91,7 +91,7 @@ jest.mock('@/shared/lib/nostr/publish', () => ({
 jest.mock('@/shared/lib/nostr/outbox/seedPool', () => ({
   seedPool: (...args: unknown[]) => mockSeedPool(...args),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('react-native-web/dist/exports/AppState', () => ({

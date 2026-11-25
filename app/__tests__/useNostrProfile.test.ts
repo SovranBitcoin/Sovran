@@ -3,7 +3,7 @@ import { ok } from 'neverthrow';
 import { useLayoutEffect } from 'react';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: undefined, isInitialized: false }),
 }));
 jest.mock('@/shared/lib/nostr/vertex/refreshVertex', () => ({

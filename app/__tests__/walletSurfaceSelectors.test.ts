@@ -130,7 +130,7 @@ describe('wallet surface e2e selectors', () => {
   });
 
   it('pins the offline banner and the Mock Offline dev toggle', () => {
-    expect(read('shared/providers/OfflineProvider.tsx')).toContain('testID="offline-banner"');
+    expect(read('shared/blocks/OfflineShell.tsx')).toContain('testID="offline-banner"');
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-version-row"');
     expect(settings).toContain('testID="settings-mock-offline-toggle"');

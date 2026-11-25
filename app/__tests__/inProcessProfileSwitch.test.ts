@@ -24,7 +24,7 @@ jest.mock('@/shared/ndk', () => ({ relays: [] }));
 jest.mock('@/shared/lib/nostr/outbox/useOwnRelayListSync', () => ({
   useOwnRelayListSync: jest.fn(),
 }));
-jest.mock('@/shared/providers/InitializationProvider', () => ({
+jest.mock('@/runtime/initializationStages', () => ({
   useInitializationStage: jest.fn(),
 }));
 jest.mock('expo-image-manipulator', () => ({
@@ -387,7 +387,7 @@ function renderNostrClient() {
   const React = require('react');
   const { generateSecretKey, getPublicKey } = require('nostr-tools/pure');
   require('@/shared/lib/logger').useInitMount = jest.fn();
-  require('@/shared/providers/InitializationProvider').useInitializationStage.mockReturnValue({
+  require('@/runtime/initializationStages').useInitializationStage.mockReturnValue({
     canStart: true,
     log: jest.fn(),
     complete: jest.fn(),
@@ -397,7 +397,17 @@ function renderNostrClient() {
   require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
     keys: { privateKey, pubkey: getPublicKey(privateKey) },
   });
-  const { NostrClientProvider, useNostrClient } = require('@/shared/providers/NostrClientProvider');
+  const { useNostrClient, useNostrClientLifecycle } = require('@/runtime/nostrClient');
+  function NostrClientProvider({
+    accountIndex,
+    children,
+  }: {
+    accountIndex: number;
+    children: React.ReactNode;
+  }) {
+    useNostrClientLifecycle(accountIndex);
+    return children;
+  }
   const seen: { client?: import('nostr/client').NostrClient } = {};
   function Probe() {
     seen.client = useNostrClient().client ?? seen.client;

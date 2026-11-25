@@ -42,7 +42,7 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
   useMintStore: (select: (state: { selectedMint?: string }) => unknown) => select({}),
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContextWithOverride: () => ({ trustedMintUrls: [], mintBalances: {} }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({

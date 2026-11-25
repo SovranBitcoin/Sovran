@@ -1,4 +1,4 @@
-import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { awaitRestoreReady } from '@/runtime/awaitRestoreReady';
 import type { RestoreStatus as RestoreReadyStatus } from '@/shared/stores/global/walletRestorePhase';
 
 type Listener = (

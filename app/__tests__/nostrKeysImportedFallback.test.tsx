@@ -29,7 +29,7 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: () => 'redacted',
   initPhase: (_name: string, fn: () => unknown) => fn(),
 }));
-jest.mock('@/shared/providers/InitializationProvider', () => {
+jest.mock('@/runtime/initializationStages', () => {
   const stage = { canStart: true, log: jest.fn(), complete: jest.fn(), error: jest.fn() };
   return { useInitializationStage: () => stage };
 });

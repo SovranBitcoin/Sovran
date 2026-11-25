@@ -2,11 +2,8 @@
  * @fileoverview Utility functions for the Sovran application
  *
  * This module contains various utility functions used throughout the application,
- * including number formatting, Lightning Network payment request handling,
- * and React provider composition.
+ * including number formatting and Lightning Network payment request handling.
  */
-
-import React from 'react';
 
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { decodeBolt11Invoice } from 'wallet';
@@ -143,56 +140,3 @@ export function getMeltQuoteTimeUntilExpiry(
   const nowSec = Math.floor((currentTimeMs ?? Date.now()) / 1000);
   return formatExpiryCountdown(meltQuote.expiry - nowSec);
 }
-
-/**
- * Composes multiple React providers into a single provider component.
- *
- * Given an array of providers, this utility nests them so that children are rendered
- * within all providers, in the order provided. Supports both direct component references
- * and component-props tuples for providers that need configuration.
- *
- * @example
- * // Direct component references (clean API)
- * const AppProviders = compose([ProviderA, ProviderB, ProviderC]);
- *
- * // Mixed approach (tuples + direct)
- * const AppProviders = compose([
- *   [NostrProvider, { relayUrls: RELAY_URLS }],
- *   [WhitenoiseProvider, { accountIndex }],
- *   ThemeProvider,  // Direct component (no props needed)
- *   PricelistProvider, // Automatically wrapped in Fragment for single-child requirement
- * ]);
- *
- * <AppProviders>
- *   <App />
- * </AppProviders>
- */
-export const compose = (
-  providers: (
-    | React.FC<{ children: React.ReactNode }>
-    | React.ComponentType<any>
-    | [React.ComponentType<any>, Record<string, any>]
-  )[]
-): React.FC<{ children: React.ReactNode }> => {
-  // Normalise ONCE, at compose time. Deriving the wrapper per render — as this
-  // used to — minted a fresh component type on every parent render, and React
-  // unmounts a subtree whose element type changed: every re-render of the
-  // owning layout tore down and rebuilt the whole provider stack beneath the
-  // first configured provider (relay sockets, wallet, price feed included).
-  const entries = providers.map((provider) =>
-    Array.isArray(provider) && provider.length === 2
-      ? { Component: provider[0], props: provider[1] as Record<string, unknown> }
-      : { Component: provider as React.ComponentType<any>, props: {} }
-  );
-
-  // No Fragment normalisation: `children: React.ReactNode` already accepts a
-  // sibling list, and no provider in either stack uses `Children.only`.
-  const ComposedProvider = ({ children }: { children: React.ReactNode }) =>
-    entries.reduceRight<React.ReactNode>(
-      (tree, { Component, props }) => <Component {...props}>{tree}</Component>,
-      children
-    );
-
-  ComposedProvider.displayName = 'ComposedProvider';
-  return ComposedProvider;
-};

@@ -1,16 +1,15 @@
 /**
  * The feed's `resume()` and `setOffline()` are only worth having if something
- * calls them. This renders the real provider over a stubbed feed and drives the
- * foreground and connectivity events, plus the unmount that has to stop it — the
- * provider is remounted on every profile switch, so a missed `stop()` is one
- * orphaned socket per switch.
+ * calls them. This starts the real account price feed over a stubbed feed and
+ * drives the foreground and connectivity events, plus the stop that has to
+ * stop it — the runtime starts it again on every profile switch, so a missed
+ * `stop()` is one orphaned socket per switch.
  */
-import { AppState, Text } from 'react-native';
-import { render, act } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 
 import * as pricelistFeedModule from '@/shared/lib/pricelistFeed';
 import { createPricelistFeed } from '@/shared/lib/pricelistFeed';
-import { PricelistProvider } from '@/shared/providers/PricelistProvider';
+import { appRuntime, startPricelistFeed } from '@/runtime/AppRuntime';
 
 // `jest.mock` is hoisted above the imports above, so these still apply.
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -25,8 +24,14 @@ jest.mock('@/shared/lib/pricelistFeed', () => {
 });
 
 const offlineState = { isOffline: false, isDisconnected: false };
-jest.mock('@/shared/providers/OfflineProvider', () => ({
-  useOfflineStatus: () => offlineState,
+const mockOfflineListeners = new Set<() => void>();
+jest.mock('@/runtime/connectivity', () => ({
+  getOfflineStatus: () => offlineState,
+  subscribeOfflineStatus: (listener: () => void) => {
+    mockOfflineListeners.add(listener);
+    return () => mockOfflineListeners.delete(listener);
+  },
+  startConnectivity: () => () => undefined,
 }));
 
 const feed = (pricelistFeedModule as unknown as { __feed: Record<string, jest.Mock> }).__feed;
@@ -34,18 +39,19 @@ const offline = offlineState;
 
 type AppStateHandler = (state: string) => void;
 
-function renderProvider() {
+function startFeed() {
   const handlers: AppStateHandler[] = [];
   const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, handler) => {
     handlers.push(handler as AppStateHandler);
     return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
   });
-  const view = render(
-    <PricelistProvider>
-      <Text>child</Text>
-    </PricelistProvider>
-  );
-  return { view, handlers, spy };
+  const stop = startPricelistFeed();
+  return { stop, handlers, spy };
+}
+
+function setConnectivity(next: typeof offlineState) {
+  Object.assign(offline, next);
+  mockOfflineListeners.forEach((listener) => listener());
 }
 
 beforeEach(() => {
@@ -54,55 +60,48 @@ beforeEach(() => {
   feed.stop.mockClear();
   feed.setOffline.mockClear();
   (createPricelistFeed as jest.Mock).mockClear();
+  mockOfflineListeners.clear();
   offline.isOffline = false;
   offline.isDisconnected = false;
 });
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('PricelistProvider wiring', () => {
-  it('starts exactly one feed and stops it on unmount', () => {
-    const { view } = renderProvider();
+describe('account price feed wiring', () => {
+  it('starts exactly one feed and stops it on stop', () => {
+    const { stop } = startFeed();
     expect(createPricelistFeed).toHaveBeenCalledTimes(1);
     expect(feed.start).toHaveBeenCalledTimes(1);
     expect(feed.stop).not.toHaveBeenCalled();
 
-    view.unmount();
+    stop();
     expect(feed.stop).toHaveBeenCalledTimes(1);
+    // Nothing keeps listening to connectivity after the account stops.
+    expect(mockOfflineListeners.size).toBe(0);
   });
 
   it('re-arms the feed when the app returns to the foreground', () => {
-    const { handlers } = renderProvider();
+    const { handlers } = startFeed();
     expect(handlers).toHaveLength(1);
 
-    act(() => handlers[0]('background'));
+    handlers[0]('background');
     expect(feed.resume).not.toHaveBeenCalled();
 
-    act(() => handlers[0]('active'));
+    handlers[0]('active');
     expect(feed.resume).toHaveBeenCalledWith('foreground');
   });
 
   it('tells the feed its connectivity before it starts, then on every change', () => {
-    const { view } = renderProvider();
+    startFeed();
     expect(feed.setOffline.mock.calls).toEqual([[false]]);
     expect(feed.setOffline.mock.invocationCallOrder[0]).toBeLessThan(
       feed.start.mock.invocationCallOrder[0]
     );
 
-    const rerender = () =>
-      view.rerender(
-        <PricelistProvider>
-          <Text>child</Text>
-        </PricelistProvider>
-      );
-    offline.isOffline = true;
-    offline.isDisconnected = true;
-    rerender();
+    setConnectivity({ isOffline: true, isDisconnected: true });
     expect(feed.setOffline).toHaveBeenLastCalledWith(true);
 
-    offline.isOffline = false;
-    offline.isDisconnected = false;
-    rerender();
+    setConnectivity({ isOffline: false, isDisconnected: false });
     expect(feed.setOffline).toHaveBeenLastCalledWith(false);
     // Reconnect goes through the pause, not a second resume path.
     expect(feed.resume).not.toHaveBeenCalled();
@@ -113,17 +112,37 @@ describe('PricelistProvider wiring', () => {
     // the feed from falling back to Mempool.space.
     offline.isOffline = true;
     offline.isDisconnected = false;
-    renderProvider();
+    startFeed();
     expect(feed.setOffline.mock.calls).toEqual([[false]]);
   });
 
-  it('starts a feed paused when the phone is offline at mount', () => {
+  it('starts a feed paused when the phone is offline at start', () => {
     offline.isOffline = true;
     offline.isDisconnected = true;
-    renderProvider();
+    startFeed();
     expect(feed.setOffline.mock.calls[0]).toEqual([true]);
     expect(feed.setOffline.mock.invocationCallOrder[0]).toBeLessThan(
       feed.start.mock.invocationCallOrder[0]
     );
+  });
+
+  it('runs one feed per account scope and stops it before the next account starts', () => {
+    startFeed();
+    feed.start.mockClear();
+    (createPricelistFeed as jest.Mock).mockClear();
+
+    appRuntime.start(0);
+    expect(appRuntime.getSnapshot()).toEqual({ accountIndex: 0, nostrClient: undefined });
+    expect(feed.start).toHaveBeenCalledTimes(1);
+
+    feed.stop.mockClear();
+    appRuntime.stop();
+    expect(feed.stop).toHaveBeenCalledTimes(1);
+    expect(appRuntime.getSnapshot()).toEqual({ accountIndex: null, nostrClient: undefined });
+
+    appRuntime.start(1);
+    expect(createPricelistFeed).toHaveBeenCalledTimes(2);
+    expect(appRuntime.getSnapshot().accountIndex).toBe(1);
+    appRuntime.stop();
   });
 });

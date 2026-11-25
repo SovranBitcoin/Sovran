@@ -43,7 +43,7 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import {
   useSendReachability,
   useSendReachabilityStore,

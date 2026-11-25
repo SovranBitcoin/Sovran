@@ -57,7 +57,7 @@ jest.mock('wallet/react', () => ({
     mintUrl: 'https://mint.example',
   }),
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => mockWalletContext,
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));

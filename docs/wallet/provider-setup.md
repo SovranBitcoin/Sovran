@@ -39,7 +39,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
 }
 ```
 
-It is mounted after `CocoProvider` and the app's `WalletContextProvider` in
+It is mounted after `WalletCore` and the app's `WalletProjection` in
 `app/app/_layout.tsx`. Screens then consume two hooks:
 
 - `usePaymentFlowMachine({ walletContext, unit })` — the send/receive flow state
@@ -48,6 +48,6 @@ It is mounted after `CocoProvider` and the app's `WalletContextProvider` in
   share, back).
 
 `walletContext` (trusted mints + balances) comes from the app's own
-`WalletContextProvider`, not from the wallet package — the package stays
+`WalletProjection`, not from the wallet package — the package stays
 UI- and storage-agnostic and receives everything platform-specific through
 adapters and props.

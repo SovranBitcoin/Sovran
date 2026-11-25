@@ -119,10 +119,10 @@ jest.mock('@/shared/lib/logger', () => {
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: { pubkey: 'a0'.repeat(32) } }),
 }));
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: mockHookClient ?? undefined, isInitialized: true }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('react-native-web/dist/exports/AppState', () => ({

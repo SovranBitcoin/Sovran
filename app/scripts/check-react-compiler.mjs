@@ -82,7 +82,7 @@ const BASELINE_PATH = resolve(APP_DIR, 'react-compiler-bailouts.json');
  * or source file appears that is neither swept nor classified there, so this
  * set cannot silently rot again.
  */
-const SOURCE_ROOTS = ['app', 'assets', 'config', 'features', 'navigation', 'shared'];
+const SOURCE_ROOTS = ['app', 'assets', 'config', 'features', 'navigation', 'runtime', 'shared'];
 const SRC_GLOB = `{${SOURCE_ROOTS.join(',')}}/**/*.{ts,tsx,js,jsx}`;
 /** Bundled source that sits beside the roots rather than inside one. */
 const SOURCE_FILES = ['index.js', 'polyfills.js', 'shim.js', 'themes.ts'];

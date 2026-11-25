@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import type { NostrClient, RelayHealth as ClientRelayHealth } from 'nostr/client';
 
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 
 export type RelayHealth = 'connected' | 'connecting' | 'disconnected' | 'failed';
 

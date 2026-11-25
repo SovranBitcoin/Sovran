@@ -53,9 +53,6 @@ jest.mock('@/navigation/nativeTabs', () => {
   return { Expo55NativeTabs, isExpo55NativeTabsSupported: () => true };
 });
 jest.mock('expo-router', () => ({ Tabs: () => null }));
-jest.mock('@/shared/providers/BackgroundProvider', () => ({
-  BackgroundProvider: mockHost('Background'),
-}));
 jest.mock('@/shared/hooks/useScreenInsets', () => ({
   TabBarInsetsProvider: mockHost('Insets'),
 }));

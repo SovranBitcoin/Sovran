@@ -21,10 +21,10 @@ jest.mock('wallet', () => ({
   accountMintUrls: () => ['https://mint.example'],
   toRealUnit: (unit: string) => unit,
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => ({ trustedMintUrls: ['https://mint.example'] }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => ({

@@ -3,7 +3,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
 import { migrateThenLoad } from '@/shared/lib/migrations/migrateThenLoad';
 import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
-import { useInitializationStage } from '@/shared/providers/InitializationProvider';
+import { useInitializationStage } from '@/runtime/initializationStages';
 import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 
 initLog('Module', 'GlobalMigrationGate loaded');

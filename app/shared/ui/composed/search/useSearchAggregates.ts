@@ -29,7 +29,7 @@ import {
 } from '@/features/search/lib/searchAction';
 import { buildSearchSections, type SearchListItem } from '@/features/search/lib/searchSections';
 import { buildDetectors } from '@/shared/config/featureDetectors';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import type { SearchStatus } from './searchListState';
 
 /**

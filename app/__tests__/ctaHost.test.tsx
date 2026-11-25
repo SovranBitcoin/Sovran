@@ -77,7 +77,7 @@ jest.mock('@cashu/coco-react', () => ({
   }),
 }));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ getLatestVersion: jest.fn() }));

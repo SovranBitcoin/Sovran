@@ -19,7 +19,7 @@ migration and its unfinished work are recorded in the
 
 ## 1. Ecash And Custody
 
-**Observed:** [CocoProvider](app/shared/providers/CocoProvider.tsx) and the
+**Observed:** [WalletCore](app/runtime/WalletCore.tsx) and the
 [wallet operations](wallet/src/operations) manage local proofs and mint requests.
 [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md) defines mint-signed ecash;
 [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md) and

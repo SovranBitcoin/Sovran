@@ -15,7 +15,7 @@ import { ownEntry } from '@/shared/lib/ownEntry';
 import { useQuickPayPeople } from '@/features/send/hooks/useQuickPayPeople';
 import { useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import type { LocalMintCandidate, LocalPersonCandidate } from '../lib/localSearch';

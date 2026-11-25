@@ -3,24 +3,17 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { setBackgroundColorAsync } from 'expo-system-ui';
-import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
-import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog, paymentLog, useInitMount } from '@/shared/lib/logger';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { initLog, useInitMount } from '@/shared/lib/logger';
 import { LogBox, Platform } from 'react-native';
 import { CtaHost } from '@/shared/blocks/CtaHost';
-import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
-import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
-import { InitializationProvider } from '@/shared/providers/InitializationProvider';
-import { compose } from '@/shared/lib/utils';
-import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
-import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
-import { LayoutGuidesProvider } from '@/shared/providers/LayoutGuidesProvider';
-import { TouchIndicatorProvider } from '@/shared/providers/TouchIndicatorProvider';
+import { OfflineShell } from '@/shared/blocks/OfflineShell';
+import { useTheme } from '@/runtime/theme';
+import { AppRoot } from '@/runtime/AppRoot';
+import { AccountScope, AccountSwitchBoundary } from '@/runtime/AccountScope';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -29,26 +22,7 @@ import { applyFeatureSetToWallet } from '@/shared/config/features';
 import { useFeatureRouteGuard } from '@/shared/lib/nav/featureRoutes';
 import { preloadNfcSupported } from '@/shared/lib/nfc/useNfcSupported';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { useProfileBalanceSync } from '@/features/wallet';
-import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
-import { useSwapLegReconciler } from '@/shared/hooks/useSwapLegReconciler';
-import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
-import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
-import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
-import PopupHost from '@/shared/blocks/popup/PopupHost';
-import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
-import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
-import { E2EStateMirror } from '@/shared/lib/e2e/E2EStateMirror';
-import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
-import {
-  AccountScopedProviders,
-  AccountSwitchBoundary,
-  TransitionControlRegistrar,
-  KeyDerivationRegistrar,
-  TransitionGuardCleanup,
-} from '@/shared/providers/AccountProviders';
 
 initLog('Module', '_layout loaded');
 
@@ -67,70 +41,6 @@ void loadSettledHeaderHeights();
 // Before Send opens, so its method list is sized by the answer, not the guess.
 applyFeatureSetToWallet();
 preloadNfcSupported();
-
-// Outer providers — stable across profile switches, never remount.
-// InitializationProvider is first so the splash screen renders immediately
-// while the blocking init stages run (avoids a blank screen gap).
-// OfflineStatusProvider lives here (not inside RootLayoutContent) so the
-// downstream SovranColadaProvider — which consumes useOfflineStatus() to
-// drive the machine's offline send branch — actually sees real network state
-// instead of the default { isOffline: false }. The visual <OfflineShell>
-// stays inside RootLayoutContent and reads the same context.
-const OuterProviders = compose([
-  KeyboardProvider,
-  InitializationProvider,
-  ThemeProvider,
-  CapabilityProvider,
-  LayoutGuidesProvider,
-  TouchIndicatorProvider,
-  HeroUINativeProvider,
-  HeroTransitionProvider,
-  OfflineStatusProvider,
-]);
-
-function PaymentStatusListener() {
-  useEffect(() => {
-    paymentLog.info('app.payment_status_listener.mount');
-    return () => {
-      paymentLog.info('app.payment_status_listener.unmount');
-    };
-  }, []);
-  usePaymentStatusListener();
-  useSwapLegReconciler();
-  return null;
-}
-
-/** Re-pops the unified Swap toast on running→terminal transitions when the user dismissed mid-flight. */
-function SwapStatusListener() {
-  useEffect(() => {
-    paymentLog.info('app.swap_status_listener.mount');
-    return () => {
-      paymentLog.info('app.swap_status_listener.unmount');
-    };
-  }, []);
-  useSwapStatusListener();
-  return null;
-}
-
-/** Invisible component that syncs the live balance to the profile store for the active profile */
-function ProfileBalanceSync() {
-  useProfileBalanceSync();
-  return null;
-}
-
-/**
- * Invisible component that runs the single own-events relay sync: hydrates the
- * canonical own-state stores (profile, follows, likes, reposts, replies, own
- * notes) so they're authoritative everywhere. Subsumes the former kind-0-only
- * `ProfileMetadataSync`.
- */
-function OwnEventsSync() {
-  useOwnEventsSync();
-  // Read-side follow seed from the tiered facade (ADR 0003); the relay sub above
-  // stays the write-authoritative live-delta listener, merged via the same LWW gate.
-  useOwnSocialGraphSeed();
-  return null;
-}
 
 // Stable, memoized modal close button. Defined at module scope (not inside
 // RootLayoutContent) so its component identity never changes between renders —
@@ -152,7 +62,7 @@ const BackButton = React.memo(function BackButton() {
   );
 });
 
-// Inner component that can access theme context
+// The route stack: the drawer, the not-found catch-all and every modal screen.
 function RootLayoutContent() {
   useFeatureRouteGuard();
   const { currentTheme } = useTheme();
@@ -247,11 +157,6 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
-      <KeyDerivationRegistrar />
-      <PaymentStatusListener />
-      <SwapStatusListener />
-      <ProfileBalanceSync />
-      <OwnEventsSync />
       {/* SDK 56: expo-status-bar removed the (Android-only) backgroundColor prop. */}
       <StatusBar style={currentTheme.includes('light') ? 'dark' : 'light'} />
       <OfflineShell>
@@ -292,57 +197,16 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   useInitMount('RootLayout');
-  const [fontsLoaded, fontError] = useFonts();
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
-
-  // Log the moment fonts finish loading — first-launch font-loading is a
-  // common contributor to time-to-first-paint. In an effect, not in render:
-  // a render-time ref write is impure, and the commit that makes the fonts
-  // available is the moment that actually matters for paint.
-  const fontsSettled = fontsLoaded || !!fontError;
-  useEffect(() => {
-    if (!fontsSettled) return;
-    initLog('Fonts', `loaded=${fontsLoaded} error=${!!fontError}`);
-  }, [fontsSettled, fontsLoaded, fontError]);
-
-  initLog(
-    'RootLayout',
-    `render — fontsLoaded=${fontsLoaded} fontError=${!!fontError} account=${activeAccountIndex}`
-  );
-
-  // Don't render anything until fonts are loaded
-  if (!fontsLoaded && !fontError) {
-    initLog('RootLayout', 'waiting for fonts — returning null');
-    return null;
-  }
+  initLog('RootLayout', `render — account=${activeAccountIndex}`);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Above every gate: e2e store snapshots must cover onboarding frames,
-          which render before AccountScopedProviders mounts. Stores are module
-          singletons, so nothing here depends on providers. */}
-      <E2EStateMirror />
-      <OuterProviders>
-        <TransitionControlRegistrar />
-        <TransitionGuardCleanup />
-        <NativeSplashLayoutGate>
-          <GlobalMigrationGate>
-            <AccountSwitchBoundary>
-              <AccountScopedProviders
-                key={`account-${activeAccountIndex}`}
-                accountIndex={activeAccountIndex}>
-                <RootLayoutContent />
-                <E2EToastProbe />
-                {/* Same-window host for the Android feed media lightbox; must
-                    sit BEFORE PopupHost so popups triggered from inside the
-                    lightbox stack above it. No-op on iOS / when empty. */}
-                <PopupHost />
-                <ActionMenuHost />
-              </AccountScopedProviders>
-            </AccountSwitchBoundary>
-          </GlobalMigrationGate>
-        </NativeSplashLayoutGate>
-      </OuterProviders>
-    </GestureHandlerRootView>
+    <AppRoot>
+      <AccountSwitchBoundary>
+        <AccountScope key={`account-${activeAccountIndex}`} accountIndex={activeAccountIndex}>
+          <RootLayoutContent />
+        </AccountScope>
+      </AccountSwitchBoundary>
+    </AppRoot>
   );
 }

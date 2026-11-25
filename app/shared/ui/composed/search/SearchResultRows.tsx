@@ -21,7 +21,7 @@ import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { paymentLog, cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import {
   ContactRow,

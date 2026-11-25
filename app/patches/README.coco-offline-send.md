@@ -12,7 +12,7 @@
   `MintFetchError` (cdk's `CacheThenNetwork`). Only a mint that was never
   synced needs the network.
 - `Manager.setOffline(true)` skips the refresh entirely, so nothing waits on
-  a request that cannot succeed. The app drives it from `OfflineProvider`.
+  a request that cannot succeed. The app drives it from `runtime/connectivity.ts`.
 - A send that needs a swap checks the mint is reachable before reserving
   anything, and fails with `MintFetchError` otherwise, so an unreachable mint
   never strands proofs mid-swap.

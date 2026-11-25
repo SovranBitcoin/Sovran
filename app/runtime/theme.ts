@@ -1,14 +1,13 @@
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { usePresentationUnit } from '@/shared/hooks/usePresentationUnit';
 import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
-import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
-import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import { THEMES, type ThemeName } from '@/themes';
+import { log } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import {
   coverWallpaperChange,
@@ -19,60 +18,72 @@ import {
 import { isBackgroundImageTheme } from '@/config/backgroundImageThemes';
 import { Uniwind } from 'uniwind';
 
-initLog('Module', 'ThemeProvider loaded');
+/**
+ * The app's chrome theme, owned by the runtime rather than a React context.
+ *
+ * `useThemeApplier` (mounted once, in `AppRoot`) resolves the theme from the
+ * profile-scoped `themeStore`, walks the resolver fallback chain, applies its
+ * CSS variables with the right transition, and records the applied name here.
+ * `useTheme` reads it anywhere.
+ */
 
-interface ThemeContextValue {
-  currentTheme: string;
-  mode: ThemeMode;
-  availableThemes: ThemeName[];
+let appliedTheme: string | null = null;
+const listeners = new Set<() => void>();
+
+function setCurrentTheme(theme: string): void {
+  if (appliedTheme === theme) return;
+  appliedTheme = theme;
+  listeners.forEach((listener) => listener());
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
-  currentTheme: 'dark',
-  mode: 'dark',
-  availableThemes: THEME_NAMES,
-});
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+const getAppliedTheme = () => appliedTheme;
 
 /**
- * Resolves the chrome theme for the whole app from the profile-scoped
- * `themeStore`: walks the resolver fallback chain and returns a theme name
- * that exists in THEMES. Gates first render on the wallpaper store only
- * (downloaded themes registered), so the built-in fallback never flashes; the
- * theme store loads later, once AccountScopedProviders opens its gate, and
- * the resolved theme follows it from then on.
+ * Applies the resolved theme for the whole app. Returns whether the app may
+ * render: only once the wallpaper store has registered downloaded themes (so
+ * the built-in fallback never flashes) and a theme has been recorded.
  */
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  useInitMount('ThemeProvider');
+export function useThemeApplier(): boolean {
   // Only gate on wallpaperStore — it's a global store and always hydrates.
   // themeStore is profile-scoped and its hydration is gated on
-  // `_migrationGate`, which signals AFTER AccountScopedProviders mounts
-  // lower in the tree. Gating ThemeProvider on themeStore's load
-  // here would deadlock the splash screen.
+  // `_migrationGate`, which signals AFTER the account scope mounts lower in
+  // the tree. Gating on themeStore's load here would deadlock the splash.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
   // The chrome theme follows the ACTIVE WALLET UNIT: switching the wallet to
   // usd applies the wallpaper assigned to usd (unit-scoped assignment inside
   // the profile). Read the persisted unit straight from mintStore — this
-  // provider mounts above CocoProvider, so the coco-aware availability hook
+  // root mounts above the wallet core, so the coco-aware availability hook
   // isn't reachable here, and the persisted choice is the right key even
   // while coco boots. Falls through resolveUnitWallpaper's chain (unit →
   // album → 'dark') when the unit has no assignment.
   const liveUnit = useMintStore((s) => s.activeUnit);
   const activeUnit = usePresentationUnit(liveUnit);
   const resolvedTheme = useUnitWallpaper(activeUnit);
-  const mode = useThemeStore((s) => s.mode);
 
   // What consumers SEE. On programmatic wallpaper changes it trails
   // `resolvedTheme` until the overlay covers the swap; on carousel-driven
   // changes it applies immediately (the page stack already shows the
   // wallpaper, so there is nothing to hide).
-  // The account only changes under a mounted provider during an in-process
+  // The account only changes under the mounted root during an in-process
   // profile switch. With that setting off it is not tracked at all, so the
   // profile store hydrating its index at boot cannot change how a theme applies.
   const inProcessSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
   const activeAccountIndex = useProfileStore((state) => state.activeAccountIndex);
   const accountIndex = inProcessSwitch ? activeAccountIndex : null;
   const lastAccount = useRef(accountIndex);
-  const [currentTheme, setCurrentTheme] = useState(resolvedTheme);
+  // Consumers start on the theme resolved at mount, as before the first
+  // apply. Once a theme is recorded this never writes again: later themes
+  // arrive through the apply below.
+  useLayoutEffect(() => {
+    if (getAppliedTheme() === null) setCurrentTheme(resolvedTheme);
+  }, [resolvedTheme]);
   const lastApplied = useRef<string | null>(null);
   const lastAppliedUnit = useRef<string | null>(null);
 
@@ -150,23 +161,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     runThemeTransition(surfaceOf, applyVars);
   }, [resolvedTheme, activeUnit, accountIndex]);
 
-  // Wait for the wallpaper store to finish registering downloaded themes —
-  // without this the first paint would render against unregistered THEMES
-  // and flash the built-in fallback.
-  if (!wallpaperHydrated) return null;
-
-  return (
-    <ThemeContext.Provider
-      value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
-      <View className="flex-1">{children}</View>
-    </ThemeContext.Provider>
-  );
+  const current = useSyncExternalStore(subscribe, getAppliedTheme, getAppliedTheme);
+  return wallpaperHydrated && current !== null;
 }
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
-};
+export function useTheme(): {
+  currentTheme: string;
+  mode: ThemeMode;
+  availableThemes: ThemeName[];
+} {
+  const currentTheme = useSyncExternalStore(subscribe, getAppliedTheme, getAppliedTheme);
+  const mode = useThemeStore((s) => s.mode);
+  return {
+    currentTheme: currentTheme ?? 'dark',
+    mode,
+    availableThemes: Object.keys(THEMES) as ThemeName[],
+  };
+}

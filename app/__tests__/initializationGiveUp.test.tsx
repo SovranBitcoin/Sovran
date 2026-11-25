@@ -79,7 +79,7 @@ jest.mock('@/shared/lib/qrButtonAnchor', () => ({
   getBootMorphCompleted: () => false,
   subscribeBootMorphCompleted: () => () => undefined,
 }));
-jest.mock('@/shared/providers/awaitRestoreReady', () => ({ awaitRestoreReady: jest.fn() }));
+jest.mock('@/runtime/awaitRestoreReady', () => ({ awaitRestoreReady: jest.fn() }));
 jest.mock('@/shared/lib/cashu/initializeDefaultMints', () => ({
   initializeDefaultMints: jest.fn(),
 }));
@@ -89,22 +89,30 @@ import { Text } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 
 import {
-  InitializationProvider,
-  useInitializationReset,
+  initializationStages,
   useInitializationStage,
   useInitializationState,
-} from '@/shared/providers/InitializationProvider';
-import { CocoProvider } from '@/shared/providers/CocoProvider';
+} from '@/runtime/initializationStages';
+
+/** A fresh stage graph, as a freshly mounted app root starts with. */
+function freshStageGraph() {
+  act(() => {
+    initializationStages.resetStages();
+    initializationStages.cancelResetStages();
+  });
+}
+beforeEach(freshStageGraph);
+import { WalletCore } from '@/runtime/WalletCore';
 import { createAndSwitchProfile } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { registerTransitionControls } from '@/shared/lib/profile/profileTransition';
 
 let mockSplashUp: boolean | undefined;
-let mockControls: ReturnType<typeof useInitializationReset> | undefined;
+let mockControls: typeof initializationStages | undefined;
 
 /** Above the account providers, as GlobalMigrationGate and the registrar are. */
 function Above({ children }: { children: React.ReactNode }) {
   const migrations = useInitializationStage('global-migrations');
-  const controls = useInitializationReset();
+  const controls = initializationStages;
   const { isInitializing } = useInitializationState();
   mockSplashUp = isInitializing;
   mockControls = controls;
@@ -126,17 +134,17 @@ function KeysStage({ children }: { children: React.ReactNode }) {
 
 function tree(account: number) {
   return (
-    <InitializationProvider>
+    <>
       <Above>
         <React.Fragment key={`account-${account}`}>
           <KeysStage>
-            <CocoProvider>
+            <WalletCore>
               <Text>wallet home</Text>
-            </CocoProvider>
+            </WalletCore>
           </KeysStage>
         </React.Fragment>
       </Above>
-    </InitializationProvider>
+    </>
   );
 }
 

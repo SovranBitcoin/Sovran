@@ -60,7 +60,7 @@ import { useOnchainMeltQuote } from '@/shared/hooks/useOnchainMeltQuote';
 import { amountToNumber } from 'wallet/amount';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { staticPopup } from '@/shared/lib/popup';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { formatAmount } from '@/shared/lib/currency';
 import { openExternalUrl } from '@/shared/lib/url';
 import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';

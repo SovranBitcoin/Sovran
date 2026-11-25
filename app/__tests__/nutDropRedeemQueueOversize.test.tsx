@@ -57,7 +57,7 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => {
   const keys = { pubkey: 'ab'.repeat(32) };
   return { useNostrKeysContext: () => ({ keys }) };
 });
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 

@@ -51,7 +51,7 @@ import {
   notifyNutDropNeedsBitcoinAccount,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
@@ -64,7 +64,7 @@ import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

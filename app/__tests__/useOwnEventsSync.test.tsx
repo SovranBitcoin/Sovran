@@ -57,7 +57,7 @@ function mockSend(subscription: { filters: Filter[]; handlers: RelaySubscription
   }
 }
 
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: mockClient, isInitialized: true }),
 }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({

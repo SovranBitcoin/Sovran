@@ -2,7 +2,14 @@ import { AppState } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import * as Network from 'expo-network';
 
-import { OfflineStatusProvider, useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import React, { useEffect } from 'react';
+import { startConnectivity, useOfflineStatus } from '@/runtime/connectivity';
+
+/** Runs the connectivity engine while mounted, as the app root does. */
+function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => startConnectivity(), []);
+  return <>{children}</>;
+}
 import { resolveOfflineReachability } from '@/shared/lib/offlineReachability';
 import { log } from '@/shared/lib/logger';
 
@@ -20,9 +27,6 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (select: (state: { mockOffline: boolean }) => unknown) =>
     select({ mockOffline: false }),
 }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: jest.fn() }));
-jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
-jest.mock('react-native-safe-area-context', () => ({}));
 
 const reachable = { isOffline: false, reason: 'probe-reachable', probes: [] } as const;
 const initialAppState = Object.getOwnPropertyDescriptor(AppState, 'currentState');

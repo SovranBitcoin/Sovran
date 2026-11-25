@@ -3,7 +3,19 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { NostrClient } from 'nostr/client';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
-import { NostrClientProvider, useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient, useNostrClientLifecycle } from '@/runtime/nostrClient';
+
+/** The account scope's Nostr client owner, around the children that read it. */
+function NostrClientProvider({
+  accountIndex,
+  children,
+}: {
+  accountIndex: number;
+  children: React.ReactNode;
+}) {
+  useNostrClientLifecycle(accountIndex);
+  return <>{children}</>;
+}
 import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 
@@ -22,7 +34,7 @@ jest.mock('@/shared/lib/nostr/outbox/useOwnRelayListSync', () => ({
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: mockKeys }),
 }));
-jest.mock('@/shared/providers/InitializationProvider', () => ({
+jest.mock('@/runtime/initializationStages', () => ({
   useInitializationStage: () => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
     return ReactActual.useMemo(

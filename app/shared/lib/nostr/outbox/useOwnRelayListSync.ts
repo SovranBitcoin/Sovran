@@ -41,7 +41,7 @@ import {
 } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { seedPool } from '@/shared/lib/nostr/outbox/seedPool';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 
 const SYNC_DEFER_MS = 1_500;
 

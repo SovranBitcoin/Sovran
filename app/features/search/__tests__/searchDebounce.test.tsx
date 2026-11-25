@@ -12,7 +12,7 @@ import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
 
 const mockFieldProps: Record<string, unknown>[] = [];
 
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: undefined, isInitialized: false }),
 }));
 

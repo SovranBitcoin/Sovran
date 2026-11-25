@@ -66,7 +66,7 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => undefin
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: mockKeys }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({

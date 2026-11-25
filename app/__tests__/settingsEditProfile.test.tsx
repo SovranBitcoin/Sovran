@@ -60,7 +60,7 @@ jest.mock('@/shared/stores/global/profileStore', () => {
       .activeAccountReaders(() => useProfileStore.getState()),
   };
 });
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: mockClient, isInitialized: true }),
 }));
 jest.mock('@/shared/lib/nostr/profile/publishOwnProfileMetadata', () => ({

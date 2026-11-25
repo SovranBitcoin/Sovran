@@ -240,7 +240,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Theme & visual
 
-<!-- code: shared/lib/themeEngine.ts; shared/lib/colorExtraction.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/providers/BackgroundProvider.tsx; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
+<!-- code: shared/lib/themeEngine.ts; shared/lib/colorExtraction.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/lib/theme/backgroundBlur.ts; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
 
 - [x] **Wallpaper-driven theming** — theme tints are derived from the user's chosen wallpaper via `react-native-image-colors`
 - [x] **Nostr wallpaper sharing** — wallpapers are published and discovered through Nostr; download-then-apply so themes never flip before the asset is ready
@@ -307,7 +307,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Recovery & backup
 
-<!-- code: features/settings/screens/SettingsRecoveryScreen.tsx; features/settings/screens/SettingsProfileScreen.tsx; features/settings/screens/DeleteScreen.tsx; shared/lib/nostr/secureStorage.ts; shared/lib/nostr/keyDerivation.ts; shared/providers/NostrKeysProvider.tsx; shared/lib/cashu/manager.ts; shared/providers/CocoProvider.tsx; shared/stores/global/walletLifecycleStore.ts; ../cashu-recovery; ../sovran-recover -->
+<!-- code: features/settings/screens/SettingsRecoveryScreen.tsx; features/settings/screens/SettingsProfileScreen.tsx; features/settings/screens/DeleteScreen.tsx; shared/lib/nostr/secureStorage.ts; shared/lib/nostr/keyDerivation.ts; shared/providers/NostrKeysProvider.tsx; shared/lib/cashu/manager.ts; runtime/WalletCore.tsx; shared/stores/global/walletLifecycleStore.ts; ../cashu-recovery; ../sovran-recover -->
 
 - [x] **BIP-39 mnemonic** — single seed root for every profile's Nostr key (NIP-06) and wallet derivation
 - [x] **Seed display & confirmation** — onboarding seed reveal + verification step

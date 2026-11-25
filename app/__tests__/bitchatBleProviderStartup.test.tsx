@@ -1,3 +1,4 @@
+import React from 'react';
 import { useNearbyDiscovery } from '@/features/nearPay/hooks/useNearbyDiscovery';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
@@ -6,7 +7,13 @@ import {
   addBLEPrivateMessageListener,
 } from 'bitchat-module';
 
-import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
+import { useBitchatAccountServices } from '@/features/bitchat/hooks/useBitchatAccountServices';
+
+/** The account scope's BitChat services, around its children. */
+function BitchatBLEProvider({ children }: { children?: React.ReactNode }) {
+  useBitchatAccountServices();
+  return <>{children}</>;
+}
 jest.mock('@/features/nearPay/hooks/useNearbyDiscovery', () => ({ useNearbyDiscovery: jest.fn() }));
 jest.mock('@/features/nearPay/lib/nearbyPayments', () => ({
   NEARBY_PAYMENT_PREFIX: 'sovran:payment:1:',

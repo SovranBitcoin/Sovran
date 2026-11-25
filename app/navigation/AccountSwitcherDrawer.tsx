@@ -35,7 +35,7 @@ import {
   importAndSwitchProfile,
   switchToExistingProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';

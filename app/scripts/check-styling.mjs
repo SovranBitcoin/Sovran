@@ -26,7 +26,7 @@ import { join } from 'node:path';
 
 import { writeRatchetArtifact } from './lib/ratchet-artifact.mjs';
 
-const ROOTS = ['app', 'features', 'shared', 'navigation', 'config'];
+const ROOTS = ['app', 'features', 'shared', 'navigation', 'config', 'runtime'];
 const BUDGET_FILE = 'styling-budget.json';
 
 /** Layout props on the stack primitives that have exact Tailwind equivalents. */

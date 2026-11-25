@@ -140,7 +140,7 @@ jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
   },
 }));
 
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => ({
     trustedMintUrls: mockTrustedMintUrls,
     mintBalances: {},

@@ -29,7 +29,7 @@ import { useMintRowsWithCache } from '../hooks/useMintRowsWithCache';
 import { useMintSelectorFrameLog } from '../hooks/useMintSelectorFrameLog';
 import { useRefreshMintSelectorOnFocus } from '../hooks/useRefreshMintSelectorOnFocus';
 import { useStickyMintSelectorItems } from '../hooks/useStickyMintSelectorItems';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import {

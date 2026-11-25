@@ -36,7 +36,7 @@ jest.mock('@/shared/blocks/StartupFailedScreen', () => ({
 jest.mock('@cashu/coco-react', () => ({
   CocoCashuProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/shared/providers/InitializationProvider', () => {
+jest.mock('@/runtime/initializationStages', () => {
   const stage = { canStart: true, log: jest.fn(), complete: jest.fn(), error: jest.fn() };
   return { useInitializationStage: () => stage };
 });
@@ -79,20 +79,20 @@ jest.mock('@/shared/lib/qrButtonAnchor', () => ({
   getBootMorphCompleted: () => true,
   subscribeBootMorphCompleted: () => () => undefined,
 }));
-jest.mock('@/shared/providers/awaitRestoreReady', () => ({ awaitRestoreReady: jest.fn() }));
+jest.mock('@/runtime/awaitRestoreReady', () => ({ awaitRestoreReady: jest.fn() }));
 jest.mock('@/shared/lib/cashu/initializeDefaultMints', () => ({
   initializeDefaultMints: jest.fn(),
 }));
 
 import { act, render } from '@testing-library/react-native';
 
-import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { WalletCore } from '@/runtime/WalletCore';
 
 it('stages the account and the wallet phrase again before a retry opens the wallet', async () => {
   mockInitialize.mockRejectedValueOnce(new Error('database is locked'));
   mockInitialize.mockReturnValue(new Promise(() => undefined));
 
-  render(<CocoProvider>{null}</CocoProvider>);
+  render(<WalletCore>{null}</WalletCore>);
   await act(async () => {});
 
   // The first attempt stages only the signer key: the keys provider staged the rest.

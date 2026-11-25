@@ -10,7 +10,7 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, description }) => {

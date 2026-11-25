@@ -1,4 +1,4 @@
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';

@@ -5,9 +5,6 @@
   "app/(transactions-flow)/transactions.tsx": {
     "inline-style": 1
   },
-  "app/_layout.tsx": {
-    "inline-style": 1
-  },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
     "inline-style": 7,
     "stack-layout-props": 2
@@ -451,10 +448,16 @@
     "stylesheet-create": 1,
     "content-container-style": 1
   },
+  "runtime/AppRoot.tsx": {
+    "inline-style": 1
+  },
   "shared/blocks/NotFoundScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 2,
     "stack-layout-props": 2
+  },
+  "shared/blocks/OfflineShell.tsx": {
+    "stylesheet-create": 1
   },
   "shared/blocks/PaymentInfo.tsx": {
     "inline-style": 2
@@ -519,9 +522,6 @@
   "shared/lib/popup/popups/sheetMenuRow.tsx": {
     "inline-style": 3,
     "stack-layout-props": 1
-  },
-  "shared/providers/OfflineProvider.tsx": {
-    "stylesheet-create": 1
   },
   "shared/styles/tokens.ts": {
     "inline-style": 1

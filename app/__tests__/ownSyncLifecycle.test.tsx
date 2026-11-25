@@ -41,10 +41,10 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => mockLayer,
 }));
-jest.mock('@/shared/providers/NostrClientProvider', () => ({
+jest.mock('@/runtime/nostrClient', () => ({
   useNostrClient: () => ({ client: mockClient ?? undefined, isInitialized: mockInitialized }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('@/shared/lib/nostr/moderation', () => ({

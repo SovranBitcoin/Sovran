@@ -76,7 +76,7 @@ chat strips, and `icon` and `action` cover a custom glyph and a trailing recover
 hand-built equivalent drifts: it is how `#f59e0b` and a private 8% danger tint reached the app.
 
 Distinct shapes with their own owners are not notices and must not be folded into one: full-screen
-error and empty states (`EmptyState`), the screen-wide offline banner in `OfflineProvider`,
+error and empty states (`EmptyState`), the screen-wide offline banner in `OfflineShell`,
 interactive call-to-action cards, badges and pills carrying no status sentence, per-field
 validation text under an input, and bare tinted copy with no surface of its own.
 

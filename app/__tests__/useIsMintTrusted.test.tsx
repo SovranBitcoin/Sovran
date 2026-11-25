@@ -21,7 +21,7 @@ jest.mock('wallet/react', () => ({
   useColadaTrustedMintUrls: () => mockTrackedUrls,
 }));
 
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => ({ trustedMintUrls: mockContextUrls }),
 }));
 

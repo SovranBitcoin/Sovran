@@ -1,14 +1,11 @@
 /**
- * WalletContextProvider — aggregates coco wallet state for colada.
- *
- * Provides a pre-built WalletContext (trustedMintUrls, mintBalances, proofAmounts,
- * preferredMintUrl) so call sites don't need to construct it or fetch proofs.
- * Proof amounts are fetched via the shared/lib/cashu/managerInternals seam when
- * balance changes.
- *
- * Must be a descendant of CocoProvider (CocoCashuProvider).
+ * The wallet as the payment machine sees it: trusted mint URLs, per-mint and
+ * per-unit balances, proof denominations, method capabilities and the
+ * preferred mint, derived from Coco for the active unit and testnut side.
+ * Mounted inside `WalletCore`. It holds no copy of mints, proofs or balances;
+ * proof denominations are read through the `managerInternals` seam when they
+ * change.
  */
-
 import React, {
   createContext,
   useCallback,
@@ -38,9 +35,7 @@ import {
   useMintKeysetUnits,
 } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
-import { walletLog, initLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
-
-initLog('Module', 'WalletContextProvider loaded');
+import { walletLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
 const EMPTY_PROOF_AMOUNTS: Record<string, number[]> = {};
@@ -62,9 +57,7 @@ function preferredMintLogFields(mintUrl: string | null | undefined): Record<stri
 export function useWalletContext(): WalletContext {
   const ctx = useContext(WalletContextCtx);
   if (!ctx) {
-    throw new Error(
-      'WalletContextProvider is missing. Wrap your app in WalletContextProvider (inside CocoProvider).'
-    );
+    throw new Error('WalletProjection is missing. Mount it inside WalletCore.');
   }
   return ctx;
 }
@@ -81,7 +74,7 @@ export function useWalletContextWithOverride(preferredMintUrl?: string): WalletC
   );
 }
 
-export function WalletContextProvider({ children }: { children: React.ReactNode }) {
+export function WalletProjection({ children }: { children: React.ReactNode }) {
   useInitMount('WalletContextProvider');
   const { trustedMints: rawTrustedMints } = useMints();
   const { balances: rawBalanceCtx } = useBalanceContext();

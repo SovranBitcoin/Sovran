@@ -1,8 +1,8 @@
 import { usePaymentFlowMachine } from 'wallet/react';
 import { accountMintUrls, toRealUnit } from 'wallet';
 import type { BLEPeer } from 'bitchat-module';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';

@@ -29,7 +29,7 @@ import { useFollowSync } from './useFollowSync';
 import { useMuteListSync } from './useMuteListSync';
 
 import { nostrLog } from '@/shared/lib/logger';
-import { useNostrClient } from '@/shared/providers/NostrClientProvider';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';

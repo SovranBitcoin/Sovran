@@ -1,9 +1,9 @@
 import { useNearbyDiscovery } from '@/features/nearPay/hooks/useNearbyDiscovery';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
 import { useNutDropAutoRedeem } from '@/features/nearPay/hooks/useNutDropAutoRedeem';
-import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
+import { bitchatLog, useInitMount } from '@/shared/lib/logger';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
 /**
@@ -28,13 +28,14 @@ function isPureTokenDm(content: string): boolean {
  */
 const SOVRAN_PROTOCOL_NAMESPACE = 'sovran:';
 
-initLog('Module', 'BitchatBLEProvider loaded');
-
 /**
- * Invisible component. Mount inside `AccountScopedProviders` (not outer
- * providers) so listeners reset when the profile switches.
+ * BitChat for one account: nearby discovery bookkeeping, Nut Drop
+ * auto-redeem and the DM listeners. Called by the account scope (inside the
+ * wallet core) so everything resets when the profile switches. It never
+ * starts BLE: discovery announces to nearby bitchat clients, so the peer
+ * list and chat surfaces own startup.
  */
-export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
+export function useBitchatAccountServices(): void {
   useInitMount('BitchatBLEProvider');
   useNearbyDiscovery();
 
@@ -91,6 +92,4 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
       statusSub.remove();
     };
   }, []);
-
-  return <>{children}</>;
 }
