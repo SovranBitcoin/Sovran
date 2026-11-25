@@ -189,9 +189,15 @@ export function SkeletonContentCrossfade({
     opacity: fade.get(),
   }));
   // Wrapped only when crossfading, so other callers keep their layout as is.
+  // Keep the Animated.View mounted across exiting → content (no remount), but
+  // drop the animated opacity style once settled so SwiftUI-hosted pills never
+  // get stuck at an intermediate opacity.
   const content = () =>
     crossfadeContent ? (
-      <Animated.View style={contentEnterStyle}>{renderContent()}</Animated.View>
+      <Animated.View
+        style={progressOverride || phase === 'exiting' ? contentEnterStyle : undefined}>
+        {renderContent()}
+      </Animated.View>
     ) : (
       renderContent()
     );

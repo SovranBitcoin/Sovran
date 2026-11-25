@@ -41,8 +41,6 @@ type MintSelectorStatus = 'pending' | 'loading' | 'ready';
 
 /** What the pill says once a wallet has settled with no mints at all. */
 export const ADD_MINT_LABEL = 'Add a mint';
-/** What it says when there are mints but none is selected. */
-export const SELECT_MINT_LABEL = 'Select a mint';
 
 interface MintSelectorShared {
   mintUrl: string | undefined;
@@ -67,14 +65,39 @@ export function useMintSelector({
   const { balances: liveBalances } = useBalanceContext();
 
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
-  const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const mockMode = useSettingsStore((state) => state.mockMode);
   const defaultMintsSettled = useDefaultMintSetupStore((state) => state.settled);
-  const balance = mintUrl
-    ? mockMode
-      ? getMockMintBalance(mintUrl, unit)
-      : amountToNumber(liveBalances.byMintAndUnit?.[mintUrl]?.[toRealUnit(unit)]?.total)
-    : 0;
+  const realUnit = toRealUnit(unit);
+  const balanceFor = (url: string) =>
+    mockMode
+      ? getMockMintBalance(url, unit)
+      : amountToNumber(liveBalances.byMintAndUnit?.[url]?.[realUnit]?.total);
+
+  // If the caller didn't pin a mint and the stored selection is missing or no
+  // longer trusted, show the highest-balance trusted mint (or first trusted
+  // mint) rather than an empty "no current mint" pill.
+  const fallbackMintUrl = useMemo(() => {
+    if (selectedMintUrl || mints.length === 0) return undefined;
+    if (storedSelectedMint && mints.some((m) => m.mintUrl === storedSelectedMint)) return undefined;
+    let best = mints[0].mintUrl;
+    let bestBalance = mockMode
+      ? getMockMintBalance(best, unit)
+      : amountToNumber(liveBalances.byMintAndUnit?.[best]?.[realUnit]?.total);
+    for (let i = 1; i < mints.length; i += 1) {
+      const candidate = mints[i].mintUrl;
+      const candidateBalance = mockMode
+        ? getMockMintBalance(candidate, unit)
+        : amountToNumber(liveBalances.byMintAndUnit?.[candidate]?.[realUnit]?.total);
+      if (candidateBalance > bestBalance) {
+        best = candidate;
+        bestBalance = candidateBalance;
+      }
+    }
+    return best;
+  }, [selectedMintUrl, mints, storedSelectedMint, mockMode, unit, liveBalances, realUnit]);
+
+  const mintUrl = selectedMintUrl ?? fallbackMintUrl ?? storedSelectedMint;
+  const balance = mintUrl ? balanceFor(mintUrl) : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]
@@ -95,13 +118,8 @@ export function useMintSelector({
     defaultMintsSettled,
   });
   const isLoading = status !== 'ready';
-  // Settled with nothing selected: never an empty name over "0 sats".
-  const ctaLabel =
-    status === 'ready' && !mintUrl
-      ? mints.length === 0
-        ? ADD_MINT_LABEL
-        : SELECT_MINT_LABEL
-      : undefined;
+  // Settled with no trusted mints at all: never an empty name over "0 sats".
+  const ctaLabel = status === 'ready' && !mintUrl ? ADD_MINT_LABEL : undefined;
 
   useEffect(() => {
     walletLog.debug('mintSelector.state', {

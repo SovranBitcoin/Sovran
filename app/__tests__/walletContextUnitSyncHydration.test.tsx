@@ -6,22 +6,30 @@
  * mint's keyset read: a mint can advertise a unit in `/v1/info` it holds no
  * keysets for, so the sync waits for that read to settle too.
  */
-import { renderHook } from '@testing-library/react-native';
+import { act, renderHook } from '@testing-library/react-native';
 
 import { WalletContextProvider, useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 const MINT = 'https://mint.example';
+const SECOND_MINT = 'https://second.example';
 let mockMints: { mintUrl: string; mintInfo?: { name: string } }[] = [];
 let mockSupported: string[] = ['sat'];
 const mockSetUnit = jest.fn();
+const mockSetSelectedMint = jest.fn();
 let mockActiveUnit = 'usd';
+let mockSelectedMint: string | undefined = MINT;
+let mockHydrated = true;
+const mockHydrationListeners = new Set<() => void>();
+let mockBalances: { byMintAndUnit: Record<string, Record<string, { total: number }>> } = {
+  byMintAndUnit: {},
+};
 // A key present means that mint's keyset read has settled (`undefined` when
 // it failed); an absent key means the read has not finished.
 let mockKeysetUnits: Record<string, string[] | undefined> = {};
 
 jest.mock('@cashu/coco-react', () => ({
   useManager: () => ({ on: jest.fn(), off: jest.fn() }),
-  useBalanceContext: () => ({ balances: { byMintAndUnit: {} } }),
+  useBalanceContext: () => ({ balances: mockBalances }),
   useMints: () => ({ trustedMints: mockMints }),
 }));
 jest.mock('wallet', () => ({
@@ -43,8 +51,19 @@ jest.mock('@/shared/lib/cashu/managerInternals', () => ({
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => {
   const useMintStore = (selector: (state: { selectedMint?: string }) => unknown) =>
-    selector({ selectedMint: MINT });
-  useMintStore.getState = () => ({ activeUnit: mockActiveUnit });
+    selector({ selectedMint: mockSelectedMint });
+  useMintStore.getState = () => ({
+    activeUnit: mockActiveUnit,
+    selectedMint: mockSelectedMint,
+    setSelectedMint: mockSetSelectedMint,
+  });
+  useMintStore.persist = {
+    hasHydrated: () => mockHydrated,
+    onFinishHydration: (cb: () => void) => {
+      mockHydrationListeners.add(cb);
+      return () => mockHydrationListeners.delete(cb);
+    },
+  };
   return { useMintStore };
 });
 jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
@@ -67,7 +86,12 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 beforeEach(() => {
   mockSetUnit.mockClear();
+  mockSetSelectedMint.mockClear();
   mockActiveUnit = 'usd';
+  mockSelectedMint = MINT;
+  mockHydrated = true;
+  mockHydrationListeners.clear();
+  mockBalances = { byMintAndUnit: {} };
   mockSupported = ['sat'];
   mockKeysetUnits = { [MINT]: undefined };
 });
@@ -131,4 +155,33 @@ it('syncs on the advertised units when the keyset read fails', () => {
   mockKeysetUnits = { [MINT]: undefined };
   rerender({});
   expect(mockSetUnit).toHaveBeenCalledWith('sat');
+});
+
+it('auto-selects the highest-balance trusted mint once mint-store hydrates', () => {
+  mockHydrated = false;
+  mockSelectedMint = undefined;
+  mockMints = [{ mintUrl: MINT }, { mintUrl: SECOND_MINT }];
+  mockBalances = {
+    byMintAndUnit: {
+      [MINT]: { usd: { total: 5 } },
+      [SECOND_MINT]: { usd: { total: 42 } },
+    },
+  };
+  renderHook(useWalletContext, { wrapper });
+  expect(mockSetSelectedMint).not.toHaveBeenCalled();
+
+  act(() => {
+    mockHydrated = true;
+    for (const listener of mockHydrationListeners) listener();
+  });
+  expect(mockSetSelectedMint).toHaveBeenCalledTimes(1);
+  expect(mockSetSelectedMint).toHaveBeenCalledWith(SECOND_MINT);
+});
+
+it('replaces a removed stored selectedMint with an active trusted mint', () => {
+  mockSelectedMint = 'https://removed.example';
+  mockMints = [{ mintUrl: MINT }];
+  renderHook(useWalletContext, { wrapper });
+  expect(mockSetSelectedMint).toHaveBeenCalledTimes(1);
+  expect(mockSetSelectedMint).toHaveBeenCalledWith(MINT);
 });

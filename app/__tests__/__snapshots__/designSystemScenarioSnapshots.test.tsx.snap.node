@@ -36672,11 +36672,7 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
                           "type": "div",
                         },
                       ],
-                      "props": {
-                        "style": {
-                          "opacity": 1,
-                        },
-                      },
+                      "props": {},
                       "type": "View",
                     },
                   ],
@@ -39328,11 +39324,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
                           "type": "div",
                         },
                       ],
-                      "props": {
-                        "style": {
-                          "opacity": 1,
-                        },
-                      },
+                      "props": {},
                       "type": "View",
                     },
                   ],
@@ -39639,11 +39631,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                                   "type": "div",
                                 },
                               ],
-                              "props": {
-                                "style": {
-                                  "opacity": 1,
-                                },
-                              },
+                              "props": {},
                               "type": "View",
                             },
                           ],
@@ -40178,11 +40166,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
                           "type": "div",
                         },
                       ],
-                      "props": {
-                        "style": {
-                          "opacity": 1,
-                        },
-                      },
+                      "props": {},
                       "type": "View",
                     },
                   ],
@@ -40470,11 +40454,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
                           "type": "div",
                         },
                       ],
-                      "props": {
-                        "style": {
-                          "opacity": 1,
-                        },
-                      },
+                      "props": {},
                       "type": "View",
                     },
                   ],
@@ -40762,11 +40742,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
                           "type": "div",
                         },
                       ],
-                      "props": {
-                        "style": {
-                          "opacity": 1,
-                        },
-                      },
+                      "props": {},
                       "type": "View",
                     },
                   ],

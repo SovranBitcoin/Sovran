@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { normalizeUrlForApi } from '@/shared/lib/url';
 import { log, mintUrlLogFields } from '@/shared/lib/logger';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 type MintImportStage =
   'waiting' | 'adding' | 'restoring' | 'complete' | 'restore-failed' | 'failed';
@@ -30,6 +31,12 @@ async function runMintImport(items: MintImportItem[], publish: (running: boolean
         log.warn('mint.add.item.failed', mintUrlLogFields(item.url));
         publish(true);
         continue;
+      }
+      if (isCurrentManager()) {
+        const mintState = useMintStore.getState?.();
+        if (mintState && !mintState.selectedMint) {
+          mintState.setSelectedMint(item.url);
+        }
       }
       // Keep a successfully added mint even if restoration fails or the profile changes.
       item.stage = 'restore-failed';
