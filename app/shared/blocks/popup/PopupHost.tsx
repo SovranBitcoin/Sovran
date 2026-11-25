@@ -438,8 +438,8 @@ function SheetPopup() {
 export default function PopupHost() {
   return (
     <Log name="PopupHost">
-      <ToastHost />
       <SheetPopup />
+      <ToastHost />
     </Log>
   );
 }

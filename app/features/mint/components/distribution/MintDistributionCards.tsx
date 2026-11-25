@@ -144,7 +144,7 @@ function MintDistributionCard({
           isSelected={enabled}
           isDisabled={isLastActive}
           onSelectedChange={handleToggle}
-          aria-label={`${displayName} enabled`}
+          accessibilityLabel={`${displayName} enabled`}
           testID={`mint-distribution-toggle:${mintUrl}`}
         />
       </View>

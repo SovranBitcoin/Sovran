@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { showCustomToast, showToast } from '@/shared/lib/popup/popups/bridge';
@@ -174,5 +175,28 @@ describe('ToastHost', () => {
     expect(r.toJSON()).not.toBeNull();
     act(() => jest.advanceTimersByTime(200));
     expect(r.toJSON()).toBeNull();
+  });
+
+  it('keeps the overlay non-modal on iOS and stacks above sheets on Android', () => {
+    const prevOS = Platform.OS;
+    try {
+      Platform.OS = 'ios';
+      const iosHost = mountHost();
+      showNamed('ios-toast', { durationMs: 'persistent' });
+      const overlay = iosHost.root.findByType('FullWindowOverlay' as never);
+      expect(overlay.props.unstable_accessibilityContainerViewIsModal).toBe(false);
+      act(() => iosHost.unmount());
+      renderer = undefined;
+
+      Platform.OS = 'android';
+      const androidHost = mountHost();
+      showNamed('android-toast', { durationMs: 'persistent' });
+      const rootView = androidHost.root.findByType('GestureHandlerRootView' as never);
+      const flat = StyleSheet.flatten(rootView.props.style);
+      expect(flat.zIndex).toBeGreaterThan(1000);
+      expect(flat.elevation).toBeGreaterThan(1000);
+    } finally {
+      Platform.OS = prevOS;
+    }
   });
 });

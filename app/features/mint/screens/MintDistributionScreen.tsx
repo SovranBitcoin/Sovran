@@ -332,7 +332,7 @@ export function MintDistributionScreen() {
                       isSelected={splitEvenly}
                       isDisabled={membershipPending}
                       onSelectedChange={handleSplitEvenlyToggle}
-                      aria-label="Split evenly"
+                      accessibilityLabel="Split evenly"
                       testID="mint-distribution-split-evenly"
                     />
                   </ListGroup.ItemSuffix>

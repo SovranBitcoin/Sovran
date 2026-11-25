@@ -95,7 +95,7 @@ export function ToastHost() {
 
   if (toasts.length === 0 && !lingering) return null;
   return (
-    <OverlayWindow>
+    <OverlayWindow modal={false} zIndex={2000}>
       <View
         pointerEvents="box-none"
         style={{

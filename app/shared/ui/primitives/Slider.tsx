@@ -52,6 +52,7 @@ export function Slider({
   const percent = useSharedValue((value - minValue) / range);
   const dragging = useSharedValue(false);
   const last = useSharedValue(value);
+  const dragStart = useSharedValue(value);
   // Follow the controlled value, except under the finger.
   useEffect(() => {
     if (!dragging.get()) percent.set((value - minValue) / range);
@@ -65,30 +66,52 @@ export function Slider({
   const track = Math.max(0, width - THUMB_WIDTH);
   const moveTo = (x: number, end: boolean) => {
     'worklet';
-    const next = snap(
-      minValue + ((x - THUMB_WIDTH / 2) / (track || 1)) * range,
-      minValue,
-      maxValue,
-      step
-    );
+    if (track <= 0) return;
+    const next = snap(minValue + ((x - THUMB_WIDTH / 2) / track) * range, minValue, maxValue, step);
     percent.set((next - minValue) / range);
     if (end || next !== last.get()) {
       last.set(next);
       scheduleOnRN(emit, next, end);
     }
   };
+  const revertDrag = () => {
+    'worklet';
+    const original = dragStart.get();
+    percent.set((original - minValue) / range);
+    if (last.get() !== original) {
+      last.set(original);
+      scheduleOnRN(emit, original, false);
+    }
+  };
+  // Require horizontal intent before taking over from a parent vertical scroll
+  // view, and commit `onChangeEnd` only when the drag or tap succeeds.
   const pan = Gesture.Pan()
     .enabled(!isDisabled)
-    .minDistance(0)
-    .onBegin((event) => {
+    .activeOffsetX([-6, 6])
+    .failOffsetY([-10, 10])
+    .onStart((event) => {
       dragging.set(true);
+      dragStart.set(last.get());
       moveTo(event.x, false);
     })
     .onUpdate((event) => moveTo(event.x, false))
-    .onFinalize((event) => {
-      moveTo(event.x, true);
+    .onEnd((event, success) => {
+      if (success) moveTo(event.x, true);
+      else revertDrag();
+    })
+    .onFinalize((_event, success) => {
+      if (!success && dragging.get()) revertDrag();
       dragging.set(false);
     });
+  const tap = Gesture.Tap()
+    .enabled(!isDisabled)
+    .maxDistance(6)
+    .onEnd((event, success) => {
+      if (!success) return;
+      moveTo(event.x, false);
+      moveTo(event.x, true);
+    });
+  const gesture = Gesture.Exclusive(pan, tap);
 
   const adjust = (direction: 1 | -1) => {
     const next = snap(value + direction * step, minValue, maxValue, step);
@@ -97,7 +120,7 @@ export function Slider({
   };
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={gesture}>
       <View
         testID={testID}
         accessible

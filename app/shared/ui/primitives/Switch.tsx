@@ -20,6 +20,7 @@ type SwitchProps = {
   isDisabled?: boolean;
   testID?: string;
   accessibilityLabel?: string;
+  'aria-label'?: string;
 };
 
 /**
@@ -36,6 +37,7 @@ export function Switch({
   isDisabled = false,
   testID,
   accessibilityLabel,
+  'aria-label': ariaLabel,
 }: SwitchProps) {
   const { track } = useStylePaint();
   const [on] = useThemeColor(['success'] as const);
@@ -49,7 +51,7 @@ export function Switch({
     <Pressable
       testID={testID}
       accessibilityRole="switch"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? ariaLabel}
       accessibilityState={{ checked: isSelected, disabled: isDisabled }}
       disabled={isDisabled}
       activeOpacity={1}

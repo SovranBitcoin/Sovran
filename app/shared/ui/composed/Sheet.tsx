@@ -35,17 +35,33 @@ const DISMISS_VELOCITY = 800;
 type SheetScroll = { offset: SharedValue<number>; gesture: ReturnType<typeof Gesture.Native> };
 
 /**
- * Where a sheet draws: above everything, route modals included. iOS needs a
+ * Where an overlay draws: above everything, route modals included. iOS needs a
  * FullWindowOverlay for that (and a gesture root inside it); on Android a
- * host mounted after the navigator already sits on top.
+ * host mounted after the navigator sits on top, ordered by `zIndex`/`elevation`
+ * so toasts always stay above sheet scrims. Non-modal overlays (toasts) must
+ * pass `modal={false}` so VoiceOver can still reach the screen beneath.
  */
-export function OverlayWindow({ children }: { children: ReactNode }) {
+export function OverlayWindow({
+  children,
+  modal = true,
+  zIndex,
+}: {
+  children: ReactNode;
+  modal?: boolean;
+  zIndex?: number;
+}) {
   const body = (
-    <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <GestureHandlerRootView
+      style={[StyleSheet.absoluteFill, zIndex != null ? { zIndex, elevation: zIndex } : undefined]}
+      pointerEvents="box-none">
       {children}
     </GestureHandlerRootView>
   );
-  return Platform.OS === 'ios' ? <FullWindowOverlay>{body}</FullWindowOverlay> : body;
+  return Platform.OS === 'ios' ? (
+    <FullWindowOverlay unstable_accessibilityContainerViewIsModal={modal}>{body}</FullWindowOverlay>
+  ) : (
+    body
+  );
 }
 
 type SheetProps = {
@@ -167,7 +183,7 @@ export function Sheet({
 
   const fixedHeight = height ? (window.height * parseFloat(height)) / 100 : undefined;
   return (
-    <OverlayWindow>
+    <OverlayWindow modal zIndex={1000}>
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none" accessible={false}>
         <Animated.View
           style={[StyleSheet.absoluteFill, { backgroundColor: scrimColor }, scrimStyle]}>

@@ -166,7 +166,12 @@ function gesture(kind: string) {
 }
 
 export const gestureHandler = {
-  Gesture: { Pan: () => gesture('pan'), Native: () => gesture('native') },
+  Gesture: {
+    Pan: () => gesture('pan'),
+    Tap: () => gesture('tap'),
+    Native: () => gesture('native'),
+    Exclusive: (...gestures: unknown[]) => ({ kind: 'exclusive', gestures }),
+  },
   GestureDetector: ({
     children,
     gesture: detected,
@@ -186,8 +191,13 @@ export const keyboardController = {
 };
 
 export const screens = {
-  FullWindowOverlay: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('FullWindowOverlay', null, children),
+  FullWindowOverlay: ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    unstable_accessibilityContainerViewIsModal?: boolean;
+  }) => React.createElement('FullWindowOverlay', props, children),
 };
 
 export const worklets = {
