@@ -52,3 +52,14 @@ it('is unknown when a keyset is missing, the fee is malformed, or the token does
   ).toBeUndefined();
   expect(tokenReceiveFee('cashuBnotatoken', [{ id: KEYSET, feePpk: 100 }])).toBeUndefined();
 });
+
+it('sums fees past the safe-integer range exactly before rounding up', () => {
+  const t = token([proof(KEYSET, 8, 1), proof(OTHER, 2, 2)]);
+  // 9007199254740991 + 10 ppk = 9007199254741001 ppk → 9007199254742 units.
+  expect(
+    tokenReceiveFee(t, [
+      { id: KEYSET, feePpk: Number.MAX_SAFE_INTEGER },
+      { id: OTHER, feePpk: 10 },
+    ])
+  ).toBe(9_007_199_254_742);
+});

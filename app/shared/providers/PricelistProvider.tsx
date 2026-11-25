@@ -12,19 +12,23 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
   const setBtcPrices = usePricelistStore((s) => s.setBtcPrices);
   const setLoading = usePricelistStore((s) => s.setLoading);
   const setError = usePricelistStore((s) => s.setError);
-  const { isOffline } = useOfflineStatus();
+  // Only the phone reporting no network pauses the feed. Failed reachability
+  // probes do not: Coinbase's /v2/time can be the only probe, and Coinbase
+  // being down is exactly when the feed must still reach Mempool.space; the
+  // feed's own backoff bounds those retries.
+  const { isDisconnected } = useOfflineStatus();
 
   const feedRef = useRef<PricelistFeed | null>(null);
-  const offlineRef = useRef(isOffline);
+  const offlineRef = useRef(isDisconnected);
 
-  // Confirmed offline pauses the feed (cancelling any request); reconnecting
+  // Disconnected pauses the feed (cancelling any request); reconnecting
   // refreshes at once when a poll is due or the last one failed. The feed
   // ignores a repeated state. Declared first so a feed created below starts
   // from the current connectivity rather than dialling out while offline.
   useEffect(() => {
-    offlineRef.current = isOffline;
-    feedRef.current?.setOffline(isOffline);
-  }, [isOffline]);
+    offlineRef.current = isDisconnected;
+    feedRef.current?.setOffline(isDisconnected);
+  }, [isDisconnected]);
 
   useEffect(() => {
     const feed = createPricelistFeed({

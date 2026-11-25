@@ -534,6 +534,36 @@ describe('pricelist provider fallback', () => {
     expect(usePricelistStore.getState().serverUpdatedAt).toBe(MEMPOOL_OK.time);
     feed.stop();
   });
+
+  it('never lets an older Mempool snapshot overwrite a fresher cached price', async () => {
+    usePricelistStore.getState().setBtcPrices({ USD: 100_000, EUR: 90_000, GBP: 80_000 }, nowSec);
+    const cached = usePricelistStore.getState().pricelist;
+    serve({
+      coinbase: async () => new Response('down', { status: 503 }),
+      mempool: async () => mempool({ time: nowSec - 7_000, USD: 80_000, EUR: 70_000, GBP: 60_000 }),
+    });
+    const { feed, onPrices } = makeFeed(jest.fn(fetchBtcRates));
+    feed.start();
+    await settle();
+    expect(onPrices).not.toHaveBeenCalled();
+    expect(usePricelistStore.getState().pricelist).toEqual(cached);
+    expect(usePricelistStore.getState().pricelist?.usd?.btc).toBe(100_000);
+    expect(usePricelistStore.getState().serverUpdatedAt).toBe(nowSec);
+    feed.stop();
+  });
+
+  it('takes a Mempool snapshot newer than the cache', async () => {
+    usePricelistStore
+      .getState()
+      .setBtcPrices({ USD: 100_000, EUR: 90_000, GBP: 80_000 }, nowSec - 600);
+    serve({ coinbase: async () => coinbase({}), mempool: async () => mempool(MEMPOOL_OK) });
+    const { feed } = makeFeed(jest.fn(fetchBtcRates));
+    feed.start();
+    await settle();
+    expect(usePricelistStore.getState().pricelist?.usd?.btc).toBe(76_000);
+    expect(usePricelistStore.getState().serverUpdatedAt).toBe(MEMPOOL_OK.time);
+    feed.stop();
+  });
 });
 
 // While the phone is confirmed offline nothing is requested: an in-flight

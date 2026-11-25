@@ -136,12 +136,17 @@ export function MintDistributionScreen() {
   );
 
   const mintUrls = mintsForCurrency.map((m) => m.mintUrl);
+  // Until every trusted mint's units are known, the split's membership is not:
+  // initialising now would prune a still-loading mint's saved share (70/30
+  // would become 100/0 and stay that way once its info arrives).
+  const membershipPending = trustedMints.some((mint) => !mint.mintInfo);
 
   useEffect(() => {
+    if (membershipPending) return;
     if (mintUrls.length > 0) {
       initializeDistribution(selectedCurrency, mintUrls);
     }
-  }, [selectedCurrency, mintUrls, initializeDistribution]);
+  }, [membershipPending, selectedCurrency, mintUrls, initializeDistribution]);
 
   // "Split evenly" mode: ON keeps every enabled mint at an equal share (the
   // sliders are read-only), OFF frees the sliders for a custom split. Not
@@ -152,12 +157,12 @@ export function MintDistributionScreen() {
   const [splitEvenly, setSplitEvenly] = useState(false);
   const seededSplitEvenlyFor = useRef<string | null>(null);
   useEffect(() => {
-    if (mintUrls.length === 0) return;
+    if (membershipPending || mintUrls.length === 0) return;
     if (seededSplitEvenlyFor.current === selectedCurrency) return;
     seededSplitEvenlyFor.current = selectedCurrency;
     const stored = useMintDistributionStore.getState().getDistribution(selectedCurrency);
     setSplitEvenly(isEvenSplit(stored, mintUrls));
-  }, [selectedCurrency, mintUrls]);
+  }, [membershipPending, selectedCurrency, mintUrls]);
 
   const mountedRef = useRef(true);
   useEffect(() => {

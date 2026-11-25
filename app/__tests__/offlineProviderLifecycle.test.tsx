@@ -197,3 +197,36 @@ it('logs each change with the reason and the target that decided it', async () =
     probeOutcomes: 'nagg:404,second:200',
   });
 });
+
+it('says the phone is disconnected only when the OS reports no network, not when probes fail', async () => {
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'probe-unreachable',
+    probes: [],
+  });
+  const { result } = renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6000);
+  });
+  expect(result.current.isOffline).toBe(true);
+  expect(result.current.isDisconnected).toBe(false);
+
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'network-disconnected',
+    probes: [],
+  });
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6000);
+  });
+  expect(result.current.isOffline).toBe(true);
+  expect(result.current.isDisconnected).toBe(true);
+
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({ ...reachable, probes: [] });
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6000);
+  });
+  expect(result.current.isOffline).toBe(false);
+  expect(result.current.isDisconnected).toBe(false);
+});

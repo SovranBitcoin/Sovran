@@ -93,3 +93,24 @@ it('lets the push through when the focused route cannot be read', () => {
   guardedRouter.push('/(mint-flow)/add');
   expect(push).toHaveBeenCalledTimes(1);
 });
+
+it('never mistakes an encoded & inside one value for a second param', () => {
+  focus('/transactions', ['(drawer)', '(tabs)', 'transactions'], {
+    filterCounterparty: 'a&filterMintUrl=b',
+  });
+  guardedRouter.push('/transactions?filterCounterparty=a&filterMintUrl=b' as never);
+  expect(push).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the order of a repeated param', () => {
+  mockFocused = {
+    pathname: '/transactions',
+    segments: ['(drawer)', '(tabs)', 'transactions'],
+    searchParams: new URLSearchParams('tag=b&tag=a'),
+  };
+  guardedRouter.push('/transactions?tag=b&tag=a' as never);
+  expect(push).toHaveBeenCalledTimes(0);
+  now += 700;
+  guardedRouter.push('/transactions?tag=a&tag=b' as never);
+  expect(push).toHaveBeenCalledTimes(1);
+});

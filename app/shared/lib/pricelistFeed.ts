@@ -5,6 +5,7 @@ import { log } from '@/shared/lib/logger';
 import {
   PRICE_STALE_MINUTES,
   RATE_CODES,
+  usePricelistStore,
   type BitcoinPrices,
 } from '@/shared/stores/global/pricelistStore';
 
@@ -19,6 +20,21 @@ interface PricelistFeedOptions {
   onLoading: (loading: boolean) => void;
   onError: (error: string | null) => void;
   fetcher?: typeof fetchBtcRates;
+  /**
+   * When the cached prices were priced, in seconds, or null with no cache.
+   * Defaults to the hydrated pricelist store.
+   */
+  cachedAtSeconds?: () => number | null;
+}
+
+/**
+ * When the cached prices were priced. A legacy write kept only its local
+ * receive time, which says nothing about how old the price was, so it
+ * compares as unknown and the next complete snapshot replaces it.
+ */
+function storeCachedAtSeconds(): number | null {
+  const { pricelist, serverUpdatedAt } = usePricelistStore.getState();
+  return pricelist ? serverUpdatedAt : null;
 }
 
 export interface PricelistFeed {
@@ -41,6 +57,7 @@ export function createPricelistFeed({
   onLoading,
   onError,
   fetcher = fetchBtcRates,
+  cachedAtSeconds = storeCachedAtSeconds,
 }: PricelistFeedOptions): PricelistFeed {
   let started = false;
   let stopped = false;
@@ -100,7 +117,15 @@ export function createPricelistFeed({
 
     if (snapshot.isOk()) {
       const { prices, updatedAt, degraded, source } = snapshot.value;
-      onPrices(prices, updatedAt);
+      // A fallback snapshot (Mempool's own `time`) can be older than prices
+      // already cached; keeping the newer cache is still a good poll.
+      const cachedAt = cachedAtSeconds();
+      const older = cachedAt !== null && updatedAt <= cachedAt;
+      if (older) {
+        log.info('pricelist.poll.older', { updatedAt, cachedAt, source: source ?? null });
+      } else {
+        onPrices(prices, updatedAt);
+      }
       onError(null);
       lastSuccessAtMs = Date.now();
       failures = 0;

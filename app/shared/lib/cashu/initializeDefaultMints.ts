@@ -21,11 +21,16 @@ export async function initializeDefaultMints(
       ...defaultSelectedMintLogFields(DEFAULT_MINT_URL),
     });
 
+    // Which defaults this run saw trusted, in curated order. Selection reads
+    // this instead of asking Coco again: each check above is already bounded,
+    // and an unbounded final lookup could keep the pill pending for good.
+    const trusted: string[] = [];
     for (const mintUrl of DEFAULT_MINT_URLS) {
       if (!isLive()) return;
       try {
         log.debug('coco.mint_trust_check.start', { ...mintUrlLogFields(mintUrl) });
         const result = await ensureTrustedDefaultMint(manager.mint, mintUrl);
+        trusted.push(mintUrl);
         if (result.status === 'already-trusted') {
           log.debug('coco.mint_exists', { ...mintUrlLogFields(mintUrl) });
           continue;
@@ -47,11 +52,16 @@ export async function initializeDefaultMints(
         ...defaultSelectedMintLogFields(DEFAULT_MINT_URL),
       });
       if (isLive() && !selectedMint) {
-        const isDefaultTrusted = await manager.mint.isTrustedMint(DEFAULT_MINT_URL);
-        if (!isLive() || useMintStore.getState().selectedMint) return;
-        if (isDefaultTrusted) {
-          setSelectedMint(DEFAULT_MINT_URL);
-          log.info('coco.mint_selected', { ...mintUrlLogFields(DEFAULT_MINT_URL) });
+        // The first curated default that is trusted: the preferred one when it
+        // answered, else the next, so a wallet with trusted mints always has
+        // one selected. Never a mint this run could not trust.
+        const pick = trusted[0];
+        if (pick) {
+          setSelectedMint(pick);
+          log.info('coco.mint_selected', {
+            ...mintUrlLogFields(pick),
+            fallback: pick !== DEFAULT_MINT_URL,
+          });
         } else {
           log.warn('coco.default_mint_not_trusted', { ...mintUrlLogFields(DEFAULT_MINT_URL) });
         }

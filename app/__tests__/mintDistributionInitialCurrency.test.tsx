@@ -116,6 +116,16 @@ it('treats btc in the route as the SAT tab and no unit as SAT', () => {
 it('does not count a mint whose info has not loaded as a sat mint', () => {
   mockMints = [{ mintUrl: 'loaded', mintInfo: { units: ['sat'] } }, { mintUrl: 'unloaded' }];
   render();
+  // Membership is pending until every mint's units are known: nothing is
+  // initialised (or pruned) yet, and the unloaded mint is never assumed sat.
+  expect(mockInitialize).not.toHaveBeenCalled();
+});
+
+it('initialises once every trusted mint has loaded its info', () => {
+  mockMints = [
+    { mintUrl: 'loaded', mintInfo: { units: ['sat'] } },
+    { mintUrl: 'usd-only', mintInfo: { units: ['usd'] } },
+  ];
+  render();
   expect(mockInitialize).toHaveBeenCalledWith('SAT', ['loaded']);
-  expect(mockInitialize).not.toHaveBeenCalledWith('SAT', expect.arrayContaining(['unloaded']));
 });

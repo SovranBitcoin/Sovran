@@ -6,10 +6,23 @@ import { deferWhileRecovering } from '@/shared/lib/cashu/recoverySuppression';
 import { walletLog } from '@/shared/lib/logger';
 
 /**
+ * Whether `mintUrl`'s keyset read has settled, loaded or failed. The map holds
+ * a key for every mint a read has answered for (`undefined` when it failed),
+ * so an absent key is a read still running.
+ */
+export function hasSettledKeysetRead(
+  unitsByMint: Record<string, string[] | undefined>,
+  mintUrl: string
+): boolean {
+  return Object.hasOwn(unitsByMint, mintUrl);
+}
+
+/**
  * Units each trusted mint actually holds keysets for, keyed by mint URL.
  * `undefined` for a mint means "not known yet" — consumers must treat that
  * as unrestricted (trust the NUT-04 advertisement) so a slow DB read never
- * hides a genuinely supported unit.
+ * hides a genuinely supported unit. `hasSettledKeysetRead` tells a read that
+ * failed from one still running.
  *
  * Why this exists: some mints advertise NUT-04/05 method-units they have no
  * keysets for (chorus lists bolt11/usd with sat-only keysets); offering such

@@ -33,7 +33,10 @@ import { amountToNumber } from 'wallet/amount';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
-import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
+import {
+  hasSettledKeysetRead,
+  useMintKeysetUnits,
+} from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
 
@@ -197,6 +200,10 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     // skip the sync for this mint for good once the info arrives.
     const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
     if (!mint || !mint.mintInfo) return;
+    // Likewise its keysets: info can advertise a unit the mint holds no keys
+    // for, and deciding on the advertisement alone would consume the key
+    // before the keyset read can correct it.
+    if (!hasSettledKeysetRead(keysetUnitsByMint, preferredMintUrl)) return;
     lastUnitSyncMintRef.current = syncKey;
     const supported = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
     const currentUnit = useMintStore.getState().activeUnit;

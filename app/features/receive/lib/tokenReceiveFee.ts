@@ -25,12 +25,14 @@ export function tokenReceiveFee(token: string, keysets: readonly KeysetFee[]): n
     return undefined;
   }
   if (proofs.length === 0) return undefined;
-  let ppk = 0;
+  // Summed as BigInt: a float sum past 2^53 rounds before the division does.
+  let ppk = 0n;
   for (const proof of proofs) {
     if (!feeById.has(proof.id)) return undefined;
     const fee = feeById.get(proof.id) ?? 0;
-    if (!Number.isInteger(fee) || fee < 0) return undefined;
-    ppk += fee;
+    if (!Number.isSafeInteger(fee) || fee < 0) return undefined;
+    ppk += BigInt(fee);
   }
-  return Math.ceil(ppk / 1000);
+  const units = (ppk + 999n) / 1000n;
+  return units <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(units) : undefined;
 }

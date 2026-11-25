@@ -42,22 +42,39 @@ function shouldSuppress(signature: string): boolean {
 /** A path segment that only groups routes, like `(mint-flow)`. */
 const isGroup = (segment: string) => segment.startsWith('(') && segment.endsWith(')');
 
+type QueryEntry = [key: string, values: string[]];
+
 /**
- * A query string as sorted, decoded `key=value` pairs. Parsed by hand: React
+ * Params as `[key, values]` tuples sorted by key, each key's values in the
+ * order given. Kept structured rather than joined back into a string, so an
+ * encoded `&` or `=` inside one value never reads as a second param.
+ */
+function canonicalParams(pairs: [string, string][]): string {
+  const byKey = new Map<string, string[]>();
+  for (const [key, value] of pairs) {
+    const values = byKey.get(key);
+    if (values) values.push(value);
+    else byKey.set(key, [value]);
+  }
+  const entries: QueryEntry[] = [...byKey.entries()].sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+  return JSON.stringify(entries);
+}
+
+/**
+ * A query string as decoded `[key, value]` pairs. Parsed by hand: React
  * Native's `URLSearchParams` polyfill only promises `toString`, `get`, `has`.
  */
-function queryPairs(query: string): string[] {
+function queryPairs(query: string): [string, string][] {
   const decode = (part: string) => decodeURIComponent(part.replace(/\+/g, ' '));
   return query
     .split('&')
     .filter(Boolean)
     .map((pair) => {
       const at = pair.indexOf('=');
-      return at < 0
-        ? `${decode(pair)}=`
-        : `${decode(pair.slice(0, at))}=${decode(pair.slice(at + 1))}`;
-    })
-    .sort();
+      return at < 0 ? [decode(pair), ''] : [decode(pair.slice(0, at)), decode(pair.slice(at + 1))];
+    });
 }
 
 /**
@@ -73,7 +90,7 @@ function isFocusedRoute(href: unknown): boolean {
     const focused = routerStore.getRouteInfo();
     if (!focused) return false;
     let pathname: string;
-    let pairs: string[];
+    let pairs: [string, string][];
     if (typeof href === 'string') {
       const at = href.indexOf('?');
       pathname = at < 0 ? href : href.slice(0, at);
@@ -90,9 +107,8 @@ function isFocusedRoute(href: unknown): boolean {
         if (value === undefined) continue;
         const dynamic = `[${key}]`;
         if (pathname.includes(dynamic)) pathname = pathname.replace(dynamic, String(value));
-        else pairs.push(`${key}=${String(value)}`);
+        else pairs.push([key, String(value)]);
       }
-      pairs.sort();
     } else {
       return false;
     }
@@ -102,7 +118,7 @@ function isFocusedRoute(href: unknown): boolean {
     const path = segments.filter((segment) => !isGroup(segment));
     if (path.at(-1) === 'index') path.pop();
     if (`/${path.join('/')}` !== focused.pathname) return false;
-    return pairs.join('&') === queryPairs(focused.searchParams.toString()).join('&');
+    return canonicalParams(pairs) === canonicalParams(queryPairs(focused.searchParams.toString()));
   } catch {
     return false;
   }
