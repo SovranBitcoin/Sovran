@@ -1,7 +1,5 @@
 /**
- * @fileoverview Transactions flow swap route wrapper
- *
- * Part of the (transactions-flow) modal group - displays with back button.
+ * @fileoverview Swap route: one grouped swap, opened from history or a toast.
  *
  * Validates the `groupId` deep-link param at the route boundary per
  * AUDIT.md dim-5 — `groupId` is used as a swap-store map key downstream.
@@ -17,7 +15,7 @@ const ParamsSchema = z.object({
 });
 
 function ModalScreen() {
-  const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.swap' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.swap' });
   if (!params) return null;
 
   return (

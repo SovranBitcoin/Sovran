@@ -9,13 +9,13 @@ describe('Android flow presentation', () => {
   it('pushes the multi-step money flows instead of sheeting them', () => {
     // A drag-to-dismiss sheet over a scrolling payment flow lets a downward
     // fling throw the payment away; these are screens, left with Back.
-    for (const flow of ['(send-flow)', '(receive-flow)', '(transactions-flow)', '(mint-flow)']) {
+    for (const flow of ['(send-flow)', '(receive-flow)', '(mint-flow)', 'transactions']) {
       expect([flow, androidFlowPresentation(flow)]).toEqual([flow, 'screen']);
     }
   });
 
   it('keeps the short pick-and-leave surfaces as sheets', () => {
-    expect(androidFlowPresentation('(filter-flow)')).toBe('sheet');
+    expect(androidFlowPresentation('filters')).toBe('sheet');
     expect(androidFlowPresentation('(prompt-flow)')).toBe('sheet');
   });
 
@@ -25,7 +25,7 @@ describe('Android flow presentation', () => {
       .map((group) => ({ group, source: readFileSync(join(ROUTES, group, '_layout.tsx'), 'utf8') }))
       .filter(({ source }) => source.includes('<AndroidSheetFlowStack'));
 
-    expect(layouts.length).toBeGreaterThan(5);
+    expect(layouts.length).toBeGreaterThanOrEqual(3);
     for (const { group, source } of layouts) {
       expect([group, source.includes(`<AndroidSheetFlowStack flow="${group}">`)]).toEqual([
         group,

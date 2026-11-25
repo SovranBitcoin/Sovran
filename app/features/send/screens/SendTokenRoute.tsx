@@ -1,8 +1,8 @@
 /**
  * @fileoverview Canonical sendToken route shell
  *
- * Single body for the three sendToken expo-router files (`app/sendToken.tsx`,
- * `app/(send-flow)/sendToken.tsx`, `app/(transactions-flow)/sendToken.tsx`).
+ * Single body for the two sendToken expo-router files (`app/sendToken.tsx`,
+ * which history opens too, and `app/(send-flow)/sendToken.tsx`).
  * Each route file is a thin pass-through that supplies the `where` log
  * scope; layout-owned `Stack.Screen` titles stay in the surrounding
  * `_layout.tsx` so we have one canonical declaration per screen name.

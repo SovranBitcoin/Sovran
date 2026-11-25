@@ -1,7 +1,5 @@
 /**
- * @fileoverview Transactions flow AI-request route wrapper
- *
- * Part of the (transactions-flow) modal group — displays with a back button.
+ * @fileoverview AI-request route: one grouped AI request, opened from history.
  *
  * `groupId` is a deep-link param used as a lookup key downstream, so it is
  * validated at the route boundary like the swap group's.
@@ -18,7 +16,7 @@ const ParamsSchema = z.object({
 });
 
 function ModalScreen() {
-  const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.aiRequest' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.aiRequest' });
   if (!params) return null;
 
   return (

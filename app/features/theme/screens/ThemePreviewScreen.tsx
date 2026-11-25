@@ -128,7 +128,7 @@ export function ThemePreviewScreen() {
 
   const handleUnitPress = useCallback((unitId: string) => {
     router.push({
-      pathname: '/(theme-flow)/background',
+      pathname: '/background',
       params: { unitId },
     });
   }, []);
@@ -194,7 +194,7 @@ export function ThemePreviewScreen() {
 
         <View className="mt-1 flex-row items-center justify-center gap-12">
           <PressableFeedback
-            onPress={() => router.push('/(theme-flow)/gallery')}
+            onPress={() => router.push('/gallery')}
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>

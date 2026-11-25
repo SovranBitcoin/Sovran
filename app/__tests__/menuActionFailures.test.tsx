@@ -166,7 +166,7 @@ describe('menu action failure containment', () => {
     // The "More" overflow dispatches the FullWindowOverlay-backed
     // actionMenuSheet() lane — NOT actionMenuPopup(), whose host disables FWO
     // and paints UNDER native route modals on iOS. ButtonHandler footers live
-    // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), so
+    // inside route modals (e.g. SendTokenScreen opened from history), so
     // the popup lane renders the menu invisibly behind the modal.
     act(() => {
       findByTestID(renderer!, 'more-button').props.onPress();

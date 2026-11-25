@@ -125,7 +125,7 @@ export function WalletScreen() {
 
   const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
-    router.navigate('/(theme-flow)/preview');
+    router.navigate('/preview');
   };
 
   const handleSplit = () => {
@@ -152,14 +152,14 @@ export function WalletScreen() {
     // Opens on the account the wallet is showing, as the pending and
     // View-all links do, rather than the sat default.
     router.navigate({
-      pathname: '/(transactions-flow)/transactions',
+      pathname: '/transactions',
       params: transactionsRouteParams({ currency: account.unit }),
     });
   };
 
   const handleMap = () => {
     walletLog.info('wallet.map.tap');
-    router.navigate('/(map-flow)');
+    router.navigate('/map');
   };
 
   // Every home action, once. The active style's layout decides where each one

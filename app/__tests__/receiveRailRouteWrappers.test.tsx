@@ -3,8 +3,9 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import ActiveLightning from '@/app/(receive-flow)/lightningReceive';
 import ActiveOnchain from '@/app/(receive-flow)/onchainReceive';
-import HistoryLightning from '@/app/(transactions-flow)/lightningReceive';
-import HistoryOnchain from '@/app/(transactions-flow)/onchainReceive';
+// History opens the root routes, marked `historyView=1`.
+import HistoryLightning from '@/app/lightningReceive';
+import HistoryOnchain from '@/app/onchainReceive';
 import { cashuLog } from '@/shared/lib/logger';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -27,6 +28,10 @@ jest.mock('expo-router', () => ({
   router: { back: (...args: unknown[]) => mockBack(...args), canGoBack: () => true },
   Stack: { Screen: () => null },
 }));
+jest.mock('@/shared/ui/composed/FormSheetChrome', () => ({
+  FormSheetChrome: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/features/receive', () => ({
   LightningReceiveRoute: jest.requireActual<
     typeof import('@/features/receive/screens/LightningReceiveRoute')

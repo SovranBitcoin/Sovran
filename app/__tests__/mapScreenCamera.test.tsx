@@ -217,7 +217,7 @@ it('a cluster tap zooms one past its expansion zoom; a merchant tap opens its pa
     await mapView().props.onMarkerClick({ id: 'point-42' });
   });
   expect(mockRouter.navigate).toHaveBeenCalledWith({
-    pathname: '/(map-flow)/detail',
+    pathname: '/detail',
     params: { placeId: '42' },
   });
 });

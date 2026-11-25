@@ -117,7 +117,31 @@ describe('feature route guard', () => {
   });
 
   it('keeps history viewable', () => {
-    expect(disabledFeatureForRoute(['(transactions-flow)', 'sendToken'], enabled)).toBeNull();
+    const entry = { historyView: '1', sendHistoryEntry: '{"id":"x"}' };
+    expect(disabledFeatureForRoute(['sendToken'], enabled, entry)).toBeNull();
+    expect(
+      disabledFeatureForRoute(['lightningSend'], enabled, {
+        historyView: '1',
+        meltHistoryEntry: '{"id":"x"}',
+      })
+    ).toBeNull();
+  });
+
+  it('opens a disabled rail from history only with the row it shows', () => {
+    // The marker alone, or a row under another rail's param, is not a past payment.
+    expect(disabledFeatureForRoute(['sendToken'], enabled, { historyView: '1' })).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        meltHistoryEntry: '{"id":"x"}',
+      })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, { sendHistoryEntry: '{"id":"x"}' })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['(send-flow)', 'sendToken'], enabled, { historyView: '0' })
+    ).toBe('ecash');
   });
 });
 

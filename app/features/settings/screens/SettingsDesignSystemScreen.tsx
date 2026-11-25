@@ -114,7 +114,7 @@ function useFlowLinks(): FlowLink[] {
       id: 'transactions',
       title: 'Transactions',
       description: 'The full list, filters, and a transaction detail from any row',
-      open: () => router.navigate('/(transactions-flow)/transactions'),
+      open: () => router.navigate('/transactions'),
     },
     {
       id: 'add-mint',
@@ -126,13 +126,13 @@ function useFlowLinks(): FlowLink[] {
       id: 'wallpapers',
       title: 'Wallpapers',
       description: 'Albums and per-account wallpaper, to check a style over an image',
-      open: () => router.navigate('/(theme-flow)/preview'),
+      open: () => router.navigate('/preview'),
     },
     {
       id: 'map',
       title: 'Bitcoin near me',
       description: 'The map and a place detail',
-      open: () => router.navigate('/(map-flow)'),
+      open: () => router.navigate('/map'),
     },
   ];
 }

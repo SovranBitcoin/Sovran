@@ -53,9 +53,9 @@ export const CANONICAL_PAGES = [
   'search', // Search tab: people, mints and places (SearchScreen)
   'settings', // Settings tab root ((tabs)/settings, SettingsScreen)
   'image-viewer', // fullscreen media overlay; no standalone route
-  'theme-preview', // per-unit wallpaper preview cards ((theme-flow)/preview)
-  'gallery', // wallpaper album gallery ((theme-flow)/gallery)
-  'transactions', // full transactions list ((transactions-flow)/transactions)
+  'theme-preview', // per-unit wallpaper preview cards (/preview)
+  'gallery', // wallpaper album gallery (/gallery)
+  'transactions', // full transactions list (/transactions)
   'balance-split', // per-mint distribution sliders (MintDistributionScreen)
   'rebalance-plan', // rebalance transfer plan + run progress (MintRebalancePlanScreen)
   'swap', // swap-group detail screen (SwapTransactionScreen)

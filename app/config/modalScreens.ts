@@ -151,17 +151,9 @@ const modalTransparent = (name: string, title?: string): ModalConfig => ({
   },
 });
 
-const flowGroups = [
-  '(receive-flow)',
-  '(send-flow)',
-  '(transactions-flow)',
-  '(prompt-flow)',
-  '(mint-flow)',
-  '(filter-flow)',
-  '(map-flow)',
-  '(theme-flow)',
-  '(profile-flow)',
-].map((name) => modalFlow(name));
+const flowGroups = ['(receive-flow)', '(send-flow)', '(prompt-flow)', '(mint-flow)', '(profile-flow)'].map(
+  (name) => modalFlow(name)
+);
 
 const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
@@ -187,6 +179,20 @@ const standaloneScreens: ModalConfig[] = [
   modalWithGradient('onchainReceive', 'modal', railHeaderTitle('onchainReceive')),
   modalWithGradient('paymentRequest', 'modal', railHeaderTitle('ecashReceive')),
   modalWithGradient('sendToken', 'modal', railHeaderTitle('ecashSend')),
+  // Transaction history. Each row opens its payment's detail route above
+  // (marked `historyView=1`), as a sheet over the list on iPhone and a pushed
+  // page on Android; the filters are a sheet on both.
+  modalWithGradient('transactions', 'modal'),
+  modalWithGradient('filters', 'modal', 'Filters'),
+  modalWithGradient('swap', 'modal', railHeaderTitle('swap')),
+  modalWithGradient('aiRequest', 'modal', 'AI request'),
+  // The merchant map, and one merchant over it.
+  modalWithGradient('map', 'modal', 'Bitcoin map'),
+  modalWithGradient('detail', 'modal', 'Merchant details'),
+  // The wallpaper picker: the preview, then a background or the gallery over it.
+  modalWithGradient('preview', 'modal', 'Theme preview'),
+  modalWithGradient('background', 'modal', 'Background'),
+  modalWithGradient('gallery', 'modal', 'Gallery'),
   cardFade('claimUsername', {
     headerShadowVisible: false,
     headerTitle: '',

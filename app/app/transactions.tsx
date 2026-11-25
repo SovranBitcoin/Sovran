@@ -1,10 +1,10 @@
 /**
- * @fileoverview Transactions flow entry screen
+ * @fileoverview Transactions: the full history list.
  *
- * Part of the (transactions-flow) modal group.
- * Clicking on a transaction navigates horizontally within the modal.
- * Uses native header with liquid glass buttons.
- * Includes filter button in header right that opens filter sheet.
+ * A root route. A row opens the payment's own detail route (marked as a
+ * history view); the header's filter button opens `/filters`, which returns
+ * here with `filter*` params. The filters live in a provider owned by this
+ * route, so they last as long as the list is open.
  *
  * Validates the deep-link `filter*` params at the route boundary per
  * AUDIT.md dim-5 — strings are downcast to closed unions
@@ -18,6 +18,7 @@ import {
   countActiveFilters,
   filtersFromTransactionsParams,
   mergeTransactionFilters,
+  TransactionsFilterProvider,
   TransactionsRouteParamsSchema,
   useTransactionsFilter,
 } from '@/features/transactions';
@@ -32,13 +33,19 @@ import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailR
 import { withAlpha } from '@/shared/lib/color';
 import { cashuLog } from '@/shared/lib/logger';
 
-function FilterButton({ activeFilterCount }: { activeFilterCount: number }) {
+// The header renders outside this route's tree, so it gets the opener as a prop.
+function FilterButton({
+  activeFilterCount,
+  onPress,
+}: {
+  activeFilterCount: number;
+  onPress: () => void;
+}) {
   const [foreground, accent, accentForeground] = useThemeColor([
     'foreground',
     'accent',
     'accent-foreground',
   ] as const);
-  const { openFilterSheet } = useTransactionsFilter();
   const hasActiveFilters = activeFilterCount > 0;
 
   return (
@@ -46,7 +53,7 @@ function FilterButton({ activeFilterCount }: { activeFilterCount: number }) {
       icon="fluent:filter-16-filled"
       size={22}
       color={hasActiveFilters ? withAlpha(foreground, 0.4) : foreground}
-      onPress={openFilterSheet}
+      onPress={onPress}
       testID="transactions-filter-open"
       accessibilityLabel="Open transaction filters"
       accessory={
@@ -66,9 +73,11 @@ function FilterButton({ activeFilterCount }: { activeFilterCount: number }) {
 
 function TransactionsRoute() {
   const params = useRouteParams(TransactionsRouteParamsSchema, {
-    where: 'transactions-flow.transactions',
+    where: 'app.transactions',
   });
-  const { filters, updateFilters, selectedMonth, setSelectedMonth } = useTransactionsFilter();
+  const { filters, updateFilters, selectedMonth, setSelectedMonth, openFilterSheet } =
+    useTransactionsFilter();
+  const [background] = useThemeColor(['surface'] as const);
 
   // Sync filter params from URL to context (when returning from filter flow)
   const filterCurrency = params?.filterCurrency;
@@ -155,7 +164,13 @@ function TransactionsRoute() {
           title: 'Transactions',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
-          headerRight: () => <FilterButton activeFilterCount={countActiveFilters(shownFilters)} />,
+          contentStyle: { backgroundColor: background },
+          headerRight: () => (
+            <FilterButton
+              activeFilterCount={countActiveFilters(shownFilters)}
+              onPress={openFilterSheet}
+            />
+          ),
         })}
       />
 
@@ -169,4 +184,10 @@ function TransactionsRoute() {
   );
 }
 
-export default TransactionsRoute;
+export default function TransactionsRouteWithFilters() {
+  return (
+    <TransactionsFilterProvider>
+      <TransactionsRoute />
+    </TransactionsFilterProvider>
+  );
+}

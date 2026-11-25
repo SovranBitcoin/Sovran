@@ -4,7 +4,7 @@
  * Single body for the Lightning receive expo-router files. The active
  * (receive-flow) route asks for `editableMint`, which binds the payment
  * machine and wires the mint pill so the user can swap mints mid-flow;
- * standalone and transactions-flow re-entries omit it, so
+ * standalone re-entries (history, toasts, links) omit it, so
  * `LightningReceiveScreen` renders the entry read-only.
  *
  * Validates the JSON-encoded `mintHistoryEntry` deep-link param at the

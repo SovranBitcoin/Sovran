@@ -9,8 +9,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import TransactionsRoute from '@/app/(transactions-flow)/transactions';
-import { TransactionsFilterProvider } from '@/features/transactions/components/TransactionsFilterContext';
+import TransactionsRoute from '@/app/transactions';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -92,11 +91,8 @@ const EVERY_FILTER = {
 };
 
 let renderer: TestRenderer.ReactTestRenderer;
-const tree = () => (
-  <TransactionsFilterProvider>
-    <TransactionsRoute />
-  </TransactionsFilterProvider>
-);
+// The route owns the filters' provider: they last while the list stays mounted.
+const tree = () => <TransactionsRoute />;
 function open(raw: Record<string, string>) {
   mockRaw = raw;
   act(() => {

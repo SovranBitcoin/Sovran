@@ -2,7 +2,7 @@
   "app/(drawer)/_layout.tsx": {
     "stylesheet-create": 1
   },
-  "app/(transactions-flow)/transactions.tsx": {
+  "app/transactions.tsx": {
     "inline-style": 1
   },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
