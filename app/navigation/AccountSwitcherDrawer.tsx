@@ -260,7 +260,7 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
           testID: `drawer-profile-view-${profile.accountIndex}`,
           onPress: () => {
             router.navigate({
-              pathname: '/(user-flow)/profile',
+              pathname: '/profile',
               params: { pubkey: profile.pubkey },
             });
           },

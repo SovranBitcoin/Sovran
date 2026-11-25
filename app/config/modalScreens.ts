@@ -14,6 +14,12 @@ export interface ModalConfig {
    * the root stack gives it the app's back button in place of the system one.
    */
   androidPushed?: boolean;
+  /**
+   * How the route presents when opened with `entry=sheet`
+   * (`buildModalProfileHref`): on iPhone a page that follows a sheet would be
+   * pushed beneath it, so a page opened from a sheet becomes a sheet too.
+   */
+  sheet?: Omit<ModalConfig, 'name' | 'sheet'>;
 }
 
 /**
@@ -151,13 +157,35 @@ const modalTransparent = (name: string, title?: string): ModalConfig => ({
   },
 });
 
-const flowGroups = ['(receive-flow)', '(send-flow)', '(prompt-flow)', '(mint-flow)', '(profile-flow)'].map(
-  (name) => modalFlow(name)
+const flowGroups = ['(receive-flow)', '(send-flow)', '(prompt-flow)', '(mint-flow)'].map((name) =>
+  modalFlow(name)
 );
+
+/**
+ * A page pushed onto the root stack, with the native header and its back
+ * button (the app's on Android); `headerShown: false` for the pages that draw
+ * their own. Opened with `entry=sheet` it is the page sheet on iPhone instead.
+ */
+const pushedPage = (name: string, title?: string, ownHeader = false): ModalConfig => {
+  const header = ownHeader ? { headerShown: false } : GRADIENT_HEADER_OPTIONS;
+  return {
+    name,
+    ...(title && { title }),
+    androidPushed: !ownHeader && Platform.OS === 'android',
+    options: { presentation: 'card', animation: 'slide_from_right', ...header },
+    ...(Platform.OS === 'ios' && {
+      sheet: { ...(title && { title }), options: { presentation: 'modal', ...header } },
+    }),
+  };
+};
 
 const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
-  slideFromRight('(user-flow)'),
+  // A Nostr profile and the BitChat pages it leads to.
+  pushedPage('profile', 'Profile'),
+  pushedPage('geohashChat', undefined, true),
+  pushedPage('bitchatNetwork', undefined, true),
+  pushedPage('bitchatDM', undefined, true),
   modalTransparent('camera', 'Scan QR'),
   modalWithGradient('share', 'formSheet'),
   // Every fact about one payment, under the same header as every other

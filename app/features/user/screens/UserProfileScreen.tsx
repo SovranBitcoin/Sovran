@@ -77,7 +77,7 @@ import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getContrastColors, withAlpha } from '@/shared/lib/color';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
+import { buildProfileHref, useProfileEntry } from '@/shared/lib/nav/profileRoutes';
 import { buildMintInfoHref, getProfileMintInfoUrl } from '@/shared/lib/nav/mintInfoRoutes';
 import {
   selectIsFollowingPubkey,
@@ -419,7 +419,7 @@ function TopFollowers({
   visualScope: string;
 }) {
   const foreground = useThemeColor('foreground');
-  const profileFlowGroup = useActiveProfileFlowGroup();
+  const profileEntry = useProfileEntry();
   const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useSharedValue(0);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
@@ -456,7 +456,7 @@ function TopFollowers({
   const handleFollowerPress = (follower: TopFollower) => {
     // push (not navigate) so each profile pushes a new stack entry; tapping
     // through follower → follower-of-follower then back returns step by step.
-    router.push(buildProfileHref('profile', { npub: follower.npub }, profileFlowGroup) as never);
+    router.push(buildProfileHref('profile', { npub: follower.npub }, profileEntry) as never);
   };
 
   const renderItem = (follower: TopFollower) => (
@@ -1048,10 +1048,9 @@ export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const profileFlowGroup = useActiveProfileFlowGroup();
   const { keys: nostrKeys } = useNostrKeysContext();
   const params = useRouteParams(UserProfileParamsSchema, {
-    where: 'user-flow.profile',
+    where: 'app.profile',
   });
   const npubParam = params?.npub;
   const pubkeyParam = params?.pubkey;
@@ -1077,7 +1076,7 @@ export function UserProfileScreen() {
   // The same hook drives `UserMessagesScreen`, so navigating
   // Profile → Send Message hits a warm cache and the conversation
   // header renders instantly with the right name + avatar (and the
-  // /(user-flow)/userMessages route avoids a duplicate kind-0
+  // /userMessages route avoids a duplicate kind-0
   // fetch). First open per session pays one round-trip; the cache
   // entry is shared across surfaces and persists across launches.
   const {
@@ -1261,15 +1260,11 @@ export function UserProfileScreen() {
   // only when it exists is what makes that choice.
   const handleShareQr = () => {
     router.push(
-      buildProfileHref(
-        'share',
-        {
-          type: 'npub',
-          data: npub,
-          ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-        },
-        profileFlowGroup
-      ) as never
+      buildProfileHref('share', {
+        type: 'npub',
+        data: npub,
+        ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+      }) as never
     );
   };
 

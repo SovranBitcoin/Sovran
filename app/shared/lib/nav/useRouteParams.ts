@@ -8,7 +8,7 @@ import { log } from '@/shared/lib/logger';
 type LoggableIssue = ReturnType<typeof loggableIssues>[number];
 
 export interface UseRouteParamsOptions {
-  /** Short identifier for log lines, e.g. `'user-flow.bitchatDM'`. */
+  /** Short identifier for log lines, e.g. `'app.bitchatDM'`. */
   where: string;
   /**
    * Behaviour when the params fail validation. Defaults to `'back'`, which

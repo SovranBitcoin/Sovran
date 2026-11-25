@@ -25,7 +25,7 @@ export function registerNativeSearchDismiss(handler: DismissHandler): () => void
  * active inside the `role="search"` tab, deactivates it (`cancelSearch()`) and
  * waits two frames before running `navigate`.
  *
- * Pushing a root-stack route (like `/(user-flow)/profile`) while a nested
+ * Pushing a root-stack route (like `/profile`) while a nested
  * `UITabBarController`'s search controller is still active leaves iOS 26's
  * bottom native tab bar corrupted when popping back. Letting UIKit commit
  * `_controller.active = NO` first keeps the footer tabs intact on return.

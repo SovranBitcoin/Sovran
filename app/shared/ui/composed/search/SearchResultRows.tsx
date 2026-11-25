@@ -131,7 +131,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       onPress={() => {
         paymentLog.info('contact.geohash.press', { geohash, source: 'search' });
         runAfterNativeSearchDismiss(() => {
-          router.push({ pathname: '/(user-flow)/geohashChat', params: { geohash } });
+          router.push({ pathname: '/geohashChat', params: { geohash } });
         });
       }}
       testID={`contact-row:geohash:${geohash}`}
@@ -159,7 +159,7 @@ function TierRow({ tier }: { tier: TierEntry }) {
         });
         runAfterNativeSearchDismiss(() => {
           router.push({
-            pathname: '/(user-flow)/geohashChat',
+            pathname: '/geohashChat',
             params: { geohash: tier.geohash, tierLabel: tier.label, transport: tier.transport },
           });
         });

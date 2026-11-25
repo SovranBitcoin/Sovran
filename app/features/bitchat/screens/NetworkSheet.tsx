@@ -48,7 +48,7 @@ function PeerRow({ peer }: PeerRowProps) {
     // upstream bitchat's UX where the peer list is a sidebar that dismisses
     // on tap.
     router.replace({
-      pathname: '/(user-flow)/bitchatDM',
+      pathname: '/bitchatDM',
       params: {
         transport: 'ble-dm',
         peerID: peer.peerID,

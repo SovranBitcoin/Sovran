@@ -23,6 +23,7 @@ import { useFeatureRouteGuard } from '@/shared/lib/nav/featureRoutes';
 import { preloadNfcSupported } from '@/shared/lib/nfc/useNfcSupported';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { isSheetEntry } from '@/shared/lib/nav/profileRoutes';
 
 initLog('Module', '_layout loaded');
 
@@ -149,9 +150,21 @@ function RootLayoutContent() {
   // Memoize the modal screen list so it isn't rebuilt on every root re-render.
   const modalScreenElements = useMemo(
     () =>
-      MODAL_SCREENS.map((screen) => (
-        <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
-      )),
+      MODAL_SCREENS.map((screen) => {
+        const options = getScreenOptions(screen);
+        if (!screen.sheet) {
+          return <Stack.Screen key={screen.name} name={screen.name} options={options} />;
+        }
+        // Opened from a sheet (`entry=sheet`), the page is a sheet too.
+        const sheetOptions = getScreenOptions({ name: screen.name, ...screen.sheet });
+        return (
+          <Stack.Screen
+            key={screen.name}
+            name={screen.name}
+            options={({ route }) => (isSheetEntry(route.params) ? sheetOptions : options)}
+          />
+        );
+      }),
     [getScreenOptions]
   );
 

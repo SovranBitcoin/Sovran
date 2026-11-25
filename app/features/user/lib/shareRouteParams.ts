@@ -1,12 +1,12 @@
 /**
- * Deep-link params contract shared by every Share route — the root `/share`
- * and the `(user-flow)` / `(profile-flow)` copies.
+ * Deep-link params contract of the Share route, `/share`: the profile's share
+ * page, the keyring's and a chat's.
  *
  * The `type` allowlist plus the per-type shape check on `data` is a security
  * boundary, not tidiness (AUDIT.md dim-5, audit 18#F-001): without it the QR +
  * clipboard would render an attacker-crafted Lightning address under the
  * user's identity, funnelling payments away from them. Defining it once means
- * hardening it cannot miss a route.
+ * hardening it lives next to its reasons.
  */
 import { z } from 'zod';
 

@@ -202,8 +202,8 @@ describe('createSovranHandlers profile routing', () => {
     void handlers.openProfile?.({ npub: 'npub1abc' });
 
     expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/(profile-flow)/profile',
-      params: { npub: 'npub1abc' },
+      pathname: '/profile',
+      params: { npub: 'npub1abc', entry: 'sheet' },
     });
   });
 

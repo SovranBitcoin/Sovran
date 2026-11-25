@@ -318,8 +318,8 @@ describe('TransactionDetailShell device probe', () => {
       renderer.root.findByProps({ testID: 'transaction-counterparty-profile' }).props.onPress();
     });
     expect(mockNavigateToProfile).toHaveBeenCalledWith({
-      pathname: '/(profile-flow)/profile',
-      params: { pubkey: 'fixture-counterparty' },
+      pathname: '/profile',
+      params: { pubkey: 'fixture-counterparty', entry: 'sheet' },
     });
     const frame = renderer.root.findByType(QRCodeFrame);
     // First child is the placeholder's QR layer, sized to the live QR square.

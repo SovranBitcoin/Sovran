@@ -137,7 +137,7 @@ function SectionHeader({
   const openProfile = () => {
     if (author?.pubkey) {
       router.navigate({
-        pathname: '/(user-flow)/profile',
+        pathname: '/profile',
         params: { pubkey: author.pubkey },
       });
     }

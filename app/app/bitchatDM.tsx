@@ -43,7 +43,7 @@ const ParamsSchema = z
   });
 
 function BitchatDMRoute() {
-  const params = useRouteParams(ParamsSchema, { where: 'user-flow.bitchatDM' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.bitchatDM' });
   if (!params) return null;
 
   return (

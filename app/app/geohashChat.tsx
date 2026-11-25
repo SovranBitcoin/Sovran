@@ -1,5 +1,5 @@
 /**
- * @fileoverview Geohash Chat route in User Flow
+ * @fileoverview Geohash Chat route
  *
  * Displays a BitChat-powered location chat screen. Supports both Nostr
  * relay and BLE mesh transports.
@@ -22,7 +22,7 @@ const ParamsSchema = z.object({
 });
 
 function GeohashChatRoute() {
-  const params = useRouteParams(ParamsSchema, { where: 'user-flow.geohashChat' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.geohashChat' });
   if (!params) return null;
 
   return (

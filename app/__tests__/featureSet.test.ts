@@ -95,7 +95,7 @@ describe('feature route guard', () => {
 
   it('blocks entry screens of a disabled module', () => {
     expect(disabledFeatureForRoute(['(send-flow)', 'sendToken'], enabled)).toBe('ecash');
-    expect(disabledFeatureForRoute(['(user-flow)', 'profile'], enabled)).toBe('nostr');
+    expect(disabledFeatureForRoute(['profile'], enabled)).toBe('nostr');
     expect(disabledFeatureForRoute(['(send-flow)', 'lightningSend'], enabled)).toBeNull();
   });
 
@@ -103,7 +103,7 @@ describe('feature route guard', () => {
     const payments = resolveFeatureSet('payments');
     const on = (f: keyof typeof payments) => payments[f];
     expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'index'], on)).toBeNull();
-    expect(disabledFeatureForRoute(['(user-flow)', 'profile'], on)).toBeNull();
+    expect(disabledFeatureForRoute(['profile'], on)).toBeNull();
   });
 
   it('keeps every tab open in every build, nostr or not', () => {
