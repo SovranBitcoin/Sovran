@@ -57,6 +57,19 @@ public class LiquidGlassTextModule: Module {
                 view.model.debugShape = value
                 view.invalidateSize()
             }
+            Prop("animated") { (view: LiquidGlassTextView, value: Bool) in
+                guard #available(iOS 17.0, *) else { return }
+                view.model.animated = value
+                view.invalidateSize()
+            }
+            Prop("numericValue") { (view: LiquidGlassTextView, value: Double) in
+                guard #available(iOS 17.0, *) else { return }
+                view.model.numericValue = value
+            }
+            Prop("formatKey") { (view: LiquidGlassTextView, value: String) in
+                guard #available(iOS 17.0, *) else { return }
+                view.model.formatKey = value
+            }
         }
     }
 

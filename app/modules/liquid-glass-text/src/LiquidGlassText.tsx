@@ -25,6 +25,9 @@ export function LiquidGlassText(props: LiquidGlassTextProps): React.ReactElement
     interactive = false,
     colorScheme,
     debugShape = 'none',
+    animated = false,
+    numericValue = 0,
+    formatKey = '',
     style,
     ...rest
   } = props;
@@ -43,6 +46,9 @@ export function LiquidGlassText(props: LiquidGlassTextProps): React.ReactElement
         interactive={interactive}
         colorScheme={colorScheme}
         debugShape={debugShape}
+        animated={animated}
+        numericValue={numericValue}
+        formatKey={formatKey}
       />
     );
   }

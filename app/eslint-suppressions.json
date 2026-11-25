@@ -153,11 +153,6 @@
       "count": 1
     }
   },
-  "shared/ui/composed/AmountFormatter.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "shared/ui/composed/SpriteView.tsx": {
     "no-restricted-imports": {
       "count": 1

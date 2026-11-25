@@ -362,6 +362,8 @@ export function PrimaryBalance({
             size={balanceSize}
             lineHeight={balanceLineHeight}
             weight={glass ? 'heavy' : 'bold'}
+            // Changed digits roll in; a format switch (tap) snaps.
+            animated
             liquid={glass}
             glassVariant={LIQUID_GLASS_BALANCE_VARIANT}
             // The paint's ink, so the figure follows a colour block it sits on.
