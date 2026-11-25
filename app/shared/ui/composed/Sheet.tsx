@@ -125,10 +125,10 @@ export function Sheet({
   const drag = useSharedValue(0);
   const measured = useSharedValue(0);
   const [laidOut, setLaidOut] = useState(false);
-  const scroll: SheetScroll = {
-    offset: useSharedValue(0),
-    gesture: Gesture.Native(),
-  };
+  // Keep `scrollOffset` separate so worklets never capture the `NativeGesture`.
+  const scrollOffset = useSharedValue(0);
+  const scrollGesture = Gesture.Native();
+  const scroll: SheetScroll = { offset: scrollOffset, gesture: scrollGesture };
 
   // Read when the animation lands; restarting on their identity would replay it.
   const callbacks = useRef({ onPresented, onClosed });
@@ -167,9 +167,9 @@ export function Sheet({
   const pan = Gesture.Pan()
     .enabled(dismissable && open)
     .activeOffsetY([-8, 8])
-    .simultaneousWithExternalGesture(scroll.gesture)
+    .simultaneousWithExternalGesture(scrollGesture)
     .onUpdate((event) => {
-      if (scroll.offset.get() > 0) return;
+      if (scrollOffset.get() > 0) return;
       drag.set(Math.max(0, event.translationY));
     })
     .onEnd((event, success) => {
