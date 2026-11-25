@@ -66,6 +66,7 @@ jest.mock('@/shared/lib/cashu/legacyEcashClaim', () => ({ startLegacyEcashClaim:
 jest.mock('@/shared/lib/routstr/reclaim', () => ({
   reclaimRoutstrBalances: jest.fn(),
   recoverPendingPayments: jest.fn(),
+  recoverSdkRecords: jest.fn(),
 }));
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest.fn() }));
 jest.mock('@/shared/lib/mintTestnutRefresh', () => ({

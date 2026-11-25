@@ -4,7 +4,11 @@ import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
-import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
+import {
+  reclaimRoutstrBalances,
+  recoverPendingPayments,
+  recoverSdkRecords,
+} from '@/shared/lib/routstr/reclaim';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -110,6 +114,8 @@ type CocoPhase2Args = {
   bgStage: { log: (message: string) => void; complete: () => void };
   chainManager: Manager;
   isLive: () => boolean;
+  /** Aborted on unmount and account switch; the Routstr sweeps stop mid-pass. */
+  signal: AbortSignal;
 };
 
 /**
@@ -120,7 +126,12 @@ type CocoPhase2Args = {
  * with ternaries inside it cannot be lowered by React Compiler, and inline it
  * would cost the provider its memoization.
  */
-async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args): Promise<void> {
+async function runCocoPhase2({
+  bgStage,
+  chainManager,
+  isLive,
+  signal,
+}: CocoPhase2Args): Promise<void> {
   try {
     initLog('Coco-bg', 'Phase 2 starting');
     log.info('coco.phase2.start');
@@ -185,13 +196,21 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     // sweeps unclaimed refunds eventually). The sweep is idempotent, so a
     // failed pass simply retries next launch.
     await recover('routstr_payments', 'Coco-bg.routstrPaymentRecovery', () =>
-      recoverPendingPayments()
+      recoverPendingPayments({ signal })
     );
     if (!isLive()) return;
     // Sats parked on a Routstr node the app has since been repointed away
     // from: money that is ours but not yet in the wallet, swept once the
     // wallet is ready.
-    await recover('routstr_reclaim', 'Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
+    await recover('routstr_reclaim', 'Coco-bg.routstrReclaim', () =>
+      reclaimRoutstrBalances({ signal })
+    );
+    if (!isLive()) return;
+    // What the removed Routstr SDK left in this account's vaults (0.1.4):
+    // after the legacy sweep, so a key it banked settles its SDK twin.
+    await recover('routstr_sdk_records', 'Coco-bg.routstrSdkRecords', () =>
+      recoverSdkRecords({ signal })
+    );
 
     if (!isLive()) return;
     // Ecash that releases before 0.0.45 stored themselves. Not awaited: it
@@ -296,7 +315,8 @@ export function CocoProvider({ children }: CocoProviderProps) {
     const chainManager = manager;
     const isLive = () => !controller.signal.aborted && CocoManager.peekInstance() === chainManager;
 
-    const runBackground = () => runCocoPhase2({ bgStage, chainManager, isLive });
+    const runBackground = () =>
+      runCocoPhase2({ bgStage, chainManager, isLive, signal: controller.signal });
 
     // Wait for the splash → QR button morph to settle before starting
     // heavy background work (default mints, NPC sync, recovery). The fixed

@@ -138,13 +138,19 @@ describe('reclaimRoutstrBalances', () => {
     const outcomes = await Promise.all([reclaimRoutstrBalances(), reclaimRoutstrBalances()]);
 
     expect(outcomes).toEqual([
-      { attempted: 1, reclaimed: 1, deferred: 0 },
-      { attempted: 1, reclaimed: 1, deferred: 0 },
+      { attempted: 1, reclaimed: 1, deferred: 0, unknownIssuer: 0, spentReplay: 0 },
+      { attempted: 1, reclaimed: 1, deferred: 0, unknownIssuer: 0, spentReplay: 0 },
     ]);
     expect(transport).toHaveBeenCalledTimes(1);
     expect(mockPrepare).toHaveBeenCalledTimes(1);
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    expect(await reclaimRoutstrBalances()).toEqual({ attempted: 0, reclaimed: 0, deferred: 0 });
+    expect(await reclaimRoutstrBalances()).toEqual({
+      attempted: 0,
+      reclaimed: 0,
+      deferred: 0,
+      unknownIssuer: 0,
+      spentReplay: 0,
+    });
   });
 
   it('retains an aborted legacy refund for a later pass', async () => {
@@ -166,7 +172,13 @@ describe('reclaimRoutstrBalances', () => {
       useRoutstrStore.getState().legacyAccounts['https://api.routstr.com']?.reclaimedAt
     ).toBeNull();
     stub(() => json(200, { token: 'cashuB-refund' }));
-    expect(await reclaimRoutstrBalances()).toEqual({ attempted: 1, reclaimed: 1, deferred: 0 });
+    expect(await reclaimRoutstrBalances()).toEqual({
+      attempted: 1,
+      reclaimed: 1,
+      deferred: 0,
+      unknownIssuer: 0,
+      spentReplay: 0,
+    });
   });
 
   it('ignores a late refund after the active profile changes', async () => {

@@ -91,6 +91,9 @@ jest.mock('@/shared/lib/routstr/reclaim', () => ({
   reclaimRoutstrBalances: async () => {
     mockCalls.push('routstrReclaim');
   },
+  recoverSdkRecords: async () => {
+    mockCalls.push('routstrSdkRecords');
+  },
 }));
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({
   reportCocoApiFailure: (...args: unknown[]) => mockReport(...args),
@@ -130,6 +133,7 @@ const FULL_ORDER = [
   'paymentRequestRecovery',
   'routstrPaymentRecovery',
   'routstrReclaim',
+  'routstrSdkRecords',
   'legacyClaim',
 ];
 
