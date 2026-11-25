@@ -12,15 +12,33 @@ import 'react-native/Libraries/Core/InitializeCore';
 
 import { installStreamCapableResponse } from './shared/lib/http/streamResponse';
 
-// Install react-native-quick-crypto FIRST so `globalThis.crypto.subtle` is
-// available before any crypto consumer initializes. ts-mls / @hpke/core (used
-// by White Noise / Marmot MLS) requires SubtleCrypto for KEM operations,
-// which Hermes does not provide natively.
-import { install as installQuickCrypto } from 'react-native-quick-crypto';
+// Install native CSPRNG (`SecRandomCopyBytes` on iOS, `java.security.SecureRandom`
+// on Android via `expo-crypto`) onto `globalThis.crypto.getRandomValues` before any
+// crypto consumer initializes. Never fall back to a JS PRNG; fail closed on boot.
+// Note: use `getRandomValues` (direct native call, no __DEV__ Math.random fallback),
+// never `getRandomBytes`.
+import { getRandomValues as nativeGetRandomValues } from 'expo-crypto';
 
 installStreamCapableResponse();
 
-installQuickCrypto();
+if (typeof globalThis.crypto !== 'object' || globalThis.crypto === null) {
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    writable: true,
+    value: {},
+  });
+}
+
+if (typeof globalThis.crypto.getRandomValues !== 'function') {
+  if (typeof nativeGetRandomValues !== 'function') {
+    throw new Error('Secure random bootstrap failed: crypto.getRandomValues is unavailable');
+  }
+  Object.defineProperty(globalThis.crypto, 'getRandomValues', {
+    configurable: true,
+    writable: true,
+    value: nativeGetRandomValues,
+  });
+}
 
 if (typeof globalThis.TextEncoder !== 'function' || typeof globalThis.TextDecoder !== 'function') {
   throw new Error('UTF-8 bootstrap failed: TextEncoder or TextDecoder is unavailable');
@@ -28,13 +46,14 @@ if (typeof globalThis.TextEncoder !== 'function' || typeof globalThis.TextDecode
 if (typeof globalThis.crypto?.getRandomValues !== 'function') {
   throw new Error('Secure random bootstrap failed: crypto.getRandomValues is unavailable');
 }
+const entropyProbe = new Uint8Array(32);
 try {
-  globalThis.crypto.getRandomValues(new Uint8Array(1));
+  globalThis.crypto.getRandomValues(entropyProbe);
 } catch {
   throw new Error('Secure random bootstrap failed: native provider is unavailable');
 }
-if (!globalThis.crypto.subtle) {
-  throw new Error('Secure crypto bootstrap failed: crypto.subtle is unavailable');
+if (!entropyProbe.some((byte) => byte !== 0)) {
+  throw new Error('Secure random bootstrap failed: native provider returned all-zero bytes');
 }
 
 if (typeof __dirname === 'undefined') global.__dirname = '/';
