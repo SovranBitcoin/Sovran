@@ -38473,37 +38473,46 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-emp
         {
           "children": [
             {
-              "children": null,
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "rgb(8, 8, 8)",
+                    "height": 52,
+                    "width": 52,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
               "props": {
-                "color": "rgb(8, 8, 8)",
-                "height": 52,
-                "width": 52,
-                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "SvgXml",
+              "type": "div",
             },
           ],
           "props": {
-            "className": "css-view-g5y9jx",
+            "aria-label": "Sovran Mint icon",
+            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
             "dir": null,
+            "role": "img",
+            "style": {
+              "backgroundColor": "rgba(96,96,96,1.00)",
+              "borderBottomLeftRadius": "36px",
+              "borderBottomRightRadius": "36px",
+              "borderTopLeftRadius": "36px",
+              "borderTopRightRadius": "36px",
+              "height": "72px",
+              "width": "72px",
+            },
           },
           "type": "div",
         },
       ],
       "props": {
-        "aria-label": "Sovran Mint icon",
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "img",
-        "style": {
-          "backgroundColor": "rgba(96,96,96,1.00)",
-          "borderBottomLeftRadius": "36px",
-          "borderBottomRightRadius": "36px",
-          "borderTopLeftRadius": "36px",
-          "borderTopRightRadius": "36px",
-          "height": "72px",
-          "width": "72px",
-        },
       },
       "type": "div",
     },
@@ -38537,44 +38546,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-emp
         },
       },
       "type": "div",
-    },
-    {
-      "children": [
-        {
-          "children": null,
-          "props": {
-            "className": "css-view-g5y9jx",
-            "dir": null,
-          },
-          "type": "div",
-        },
-        {
-          "children": [
-            "Having problems",
-          ],
-          "props": {
-            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-            "dir": "auto",
-            "style": {
-              "color": "rgba(96,96,96,1.00)",
-              "fontFamily": "OxygenRegular",
-              "fontSize": "13px",
-            },
-          },
-          "type": "div",
-        },
-      ],
-      "props": {
-        "accessibilityElementsHidden": true,
-        "accessible": false,
-        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-        "importantForAccessibility": "no-hide-descendants",
-        "style": {
-          "opacity": 0,
-        },
-        "testID": "mint-info-health",
-      },
-      "type": "View",
     },
   ],
   "props": {
@@ -38592,37 +38563,81 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-err
         {
           "children": [
             {
-              "children": null,
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "rgb(8, 8, 8)",
+                    "height": 52,
+                    "width": 52,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
               "props": {
-                "color": "rgb(8, 8, 8)",
-                "height": 52,
-                "width": 52,
-                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "SvgXml",
+              "type": "div",
             },
           ],
           "props": {
-            "className": "css-view-g5y9jx",
+            "aria-label": "Sovran Mint icon",
+            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
             "dir": null,
+            "role": "img",
+            "style": {
+              "backgroundColor": "rgba(96,96,96,1.00)",
+              "borderBottomLeftRadius": "36px",
+              "borderBottomRightRadius": "36px",
+              "borderTopLeftRadius": "36px",
+              "borderTopRightRadius": "36px",
+              "height": "72px",
+              "width": "72px",
+            },
           },
           "type": "div",
         },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "aria-label": "Having problems",
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(192,128,32,1.00)",
+                  "borderBottomColor": "rgba(8,8,8,1.00)",
+                  "borderBottomLeftRadius": "11px",
+                  "borderBottomRightRadius": "11px",
+                  "borderLeftColor": "rgba(8,8,8,1.00)",
+                  "borderRightColor": "rgba(8,8,8,1.00)",
+                  "borderTopColor": "rgba(8,8,8,1.00)",
+                  "borderTopLeftRadius": "11px",
+                  "borderTopRightRadius": "11px",
+                  "height": "22px",
+                  "width": "22px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "absolute inset-0",
+            "pointerEvents": "none",
+            "style": {
+              "opacity": 1,
+            },
+            "testID": "mint-info-health",
+          },
+          "type": "View",
+        },
       ],
       "props": {
-        "aria-label": "Sovran Mint icon",
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "img",
-        "style": {
-          "backgroundColor": "rgba(96,96,96,1.00)",
-          "borderBottomLeftRadius": "36px",
-          "borderBottomRightRadius": "36px",
-          "borderTopLeftRadius": "36px",
-          "borderTopRightRadius": "36px",
-          "height": "72px",
-          "width": "72px",
-        },
       },
       "type": "div",
     },
@@ -38656,45 +38671,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-err
         },
       },
       "type": "div",
-    },
-    {
-      "children": [
-        {
-          "children": null,
-          "props": {
-            "className": "css-view-g5y9jx",
-            "dir": null,
-          },
-          "type": "div",
-        },
-        {
-          "children": [
-            "Having problems",
-          ],
-          "props": {
-            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-            "dir": "auto",
-            "style": {
-              "color": "rgba(96,96,96,1.00)",
-              "fontFamily": "OxygenRegular",
-              "fontSize": "13px",
-            },
-          },
-          "type": "div",
-        },
-      ],
-      "props": {
-        "accessibilityElementsHidden": false,
-        "accessibilityLabel": "Status: Having problems",
-        "accessible": true,
-        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-        "importantForAccessibility": "auto",
-        "style": {
-          "opacity": 1,
-        },
-        "testID": "mint-info-health",
-      },
-      "type": "View",
     },
   ],
   "props": {
@@ -38731,37 +38707,81 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-lar
                 {
                   "children": [
                     {
-                      "children": null,
+                      "children": [
+                        {
+                          "children": null,
+                          "props": {
+                            "color": "rgb(8, 8, 8)",
+                            "height": 52,
+                            "width": 52,
+                            "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                          },
+                          "type": "SvgXml",
+                        },
+                      ],
                       "props": {
-                        "color": "rgb(8, 8, 8)",
-                        "height": 52,
-                        "width": 52,
-                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                        "className": "css-view-g5y9jx",
+                        "dir": null,
                       },
-                      "type": "SvgXml",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
+                    "aria-label": "Sovran Mint icon",
+                    "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
                     "dir": null,
+                    "role": "img",
+                    "style": {
+                      "backgroundColor": "rgba(96,96,96,1.00)",
+                      "borderBottomLeftRadius": "36px",
+                      "borderBottomRightRadius": "36px",
+                      "borderTopLeftRadius": "36px",
+                      "borderTopRightRadius": "36px",
+                      "height": "72px",
+                      "width": "72px",
+                    },
                   },
                   "type": "div",
                 },
+                {
+                  "children": [
+                    {
+                      "children": null,
+                      "props": {
+                        "aria-label": "Online",
+                        "className": "css-view-g5y9jx",
+                        "dir": null,
+                        "style": {
+                          "backgroundColor": "rgba(32,128,72,1.00)",
+                          "borderBottomColor": "rgba(8,8,8,1.00)",
+                          "borderBottomLeftRadius": "11px",
+                          "borderBottomRightRadius": "11px",
+                          "borderLeftColor": "rgba(8,8,8,1.00)",
+                          "borderRightColor": "rgba(8,8,8,1.00)",
+                          "borderTopColor": "rgba(8,8,8,1.00)",
+                          "borderTopLeftRadius": "11px",
+                          "borderTopRightRadius": "11px",
+                          "height": "22px",
+                          "width": "22px",
+                        },
+                      },
+                      "type": "div",
+                    },
+                  ],
+                  "props": {
+                    "className": "absolute inset-0",
+                    "pointerEvents": "none",
+                    "style": {
+                      "opacity": 1,
+                    },
+                    "testID": "mint-info-health",
+                  },
+                  "type": "View",
+                },
               ],
               "props": {
-                "aria-label": "Sovran Mint icon",
-                "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+                "className": "css-view-g5y9jx",
                 "dir": null,
-                "role": "img",
-                "style": {
-                  "backgroundColor": "rgba(96,96,96,1.00)",
-                  "borderBottomLeftRadius": "36px",
-                  "borderBottomRightRadius": "36px",
-                  "borderTopLeftRadius": "36px",
-                  "borderTopRightRadius": "36px",
-                  "height": "72px",
-                  "width": "72px",
-                },
               },
               "type": "div",
             },
@@ -38796,45 +38816,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-lar
               },
               "type": "div",
             },
-            {
-              "children": [
-                {
-                  "children": null,
-                  "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                  },
-                  "type": "div",
-                },
-                {
-                  "children": [
-                    "Operational",
-                  ],
-                  "props": {
-                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                    "dir": "auto",
-                    "style": {
-                      "color": "rgba(96,96,96,1.00)",
-                      "fontFamily": "OxygenRegular",
-                      "fontSize": "13px",
-                    },
-                  },
-                  "type": "div",
-                },
-              ],
-              "props": {
-                "accessibilityElementsHidden": false,
-                "accessibilityLabel": "Status: Operational",
-                "accessible": true,
-                "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-                "importantForAccessibility": "auto",
-                "style": {
-                  "opacity": 1,
-                },
-                "testID": "mint-info-health",
-              },
-              "type": "View",
-            },
           ],
           "props": {
             "className": "items-center",
@@ -38866,37 +38847,81 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-off
         {
           "children": [
             {
-              "children": null,
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "rgb(8, 8, 8)",
+                    "height": 52,
+                    "width": 52,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
               "props": {
-                "color": "rgb(8, 8, 8)",
-                "height": 52,
-                "width": 52,
-                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "SvgXml",
+              "type": "div",
             },
           ],
           "props": {
-            "className": "css-view-g5y9jx",
+            "aria-label": "Sovran Mint icon",
+            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
             "dir": null,
+            "role": "img",
+            "style": {
+              "backgroundColor": "rgba(96,96,96,1.00)",
+              "borderBottomLeftRadius": "36px",
+              "borderBottomRightRadius": "36px",
+              "borderTopLeftRadius": "36px",
+              "borderTopRightRadius": "36px",
+              "height": "72px",
+              "width": "72px",
+            },
           },
           "type": "div",
         },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "aria-label": "Offline",
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(192,48,48,1.00)",
+                  "borderBottomColor": "rgba(8,8,8,1.00)",
+                  "borderBottomLeftRadius": "11px",
+                  "borderBottomRightRadius": "11px",
+                  "borderLeftColor": "rgba(8,8,8,1.00)",
+                  "borderRightColor": "rgba(8,8,8,1.00)",
+                  "borderTopColor": "rgba(8,8,8,1.00)",
+                  "borderTopLeftRadius": "11px",
+                  "borderTopRightRadius": "11px",
+                  "height": "22px",
+                  "width": "22px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "absolute inset-0",
+            "pointerEvents": "none",
+            "style": {
+              "opacity": 1,
+            },
+            "testID": "mint-info-health",
+          },
+          "type": "View",
+        },
       ],
       "props": {
-        "aria-label": "Sovran Mint icon",
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "img",
-        "style": {
-          "backgroundColor": "rgba(96,96,96,1.00)",
-          "borderBottomLeftRadius": "36px",
-          "borderBottomRightRadius": "36px",
-          "borderTopLeftRadius": "36px",
-          "borderTopRightRadius": "36px",
-          "height": "72px",
-          "width": "72px",
-        },
       },
       "type": "div",
     },
@@ -38930,45 +38955,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-off
         },
       },
       "type": "div",
-    },
-    {
-      "children": [
-        {
-          "children": null,
-          "props": {
-            "className": "css-view-g5y9jx",
-            "dir": null,
-          },
-          "type": "div",
-        },
-        {
-          "children": [
-            "Offline",
-          ],
-          "props": {
-            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-            "dir": "auto",
-            "style": {
-              "color": "rgba(96,96,96,1.00)",
-              "fontFamily": "OxygenRegular",
-              "fontSize": "13px",
-            },
-          },
-          "type": "div",
-        },
-      ],
-      "props": {
-        "accessibilityElementsHidden": false,
-        "accessibilityLabel": "Status: Offline",
-        "accessible": true,
-        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-        "importantForAccessibility": "auto",
-        "style": {
-          "opacity": 1,
-        },
-        "testID": "mint-info-health",
-      },
-      "type": "View",
     },
   ],
   "props": {
@@ -38986,37 +38972,81 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-pop
         {
           "children": [
             {
-              "children": null,
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "rgb(8, 8, 8)",
+                    "height": 52,
+                    "width": 52,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
               "props": {
-                "color": "rgb(8, 8, 8)",
-                "height": 52,
-                "width": 52,
-                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "SvgXml",
+              "type": "div",
             },
           ],
           "props": {
-            "className": "css-view-g5y9jx",
+            "aria-label": "Sovran Mint icon",
+            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
             "dir": null,
+            "role": "img",
+            "style": {
+              "backgroundColor": "rgba(96,96,96,1.00)",
+              "borderBottomLeftRadius": "36px",
+              "borderBottomRightRadius": "36px",
+              "borderTopLeftRadius": "36px",
+              "borderTopRightRadius": "36px",
+              "height": "72px",
+              "width": "72px",
+            },
           },
           "type": "div",
         },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "aria-label": "Online",
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(32,128,72,1.00)",
+                  "borderBottomColor": "rgba(8,8,8,1.00)",
+                  "borderBottomLeftRadius": "11px",
+                  "borderBottomRightRadius": "11px",
+                  "borderLeftColor": "rgba(8,8,8,1.00)",
+                  "borderRightColor": "rgba(8,8,8,1.00)",
+                  "borderTopColor": "rgba(8,8,8,1.00)",
+                  "borderTopLeftRadius": "11px",
+                  "borderTopRightRadius": "11px",
+                  "height": "22px",
+                  "width": "22px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "absolute inset-0",
+            "pointerEvents": "none",
+            "style": {
+              "opacity": 1,
+            },
+            "testID": "mint-info-health",
+          },
+          "type": "View",
+        },
       ],
       "props": {
-        "aria-label": "Sovran Mint icon",
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "img",
-        "style": {
-          "backgroundColor": "rgba(96,96,96,1.00)",
-          "borderBottomLeftRadius": "36px",
-          "borderBottomRightRadius": "36px",
-          "borderTopLeftRadius": "36px",
-          "borderTopRightRadius": "36px",
-          "height": "72px",
-          "width": "72px",
-        },
       },
       "type": "div",
     },
@@ -39051,45 +39081,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-pop
       },
       "type": "div",
     },
-    {
-      "children": [
-        {
-          "children": null,
-          "props": {
-            "className": "css-view-g5y9jx",
-            "dir": null,
-          },
-          "type": "div",
-        },
-        {
-          "children": [
-            "Operational",
-          ],
-          "props": {
-            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-            "dir": "auto",
-            "style": {
-              "color": "rgba(96,96,96,1.00)",
-              "fontFamily": "OxygenRegular",
-              "fontSize": "13px",
-            },
-          },
-          "type": "div",
-        },
-      ],
-      "props": {
-        "accessibilityElementsHidden": false,
-        "accessibilityLabel": "Status: Operational",
-        "accessible": true,
-        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-        "importantForAccessibility": "auto",
-        "style": {
-          "opacity": 1,
-        },
-        "testID": "mint-info-health",
-      },
-      "type": "View",
-    },
   ],
   "props": {
     "className": "items-center",
@@ -39106,37 +39097,81 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-wor
         {
           "children": [
             {
-              "children": null,
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "rgb(8, 8, 8)",
+                    "height": 52,
+                    "width": 52,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
               "props": {
-                "color": "rgb(8, 8, 8)",
-                "height": 52,
-                "width": 52,
-                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "SvgXml",
+              "type": "div",
             },
           ],
           "props": {
-            "className": "css-view-g5y9jx",
+            "aria-label": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone icon",
+            "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
             "dir": null,
+            "role": "img",
+            "style": {
+              "backgroundColor": "rgba(96,96,96,1.00)",
+              "borderBottomLeftRadius": "36px",
+              "borderBottomRightRadius": "36px",
+              "borderTopLeftRadius": "36px",
+              "borderTopRightRadius": "36px",
+              "height": "72px",
+              "width": "72px",
+            },
           },
           "type": "div",
         },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "aria-label": "Having problems",
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(192,128,32,1.00)",
+                  "borderBottomColor": "rgba(8,8,8,1.00)",
+                  "borderBottomLeftRadius": "11px",
+                  "borderBottomRightRadius": "11px",
+                  "borderLeftColor": "rgba(8,8,8,1.00)",
+                  "borderRightColor": "rgba(8,8,8,1.00)",
+                  "borderTopColor": "rgba(8,8,8,1.00)",
+                  "borderTopLeftRadius": "11px",
+                  "borderTopRightRadius": "11px",
+                  "height": "22px",
+                  "width": "22px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "absolute inset-0",
+            "pointerEvents": "none",
+            "style": {
+              "opacity": 1,
+            },
+            "testID": "mint-info-health",
+          },
+          "type": "View",
+        },
       ],
       "props": {
-        "aria-label": "نعناع البيتكوين الكبير 🥜⚡️🧡 Peanut Mint 🧡⚡️🥜 Mintwithanamethatneverbreaksbecauseithasnospacesanywhereatallnotevenone icon",
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "img",
-        "style": {
-          "backgroundColor": "rgba(96,96,96,1.00)",
-          "borderBottomLeftRadius": "36px",
-          "borderBottomRightRadius": "36px",
-          "borderTopLeftRadius": "36px",
-          "borderTopRightRadius": "36px",
-          "height": "72px",
-          "width": "72px",
-        },
       },
       "type": "div",
     },
@@ -39170,45 +39205,6 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-header-wor
         },
       },
       "type": "div",
-    },
-    {
-      "children": [
-        {
-          "children": null,
-          "props": {
-            "className": "css-view-g5y9jx",
-            "dir": null,
-          },
-          "type": "div",
-        },
-        {
-          "children": [
-            "Having problems",
-          ],
-          "props": {
-            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-            "dir": "auto",
-            "style": {
-              "color": "rgba(96,96,96,1.00)",
-              "fontFamily": "OxygenRegular",
-              "fontSize": "13px",
-            },
-          },
-          "type": "div",
-        },
-      ],
-      "props": {
-        "accessibilityElementsHidden": false,
-        "accessibilityLabel": "Status: Having problems",
-        "accessible": true,
-        "className": "mt-1 min-h-[22px] flex-row items-center justify-center gap-1.5",
-        "importantForAccessibility": "auto",
-        "style": {
-          "opacity": 1,
-        },
-        "testID": "mint-info-health",
-      },
-      "type": "View",
     },
   ],
   "props": {

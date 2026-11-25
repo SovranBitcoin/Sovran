@@ -1,6 +1,6 @@
 /**
- * Mint Info's header: the auditor's state in plain words, and a status line
- * that keeps its place (invisible) for a mint nobody has audited.
+ * Mint Info's header: the 72pt icon with the shared bottom-right presence dot,
+ * the mint name, and its host when different. No extra "Operational" text line.
  */
 import { render, screen } from '@testing-library/react-native';
 
@@ -16,6 +16,23 @@ jest.mock('@/shared/ui/composed/MintIcon', () => {
       createElement('View', { testID: `mint-icon:${size}:${isLoading ? 'loading' : 'ready'}` }),
   };
 });
+jest.mock('@/shared/ui/primitives/PresenceDot', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  const labels: Record<string, string> = {
+    online: 'Online',
+    degraded: 'Having problems',
+    offline: 'Offline',
+  };
+  return {
+    PresenceDot: ({ presence, size }: { presence?: string | null; size: number }) =>
+      presence
+        ? createElement('View', {
+            testID: `presence-dot:${presence}:${size}`,
+            accessibilityLabel: labels[presence],
+          })
+        : null,
+  };
+});
 jest.mock('@/shared/ui/primitives/Text', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
   return {
@@ -25,7 +42,10 @@ jest.mock('@/shared/ui/primitives/Text', () => {
 });
 jest.mock('@/shared/ui/primitives/View/View', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
-  return { View: () => createElement('View', null) };
+  return {
+    View: ({ children, ...props }: { children?: import('react').ReactNode }) =>
+      createElement('View', props, children),
+  };
 });
 jest.mock('react-native-reanimated', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
@@ -53,7 +73,7 @@ describe('mintHealthFromAudit', () => {
 });
 
 describe('MintHeader', () => {
-  it('shows the 72pt icon, the name, the host and how the mint is running', () => {
+  it('shows the 72pt icon with the bottom-right dot, the name and the host — no status text line', () => {
     render(
       <MintHeader
         name="Minibits"
@@ -62,22 +82,28 @@ describe('MintHeader', () => {
       />
     );
     expect(screen.getByTestId('mint-icon:72:ready')).toBeTruthy();
+    expect(screen.getByTestId('presence-dot:online:72')).toBeTruthy();
+    expect(screen.getByLabelText('Online')).toBeTruthy();
     expect(screen.getByText('Minibits')).toBeTruthy();
     expect(screen.getByText('mint.minibits.cash')).toBeTruthy();
-    const line = screen.getByTestId('mint-info-health');
-    expect(line.props.accessibilityLabel).toBe('Status: Operational');
-    // At least one line high, and free to grow with large text.
-    expect(line.props.className).toContain('min-h-[22px]');
+    expect(screen.queryByText('Operational')).toBeNull();
   });
 
-  it('keeps the status line in place, hidden from screen readers, until there is an audit', () => {
+  it('draws no dot for an unaudited mint or while loading', () => {
     render(<MintHeader name="https://mint.example" mintUrl="https://mint.example" />);
-    const line = screen.getByTestId('mint-info-health', { includeHiddenElements: true });
-    expect(line.props.className).toContain('min-h-[22px]');
-    expect(line.props.accessibilityElementsHidden).toBe(true);
-    expect(line.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(screen.queryByTestId('mint-info-health')).toBeNull();
     // A name that is only the address is not repeated as a host line.
     expect(screen.queryByText('mint.example')).toBeNull();
+
+    render(
+      <MintHeader
+        name="https://mint.example"
+        mintUrl="https://mint.example"
+        health="operational"
+        isLoading
+      />
+    );
+    expect(screen.queryByTestId('mint-info-health')).toBeNull();
   });
 
   it('keeps the host line while the name is still loading, so it does not appear later', () => {
@@ -86,10 +112,15 @@ describe('MintHeader', () => {
   });
 
   it.each([
-    ['problems', 'Having problems'],
-    ['offline', 'Offline'],
-  ] as const)('says %s in plain words', (health, words) => {
-    render(<MintHeader name="Mint" health={health} />);
-    expect(screen.getByText(words)).toBeTruthy();
-  });
+    ['problems', 'degraded', 'Having problems'],
+    ['offline', 'offline', 'Offline'],
+  ] as const)(
+    'maps %s to a %s presence dot with accessible label %s',
+    (health, presence, label) => {
+      render(<MintHeader name="Mint" health={health} />);
+      expect(screen.getByTestId(`presence-dot:${presence}:72`)).toBeTruthy();
+      expect(screen.getByLabelText(label)).toBeTruthy();
+      expect(screen.queryByText(label)).toBeNull();
+    }
+  );
 });

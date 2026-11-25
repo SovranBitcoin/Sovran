@@ -72,7 +72,7 @@ describe('mint info screen source', () => {
     expect(chart).toContain('No ratings yet');
   });
 
-  it('heads the page with the plain mint header: no ring, no badge, a status line', () => {
+  it('heads the page with the plain mint header: no ring, bottom-right presence dot', () => {
     const header = readFileSync(resolve(ROOT, 'features/mint/components/MintHeader.tsx'), 'utf8');
     expect(source).not.toContain('function ProgressRing(');
     expect(source).not.toContain('react-native-svg');
@@ -80,9 +80,9 @@ describe('mint info screen source', () => {
     expect(source).toContain('<MintHeader');
     expect(source).toContain('health={mintHealthFromAudit(audit?.state)}');
     expect(source).toContain('collapseAt: 98');
-    // A 72pt icon alone, and a status line that always takes its 22pt.
+    // A 72pt icon with the shared bottom-right presence dot (no text status line).
     expect(header).toContain('const ICON_SIZE = 72;');
-    expect(header).toContain('h-[22px]');
+    expect(header).toContain('<PresenceDot');
     expect(header).toContain('const STATUS_FADE_MS = 200;');
     // The success rate is never invented for an unaudited mint.
     expect(source).not.toContain('progress = 0.5');
