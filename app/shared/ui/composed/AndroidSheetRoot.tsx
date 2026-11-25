@@ -15,7 +15,7 @@
  * Why the context: native-stack initializes HeaderHeightContext to a default
  * (~56dp + top inset) and only corrects it after the custom header's first
  * onLayout, shifting sheet content by 16-31dp a frame or two after open.
- * Sheets with a known fixed-height header (FlowSheetHeader) publish that
+ * Sheets with a known fixed-height header (FormSheetChrome) publish that
  * constant here; Screen/ModalLayoutWrapper prefer it so the first frame and
  * the steady state agree.
  *
@@ -24,8 +24,24 @@
 import React, { createContext } from 'react';
 import { Platform, View } from 'react-native';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { headerButtonSize, spacing } from '@/shared/styles/tokens';
 
 export const SheetHeaderHeightContext = createContext<number | null>(null);
+
+/**
+ * The sheet header's fixed height: SheetGrabber (8 marginTop + 4) + title row
+ * (headerButtonSize content + 4×2 padding). Fixed (not min) so content never
+ * shifts when a measured height settles.
+ */
+export const SHEET_HEADER_HEIGHT = 12 + headerButtonSize + spacing.xs * 2;
+
+/** Scrim gradient height: the bar plus a ~32dp eased fade tail painting
+ *  below it over scrolling content. */
+export const SHEET_SCRIM_HEIGHT = SHEET_HEADER_HEIGHT + 32;
+
+/** How far the scrim's eased fade tail overhangs below the bar. Content and
+ *  sticky insets add this back so the first row clears the fade at rest. */
+export const SHEET_SCRIM_OVERHANG = SHEET_SCRIM_HEIGHT - SHEET_HEADER_HEIGHT;
 
 /** Visible peek of the previous page above the sheet's top edge — the iOS
  *  pageSheet margin equivalent. Content height controls the sheet position
@@ -40,7 +56,7 @@ const ANDROID_SHEET_TOP_GAP = 28;
 
 interface AndroidSheetRootProps {
   children: React.ReactNode;
-  /** Fixed JS-header height inside this sheet (e.g. FLOW_SHEET_HEADER_HEIGHT). */
+  /** Fixed JS-header height inside this sheet (e.g. SHEET_HEADER_HEIGHT). */
   headerHeight?: number;
 }
 
@@ -65,7 +81,7 @@ export function AndroidSheetRoot({ children, headerHeight }: AndroidSheetRootPro
  *
  * Fabric scopes zIndex to the nearest view that forms a stacking context, and
  * plain layout/background views don't. The page and the header are siblings
- * (native-stack's custom-header wrapper, or FormSheetChrome's overlay), so a
+ * (FormSheetChrome's overlay), so a
  * page layer such as ScrollEdgeFade (zIndex 50) or sticky chrome
  * (zIndex.dropdown) was sorted against the header wrapper's zIndex 1 and drew
  * its gradient over the title and headerLeft/headerRight. `isolation` makes the

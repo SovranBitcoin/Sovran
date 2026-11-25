@@ -21,7 +21,7 @@
 
 import { Stack } from 'expo-router';
 import { railHeaderTitle } from 'wallet';
-import { AndroidSheetFlowStack, MINT_SELECT_SCREEN_OPTIONS } from '../../config/flowLayoutOptions';
+import { FlowStack, MINT_SELECT_SCREEN_OPTIONS } from '../../config/flowLayoutOptions';
 
 const SEND_OPTIONS = { title: 'Send' };
 const NEAR_PAY_HEADER_OPTIONS = {
@@ -58,7 +58,7 @@ const CAMERA_OPTIONS = {
 
 export default function SendFlowLayout() {
   return (
-    <AndroidSheetFlowStack flow="(send-flow)">
+    <FlowStack>
       <Stack.Screen name="send" options={SEND_OPTIONS} />
       <Stack.Screen name="mintSelect" options={MINT_SELECT_SCREEN_OPTIONS} />
       <Stack.Screen name="nearPay" options={NEAR_PAY_OPTIONS} />
@@ -69,6 +69,6 @@ export default function SendFlowLayout() {
       <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
       <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
       <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
-    </AndroidSheetFlowStack>
+    </FlowStack>
   );
 }

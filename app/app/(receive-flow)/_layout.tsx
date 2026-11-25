@@ -16,7 +16,7 @@
 import { Stack } from 'expo-router';
 import { railHeaderTitle } from 'wallet';
 
-import { AndroidSheetFlowStack, MINT_SELECT_SCREEN_OPTIONS } from '../../config/flowLayoutOptions';
+import { FlowStack, MINT_SELECT_SCREEN_OPTIONS } from '../../config/flowLayoutOptions';
 
 const RECEIVE_OPTIONS = { title: 'Receive' };
 const AMOUNT_OPTIONS = { title: 'Select amount' };
@@ -34,7 +34,7 @@ const CAMERA_OPTIONS = {
 
 export default function ReceiveFlowLayout() {
   return (
-    <AndroidSheetFlowStack flow="(receive-flow)">
+    <FlowStack>
       <Stack.Screen name="receive" options={RECEIVE_OPTIONS} />
       <Stack.Screen name="qrDisplay" options={RECEIVE_OPTIONS} />
       <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
@@ -46,6 +46,6 @@ export default function ReceiveFlowLayout() {
       <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />
       <Stack.Screen name="messageEcash" options={MESSAGE_ECASH_OPTIONS} />
       <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
-    </AndroidSheetFlowStack>
+    </FlowStack>
   );
 }

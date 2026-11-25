@@ -23,11 +23,13 @@ header, a fixed-height frame and a scrim to imitate one.
   with the app's back button on its first screen as well as later ones.
 - **Sheets for menus.** `(filter-flow)`, `(prompt-flow)` and `share` stay bottom
   sheets: a person picks or confirms and leaves, with no step after.
+  (Amended by [ADR 0041](0041-four-flow-stacks-and-root-routes.md): these are
+  now the root routes `filters`, `cta`, `cta-sample` and `share`; the backup a
+  prompt starts is a pushed screen over it.)
 - **One owner.** `config/androidFlowPresentation.ts` holds the list.
   `config/modalScreens.ts` reads it to present the route;
-  `AndroidSheetFlowStack` and `FormSheetChrome` read it to choose the chrome.
-  A test checks every flow layout names its own route group, so the two halves
-  cannot disagree.
+  `FormSheetChrome` reads it to choose the chrome. Since ADR 0041 no flow
+  stack is a sheet, so the flow stacks' JS sheet header is gone.
 - **iOS is unchanged.**
 
 What this does not give: predictive-back animation inside the app.

@@ -26,14 +26,12 @@ export interface ModalConfig {
  * Android sheet presentation: a native bottom sheet (react-native-screens
  * formSheet, Material BottomSheetBehavior) at full height — drag-to-dismiss,
  * dim scrim, rounded top corners. The closest Android analog of the iOS
- * pageSheet card. Used by the standalone single-screen modals AND the flow
- * groups (modalFlow).
+ * pageSheet card. Used only by the single-screen routes
+ * `androidFlowPresentation` names; every flow stack is a pushed screen there.
  *
  * No native header renders inside an Android formSheet (RNS #2657, not fixed
- * in any 4.x), so everything here carries `headerShown: false` and the JS
- * side draws the chrome instead: standalone route files wrap their screens in
- * FormSheetChrome; flow groups' nested stacks render FlowSheetHeader via
- * createFlowLayoutScreenOptions({...}, { androidSheet: true }).
+ * in any 4.x), so everything here carries `headerShown: false` and the route
+ * file draws the chrome instead: FormSheetChrome, or the prompt's own page.
  * sheetGrabberVisible is iOS-only (the JS chrome draws the grabber);
  * sheetCornerRadius IS cross-platform — unset it clamps to 0 on Android
  * (RNS Screen.kt default -1 → max(...,0)), which rendered SQUARE sheet
@@ -70,22 +68,16 @@ export const PICKER_SHEET_OPTIONS: Partial<NativeStackNavigationOptions> =
     : {};
 
 /**
- * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal.
- * Android: a pushed screen, or a native bottom sheet for the few flows
- * `androidFlowPresentation` names. The flow's `_layout` renders
- * `AndroidSheetFlowStack` with the same flow name, which picks the matching
- * chrome, so the two can never disagree.
+ * A flow group hosting a nested stack (`FlowStack`). iOS: a page sheet whose
+ * steps push inside it. Android: a pushed screen, entered with a horizontal
+ * slide and left with Back (ADR 0025); its nested stack draws the native header.
  */
 const modalFlow = (name: string): ModalConfig => ({
   name,
   options:
     Platform.OS !== 'android'
       ? { presentation: 'modal', headerShown: false }
-      : androidFlowPresentation(name) === 'sheet'
-        ? ANDROID_SHEET_OPTIONS
-        : // A pushed screen: entered with a horizontal slide, left with Back.
-          // The flow's own nested stack draws the native header.
-          { presentation: 'card', headerShown: false, animation: 'slide_from_right' },
+      : { presentation: 'card', headerShown: false, animation: 'slide_from_right' },
 });
 
 /** Slide from right: nested layout handles headers, horizontal slide animation. */

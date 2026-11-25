@@ -96,8 +96,8 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('@/shared/ui/composed/AndroidSheetRoot', () => ({
   SheetHeaderHeightContext: jest.requireActual<typeof import('react')>('react').createContext(null),
+  SHEET_SCRIM_OVERHANG: 0,
 }));
-jest.mock('@/shared/ui/composed/FlowSheetHeader', () => ({ FLOW_SHEET_SCRIM_OVERHANG: 0 }));
 jest.mock('@/shared/ui/composed/ModalLayoutWrapper', () => ({
   ModalLayoutWrapper: ({
     children,

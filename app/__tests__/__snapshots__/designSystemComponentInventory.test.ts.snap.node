@@ -180,7 +180,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/EcashNote.tsx",
     "shared/ui/composed/ElapsedSeconds.tsx",
     "shared/ui/composed/EmojiPickerSheet.tsx",
-    "shared/ui/composed/FlowSheetHeader.tsx",
     "shared/ui/composed/FollowBadge.tsx",
     "shared/ui/composed/FormSheetChrome.tsx",
     "shared/ui/composed/GradientCardFrame.tsx",
@@ -241,6 +240,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 235,
+  "total": 234,
 }
 `;

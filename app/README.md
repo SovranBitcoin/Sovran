@@ -348,7 +348,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 <!-- code: app/_layout.tsx; app/(drawer)/_layout.tsx; app/(drawer)/(tabs)/_layout.tsx; navigation/nativeTabs.tsx; shared/blocks/SovranTabBar.tsx; shared/ui/composed/Screen.tsx; shared/ui/composed/BottomButtons.tsx; shared/ui/primitives/Button.tsx; shared/ui/primitives/Pressable.tsx; shared/ui/primitives/SelectableCheck/index.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; assets/icons/index.tsx; scripts/regenerate-icons.js; shared/lib/date.ts; shared/ui/composed/chat/ChatScreen.tsx -->
 
 - [x] **Expo Router** — file-based routing under `app/`
-- [x] **Modal flow stacks** — `(send-flow)`, `(receive-flow)`, `(mint-flow)`, `(split-bill-flow)`, `(settings-flow)`, `(theme-flow)`, etc.
+- [x] **Flow stacks** — `(send-flow)`, `(receive-flow)`, `(mint-flow)`, `(settings-flow)`; every other page is a root route (ADR 0041)
 - [x] **Drawer + bottom tabs** — drawer for profiles/settings, tabs for top-level surfaces
 - [x] **`@gorhom/bottom-sheet`** — native bottom sheets for pickers and confirmations
 - [x] **`heroui-native`** — in-card buttons, dialogs, segmented chips

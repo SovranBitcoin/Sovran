@@ -6,10 +6,8 @@
  * screens within push horizontally with a back header.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { FlowStack } from '../../config/flowLayoutOptions';
 
 // Redirects to the Settings tab; no header flashes on the way.
 const INDEX_OPTIONS = { headerShown: false };
@@ -38,13 +36,8 @@ const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
-    [foreground, background]
-  );
   return (
-    <Stack screenOptions={screenOptions}>
+    <FlowStack>
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
@@ -81,6 +74,6 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="design-system-prompt" options={DESIGN_SYSTEM_PROMPT_OPTIONS} />
       <Stack.Screen name="recovery" options={RECOVERY_OPTIONS} />
       <Stack.Screen name="delete" options={DELETE_OPTIONS} />
-    </Stack>
+    </FlowStack>
   );
 }

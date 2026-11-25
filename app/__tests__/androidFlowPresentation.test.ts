@@ -6,31 +6,31 @@ import { androidFlowPresentation } from '@/config/androidFlowPresentation';
 const ROUTES = join(__dirname, '..', 'app');
 
 describe('Android flow presentation', () => {
-  it('pushes the multi-step money flows instead of sheeting them', () => {
+  it('pushes the money routes instead of sheeting them', () => {
     // A drag-to-dismiss sheet over a scrolling payment flow lets a downward
     // fling throw the payment away; these are screens, left with Back.
-    for (const flow of ['(send-flow)', '(receive-flow)', '(mint-flow)', 'transactions']) {
-      expect([flow, androidFlowPresentation(flow)]).toEqual([flow, 'screen']);
+    for (const route of ['transactions', 'lightningSend', 'sendToken', 'backup-intro']) {
+      expect([route, androidFlowPresentation(route)]).toEqual([route, 'screen']);
     }
   });
 
   it('keeps the short pick-and-leave surfaces as sheets', () => {
-    expect(androidFlowPresentation('filters')).toBe('sheet');
-    expect(androidFlowPresentation('cta')).toBe('sheet');
+    for (const route of ['filters', 'cta', 'cta-sample', 'share']) {
+      expect([route, androidFlowPresentation(route)]).toEqual([route, 'sheet']);
+    }
   });
 
-  it('has every flow layout name its own route group, so root and chrome agree', () => {
-    const layouts = readdirSync(ROUTES)
-      .filter((name) => /^\(.+-flow\)$/.test(name))
-      .map((group) => ({ group, source: readFileSync(join(ROUTES, group, '_layout.tsx'), 'utf8') }))
-      .filter(({ source }) => source.includes('<AndroidSheetFlowStack'));
-
-    expect(layouts.length).toBeGreaterThanOrEqual(3);
-    for (const { group, source } of layouts) {
-      expect([group, source.includes(`<AndroidSheetFlowStack flow="${group}">`)]).toEqual([
-        group,
-        true,
-      ]);
+  it('has exactly the four flow stacks, each built on FlowStack', () => {
+    const groups = readdirSync(ROUTES).filter((name) => /^\(.+-flow\)$/.test(name));
+    expect(groups.sort()).toEqual([
+      '(mint-flow)',
+      '(receive-flow)',
+      '(send-flow)',
+      '(settings-flow)',
+    ]);
+    for (const group of groups) {
+      const source = readFileSync(join(ROUTES, group, '_layout.tsx'), 'utf8');
+      expect([group, source.includes('<FlowStack>')]).toEqual([group, true]);
     }
   });
 });

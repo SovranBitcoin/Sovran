@@ -1,9 +1,7 @@
 /**
  * The drag-handle bar shown at the top of Android sheet surfaces.
  * react-native-screens' sheetGrabberVisible is iOS-only, so Android sheets
- * draw their own. One component so the standalone-modal chrome
- * (FormSheetChrome) and the flow-sheet header (FlowSheetHeader) stay
- * pixel-identical.
+ * draw their own (FormSheetChrome).
  */
 import { StyleSheet, View } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';

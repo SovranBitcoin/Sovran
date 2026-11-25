@@ -1,23 +1,23 @@
 import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
 /**
- * @fileoverview Shared modal configuration for flow layouts
+ * @fileoverview The four flow stacks' shared stack and header
  *
- * This file contains shared screen options and components used by all flow layouts
- * (receive-flow, send-flow, mint-flow, transactions-flow) to ensure consistency.
+ * `(send-flow)`, `(receive-flow)`, `(mint-flow)` and `(settings-flow)` are the
+ * only nested stacks: a task whose steps push inside one sheet on iPhone (or
+ * one pushed page for Settings) and inside one pushed screen on Android. Every
+ * other route is a root route (config/modalScreens.ts). All four draw the
+ * native header on both platforms.
  */
 
-import { androidFlowPresentation } from './androidFlowPresentation';
 import { PICKER_SHEET_OPTIONS } from './modalScreens';
 import { memo, useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
+import type { NativeStackNavigationOptions } from 'expo-router';
 import type { ParamListBase, NavigationProp } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { AndroidSheetRoot, SheetPageLayer } from '@/shared/ui/composed/AndroidSheetRoot';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
-import { FLOW_SHEET_HEADER_HEIGHT, FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 
 interface FlowColors {
@@ -101,27 +101,6 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   },
 });
 
-// Module-scope so the header's component identity is stable across renders
-// (same reasoning as CloseButton in app/_layout.tsx).
-const renderFlowSheetHeader = (props: NativeStackHeaderProps) => <FlowSheetHeader {...props} />;
-
-// Each page renders as a sibling of FlowSheetHeader; isolating it keeps its
-// zIndex layers (edge fades, sticky rows) under the header's title and buttons.
-const renderSheetPageLayer = ({ children }: { children: ReactNode }) => (
-  <SheetPageLayer>{children}</SheetPageLayer>
-);
-
-/**
- * Create screen options function for flow layouts.
- * This returns a function that can be passed to Stack's screenOptions prop.
- *
- * `androidSheet`: set by the nine MODAL flow groups, whose root screens
- * present as native Android formSheets (config/modalScreens.ts modalFlow).
- * Native headers don't render inside Android formSheets (RNS #2657), so the
- * nested stack swaps in the JS FlowSheetHeader, which interprets the same
- * per-screen options. The card-presented stacks ((settings-flow),
- * (user-flow)) must NOT set this — their native headers work.
- */
 /**
  * The mint selector, when a flow pushes it over another screen: the picker
  * sheet (`PICKER_SHEET_OPTIONS`) on iPhone, a pushed page on Android. As the
@@ -136,11 +115,11 @@ export const MINT_SELECT_SCREEN_OPTIONS: NativeStackNavigationOptions = {
   title: 'Select mint',
 };
 
-export const createFlowLayoutScreenOptions = (
-  colors: FlowColors,
-  config?: { androidSheet?: boolean }
-) => {
-  const sheetHeader = config?.androidSheet === true && Platform.OS === 'android';
+/**
+ * Screen options for a flow stack, for Stack's `screenOptions`: the shared
+ * header, with the close button on the first screen and back after it.
+ */
+const createFlowLayoutScreenOptions = (colors: FlowColors) => {
   return ({
     navigation,
     route,
@@ -154,19 +133,11 @@ export const createFlowLayoutScreenOptions = (
 
     return withGlassHeaderItems({
       ...getBaseFlowScreenOptions(colors),
-      // Sheet flows render the scrim INSIDE FlowSheetHeader and must strip the
-      // headerBackground option: native-stack renders that option ITSELF in an
-      // absolutely-positioned wrapper with elevation:1 (styles.translucent)
-      // when headerTransparent — and on Android that elevation composites the
-      // gradient ABOVE the elevation-0 custom header, covering the title and
-      // headerLeft/headerRight buttons. Per-screen `headerBackground: () =>
-      // null` remains the sanctioned scrim opt-out (renders nothing).
-      ...(sheetHeader ? { header: renderFlowSheetHeader, headerBackground: undefined } : {}),
       // Dynamic back/close button based on stack depth
       headerLeft: () => (
         <FlowHeaderButton
           isFirstScreen={isFirstScreen}
-          pushed={Platform.OS === 'android' && !sheetHeader}
+          pushed={Platform.OS === 'android'}
           sheet={Platform.OS === 'ios' && !isFirstScreen && IOS_SHEET_SCREENS.has(route.name)}
         />
       ),
@@ -175,40 +146,16 @@ export const createFlowLayoutScreenOptions = (
 };
 
 /**
- * Shared orchestration for modal flows presented as Android form sheets.
- * Route modules supply only their Stack.Screen declarations; theme, header,
- * sheet geometry, and stack policy stay local to this module.
+ * The stack a flow group's `_layout` renders: themed, with the shared header.
+ * Route modules supply only their Stack.Screen declarations.
  */
-export function AndroidSheetFlowStack({
-  flow,
-  children,
-}: {
-  /** The route group this stack belongs to, e.g. `(send-flow)`. */
-  flow: string;
-  children: ReactNode;
-}) {
+export function FlowStack({ children }: { children: ReactNode }) {
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  // Android only: a sheet flow draws the JS sheet header inside a fixed-height
-  // sheet frame; a pushed flow is an ordinary stack with the native header.
-  const androidSheet = Platform.OS === 'android' && androidFlowPresentation(flow) === 'sheet';
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet }),
-    [foreground, background, androidSheet]
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
   );
-
-  if (Platform.OS === 'android' && !androidSheet) {
-    return <Stack screenOptions={screenOptions}>{children}</Stack>;
-  }
-
-  return (
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack
-        screenOptions={screenOptions}
-        screenLayout={Platform.OS === 'android' ? renderSheetPageLayer : undefined}>
-        {children}
-      </Stack>
-    </AndroidSheetRoot>
-  );
+  return <Stack screenOptions={screenOptions}>{children}</Stack>;
 }
 
 /**

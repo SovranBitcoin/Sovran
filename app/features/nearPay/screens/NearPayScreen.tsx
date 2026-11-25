@@ -2159,8 +2159,8 @@ export function NearPayScreen() {
         // display, so the bar carries nothing beside the back button.
         headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
         // The send flow's shared-element avatar lands inside the header band,
-        // and Android's sheet header (FlowSheetHeader) composites its scrim
-        // gradient ABOVE screen content — the avatar ended up underneath it.
+        // and Android composites the header's scrim gradient ABOVE screen
+        // content — the avatar ended up underneath it.
         // A null headerBackground is the sanctioned per-screen scrim opt-out;
         // the radar's faint dot field doesn't need the legibility fade.
         ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),

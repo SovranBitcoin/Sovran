@@ -12,6 +12,7 @@ jest.mock('wallet', () => ({
   configureEnabledPaymentMethods: jest.fn(),
 }));
 
+import { rewriteSystemPath } from '@/app/+native-intent';
 import { MODAL_SCREENS } from '@/config/modalScreens';
 import { PAGE_ROUTES } from '@/e2e/schema/page-routes';
 
@@ -35,6 +36,34 @@ function pathExists(path: string): boolean {
 }
 
 const TABS_DIR = join(ROUTES_DIR, '(drawer)', '(tabs)');
+
+/** Every page the seven flattened route groups held, by its old group. */
+const FLATTENED_GROUPS: Record<string, readonly string[]> = {
+  '(map-flow)': ['', 'index', 'detail'],
+  '(theme-flow)': ['preview', 'background', 'gallery'],
+  '(filter-flow)': ['filters'],
+  '(transactions-flow)': [
+    'transactions',
+    'swap',
+    'aiRequest',
+    'lightningSend',
+    'onchainSend',
+    'sendToken',
+    'lightningReceive',
+    'onchainReceive',
+    'receiveToken',
+  ],
+  '(user-flow)': ['profile', 'share', 'geohashChat', 'bitchatNetwork', 'bitchatDM'],
+  '(profile-flow)': ['profile', 'share', 'bitchatNetwork', 'bitchatDM'],
+  '(prompt-flow)': [
+    'cta',
+    'cta-sample',
+    'backup-intro',
+    'backup-words',
+    'backup-verify',
+    'backup-done',
+  ],
+};
 
 describe('route integrity', () => {
   it('every tab is a folder with a stack and a root page, Search last', () => {
@@ -89,5 +118,31 @@ describe('route integrity', () => {
     const names = [...MODAL_SCREENS.map((screen) => screen.name), ...literal];
     expect(names.length).toBeGreaterThan(1);
     expect(names.filter((name) => !screenExists(ROUTES_DIR, name))).toEqual([]);
+  });
+
+  it('keeps exactly four flow groups', () => {
+    const groups = readdirSync(ROUTES_DIR).filter((entry) => /^\(.+-flow\)$/.test(entry));
+    expect(groups.sort()).toEqual([
+      '(mint-flow)',
+      '(receive-flow)',
+      '(send-flow)',
+      '(settings-flow)',
+    ]);
+  });
+
+  it('opens every page of a flattened group at an existing root route, query intact', () => {
+    const broken: string[] = [];
+    for (const [group, leaves] of Object.entries(FLATTENED_GROUPS)) {
+      expect([group, isDir(join(ROUTES_DIR, group))]).toEqual([group, false]);
+      for (const leaf of leaves) {
+        const link = `/${group}${leaf ? `/${leaf}` : ''}?a=1%202`;
+        const rewritten = rewriteSystemPath(link);
+        const [pathname, query] = rewritten.split('?');
+        if (pathname.includes('(') || query !== 'a=1%202' || !pathExists(pathname)) {
+          broken.push(`${link} -> ${rewritten}`);
+        }
+      }
+    }
+    expect(broken).toEqual([]);
   });
 });
