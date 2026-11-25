@@ -417,6 +417,7 @@ private final class GlyphOutlines: @unchecked Sendable {
 /// digit leaves through one edge while the new one enters from the other, and
 /// both are cut to the slot so nothing spills past the line. `progress`
 /// animates (0 = start of roll, 1 = settled).
+@available(iOS 26.0, *)
 private struct RollingGlyphShape: Shape {
     let outlines: GlyphOutlines
     let from: String?
