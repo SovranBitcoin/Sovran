@@ -73,16 +73,9 @@ const MAX_PLACE_DETAILS_ENTRIES = 200;
 const BTCMAP_BASE_URL = 'https://api.btcmap.org/v4';
 
 // BTCMap v4 omits every attribute except `id` unless requested via `?fields=`.
-// Deliberately omit `deleted_at` from the list query so v4 returns active places only.
-const BTCMAP_PLACES_FIELDS = [
-  'id',
-  'lat',
-  'lon',
-  'icon',
-  'comments',
-  'boosted_until',
-  'updated_at',
-].join(',');
+// Deliberately omit `deleted_at` from the list query so v4 returns active places only,
+// and omit unused `comments`/`boosted_until` to keep the ~30k-row payload lean.
+const BTCMAP_PLACES_FIELDS = ['id', 'lat', 'lon', 'icon', 'updated_at'].join(',');
 
 const BTCMAP_PLACE_DETAILS_FIELDS = [
   'id',

@@ -644,13 +644,22 @@ export const fetchMintInfos = async (
   };
 
   const existing = useMintTestnutStore.getState().byMintUrl;
-  const nowSec = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  const nowSec = Math.floor(nowMs / 1000);
+  const FRESH_VERDICT_MS = 24 * 60 * 60 * 1000;
+
+  // Skip re-probing mints that already have a fresh probed verdict within 24h.
+  const toProbe = mintUrls.filter((mintUrl) => {
+    const saved = existing[normalizeMintUrlKey(mintUrl)];
+    return !(saved?.probedAt != null && nowMs - saved.checkedAt <= FRESH_VERDICT_MS);
+  });
 
   // Run local NUT-04 unpaid-quote probes with bounded concurrency (max 4).
   const probeResults = new Map<string, boolean | null>();
   const CONCURRENCY = 4;
-  for (let i = 0; i < mintUrls.length; i += CONCURRENCY) {
-    const batch = mintUrls.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < toProbe.length; i += CONCURRENCY) {
+    if (controls?.signal?.aborted) break;
+    const batch = toProbe.slice(i, i + CONCURRENCY);
     const settled = await Promise.all(
       batch.map(async (mintUrl) => {
         const verdict = await probeMintTestnut(mintUrl, { signal: controls?.signal });
@@ -662,8 +671,8 @@ export const fetchMintInfos = async (
     }
   }
 
-  // Only consult multi-auditor discovery for mints whose local probe was indeterminate.
-  const unresolved = mintUrls.filter((mintUrl) => probeResults.get(mintUrl) === null);
+  // Only consult multi-auditor discovery for probed mints whose local probe was indeterminate.
+  const unresolved = toProbe.filter((mintUrl) => probeResults.get(mintUrl) === null);
   let auditorByKey = new Map<string, DiscoverMint>();
   if (unresolved.length > 0 && !controls?.signal?.aborted) {
     const discovered = await discoverMints({ signal: controls?.signal });
@@ -677,16 +686,22 @@ export const fetchMintInfos = async (
   return ok(
     mintUrls.map((mintUrl) => {
       const key = normalizeMintUrlKey(mintUrl);
+      const saved = existing[key];
+      if (!probeResults.has(mintUrl) && saved?.probedAt != null) {
+        return {
+          mintUrl,
+          testnut: saved.testnut,
+          known: true,
+          probedAt: saved.probedAt,
+        };
+      }
       const localVerdict = probeResults.get(mintUrl) ?? null;
       const found = auditorByKey.get(key);
-      const saved = existing[key];
       const hasAuditedVerdict = found?.hasAudit === true && typeof found.testnut === 'boolean';
       const hasVerdict = localVerdict !== null || hasAuditedVerdict;
       const testnut =
         localVerdict !== null
-          ? saved?.testnut === true
-            ? true
-            : localVerdict
+          ? localVerdict
           : saved?.testnut === true
             ? true
             : hasAuditedVerdict

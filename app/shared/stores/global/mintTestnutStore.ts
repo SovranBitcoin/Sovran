@@ -28,7 +28,7 @@ import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
 import type { DiscoverMint, MintInfoRow } from '@/shared/lib/apiClient';
-import { isKnownTestnutHost } from '@/shared/lib/cashu/testnutProbe';
+import { isKnownTestnutHost } from '@/shared/lib/cashu/knownTestnutHosts';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';

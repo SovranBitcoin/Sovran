@@ -13,20 +13,12 @@
 import { z } from 'zod';
 import { parseWith } from '@sovranbitcoin/schemas';
 import { fetchJson } from '@/shared/lib/apiClient';
+import { isKnownTestnutHost } from './knownTestnutHosts';
 
-const KNOWN_TESTNUT_HOSTS = new Set(['testnut.cashu.space', 'fake.thesimplekid.dev']);
+export { isKnownTestnutHost };
+
 const DEFAULT_PROBE_DELAY_MS = 2_500;
 const DEFAULT_TIMEOUT_MS = 5_000;
-
-export function isKnownTestnutHost(mintUrl: string): boolean {
-  try {
-    const raw = /^[a-z][a-z0-9+.-]*:\/\//i.test(mintUrl) ? mintUrl : `https://${mintUrl}`;
-    const host = new URL(raw).hostname.toLowerCase();
-    return KNOWN_TESTNUT_HOSTS.has(host) || host.endsWith('.testnut.cashu.space');
-  } catch {
-    return false;
-  }
-}
 
 const KeysetsSchema = z.looseObject({
   keysets: z
@@ -118,7 +110,8 @@ export async function probeMintTestnut(
   const { signal, delayMs = DEFAULT_PROBE_DELAY_MS, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   if (signal?.aborted) return null;
 
-  const baseUrl = mintUrl.replace(/\/+$/, '');
+  const normalized = /^[a-z][a-z0-9+.-]*:\/\//i.test(mintUrl) ? mintUrl : `https://${mintUrl}`;
+  const baseUrl = normalized.replace(/\/+$/, '');
   const unit = await pickProbeUnit(baseUrl, timeoutMs, signal);
   if (signal?.aborted) return null;
 
