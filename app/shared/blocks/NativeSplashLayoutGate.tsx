@@ -7,7 +7,7 @@
  * anchor). Replays on a profile switch. Lives outside the root route file so
  * `app/_layout.tsx` only composes providers and configures navigation.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
@@ -143,6 +143,11 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // overlay at that exact spot we need to subtract our own window offset
   // (a parent View further up may not start at window (0,0)).
   const [parentOffset, setParentOffset] = useState({ x: 0, y: 0 });
+
+  useLayoutEffect(() => {
+    setBootMorphCompleted(false);
+    setBootSplashHandoff(false);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeQRButtonAnchor((next) => {

@@ -250,14 +250,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           }
         }
 
-        // Defer CPU-bound derivation until after animations (e.g. drawer close on profile switch)
-        await initPhase(
-          'NostrKeys.runAfterInteractions',
-          () =>
-            new Promise<void>((resolve) => {
-              InteractionManager.runAfterInteractions(() => resolve());
-            })
-        );
+        if (!mounted.current) return;
 
         const loaded = await loadAccountKeys({
           mnemonic: mnemonicToUse,

@@ -1,7 +1,7 @@
 import { createCredentialStaging } from '@/shared/lib/cashu/credentialStaging';
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { AppState, type AppStateStatus } from 'react-native';
-import { Manager, type WebSocketFactory, type WebSocketLike } from '@cashu/coco-core';
+import type { Manager, WebSocketFactory, WebSocketLike } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';
 import {
   createCashuSeedGetter,
@@ -45,7 +45,12 @@ import {
   deriveCashuMnemonic,
   deriveCashuMnemonicForImported,
 } from '@/shared/lib/nostr/keyDerivation';
-import { getInflightProofs, restoreProofsToReady } from './managerInternals';
+import {
+  getInflightProofs,
+  openLocalCocoManager,
+  restoreProofsToReady,
+  startCocoOperationRecovery,
+} from './managerInternals';
 import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
 import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFaults/webSocketFactory';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -103,11 +108,6 @@ const COCO_TIMED_NAMESPACES = [
   'ext',
 ] as const satisfies readonly (keyof Manager)[];
 
-/**
- * Passed to the Manager's constructor as well as to the explicit enable call:
- * coco's `resumeSubscriptions` rebuilds the processor from its constructor
- * config, so both must describe the same processor.
- */
 const MINT_OPERATION_PROCESSOR_OPTIONS = {
   processIntervalMs: 5000,
   maxRetries: 3,
@@ -271,16 +271,8 @@ export function trackSocketCloses(create: WebSocketFactory): {
 }
 
 /**
- * Pause coco's subscriptions and NPC sync while the app is backgrounded, and
- * bring both back with an immediate check when it returns.
- *
- * Pausing stops NPC first: a sync that lands after coco has stopped its mint
- * processor would queue quotes nothing is listening for. Resuming goes through
- * coco's own `resumeSubscriptions`, which reconnects the mint sockets, restarts
- * every watcher with a rescan of what is pending and recovers pending mint
- * operations: the checks a cold start makes, so anything paid while
- * backgrounded is found on return. NPC restarts after it, once the processor
- * is listening again.
+ * Pause NPC sync in the background. On foreground return, repair transport
+ * for Coco's live owners, requeue cached paid quotes and resume NPC sync.
  */
 export function createWalletForegroundGate(options: {
   appState: ForegroundSignal;
@@ -426,8 +418,7 @@ export class CocoManager {
   }
   private static npcPlugin: NPCPlugin | null = null;
   private static npcAccount: NPCAccountApi | null = null;
-  /** Pauses coco and NPC polling while the app is backgrounded. Armed only
-   *  once enableNpcSyncAndProcessor has run; see armForegroundGate. */
+  /** Pauses NPC polling in the background and repairs Coco transport on resume. */
   private static foregroundGate: ReturnType<typeof createForegroundGate> | null = null;
   private static socketCloses: ReturnType<typeof trackSocketCloses> | null = null;
   /** Stored reference to seed getter for pre-warming during background init */
@@ -740,9 +731,8 @@ export class CocoManager {
   /**
    * Initialize the Coco Manager with database and seed management.
    * This creates the Manager instance only — no network calls, no watchers.
-   * Call {@link enableSafeWatchers} and {@link enableNpcSyncAndProcessor}
-   * separately (in a non-blocking phase) — NPC sync must stay gated on the
-   * NUT-13 restore so deterministic counters don't desync from the mint.
+   * Call {@link warmSeedCache}, {@link startOperationRecovery} and {@link enableNpcSync}
+   * in Phase 2. Operation recovery and NPC sync wait for NUT-13 restore.
    */
   static async initialize(): Promise<Manager> {
     for (;;) {
@@ -894,14 +884,6 @@ export class CocoManager {
       // Decided here, while the database is still empty: once the migrations
       // below have run, a wallet that was lost looks like any other.
       askForRestoreIfWalletDatabaseLost(accountIndex, wasEmpty);
-      await initPhase('CocoManager.reposInit', () => repositories.init());
-      cashuLog.debug('cashu.manager.repositories.ready', { dbName });
-      // Post-init dump is diagnostic for migration boots only — skip the
-      // extra sqlite_master scan on ordinary already-migrated boots.
-      if (migrationExpected) {
-        await this.logPostInitSchema(db, dbName, preInitMigrationCount);
-      }
-
       // 2. Seed getter (lazy — no crypto work until first call, cached after)
       // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
       const seedGetter = createCashuSeedGetter({
@@ -1003,7 +985,7 @@ export class CocoManager {
       this.socketCloses = createSocket ? trackSocketCloses(createSocket) : null;
 
       const manager = await initPhase('CocoManager.createManager', () =>
-        Manager.create({
+        openLocalCocoManager({
           repo: repositories,
           seedGetter,
           logger: new CocoCoreLogger('manager'),
@@ -1015,6 +997,10 @@ export class CocoManager {
           outputDataCreator,
         })
       );
+      // Scan the resulting schema only on migration boots.
+      if (migrationExpected) {
+        await this.logPostInitSchema(db, dbName, preInitMigrationCount);
+      }
       if (resetGeneration !== this.resetGeneration) {
         await manager.dispose().catch(() => undefined);
         acquired.db = null;
@@ -1049,20 +1035,16 @@ export class CocoManager {
       cashuLog.error('cashu.manager.init_failed', { error });
       // Manager/repositories init failing is exactly what upstream needs
       // to hear about (schema migration or adapter contract breakage).
-      reportCocoApiFailure('Manager.initialize/repositories.init', error, {
+      reportCocoApiFailure('CocoManager.openLocal/repositories.init', error, {
         dbName: this.getDbName(),
       });
       throw error;
     }
   }
 
-  /**
-   * Enable observe-only watchers and pre-warm the seed cache. Safe to call
-   * before NUT-13 wallet restore has completed — does not start any operation
-   * that uses the deterministic counter.
-   */
-  static enableSafeWatchers(): Promise<void> {
-    return this.runBackground(() => this.startSafeWatchers());
+  /** Pre-warm the seed cache before restore. Coco's owners start after restore. */
+  static warmSeedCache(): Promise<void> {
+    return this.runBackground(() => this.warmSeedCacheAndReconcileE2EProofs());
   }
 
   /** Run a background start so that `cleanup` can wait for it to end. */
@@ -1084,22 +1066,22 @@ export class CocoManager {
     return work;
   }
 
-  private static async startSafeWatchers(): Promise<void> {
+  private static async warmSeedCacheAndReconcileE2EProofs(): Promise<void> {
     // The wallet this start is for. Every step below acts on it and on nothing
     // read later from the statics: by the time an await returns, a teardown
     // that stopped waiting may have opened the next account's wallet.
     const manager = this.openWallet();
     if (!manager) {
-      cashuLog.warn('cashu.manager.safe_watchers.no_instance');
+      cashuLog.warn('cashu.manager.seed_cache_warmup.no_instance');
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     const superseded = () => {
       if (this.openWallet() === manager) return false;
-      cashuLog.warn('cashu.manager.safe_watchers.superseded');
+      cashuLog.warn('cashu.manager.seed_cache_warmup.superseded');
       return true;
     };
     const t0 = performance.now();
-    cashuLog.info('cashu.manager.safe_watchers.start');
+    cashuLog.info('cashu.manager.seed_cache_warmup.start');
 
     if (this.seedGetter) {
       await initPhase('CocoManager.seedCacheWarm', () => this.seedGetter!());
@@ -1136,31 +1118,40 @@ export class CocoManager {
       }
     }
 
-    cashuLog.info('cashu.manager.safe_watchers.done', {
+    cashuLog.info('cashu.manager.seed_cache_warmup.done', {
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
   }
 
-  /**
-   * Start the mint-operation watcher (with `watchExistingPendingOnStart`),
-   * the mint-operation processor, and NPC sync. **Must NOT be called until the wallet
-   * has restored its NUT-13 deterministic counter from the mint** — otherwise
-   * any minting from a paid quote will use a counter the mint already signed,
-   * triggering an `outputs already signed` rejection that retries forever
-   * (see walletLifecycleStore + AppGate's RestoreGate).
-   */
-  static enableNpcSyncAndProcessor(): Promise<void> {
-    return this.runBackground(() => this.startNpcSyncAndProcessor());
+  private static operationRecovery = new WeakMap<Manager, Promise<void>>();
+
+  /** Called after RestoreGate has restored the deterministic counter, if needed. */
+  static startOperationRecovery(): Promise<void> {
+    const instance = this.openWallet();
+    if (!instance) return Promise.resolve();
+    const started = this.operationRecovery.get(instance);
+    if (started) return started;
+
+    const work = this.runBackground(() =>
+      startCocoOperationRecovery(instance, () => this.openWallet() === instance)
+    );
+    this.operationRecovery.set(instance, work);
+    return work;
   }
 
-  private static async startNpcSyncAndProcessor(): Promise<void> {
+  /** Start NPC quote sync after restore and Coco operation startup. */
+  static enableNpcSync(): Promise<void> {
+    return this.runBackground(() => this.startNpcSync());
+  }
+
+  private static async startNpcSync(): Promise<void> {
     const manager = this.openWallet();
     if (!manager) {
-      cashuLog.warn('cashu.manager.npc_sync_and_processor.no_instance');
+      cashuLog.warn('cashu.manager.npc_background.no_instance');
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     const t0 = performance.now();
-    cashuLog.info('cashu.manager.npc_sync_and_processor.start');
+    cashuLog.info('cashu.manager.npc_background.start');
 
     let npcAccount: NPCAccountApi | null = null;
     try {
@@ -1171,44 +1162,6 @@ export class CocoManager {
       });
     } catch (error) {
       cashuLog.warn('cashu.manager.plugins_init_failed', { error });
-    }
-
-    try {
-      initLog('CocoManager', 'reconciling legacy mint quotes...');
-      const result = await manager.reconcileLegacyMintQuotes();
-      cashuLog.info('cashu.manager.legacy_mint_quotes_reconciled', {
-        reconciled: result.reconciled.length,
-        skipped: result.skipped.length,
-      });
-    } catch (error) {
-      cashuLog.warn('cashu.manager.legacy_mint_quote_reconcile_failed', { error });
-      reportCocoApiFailure('reconcileLegacyMintQuotes', error);
-    }
-
-    try {
-      initLog('CocoManager', 'recovering pending mint operations...');
-      await manager.recoverPendingMintOperations();
-      initLog('CocoManager', 'pending mint operation recovery done');
-      cashuLog.info('cashu.manager.pending_mint_recovery_done');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.pending_mint_recovery_failed', { error });
-      reportCocoApiFailure('recoverPendingMintOperations', error);
-    }
-
-    try {
-      const result = await manager.requeuePaidMintQuotes();
-      if (result.requeued.length > 0) {
-        cashuLog.info('cashu.manager.paid_mint_quotes_requeued', {
-          requeued: result.requeued.length,
-        });
-      } else {
-        cashuLog.debug('cashu.manager.paid_mint_quote_requeue_noop', {
-          requeued: result.requeued.length,
-        });
-      }
-    } catch (error) {
-      cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
-      reportCocoApiFailure('requeuePaidMintQuotes', error);
     }
 
     if (npcAccount) {
@@ -1244,21 +1197,12 @@ export class CocoManager {
     // behind by a teardown must not arm it for a wallet that is gone.
     if (this.openWallet() === manager) this.armForegroundGate(manager);
 
-    cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
+    cashuLog.info('cashu.manager.npc_background.done', {
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
   }
 
-  /**
-   * Start pausing wallet polling while the app is backgrounded.
-   *
-   * Armed here and not at initialize() because coco's `resumeSubscriptions`
-   * turns every watcher and processor back on, including the mint-operation
-   * pair that must stay off until the NUT-13 restore has finished. Once
-   * enableNpcSyncAndProcessor has run they are all meant to be on, so a resume
-   * can only restore what was already enabled. Before that point backgrounding
-   * pauses nothing, as it always has.
-   */
+  /** Repair existing subscriptions on foreground return, after their owners start. */
   private static armForegroundGate(manager: Manager): void {
     if (this.foregroundGate || this.openWallet() !== manager) return;
     this.foregroundGate = createWalletForegroundGate({

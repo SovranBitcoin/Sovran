@@ -19,7 +19,7 @@ const DEFAULT_ATTEMPTS = 2;
 const DEFAULT_RETRY_DELAY_MS = 750;
 // Coco's mint HTTP layer has no abort/timeout hook, so a mint that accepts the
 // TCP connection but never responds would hang an attempt forever — and with
-// it CocoProvider Phase 2, which must reach enableNpcSyncAndProcessor or paid
+// it CocoProvider Phase 2, which must reach startOperationRecovery or paid
 // mint quotes are never detected. The race below bounds each attempt instead.
 const DEFAULT_ATTEMPT_TIMEOUT_MS = 10_000;
 

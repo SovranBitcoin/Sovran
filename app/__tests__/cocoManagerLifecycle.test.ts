@@ -3,9 +3,12 @@
  * `initialize`, `cleanup`, `isInitialized` and `peekInstance`. The database
  * and the plugins are stand-ins; the coco Manager is the real one.
  */
-import { Manager, MemoryRepositories } from '@cashu/coco-core';
+import { Amount, MemoryRepositories } from '@cashu/coco-core';
+import { ExtensionRegistrationError } from '@cashu/coco-core/plugin';
 import { createP2PKImportPlugin } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
+import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
+import { ExpoSqliteOnNode } from './cocoDatabases/expoSqliteOnNode';
 import { getPublicKey } from 'nostr-tools/pure';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
@@ -46,10 +49,6 @@ jest.mock('@/shared/lib/nostr/keyDerivation', () => ({
 }));
 jest.mock('@/shared/lib/cashu/cocoRepositories', () => ({
   createSovranCocoRepositories: jest.fn(),
-}));
-jest.mock('@/shared/lib/cashu/managerInternals', () => ({
-  getInflightProofs: jest.fn(),
-  restoreProofsToReady: jest.fn(),
 }));
 jest.mock('@/shared/lib/cashu/npc', () => ({
   NPC_BASE_URL: 'https://npub.cash',
@@ -115,6 +114,104 @@ afterEach(async () => {
 const closes = () => opened.reduce((n, db) => n + db.closeAsync.mock.calls.length, 0);
 
 describe('opening', () => {
+  it('initializes the repository once', async () => {
+    const repo = new MemoryRepositories();
+    const init = jest.spyOn(repo, 'init');
+    repositories.mockReturnValueOnce(repo);
+
+    await CocoManager.initialize();
+
+    expect(init).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a SQLite wallet before contacting its offline mint, then recovers in Phase 2', async () => {
+    const db = new ExpoSqliteOnNode(':memory:');
+    openDatabase.mockResolvedValueOnce(db);
+    const repo = new ExpoSqliteRepositories({ database: db as unknown as SQLite.SQLiteDatabase });
+    repositories.mockReturnValueOnce(repo);
+    await repo.init();
+    const now = Date.now();
+    const mintUrl = 'https://offline-mint.invalid';
+    await repo.mintRepository.addNewMint({
+      mintUrl,
+      name: 'Offline mint',
+      trusted: true,
+      createdAt: now,
+      updatedAt: now,
+      mintInfo: {
+        name: 'Offline mint',
+        contact: [],
+        pubkey: getPublicKey(SIGNER_KEY),
+        version: 'test',
+        nuts: { '4': { methods: [], disabled: false }, '5': { methods: [], disabled: false } },
+      },
+    });
+    await repo.mintQuoteRepository.upsertMintQuote({
+      mintUrl,
+      method: 'bolt11',
+      quoteId: 'pending-quote',
+      quote: 'pending-quote',
+      request: 'test-invoice',
+      unit: 'sat',
+      expiry: null,
+      state: 'UNPAID',
+      reusable: false,
+      amount: Amount.from(1),
+      amountPaid: Amount.from(0),
+      amountIssued: Amount.from(0),
+      remoteUpdatedAt: null,
+      quoteData: { amount: Amount.from(1) },
+      createdAt: now,
+      updatedAt: now,
+    });
+    await repo.mintOperationRepository.create({
+      id: 'pending-mint',
+      mintUrl,
+      method: 'bolt11',
+      methodData: {},
+      quoteId: 'pending-quote',
+      amount: Amount.from(1),
+      unit: 'sat',
+      state: 'pending',
+      request: 'test-invoice',
+      expiry: null,
+      outputData: { keep: [], send: [] },
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const outage = deferred<Response>();
+    const fetch = jest.spyOn(globalThis, 'fetch').mockImplementation(() => outage.promise);
+    const opening = CocoManager.initialize();
+    try {
+      const manager = await Promise.race([opening, tick().then(() => null)]);
+      if (!manager) throw new Error('Wallet open waited for the offline mint');
+      expect(fetch).not.toHaveBeenCalled();
+
+      const subscribe = jest.spyOn(manager.subscriptions, 'subscribe');
+      const background = CocoManager.startOperationRecovery();
+      expect(CocoManager.startOperationRecovery()).toBe(background);
+      await tick();
+      expect(subscribe).toHaveBeenCalledWith(
+        mintUrl,
+        'bolt11_mint_quote',
+        ['pending-quote'],
+        expect.any(Function)
+      );
+      expect(
+        fetch.mock.calls.some(([url]) => String(url).includes('/mint/quote/bolt11/pending-quote'))
+      ).toBe(true);
+      outage.reject(new Error('Mint unreachable'));
+      await background;
+      expect((await repo.mintOperationRepository.getById('pending-mint'))?.state).toBe('pending');
+    } finally {
+      // Also release startup in the regression case, where open is waiting on fetch.
+      outage.reject(new Error('Mint unreachable'));
+      await opening.catch(() => undefined);
+      await CocoManager.cleanup();
+    }
+  });
+
   it('shares one open between callers that ask while the database opens', async () => {
     const first = CocoManager.initialize();
     const second = CocoManager.initialize();
@@ -224,8 +321,17 @@ describe('starting the plugins', () => {
   });
 
   it('closes a wallet whose startup failed, and opens a new one next time', async () => {
-    jest.spyOn(Manager, 'create').mockRejectedValueOnce(new Error('plugin failed'));
-    await expect(CocoManager.initialize()).rejects.toThrow('plugin failed');
+    jest.mocked(createP2PKImportPlugin).mockReturnValueOnce({
+      name: 'broken-plugin',
+      required: ['keyRingService', 'logger'],
+      onInit: () => {
+        throw new ExtensionRegistrationError('broken-plugin', 'duplicate');
+      },
+    });
+    await expect(CocoManager.initialize()).rejects.toMatchObject({
+      name: 'CocoInitializationError',
+      cleanupState: 'confirmed',
+    });
     expect(CocoManager.isInitialized()).toBe(false);
     expect(CocoManager.peekInstance()).toBeNull();
     expect(opened[0].closeAsync).toHaveBeenCalledTimes(1);
@@ -255,5 +361,34 @@ describe('an open that fails after the database opened', () => {
     CocoManager.setSignerKey(SIGNER_KEY);
     await expect(CocoManager.initialize()).resolves.toBeDefined();
     expect(openDatabase).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('split startup adapter parity with upstream Manager.initialize', () => {
+  it('mirrors every step of Coco Manager.prototype.initialize in upstream order', () => {
+    const { Manager } = jest.requireActual('@cashu/coco-core') as {
+      Manager: { prototype: { initialize: () => Promise<void> } };
+    };
+    const source = Manager.prototype.initialize.toString();
+    const expectedOrder = [
+      'initPlugins',
+      'reconcileLegacyMintQuotes',
+      'mintOperationWatcher?.start',
+      'proofStateWatcher?.start',
+      'meltQuoteWatcher?.start',
+      'mintOperationProcessor?.start',
+      'meltSettlementProcessor?.start',
+      'ops.send.recovery.run',
+      'ops.melt.recovery.run',
+      'recoverPendingPaymentRequestReceiveAttempts',
+      'recoverPendingMintOperations',
+      'mintSwapOperationProcessor?.start',
+    ];
+    let lastIndex = -1;
+    for (const step of expectedOrder) {
+      const idx = source.indexOf(step);
+      expect(idx).toBeGreaterThan(lastIndex);
+      lastIndex = idx;
+    }
   });
 });

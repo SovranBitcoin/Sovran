@@ -41,10 +41,6 @@ jest.mock('@/shared/lib/nostr/keyDerivation', () => ({
 jest.mock('@/shared/lib/cashu/cocoRepositories', () => ({
   createSovranCocoRepositories: jest.fn(),
 }));
-jest.mock('@/shared/lib/cashu/managerInternals', () => ({
-  getInflightProofs: jest.fn(),
-  restoreProofsToReady: jest.fn(),
-}));
 jest.mock('@/shared/lib/cashu/npc', () => ({
   NPC_BASE_URL: 'https://npub.cash',
   NPC_SYNC_INTERVAL_MS: 60_000,
@@ -307,7 +303,7 @@ describe('background start-up and a teardown', () => {
 
   it('is waited for by a teardown that starts while it is running', async () => {
     const { finishPlugins } = parkedWallet();
-    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    const background = CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
 
     let cleaned = false;
@@ -329,7 +325,7 @@ describe('background start-up and a teardown', () => {
   it('creates no account for another wallet when the wallet changed under it', async () => {
     const { finishPlugins } = parkedWallet();
     const addAccount = privates().npcPlugin!.addAccount;
-    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    const background = CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
 
     // The teardown gave up waiting, the account flipped, and another wallet is open.
@@ -349,7 +345,7 @@ describe('background start-up and a teardown', () => {
       openAs(nextWallet);
       return { getInfo: jest.fn() };
     });
-    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    const background = CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
     finishPlugins();
     await background;
@@ -360,7 +356,7 @@ describe('background start-up and a teardown', () => {
   it('counts as running until every start for the open wallet has ended, whichever ends first', async () => {
     const wallet = parkedWallet();
     const finishFirst = wallet.finishPlugins;
-    const one = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    const one = CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
     // A second start for the same wallet, parked on its own promise.
     let finishSecond!: () => void;
@@ -370,7 +366,7 @@ describe('background start-up and a teardown', () => {
           finishSecond = () => resolve({ signEvent: jest.fn() });
         })
     );
-    const two = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    const two = CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
 
     finishFirst();
@@ -386,7 +382,7 @@ describe('background start-up and a teardown', () => {
     // Its teardown stopped waiting and the next account's wallet is open. The
     // old start may never end; the new wallet is still free to be switched.
     parkedWallet();
-    void CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    void CocoManager.enableNpcSync().catch(() => undefined);
     await tick();
     expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(true);
 
