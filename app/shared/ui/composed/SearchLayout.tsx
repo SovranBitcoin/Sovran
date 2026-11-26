@@ -1,12 +1,12 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { runAfterNativeSearchDismiss } from '@/shared/ui/composed/search/nativeSearchDismiss';
-import { useSearchClose } from '@/shared/ui/composed/search/SearchCloseContext';
 import {
   getHeaderTitleWidthBesideRightButton,
   HEADER_LAYOUT,
@@ -36,8 +36,34 @@ export const useSearchContext = () => {
 
 // --- Close ---
 
+type SearchClose = {
+  /** Leaves Search for the tab it was opened from. */
+  close: () => void;
+  /** VoiceOver/TalkBack label naming where closing returns to. */
+  accessibilityLabel: string;
+};
+
+// Without a tab navigator above it (tests, a stray mount), close goes to Wallet.
+const WALLET_CLOSE: SearchClose = {
+  close: () => guardedRouter.raw.navigate('/(drawer)/(tabs)/index'),
+  accessibilityLabel: 'Close search. Returns to Wallet',
+};
+
+const SearchCloseContext = createContext<SearchClose>(WALLET_CLOSE);
+
+/** The tab navigator tells the Search header where its close button returns to. */
+export function SearchCloseProvider({
+  value,
+  children,
+}: {
+  value: SearchClose;
+  children: ReactNode;
+}) {
+  return <SearchCloseContext.Provider value={value}>{children}</SearchCloseContext.Provider>;
+}
+
 function SearchCloseButton() {
-  const { close, accessibilityLabel } = useSearchClose();
+  const { close, accessibilityLabel } = useContext(SearchCloseContext);
   return (
     <ScreenHeaderAction
       icon="material-symbols:close-rounded"

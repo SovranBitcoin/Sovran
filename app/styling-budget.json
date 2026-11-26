@@ -274,7 +274,6 @@
     "stack-layout-props": 5
   },
   "features/settings/screens/SettingsDesignSystemScreensScreen.tsx": {
-    "inline-style": 2,
     "content-container-style": 1
   },
   "features/settings/screens/SettingsDesignSystemSegmentedScreen.tsx": {
@@ -291,7 +290,7 @@
     "content-container-style": 1
   },
   "features/settings/screens/SettingsKeyringScreen.tsx": {
-    "inline-style": 7,
+    "inline-style": 3,
     "stack-layout-props": 7
   },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
@@ -411,7 +410,7 @@
   },
   "features/user/screens/UserProfileScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 17,
+    "inline-style": 16,
     "stack-layout-props": 4
   },
   "features/wallet/components/Account.tsx": {
@@ -667,7 +666,7 @@
     "content-container-style": 1
   },
   "shared/ui/composed/ProfileTierRing.tsx": {
-    "inline-style": 3
+    "inline-style": 2
   },
   "shared/ui/composed/QRButton/QRButton.android.tsx": {
     "stylesheet-create": 1

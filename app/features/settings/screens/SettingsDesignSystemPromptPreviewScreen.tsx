@@ -7,10 +7,11 @@
  */
 
 import { useState, type ReactNode } from 'react';
-import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CtaView } from '@/shared/blocks/CtaScreen';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { ZeroTopSafeArea } from '@/shared/hooks/useScreenInsets';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { headerButtonSize, spacing } from '@/shared/styles/tokens';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -56,9 +57,7 @@ function WithClosePreview({ children }: { children: ReactNode }) {
   return (
     <>
       <View className="bg-surface flex-1" style={pageInset}>
-        <SafeAreaInsetsContext.Provider value={{ ...insets, top: 0 }}>
-          {children}
-        </SafeAreaInsetsContext.Provider>
+        <ZeroTopSafeArea>{children}</ZeroTopSafeArea>
       </View>
       <View className="absolute right-3" style={belowStatusBar}>
         <ScreenHeaderAction

@@ -11,8 +11,7 @@ import {
   getHeaderTitleWidthBesideRightButton,
   HEADER_LAYOUT,
 } from '@/features/wallet/lib/walletHeader';
-import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
-import { SearchCloseProvider } from '@/shared/ui/composed/search/SearchCloseContext';
+import { SearchCloseProvider, SearchLayout } from '@/shared/ui/composed/SearchLayout';
 
 type HeaderOptions = {
   headerLeft?: () => unknown;

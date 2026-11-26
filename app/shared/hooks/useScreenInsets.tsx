@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { spacing } from '@/shared/styles/tokens';
 
@@ -29,6 +29,16 @@ export function useReportTabBarHeight() {
 
 /** A parent frame can consume its bottom inset once for all descendant scrollers. */
 export const ConsumedBottomInsetContext = createContext(false);
+
+/** Zeroes the top safe-area inset for descendants whose parent frame already cleared it. */
+export function ZeroTopSafeArea({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <SafeAreaInsetsContext.Provider value={{ ...insets, top: 0 }}>
+      {children}
+    </SafeAreaInsetsContext.Provider>
+  );
+}
 /** Screen publishes measured footer clearance to custom scrollers as well as its own. */
 export const ScreenBottomPaddingContext = createContext(0);
 /** Custom page scrollers consume this inside their content, never their viewport. */

@@ -9,7 +9,7 @@ import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nati
 import { DrawerSceneOverlay } from '@/navigation/DrawerSceneOverlay';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { SearchCloseProvider } from '@/shared/ui/composed/search/SearchCloseContext';
+import { SearchCloseProvider } from '@/shared/ui/composed/SearchLayout';
 
 export const unstable_settings = {
   anchor: 'index',

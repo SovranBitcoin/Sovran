@@ -31,7 +31,7 @@ function mockHost(name: string) {
 }
 
 let mockSearchClose: { close: () => void; accessibilityLabel: string } | undefined;
-jest.mock('@/shared/ui/composed/search/SearchCloseContext', () => ({
+jest.mock('@/shared/ui/composed/SearchLayout', () => ({
   SearchCloseProvider: (props: {
     value: { close: () => void; accessibilityLabel: string };
     children: React.ReactNode;

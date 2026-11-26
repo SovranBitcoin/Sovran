@@ -232,7 +232,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/search/FeedTabButton.tsx",
     "shared/ui/composed/search/RecentPeopleSearchStrip.tsx",
     "shared/ui/composed/search/RecentSearches.tsx",
-    "shared/ui/composed/search/SearchCloseContext.tsx",
     "shared/ui/composed/search/SearchResultRows.tsx",
     "shared/ui/composed/search/UnifiedSearch.tsx",
     "shared/ui/primitives/AnimatedEmoji.tsx",
@@ -249,6 +248,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 243,
+  "total": 242,
 }
 `;
