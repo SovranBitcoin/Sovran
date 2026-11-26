@@ -115,8 +115,6 @@ const MINT_OPERATION_PROCESSOR_OPTIONS = {
   initialEnqueueDelayMs: 2000,
 };
 
-/** How long a resume waits for the sockets the pause closed to report it. */
-const SOCKET_CLOSE_WAIT_MS = 2_000;
 const FOREGROUND_GATE_ATTEMPTS = 3;
 const FOREGROUND_GATE_RETRY_MS = 2_000;
 /**

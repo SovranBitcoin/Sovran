@@ -78,22 +78,32 @@ const STORE = 'swap-transactions-store';
 const SOURCE = 'https://source.example';
 const DESTINATION = 'https://destination.example';
 
-/** Whether account A's recipient has issued. */
-let recipientState = 'pending';
+/** Whether account A's swap has completed. */
+let swapCompleted = false;
+let releaseWait: (() => void) | null = null;
 
-function createManager() {
-  const operation = () => ({
-    id: 'mint-op-1',
-    quoteId: 'mint-quote-1',
-    mintUrl: DESTINATION,
-    method: 'bolt11',
-    request: 'lnbc-fixture',
-    amount: Amount.from(100),
-    unit: 'sat',
-    state: recipientState,
+function makeSwapOp(id: string, state: string) {
+  return {
+    id,
+    revision: 1,
+    sourceMintUrl: SOURCE,
+    destinationMintUrl: DESTINATION,
+    unit: 'sat' as const,
+    destinationAmount: Amount.from(100),
+    sourceQuote: { mintUrl: SOURCE, method: 'bolt11' as const, quoteId: 'melt-quote-1' },
+    destinationQuote: { mintUrl: DESTINATION, method: 'bolt11' as const, quoteId: 'mint-quote-1' },
+    sourceOperationId: 'melt-op-1',
+    destinationOperationId: 'mint-op-1',
+    paymentRequestHash: '00'.repeat(32),
     createdAt: 1000,
     updatedAt: 1000,
-  });
+    stateEnteredAt: 1000,
+    retry: { attemptCount: 0, lastAttemptAt: null, nextAttemptAt: null, lastError: null },
+    state,
+  };
+}
+
+function createManager() {
   return {
     wallet: {
       balances: {
@@ -103,33 +113,30 @@ function createManager() {
         })),
       },
     },
-    quotes: {
-      mint: {
-        create: jest.fn(async () => ({
-          quoteId: 'mint-quote-1',
-          mintUrl: DESTINATION,
-          unit: 'sat',
-          request: 'lnbc-fixture',
-        })),
-      },
-      melt: { create: jest.fn(async () => ({ quoteId: 'melt-quote-1', mintUrl: SOURCE })) },
-    },
     ops: {
-      mint: {
-        prepare: jest.fn(async () => operation()),
-        get: jest.fn(async () => operation()),
-      },
-      melt: {
-        prepare: jest.fn(async () => ({
-          id: 'melt-op-1',
-          quoteId: 'melt-quote-1',
-          amount: Amount.from(100),
-          fee_reserve: 0,
-          swap_fee: 0,
-        })),
-        execute: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-        refresh: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-        get: jest.fn(async () => null),
+      mintSwap: {
+        prepare: jest.fn(async (input: { id: string }) => makeSwapOp(input.id, 'prepared')),
+        execute: jest.fn(async (id: string) =>
+          makeSwapOp(id, swapCompleted ? 'completed' : 'destination_funded')
+        ),
+        get: jest.fn(async (id: string) =>
+          makeSwapOp(id, swapCompleted ? 'completed' : 'destination_funded')
+        ),
+        listActive: jest.fn(async () => []),
+        refresh: jest.fn(async (id: string) =>
+          makeSwapOp(id, swapCompleted ? 'completed' : 'destination_funded')
+        ),
+        cancel: jest.fn(async (id: string) => makeSwapOp(id, 'cancelled')),
+        waitForOutcome: jest.fn(
+          (id: string) =>
+            new Promise((resolve) => {
+              releaseWait = () =>
+                resolve({
+                  status: swapCompleted ? 'completed' : 'timeout',
+                  operation: makeSwapOp(id, swapCompleted ? 'completed' : 'destination_funded'),
+                });
+            })
+        ),
       },
     },
     mint: { addMint: jest.fn().mockResolvedValue(undefined) },
@@ -173,7 +180,8 @@ async function switchTo(accountIndex: number) {
 
 beforeEach(async () => {
   jest.useFakeTimers();
-  recipientState = 'pending';
+  swapCompleted = false;
+  releaseWait = null;
   mockManager = createManager();
   jest.mocked(setTransactionAnnotation).mockClear();
   await AsyncStorage.clear();
@@ -240,11 +248,11 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
   // A's first transfer arrives. The run would move on to the second, but the
   // open account is no longer A: it pays nothing more and lets the group go,
   // so a swap can start in B.
-  recipientState = 'finalized';
-  await flush(16000);
-  await flush(16000);
-  expect(managerA.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(managerA.quotes.mint.create).toHaveBeenCalledTimes(1);
+  swapCompleted = true;
+  releaseWait?.();
+  await flush(1000);
+  expect(managerA.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
+  expect(managerA.ops.mintSwap.prepare).toHaveBeenCalledTimes(1);
   expect(anySwapGroupHeld()).toBe(false);
 
   // B's history is untouched, in memory and saved, and no annotation was written for it.
@@ -253,7 +261,7 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
   expect(setTransactionAnnotation).toHaveBeenCalledTimes(annotationsBeforeSwitch);
 
   // A's saved group is left as the run last wrote it before the switch: one
-  // leg, its melt paid, its mint not yet seen.
+  // leg, its source paid, its destination not yet seen.
   const savedA = (await saved(ACCOUNT_A)).groups[groupId];
   expect(savedA).toMatchObject({
     state: 'running',
@@ -266,6 +274,7 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
   await act(async () => {
     await reconcileSwapLegs({
       ops: {
+        mintSwap: { get: async () => ({ state: 'completed' }) },
         melt: { get: async () => ({ state: 'finalized' }), cancel: async () => {} },
         mint: { get: async () => ({ state: 'finalized' }) },
       },

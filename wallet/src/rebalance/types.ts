@@ -1,4 +1,4 @@
-import type { Amount } from '@cashu/coco-core';
+import type { Manager, MintSwapOperation } from '@cashu/coco-core';
 
 import type { CocoLogger } from '../logger';
 
@@ -12,14 +12,13 @@ export interface RebalanceTransfer {
   chainPath?: string[];
   chainHopIndex?: number;
   /**
-   * One leg only: a melt Lightning finds no route for fails this transfer
-   * instead of being sent through middleman mints. The caller routes.
+   * One leg only: a source payment rejection fails this transfer instead of
+   * being sent through middleman mints. The caller routes.
    */
   directOnly?: boolean;
   /**
-   * Most the source may be debited, in sats: the invoice plus the mint's fee
-   * reserve and input fee of the prepared melt. Above it the transfer fails
-   * before anything is paid.
+   * Most the source may be debited, in sats: the destination amount plus fees.
+   * Passed directly to Coco's `ops.mintSwap.prepare({ sourceDebitCap })`.
    */
   sourceDebitCap?: number;
   /**
@@ -30,85 +29,28 @@ export interface RebalanceTransfer {
   exactAmount?: boolean;
 }
 
-/** The recipient side: a prepared bolt11 mint operation whose invoice the melt pays. */
-export interface RebalanceMintReceipt {
-  id: string;
-  quoteId?: string;
-  mintUrl: string;
-  method: string;
-  unit: string;
-  amount: Amount;
-  request: string;
-}
-
-/** A persisted recipient operation as coco reports it. */
-export interface RebalanceMintSnapshot {
-  id: string;
-  quoteId?: string;
-  mintUrl: string;
-  method: string;
-  unit: string;
-  amount: Amount;
-  state: string;
-  error?: string;
-}
-
-type AmountValue = Amount | number | bigint | string | null | undefined;
-
-/** The sender side: a prepared (not yet executed) melt operation. */
-export interface RebalancePreparedMelt {
-  id: string;
-  quoteId?: string;
-  amount?: AmountValue;
-  fee_reserve?: AmountValue;
-  swap_fee?: AmountValue;
-  /** False when the selected proofs are melted as they are (no pre-swap). */
-  needsSwap?: boolean;
-  /** Sum of the proofs reserved for this melt. */
-  inputAmount?: AmountValue;
-  /** The pre-swap's outputs; `send` is what the melt then spends. */
-  swapOutputData?: {
-    send?: readonly { blindedMessage?: { amount?: AmountValue } }[];
-  };
-}
-
-/** A melt operation's persisted state. */
-export interface RebalanceMeltSnapshot {
-  id?: string;
-  state?: string;
-}
-
 export interface StrandedMintBalance {
   url: string;
   balance: number;
 }
 
+/** The Coco `manager.ops.mintSwap` surface that the rebalance engine drives. */
+export type RebalanceMintSwapApi = Pick<
+  Manager['ops']['mintSwap'],
+  'prepare' | 'execute' | 'get' | 'listActive' | 'refresh' | 'cancel' | 'waitForOutcome'
+>;
+
 /**
- * Wallet capabilities the engine drives. Each method is one Coco call (or one
- * existing recovery helper); the engine owns their sequencing.
+ * Wallet capabilities the rebalance engine drives. Single-hop swap execution,
+ * settlement, proof reservation and recovery belong to Coco's `ops.mintSwap`.
  */
 export interface RebalanceWalletPort {
   /** Spendable balance per mint URL, in the transfer unit. */
   balancesByMint(): Promise<Record<string, number>>;
   /** Input fee if every ready proof on the mint were spent. May throw; callers fall back. */
   worstCaseInputFee(mintUrl: string): Promise<number>;
-  /** Fee reserve the mint quotes for paying `invoice` (read-only quote, nothing persisted). */
-  probeMeltFeeReserve(mintUrl: string, invoice: string): Promise<number>;
-  createMintReceipt(mintUrl: string, amount: number): Promise<RebalanceMintReceipt>;
-  getMintOperation(operationId: string): Promise<RebalanceMintSnapshot | null>;
-  /**
-   * Re-check a recipient operation with its mint and return its latest state.
-   * Optional: readers fall back to `getMintOperation`.
-   */
-  refreshMintOperation?(operationId: string): Promise<RebalanceMintSnapshot | null>;
-  prepareMelt(mintUrl: string, invoice: string): Promise<RebalancePreparedMelt>;
-  executeMelt(operationId: string): Promise<RebalanceMeltSnapshot | undefined>;
-  refreshMelt(operationId: string): Promise<RebalanceMeltSnapshot>;
-  getMeltOperation(operationId: string): Promise<RebalanceMeltSnapshot | null>;
-  /** Return proofs stuck `inflight` on the mint to ready. */
-  restoreInflightProofs(mintUrl: string): Promise<void>;
-  /** Cancel a prepared melt that will not be executed, releasing its reserved proofs. */
-  cancelPreparedMelt(operationId: string): Promise<void>;
+  /** Coco's native single-hop mint-to-mint swap API. */
+  mintSwap: RebalanceMintSwapApi;
   trustMint(mintUrl: string): Promise<void>;
   /** Untrust every URL; report those still holding a balance. */
   releaseTrust(mintUrls: readonly string[]): Promise<{
@@ -133,9 +75,9 @@ export type RebalanceLegStatus =
   | 'done'
   | 'failed'
   | 'skipped'
-  /** The melt was sent and its outcome is not yet known; coco recovers it later. */
+  /** The source payment was sent and its outcome is not yet known; coco recovers it later. */
   | 'paymentPending'
-  /** The melt settled; the destination mint had not issued within the wait. */
+  /** The source paid; the destination mint had not issued within the wait. */
   | 'settling';
 
 /** Structured routing context; the UI formats it for display. */
@@ -175,10 +117,8 @@ export interface RebalanceEventSink {
   /** A leg is committed to run with this amount (persist it for history). */
   legOpened(legId: string, leg: RebalanceLegDescriptor): void;
   legUpdated(legId: string, update: RebalanceLegUpdate): void;
-  mintReceiptCreated(legId: string, receipt: RebalanceMintReceipt): void;
-  meltPrepared(legId: string, melt: RebalancePreparedMelt): void;
-  /** A prepared melt was cancelled before it was executed: it never paid, and never will. */
-  meltReleased?(operationId: string): void;
+  /** Coco prepared the mint swap; carries parent + child quote/operation ids for history. */
+  swapPrepared(legId: string, operation: MintSwapOperation): void;
   /** A middleman route is about to run: create one leg per hop and return their ids in order. */
   routeAttemptStarted(
     stepId: string,
@@ -189,12 +129,11 @@ export interface RebalanceEventSink {
 export type RebalanceTransferOutcome =
   | { status: 'done' }
   | { status: 'skipped' }
-  /** Melt sent, settlement not confirmed in time. Never retried; coco reconciles it. */
+  /** Source payment sent, settlement not confirmed in time. Never retried; coco reconciles it. */
   | { status: 'pending'; operationId: string }
   /**
-   * The melt settled, so the money has left the source mint, but the destination
-   * had not issued within the wait. Never retried; the destination claims its
-   * quote on its own schedule.
+   * The source settled, so the money has left the source mint, but the destination
+   * had not issued within the wait. Never retried; coco's mintSwap processor claims it.
    */
   | { status: 'settling' }
   | { status: 'failed'; error: unknown }

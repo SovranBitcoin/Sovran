@@ -575,3 +575,62 @@ describe('a pass whose write was refused because the leg changed while it was re
     expect(leg().localStatus).toBe('invoiceReady');
   });
 });
+
+describe('a leg backed by a native Coco mintSwap operation', () => {
+  function swapLeg(status: 'paymentPending' | 'settling' | 'melting') {
+    const leg = savedLeg(status);
+    useSwapTransactionsStore.getState().tagMintSwap(leg.groupId, leg.legId, 'swap-op-1');
+    return leg;
+  }
+
+  function swapManager(state: string) {
+    return {
+      ops: {
+        mintSwap: { get: jest.fn(async () => ({ state })) },
+        mint: { get: jest.fn(async () => null) },
+        melt: { get: jest.fn(async () => null), cancel: jest.fn(async () => undefined) },
+      },
+    };
+  }
+
+  it('marks paymentPending done directly when Coco mintSwap is completed', async () => {
+    const leg = swapLeg('paymentPending');
+    const coco = swapManager('completed');
+
+    await reconcileSwapLegs(coco);
+
+    expect(coco.ops.mintSwap.get).toHaveBeenCalledWith('swap-op-1');
+    expect(coco.ops.melt.get).not.toHaveBeenCalled();
+    expect(leg().localStatus).toBe('done');
+  });
+
+  it.each(['failed', 'cancelled'] as const)(
+    'marks paymentPending failed when Coco mintSwap is %s',
+    async (state) => {
+      const leg = swapLeg('paymentPending');
+      await reconcileSwapLegs(swapManager(state));
+
+      expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+    }
+  );
+
+  it.each(['destination_funded', 'destination_pending'] as const)(
+    'moves paymentPending to settling when Coco mintSwap is %s',
+    async (state) => {
+      const leg = swapLeg('paymentPending');
+      await reconcileSwapLegs(swapManager(state));
+
+      expect(leg().localStatus).toBe('settling');
+    }
+  );
+
+  it.each(['source_pending', 'needs_attention'] as const)(
+    'leaves paymentPending alone while Coco mintSwap is %s',
+    async (state) => {
+      const leg = swapLeg('paymentPending');
+      await reconcileSwapLegs(swapManager(state));
+
+      expect(leg().localStatus).toBe('paymentPending');
+    }
+  );
+});

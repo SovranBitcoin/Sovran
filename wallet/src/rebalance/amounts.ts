@@ -47,24 +47,3 @@ export function computeInitialTransferAmount({
   }
   return { status: 'ready', amount: requestedSatAmount, capped: false };
 }
-
-/**
- * Re-cap an amount once the mint's real fee reserve is known. Returns the new
- * amount, or null when the current amount already fits or the capped amount
- * would fall below the transfer threshold.
- */
-export function recapForProbedHeadroom({
-  amount,
-  sourceBalance,
-  headroom,
-  minTransferThreshold,
-}: {
-  amount: number;
-  sourceBalance: number;
-  headroom: number;
-  minTransferThreshold: number;
-}): number | null {
-  if (amount + headroom <= sourceBalance) return null;
-  const capped = toWholeSats(sourceBalance - headroom) ?? 0;
-  return capped >= minTransferThreshold ? capped : null;
-}

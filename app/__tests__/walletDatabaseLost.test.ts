@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MemoryRepositories } from '@cashu/coco-core';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
 import { getPublicKey } from 'nostr-tools/pure';
@@ -97,10 +98,12 @@ beforeEach(async () => {
   statusAtMigration = null;
   openDatabase.mockReset();
   getInfo.mockResolvedValue({ exists: false });
-  repositories.mockReturnValue({
-    init: async () => {
+  repositories.mockImplementation(() => {
+    const repo = new MemoryRepositories();
+    repo.init = async () => {
       statusAtMigration = status();
-    },
+    };
+    return repo;
   });
   useProfileStore.setState({
     activeAccountIndex: 0,

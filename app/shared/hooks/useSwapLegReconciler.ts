@@ -16,6 +16,7 @@ export function useSwapLegReconciler(): void {
     const reconciler = createSwapLegReconciler(manager);
     reconciler.run();
     const offs = [
+      manager.on('mint-swap:updated', reconciler.run),
       manager.on('mint-op:finalized', reconciler.run),
       manager.on('melt-op:finalized', reconciler.run),
       manager.on('melt-op:rolled-back', reconciler.run),

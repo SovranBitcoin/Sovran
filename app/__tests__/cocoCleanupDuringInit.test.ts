@@ -271,29 +271,31 @@ describe('background start-up and a teardown', () => {
     };
   };
 
-  /** A wallet whose plugin start-up is parked until `finishPlugins` is called. */
+  /** A wallet whose background start-up is parked on signer resolution until `finishPlugins` is called. */
   function parkedWallet() {
     let finishPlugins!: () => void;
     const wallet = {
       use: jest.fn(),
-      initPlugins: jest.fn(
-        () =>
-          new Promise<void>((resolve) => {
-            finishPlugins = resolve;
-          })
-      ),
+      ensureSubscriptions: jest.fn().mockResolvedValue(undefined),
+      requeuePaidMintQuotes: jest.fn().mockResolvedValue({ requeued: [] }),
+      dispose: jest.fn().mockResolvedValue(undefined),
     };
     openAs(wallet);
     privates().npcAccount = null;
-    privates().npcPluginRegistered = false;
     privates().npcPlugin = { addAccount: jest.fn() };
+    const signerSpy = jest.spyOn(privates(), 'getCurrentProfileSigner').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishPlugins = () => resolve({ signEvent: jest.fn() });
+        })
+    );
     // The start-up ends by listening for the app leaving the foreground.
     jest
       .spyOn(AppState, 'addEventListener')
       .mockReturnValue({ remove: jest.fn() } as unknown as ReturnType<
         typeof AppState.addEventListener
       >);
-    return { wallet, finishPlugins: () => finishPlugins() };
+    return { wallet, signerSpy, finishPlugins: () => finishPlugins() };
   }
 
   afterEach(() => {
@@ -326,9 +328,6 @@ describe('background start-up and a teardown', () => {
 
   it('creates no account for another wallet when the wallet changed under it', async () => {
     const { finishPlugins } = parkedWallet();
-    const signer = jest
-      .spyOn(privates(), 'getCurrentProfileSigner')
-      .mockResolvedValue({ signEvent: jest.fn() });
     const addAccount = privates().npcPlugin!.addAccount;
     const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
     await tick();
@@ -338,15 +337,13 @@ describe('background start-up and a teardown', () => {
     finishPlugins();
     await background;
 
-    // Nothing of the active account is read for a wallet that is gone.
-    expect(signer).not.toHaveBeenCalled();
+    // Nothing is registered for a wallet that is gone.
     expect(addAccount).not.toHaveBeenCalled();
     expect(privates().npcAccount).toBeNull();
   });
 
   it('does not save an account that finished being added after the wallet changed', async () => {
     const { finishPlugins } = parkedWallet();
-    jest.spyOn(privates(), 'getCurrentProfileSigner').mockResolvedValue({ signEvent: jest.fn() });
     const nextWallet = { other: 'wallet' };
     privates().npcPlugin!.addAccount.mockImplementation(async () => {
       openAs(nextWallet);
@@ -367,10 +364,10 @@ describe('background start-up and a teardown', () => {
     await tick();
     // A second start for the same wallet, parked on its own promise.
     let finishSecond!: () => void;
-    wallet.wallet.initPlugins.mockImplementationOnce(
+    wallet.signerSpy.mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
-          finishSecond = resolve;
+        new Promise((resolve) => {
+          finishSecond = () => resolve({ signEvent: jest.fn() });
         })
     );
     const two = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);

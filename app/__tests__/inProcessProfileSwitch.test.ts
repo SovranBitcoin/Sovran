@@ -473,13 +473,8 @@ it('does not merge a late account-A hydration into an empty account B', async ()
 it('strict Coco cleanup rejects swallowed teardown failures while default cleanup stays best-effort', async () => {
   await setup();
   const { CocoManager } = jest.requireActual('@/shared/lib/cashu/manager');
-  const dispose = jest.fn().mockResolvedValue(undefined);
+  const dispose = jest.fn().mockRejectedValue(new Error('dispose failed'));
   const instance = {
-    disableProofStateWatcher: jest.fn().mockRejectedValue(new Error('watcher teardown failed')),
-    disableMintOperationProcessor: jest.fn().mockResolvedValue(undefined),
-    disableMintOperationWatcher: jest.fn().mockResolvedValue(undefined),
-    disableMeltSettlementProcessor: jest.fn().mockResolvedValue(undefined),
-    disableMeltQuoteWatcher: jest.fn().mockResolvedValue(undefined),
     dispose,
   };
   // Synthetic manager only: no native database, proofs, wallet or network.

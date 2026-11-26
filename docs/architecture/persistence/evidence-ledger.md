@@ -6,7 +6,7 @@ The slim-down and zero-backend tracks removed Feed, Composer, Stories, Notificat
 
 | Evidence | Current result |
 | --- | --- |
-| `surface.sh main` vs `HEAD` | Zero changes to storage dependency versions (`@cashu/coco-core` 2.0.0, `@react-native-async-storage/async-storage` 2.2.0, `expo-secure-store` ~56.0.4, `expo-sqlite` ~56.0.5, `zustand` ^5.0.8), SecureStore keys, SQLite database filenames, or seed derivation paths. |
+| `surface.sh main` vs `HEAD` | Upgraded `@cashu/coco-core`, `@cashu/coco-expo-sqlite`, and `@cashu/coco-react` to `0.0.0-nightly-20261120132306-58abfae` (`cashubtc/coco@58abfae8`, with nightly SQLite DB fixture certified across all 12 shipped DBs from 0.6.0 through 2.0.0); zero changes to SecureStore keys, SQLite database filenames, or seed derivation paths; additive optional `mintSwapOperationId` on `swap-transactions-store`. |
 | `cd app && bun run test:upgrade` | **13/13 suites, 1,325/1,325 tests passed** (2 skipped) across all 20 frozen epochs (`E01-0.0.1`..`E20-0.1.4`) and Coco database upgrades. |
 | Independent cross-provider verifier | **Codex (`gpt-6.2-sol`)** verified all 7 `persistence-surface.json` sections PASS, `disabledMintAuditors` upgrade-safe without version bump, legacy White Noise wipe prefixes intact, and Routstr recovery intact. |
 | Real in-place device upgrade (iOS / Android) | **NOT RUN**: headless Linux environment has no iOS Simulator or Android Emulator; must be run before store release. |

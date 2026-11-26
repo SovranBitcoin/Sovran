@@ -61,19 +61,31 @@ jest.mock('@/features/mint/components/rebalance', () => ({
 
 const SOURCE = 'https://source.example';
 const DESTINATION = 'https://destination.example';
-let mintState = 'pending';
-const operation = () => ({
-  id: 'mint-op-1',
-  quoteId: 'mint-quote-1',
-  mintUrl: DESTINATION,
-  method: 'bolt11',
-  request: 'lnbc-fixture',
-  amount: Amount.from(100),
-  unit: 'sat',
-  state: mintState,
-  createdAt: 1000,
-  updatedAt: 1000,
-});
+let swapOutcomeState: 'completed' | 'destination_funded' = 'destination_funded';
+let pendingWaitResolvers: Array<() => void> = [];
+
+function makeSwapOp(id: string, state: string, extra: Record<string, unknown> = {}) {
+  return {
+    id,
+    revision: 1,
+    sourceMintUrl: SOURCE,
+    destinationMintUrl: DESTINATION,
+    unit: 'sat' as const,
+    destinationAmount: Amount.from(100),
+    sourceQuote: { mintUrl: SOURCE, method: 'bolt11' as const, quoteId: `mq-${id}` },
+    destinationQuote: { mintUrl: DESTINATION, method: 'bolt11' as const, quoteId: `dq-${id}` },
+    sourceOperationId: `melt-${id}`,
+    destinationOperationId: `mint-${id}`,
+    paymentRequestHash: '00'.repeat(32),
+    createdAt: 1000,
+    updatedAt: 1000,
+    stateEnteredAt: 1000,
+    retry: { attemptCount: 0, lastAttemptAt: null, nextAttemptAt: null, lastError: null },
+    state,
+    ...extra,
+  };
+}
+
 const mockManager = {
   wallet: {
     balances: {
@@ -83,34 +95,25 @@ const mockManager = {
       })),
     },
   },
-  quotes: {
-    mint: {
-      create: jest.fn(async () => ({
-        quoteId: 'mint-quote-1',
-        mintUrl: DESTINATION,
-        unit: 'sat',
-        request: 'lnbc-fixture',
-      })),
-    },
-    melt: { create: jest.fn(async () => ({ quoteId: 'melt-quote-1', mintUrl: SOURCE })) },
-  },
   ops: {
-    mint: {
-      prepare: jest.fn(async () => operation()),
-      get: jest.fn(async () => operation()),
-    },
-    melt: {
-      prepare: jest.fn(async () => ({
-        id: 'melt-op-1',
-        quoteId: 'melt-quote-1',
-        amount: Amount.from(100),
-        fee_reserve: 0,
-        swap_fee: 0,
-      })),
-      // Every melt is paid; the recipient stays pending until `mintState` says otherwise.
-      execute: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-      refresh: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-      get: jest.fn(async () => null),
+    mintSwap: {
+      prepare: jest.fn(async (input: { id: string }) => makeSwapOp(input.id, 'prepared')),
+      execute: jest.fn(async (id: string) => makeSwapOp(id, swapOutcomeState)),
+      get: jest.fn(async (id: string) => makeSwapOp(id, swapOutcomeState)),
+      listActive: jest.fn(async () => []),
+      refresh: jest.fn(async (id: string) => makeSwapOp(id, swapOutcomeState)),
+      cancel: jest.fn(async (id: string) => makeSwapOp(id, 'cancelled')),
+      waitForOutcome: jest.fn(
+        (id: string) =>
+          new Promise((resolve) => {
+            pendingWaitResolvers.push(() =>
+              resolve({
+                status: swapOutcomeState === 'completed' ? 'completed' : 'timeout',
+                operation: makeSwapOp(id, swapOutcomeState),
+              })
+            );
+          })
+      ),
     },
   },
   mint: { addMint: jest.fn().mockResolvedValue(undefined) },
@@ -156,29 +159,28 @@ beforeEach(() => {
 afterEach(() => {
   // A run still going holds its group for the process; end it with the test.
   for (const result of mounted) act(() => result.current.handleCancelRun());
+  for (const resolve of pendingWaitResolvers.splice(0)) resolve();
   mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
 });
 
 it('ends the group, its leg, the toast and the screen as finished after a retry that succeeds', async () => {
-  // The first melt is rolled back: step 1 fails. Step 2's melt is paid and its
-  // recipient stays pending, so the run is still going when Cancel is pressed.
-  mockManager.ops.melt.execute.mockImplementationOnce(async () => ({
-    id: 'melt-op-1',
-    state: 'pending',
-  }));
-  mockManager.ops.melt.refresh.mockResolvedValueOnce({ id: 'melt-op-1', state: 'rolled_back' });
-  mintState = 'pending';
+  // Step 1 fails (source rejected); step 2 stays in destination_funded so the run is still going when Cancel is pressed.
+  mockManager.ops.mintSwap.execute.mockImplementationOnce(async (id: string) =>
+    makeSwapOp(id, 'failed', { failure: { code: 'source_payment_rejected' } })
+  );
+  swapOutcomeState = 'destination_funded';
   const { result } = mount();
   await act(async () => result.current.handleStart());
   await act(async () => {
-    await jest.advanceTimersByTimeAsync(3000);
+    await jest.advanceTimersByTimeAsync(100);
   });
   expect(result.current.stepStates['step-1'].status).toBe('failed');
   expect(result.current.runStatus).toBe('running');
 
   act(() => result.current.handleCancelRun());
+  for (const resolve of pendingWaitResolvers.splice(0)) resolve();
   await act(async () => {
     await jest.advanceTimersByTimeAsync(2000);
   });
@@ -187,8 +189,8 @@ it('ends the group, its leg, the toast and the screen as finished after a retry 
   expect(group().state).toBe('cancelled');
   expect(useSwapStatusStore.getState().active?.state).toBe('cancelled');
 
-  // The retry: the recipient now issues.
-  mintState = 'finalized';
+  // The retry: the swap now completes.
+  swapOutcomeState = 'completed';
   await act(async () => {
     await result.current.handleRetry(plan.steps[0]);
   });
@@ -205,14 +207,12 @@ it('ends the group, its leg, the toast and the screen as finished after a retry 
   expect(storeLog.warn).not.toHaveBeenCalled();
 });
 
-/** Step 1's melt is rolled back; step 2 is paid and arrives. The run ends with the toast failed. */
+/** Step 1 fails; step 2 completes. The run ends with the toast failed. */
 async function runWithStepOneFailed() {
-  mockManager.ops.melt.execute.mockImplementationOnce(async () => ({
-    id: 'melt-op-1',
-    state: 'pending',
-  }));
-  mockManager.ops.melt.refresh.mockResolvedValueOnce({ id: 'melt-op-1', state: 'rolled_back' });
-  mintState = 'finalized';
+  mockManager.ops.mintSwap.execute.mockImplementationOnce(async (id: string) =>
+    makeSwapOp(id, 'failed', { failure: { code: 'source_payment_rejected' } })
+  );
+  swapOutcomeState = 'completed';
   const screen = mount();
   await act(async () => screen.result.current.handleStart());
   await act(async () => {
@@ -252,10 +252,10 @@ it('shows the toast again for a retry after the ended toast was dismissed, and e
 it('refuses a retry while another screen’s swap owns a run, though no toast is showing', async () => {
   const first = await runWithStepOneFailed();
   useSwapStatusStore.getState().clear();
-  const executed = mockManager.ops.melt.execute.mock.calls.length;
+  const executed = mockManager.ops.mintSwap.execute.mock.calls.length;
 
-  // A second screen starts a swap whose recipient does not issue yet; its toast is swiped away.
-  mintState = 'pending';
+  // A second screen starts a swap whose destination does not issue yet; its toast is swiped away.
+  swapOutcomeState = 'destination_funded';
   const second = mount();
   await act(async () => second.result.current.handleStart());
   await act(async () => {
@@ -263,7 +263,7 @@ it('refuses a retry while another screen’s swap owns a run, though no toast is
   });
   expect(second.result.current.runStatus).toBe('running');
   useSwapStatusStore.getState().clear();
-  const executedBySecond = mockManager.ops.melt.execute.mock.calls.length;
+  const executedBySecond = mockManager.ops.mintSwap.execute.mock.calls.length;
   expect(executedBySecond).toBeGreaterThan(executed);
 
   await act(async () => {
@@ -271,7 +271,7 @@ it('refuses a retry while another screen’s swap owns a run, though no toast is
     await jest.advanceTimersByTimeAsync(100);
   });
 
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(executedBySecond);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(executedBySecond);
   expect(first.result.current.runStatus).toBe('finished');
   expect(first.result.current.stepStates['step-1'].status).toBe('failed');
 });

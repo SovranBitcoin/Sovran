@@ -24,9 +24,9 @@ import type { LogEntry } from '@/shared/lib/loggerCore';
 // package.json subpaths, so runtime resolution isn't an option here — keep
 // these in lockstep with the package.json pins when bumping coco/cashu-ts.
 export const COCO_VERSIONS = {
-  cocoCore: '2.0.0',
-  cocoReact: '2.0.0',
-  cocoExpoSqlite: '2.0.0',
+  cocoCore: '0.0.0-nightly-20261120132306-58abfae',
+  cocoReact: '0.0.0-nightly-20261120132306-58abfae',
+  cocoExpoSqlite: '0.0.0-nightly-20261120132306-58abfae',
   cashuTs: '5.0.0-rc.4',
 } as const;
 

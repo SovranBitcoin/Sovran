@@ -18,3 +18,10 @@ are still routed by the engine as a sequence of single legs.
 
 When Coco v3 is published, adopting it replaces the port's implementation with a call to
 `manager.ops.mintSwap`; the engine and its tests do not change.
+
+## Adopted (2026-11-26)
+
+Upgraded `@cashu/coco-core` to `0.0.0-nightly-20261120132306-58abfae` (`cashubtc/coco@58abfae8`),
+which ships `manager.ops.mintSwap`. `wallet/src/rebalance/engine.ts` now drives
+`manager.ops.mintSwap` directly for every hop, and the interim `SingleLegTransferPort` shim
+(`wallet/src/rebalance/singleLegPort.ts`) has been removed.

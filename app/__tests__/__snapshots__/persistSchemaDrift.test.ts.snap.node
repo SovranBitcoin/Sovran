@@ -7263,6 +7263,10 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                       "maxLength": 256,
                       "type": "string",
                     },
+                    "mintSwapOperationId": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
                     "toMintUrl": {
                       "maxLength": 2048,
                       "type": "string",
@@ -7442,6 +7446,10 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                       "type": "string",
                     },
                     "mintQuoteId": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                    "mintSwapOperationId": {
                       "maxLength": 256,
                       "type": "string",
                     },

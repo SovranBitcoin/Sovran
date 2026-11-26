@@ -178,21 +178,29 @@ export function createRebalanceStepSink({
           : { localStatus }
       );
     },
-    mintReceiptCreated(legId, receipt) {
+    swapPrepared(legId, operation) {
+      updateStepState(legId, { operationId: operation.id });
       const swapLegId = swapLegIds[legId];
-      if (!groupId || !swapLegId || !receipt.quoteId) return;
-      swapStore()?.tagMintQuote(groupId, swapLegId, {
-        quoteId: receipt.quoteId,
-        operationId: receipt.id,
-      });
-      annotate(receipt.quoteId, legId, 'mint');
-    },
-    meltPrepared(legId, melt) {
-      updateStepState(legId, { operationId: melt.id });
-      const swapLegId = swapLegIds[legId];
-      if (!groupId || !swapLegId || !melt.quoteId) return;
-      swapStore()?.tagMelt(groupId, swapLegId, { quoteId: melt.quoteId, operationId: melt.id });
-      annotate(melt.quoteId, legId, 'melt');
+      if (!groupId || !swapLegId) return;
+      const history = swapStore();
+      if (!history) return;
+      history.tagMintSwap(groupId, swapLegId, operation.id);
+      const mintQuoteId = operation.destinationQuote.quoteId;
+      if (mintQuoteId) {
+        history.tagMintQuote(groupId, swapLegId, {
+          quoteId: mintQuoteId,
+          operationId: operation.destinationOperationId,
+        });
+        annotate(mintQuoteId, legId, 'mint');
+      }
+      const meltQuoteId = operation.sourceQuote.quoteId;
+      if (meltQuoteId) {
+        history.tagMelt(groupId, swapLegId, {
+          quoteId: meltQuoteId,
+          operationId: operation.sourceOperationId,
+        });
+        annotate(meltQuoteId, legId, 'melt');
+      }
     },
     routeAttemptStarted(stepId, { route, index, count }) {
       const chainId = mintLocalId('chain');
