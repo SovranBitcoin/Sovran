@@ -877,9 +877,12 @@ export class CocoManager {
       // in-memory for this manager session and scrubs legacy rows.
       const ephemeralKeyringPubkeys = new Set<string>();
       if (p2pkImportSecretKey) {
-        ephemeralKeyringPubkeys.add(
-          cashuP2pkPubkeyFromNostrHex(getPublicKey(new Uint8Array(p2pkImportSecretKey)))
-        );
+        const xOnly = getPublicKey(new Uint8Array(p2pkImportSecretKey));
+        // Coco nightly keys P2PK imports by canonical SEC1 parity (`02` or `03`),
+        // whereas legacy builds always used `02`. Register both so odd-Y signer
+        // keys stay in-memory and never leak into plaintext SQLite.
+        ephemeralKeyringPubkeys.add(cashuP2pkPubkeyFromNostrHex(xOnly));
+        ephemeralKeyringPubkeys.add(`03${xOnly}`);
       }
       cashuLog.info('cashu.manager.repositories.create', {
         dbName,
@@ -1006,14 +1009,8 @@ export class CocoManager {
           logger: new CocoCoreLogger('manager'),
           webSocketFactory: this.socketCloses?.factory,
           plugins,
-          watchers: {
-            mintOperationWatcher: { watchExistingPendingQuotesOnStart: false },
-            proofStateWatcher: { watchExistingInflightOnStart: false },
-            meltQuoteWatcher: { watchExistingPendingQuotesOnStart: false },
-          },
           processors: {
             mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS,
-            meltSettlementProcessor: { initializeExistingPendingOperationsOnStart: false },
           },
           outputDataCreator,
         })

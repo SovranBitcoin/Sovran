@@ -39,10 +39,19 @@ function overlayServesPurpose(purpose: KeypairPurpose | undefined): boolean {
  * `purpose` parameter through to the delegate and consult the overlay only
  * for p2pk-compatible queries.
  */
+interface KeypairOverlay {
+  readonly size: number;
+  get(key: string): Keypair | undefined;
+  has(key: string): boolean;
+  set(key: string, value: Keypair): unknown;
+  delete(key: string): boolean;
+  values(): IterableIterator<Keypair>;
+}
+
 function wrapKeyRingRepository(
   repository: KeyRingRepository,
   ephemeralPubkeys: ReadonlySet<string>,
-  overlay: Map<string, Keypair>
+  overlay: KeypairOverlay
 ): KeyRingRepository {
   return {
     getPersistedKeyPair: async (publicKey, purpose) => {
@@ -55,6 +64,14 @@ function wrapKeyRingRepository(
           });
           return overlayKeyPair;
         }
+        // Ephemeral p2pk keys live in the overlay only; hide any legacy
+        // plaintext SQLite p2pk row so Coco's importP2pk proceeds to
+        // setPersistedKeyPair (populating the overlay and scrubbing the row).
+        if (ephemeralPubkeys.has(publicKey)) {
+          if (purpose === 'p2pk') return null;
+          const persisted = await repository.getPersistedKeyPair(publicKey, purpose);
+          return persisted && (persisted.purpose ?? 'p2pk') !== 'p2pk' ? persisted : null;
+        }
       }
       return repository.getPersistedKeyPair(publicKey, purpose);
     },
@@ -66,8 +83,12 @@ function wrapKeyRingRepository(
           ephemeralCount: ephemeralPubkeys.size,
         });
         // Scrub any legacy plaintext row written by builds that predate the
-        // overlay. Exact primary-key match — cannot touch other keys.
+        // overlay (including the legacy always-`02` row when Coco nightly
+        // imports an odd-Y key under `03`). Exact primary-key matches only.
         await repository.deletePersistedKeyPair(keyPair.publicKeyHex, 'p2pk');
+        if (keyPair.publicKeyHex.startsWith('03')) {
+          await repository.deletePersistedKeyPair(`02${keyPair.publicKeyHex.slice(2)}`, 'p2pk');
+        }
         cashuLog.info('cashu.repository.keyring.ephemeral_scrubbed', {
           overlaySize: overlay.size,
         });
@@ -119,7 +140,7 @@ function wrapKeyRingRepository(
     getLastAllocatedIndex: (purpose) => repository.getLastAllocatedIndex(purpose),
     getHighestStoredDerivationIndex: (purpose) =>
       repository.getHighestStoredDerivationIndex(purpose),
-    setLastAllocatedIndex: (index, purpose) => repository.setLastAllocatedIndex(index, purpose),
+    setLastAllocatedIndex: (purpose, index) => repository.setLastAllocatedIndex(purpose, index),
   };
 }
 
@@ -266,9 +287,12 @@ export function createSovranCocoRepositories(
     hasEphemeralKeyring: ephemeralPubkeys.size > 0,
     ephemeralCount: ephemeralPubkeys.size,
   });
-  // One overlay per repositories instance (one manager per profile session);
-  // the SAME wrapped keyring is shared by the top-level repo and every
-  // transaction scope so reads inside transactions see overlay keys.
+  // One overlay per repositories instance (one manager per profile session),
+  // shared by the top-level repo and every transaction scope so reads inside
+  // transactions see overlay keys. Each transaction scope MUST wrap its own
+  // `scope.keyRingRepository` (never the root `repositories.keyRingRepository`):
+  // ExpoSqliteDb serializes root queries behind active transactions, so
+  // calling the root keyring from inside `withTransaction` self-deadlocks.
   const overlay = new Map<string, Keypair>();
   const keyRing =
     ephemeralPubkeys.size > 0
@@ -291,15 +315,54 @@ export function createSovranCocoRepositories(
         hasEphemeralKeyring: ephemeralPubkeys.size > 0,
       });
       try {
+        type OverlayMutation =
+          { type: 'set'; key: string; value: Keypair } | { type: 'delete'; key: string };
+        let stagedMutations: OverlayMutation[] | null = null;
         const result = await repositories.withTransaction((scope) => {
+          let transactionKeyRing: KeyRingRepository | null = null;
+          if (ephemeralPubkeys.size > 0) {
+            // Stage overlay writes per transaction and replay onto the root
+            // overlay only after SQLite COMMIT succeeds, so neither callback
+            // errors nor COMMIT failures leak uncommitted state to root readers.
+            const view = new Map(overlay);
+            const mutations: OverlayMutation[] = [];
+            stagedMutations = mutations;
+            const stagedOverlay: KeypairOverlay = {
+              get size() {
+                return view.size;
+              },
+              get: (key) => view.get(key),
+              has: (key) => view.has(key),
+              set: (key, value) => {
+                mutations.push({ type: 'set', key, value });
+                return view.set(key, value);
+              },
+              delete: (key) => {
+                mutations.push({ type: 'delete', key });
+                return view.delete(key);
+              },
+              values: () => view.values(),
+            };
+            transactionKeyRing = wrapKeyRingRepository(
+              scope.keyRingRepository,
+              ephemeralPubkeys,
+              stagedOverlay
+            );
+          }
           const transactionCounter = wrapCounterRepository(
             scope.counterRepository,
             scope.proofRepository,
             createCounterWriteQueue(),
             (task) => task(scope.counterRepository)
           );
-          return fn(overlayRepositoryScope(scope, keyRing, transactionCounter));
+          return fn(overlayRepositoryScope(scope, transactionKeyRing, transactionCounter));
         });
+        if (stagedMutations) {
+          for (const mutation of stagedMutations as OverlayMutation[]) {
+            if (mutation.type === 'set') overlay.set(mutation.key, mutation.value);
+            else overlay.delete(mutation.key);
+          }
+        }
         cashuLog.debug('cashu.repository.transaction.done', {
           duration_ms: Date.now() - startedAt,
         });
