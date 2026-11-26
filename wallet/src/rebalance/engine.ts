@@ -124,7 +124,7 @@ function isArrivingAtMint(op: MintSwapOperation, mintUrl: string): boolean {
 }
 
 export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceEngine {
-  const { wallet, lock, minTransferThreshold, minFeeReserve } = config;
+  const { wallet, lock, minTransferThreshold, minFeeReserve, sessionSignal } = config;
   const clock = config.clock ?? defaultRebalanceClock;
   const log = config.logger ?? packageLogger;
   const debug = (entry: Record<string, unknown>) => log.debug('mint.rebalance.step', entry);
@@ -166,6 +166,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   async function trustIntermediaries(chainPath: readonly string[]): Promise<string[]> {
     const temporarilyTrusted: string[] = [];
     for (const url of chainPath.slice(1, -1)) {
+      if (sessionSignal?.aborted) break;
       if (config.trustedMintUrls.has(url)) continue;
       try {
         await wallet.trustMint(url);
@@ -181,7 +182,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     temporarilyTrusted: readonly string[],
     report: { sink: Pick<RebalanceEventSink, 'legUpdated'>; warnLegId?: string }
   ): Promise<void> {
-    if (temporarilyTrusted.length === 0) return;
+    if (temporarilyTrusted.length === 0 || sessionSignal?.aborted) return;
     // Keep any intermediary trusted while a funded Coco mintSwap is still arriving at it.
     let activeSwaps: MintSwapOperation[] = [];
     try {
@@ -189,6 +190,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     } catch {
       activeSwaps = [];
     }
+    if (sessionSignal?.aborted) return;
     const releasable = temporarilyTrusted.filter(
       (url) => !activeSwaps.some((op) => isArrivingAtMint(op, url))
     );
@@ -251,6 +253,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     if (!isActive()) return { kind: 'aborted' };
 
     const balances = await wallet.balancesByMint();
+    if (sessionSignal?.aborted) return { kind: 'aborted' };
     const sourceBalance = toWholeSats(balances[fromMintUrl] ?? 0) ?? 0;
     const worstCaseInputFee = await readWorstCaseInputFee(fromMintUrl);
     const feeHeadroom =
@@ -365,6 +368,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       op = await wallet.mintSwap.execute(prepared.id);
     } catch (err) {
+      if (sessionSignal?.aborted) return { kind: 'aborted' };
       executeError = err;
       op = await wallet.mintSwap.get(prepared.id).catch((lookupError: unknown) => {
         debug({ event: 'execute_outcome_unknown', legId, error: errField(lookupError) });
@@ -376,6 +380,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return { kind: 'pending', operationId: prepared.id };
       }
     }
+
+    if (sessionSignal?.aborted) return { kind: 'aborted' };
 
     // 3. Observe durable outcome if Coco left the swap in flight
     if (
@@ -390,14 +396,17 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         const outcome = await wallet.mintSwap.waitForOutcome(op.id, {
           timeoutMs: waitTimeoutMs,
           pollIntervalMs: OUTCOME_POLL_MS,
+          ...(sessionSignal && { signal: sessionSignal }),
         });
         op = outcome.operation;
       } catch (err) {
+        if (sessionSignal?.aborted) return { kind: 'aborted' };
         debug({ event: 'wait_outcome_error', legId, error: errField(err) });
         op = (await wallet.mintSwap.get(op.id).catch(() => null)) ?? op;
       }
     }
 
+    if (sessionSignal?.aborted) return { kind: 'aborted' };
     switch (op.state) {
       case 'completed':
         sink.legUpdated(legId, { status: 'done', error: null });
@@ -543,6 +552,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       });
 
       const temporarilyTrusted = await trustIntermediaries(route.path);
+      if (sessionSignal?.aborted) return { status: 'aborted' };
       const { chainId, hopLegIds } = sink.routeAttemptStarted(id, {
         route,
         index,
@@ -650,7 +660,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       for (const step of steps) {
         if (!mayOpenLeg(callbacks)) return { status: 'aborted' };
         if (callbacks.isSettled(step.id)) continue;
-        if (await stillArriving(step.fromMintUrl)) {
+        const arriving = await stillArriving(step.fromMintUrl);
+        if (sessionSignal?.aborted) return { status: 'aborted' };
+        if (arriving) {
           anyPending = true;
           log.info('swap.leg.held', { stepId: step.id });
           continue;

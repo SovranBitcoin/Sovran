@@ -71,7 +71,7 @@ function createAppRuntime() {
   return {
     startProcess(): () => void {
       const stopConnectivity = startConnectivity();
-      // Profile transitions hold the splash by resetting the stage graph.
+      // Let profile transitions hold the splash and coordinate startup stages.
       registerTransitionControls(initializationStages);
       // Leftovers: a transition guard from a restart mid-switch, and a Remote
       // Login pairing link an older build left.

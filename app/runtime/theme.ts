@@ -71,12 +71,11 @@ export function useThemeApplier(): boolean {
   // `resolvedTheme` until the overlay covers the swap; on carousel-driven
   // changes it applies immediately (the page stack already shows the
   // wallpaper, so there is nothing to hide).
-  // The account only changes under the mounted root during an in-process
-  // profile switch. With that setting off it is not tracked at all, so the
-  // profile store hydrating its index at boot cannot change how a theme applies.
-  const inProcessSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
-  const activeAccountIndex = useProfileStore((state) => state.activeAccountIndex);
-  const accountIndex = inProcessSwitch ? activeAccountIndex : null;
+  // A different account under the mounted root needs its theme applied immediately.
+  const restartOnProfileSwitch = useSettingsStore((state) => state.restartOnProfileSwitch);
+  const accountIndex = useProfileStore((state) =>
+    restartOnProfileSwitch ? null : state.activeAccountIndex
+  );
   const lastAccount = useRef(accountIndex);
   // Consumers start on the theme resolved at mount, as before the first
   // apply. Once a theme is recorded this never writes again: later themes
@@ -92,7 +91,8 @@ export function useThemeApplier(): boolean {
       log.warn('theme.not_found', { themeName: resolvedTheme });
       return;
     }
-    if (lastApplied.current === resolvedTheme) {
+    const accountChanged = lastAccount.current !== accountIndex;
+    if (!accountChanged && lastApplied.current === resolvedTheme) {
       lastAppliedUnit.current = activeUnit;
       return;
     }
@@ -122,7 +122,7 @@ export function useThemeApplier(): boolean {
     const unitChanged = lastAppliedUnit.current !== activeUnit;
     lastAppliedUnit.current = activeUnit;
 
-    if (lastApplied.current === null || lastAccount.current !== accountIndex) {
+    if (lastApplied.current === null || accountChanged) {
       lastAccount.current = accountIndex;
       // Boot apply — no transition, no fade.
       lastApplied.current = resolvedTheme;

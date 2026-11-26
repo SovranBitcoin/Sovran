@@ -13,7 +13,7 @@
  *
  * `NativeSplashLayoutGate` reads `isInitializing` and hides the native splash
  * once it flips false and the root view has laid out. Profile transitions hold
- * the splash through `initializationStages.resetStages`.
+ * the splash through `initializationStages`.
  */
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { initLog, log } from '@/shared/lib/logger';
@@ -82,16 +82,18 @@ interface StageGraph {
    * in which no stage exists yet and the app would otherwise look initialised.
    */
   awaitingStages: boolean;
+  /** The switch holds the splash independently of the outgoing stage graph. */
+  profileSwitchHeld: boolean;
 }
 
-let graph: StageGraph = { stages: new Map(), awaitingStages: false };
+let graph: StageGraph = { stages: new Map(), awaitingStages: false, profileSwitchHeld: false };
 const listeners = new Set<() => void>();
 // When each stage first left 'pending', so its duration can be logged.
 const stageStartTimes = new Map<string, number>();
 let lastLoggedInitializing: boolean | null = null;
 
 function isInitializingIn(g: StageGraph): boolean {
-  if (g.awaitingStages) return true;
+  if (g.awaitingStages || g.profileSwitchHeld) return true;
   for (const stage of g.stages.values()) {
     if (stage.blocking && (stage.status === 'loading' || stage.status === 'pending')) return true;
   }
@@ -199,6 +201,10 @@ function endAwaitIfStagesExist(): void {
  * when the switch aborts before any stage registers.
  */
 export const initializationStages = {
+  holdForProfileSwitch(): void {
+    // Keep providers running until the switch has stopped their services.
+    commit({ ...graph, profileSwitchHeld: true });
+  },
   resetStages(options?: ResetStagesOptions): void {
     const keep = options?.keepStagesThatOutliveAccount === true;
     log.info('init.provider.reset_stages', { keepStagesThatOutliveAccount: keep });
@@ -212,10 +218,16 @@ export const initializationStages = {
       });
     }
     stageStartTimes.clear();
-    commit({ stages: kept, awaitingStages: true });
+    commit({
+      stages: kept,
+      awaitingStages: true,
+      profileSwitchHeld: keep && graph.profileSwitchHeld,
+    });
   },
   cancelResetStages(): void {
-    if (graph.awaitingStages) commit({ ...graph, awaitingStages: false });
+    if (graph.awaitingStages || graph.profileSwitchHeld) {
+      commit({ ...graph, awaitingStages: false, profileSwitchHeld: false });
+    }
   },
 };
 
@@ -236,7 +248,11 @@ export function useInitializationState() {
   useEffect(() => {
     if (current.awaitingStages && current.stages.size > 0) endAwaitIfStagesExist();
   }, [current]);
-  return { isInitializing: isInitializingIn(current), hasFailedStage: hasFailedStageIn(current) };
+  return {
+    isInitializing: isInitializingIn(current),
+    hasFailedStage: hasFailedStageIn(current),
+    profileSwitchHeld: current.profileSwitchHeld,
+  };
 }
 
 export function useInitializationStage(stageId: StageId) {

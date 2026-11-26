@@ -85,8 +85,7 @@ jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   probeMintForHistory: jest.fn(),
 }));
 jest.mock('@/shared/lib/cashu/recoverySuppression', () => ({
-  beginRecoverySuppression: jest.fn(),
-  endRecoverySuppression: jest.fn(),
+  beginRecoverySuppression: jest.fn(() => jest.fn()),
 }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
 jest.mock('expo-secure-store', () => ({

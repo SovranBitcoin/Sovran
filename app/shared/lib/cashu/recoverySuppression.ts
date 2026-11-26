@@ -25,29 +25,43 @@
  * node_modules.
  */
 import { cashuLog } from '@/shared/lib/logger';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 
-let suppressed = false;
+let owner: symbol | undefined;
 const pending = new Map<string, () => void>();
+
+registerAccountScoped(
+  'wallet.recovery-suppression',
+  () => {
+    owner = undefined;
+    pending.clear();
+  },
+  () => owner === undefined && pending.size === 0
+);
 
 /**
  * Ask to defer a refresh. Returns true when the caller should skip its work —
- * the callback is held and replayed once, on `endRecoverySuppression`.
+ * the callback is held and replayed once, on the owning run's end callback.
  */
 export function deferWhileRecovering(key: string, flush: () => void): boolean {
-  if (!suppressed) return false;
+  if (!owner) return false;
   pending.set(key, flush);
   return true;
 }
 
-export function beginRecoverySuppression(): void {
-  suppressed = true;
+/** Returns an end callback that can only flush this run's deferred refreshes. */
+export function beginRecoverySuppression(): () => void {
+  const token = Symbol();
+  owner = token;
   pending.clear();
   cashuLog.info('cashu.recovery_suppression.begin', {});
+  return () => {
+    if (owner === token) flushRecoverySuppression();
+  };
 }
 
-/** Ends suppression and replays one refresh per distinct subscriber. */
-export function endRecoverySuppression(): void {
-  suppressed = false;
+function flushRecoverySuppression(): void {
+  owner = undefined;
   const flushes = [...pending.values()];
   const keys = [...pending.keys()];
   pending.clear();
@@ -67,5 +81,5 @@ export function endRecoverySuppression(): void {
 }
 
 export function isRecoverySuppressed(): boolean {
-  return suppressed;
+  return owner !== undefined;
 }

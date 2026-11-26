@@ -17,8 +17,8 @@ jest.mock('react-native-safe-area-context', () => ({
 let mockDisplayName = '';
 let mockKeys: { pubkey: string; npub: string } | undefined;
 let mockDevMode = false;
-let mockInProcessProfileSwitch = false;
-const mockSetInProcessProfileSwitch = jest.fn();
+let mockRestartOnProfileSwitch = false;
+const mockSetRestartOnProfileSwitch = jest.fn();
 let mockVerboseLoggingEnabled = true;
 const mockSetVerboseLoggingEnabled = jest.fn();
 let mockPolicy = 'RELAXED';
@@ -33,8 +33,8 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (select: (state: object) => unknown) =>
     select({
       experimental: mockDevMode,
-      inProcessProfileSwitch: mockInProcessProfileSwitch,
-      setInProcessProfileSwitch: mockSetInProcessProfileSwitch,
+      restartOnProfileSwitch: mockRestartOnProfileSwitch,
+      setRestartOnProfileSwitch: mockSetRestartOnProfileSwitch,
       verboseLoggingEnabled: mockVerboseLoggingEnabled,
       setVerboseLoggingEnabled: mockSetVerboseLoggingEnabled,
     }),
@@ -97,8 +97,8 @@ beforeEach(() => {
   mockDisplayName = '';
   mockKeys = undefined;
   mockDevMode = false;
-  mockInProcessProfileSwitch = false;
-  mockSetInProcessProfileSwitch.mockClear();
+  mockRestartOnProfileSwitch = false;
+  mockSetRestartOnProfileSwitch.mockClear();
   mockVerboseLoggingEnabled = true;
   mockSetVerboseLoggingEnabled.mockClear();
   mockPolicy = 'RELAXED';
@@ -154,23 +154,23 @@ it('reserves two single-line profile placeholders and replaces them with resolve
 it('exposes profile switching as a checked switch and toggles in both directions', () => {
   mockDevMode = true;
   render();
-  const toggle = () => control('settings-in-process-profile-switch-toggle');
+  const toggle = () => control('settings-restart-on-profile-switch-toggle');
   expect(toggle().props.accessible).toBe(true);
   expect(toggle().props.accessibilityRole).toBe('switch');
-  expect(toggle().props.accessibilityLabel).toBe('Switch profiles without restart');
+  expect(toggle().props.accessibilityLabel).toBe('Restart app on profile switch');
   expect(toggle().props.accessibilityState).toEqual({ checked: false });
   act(() => {
     toggle().props.onPress();
   });
-  expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(true);
+  expect(mockSetRestartOnProfileSwitch).toHaveBeenLastCalledWith(true);
 
-  mockInProcessProfileSwitch = true;
+  mockRestartOnProfileSwitch = true;
   act(() => tree.update(<SettingsScreen />));
   expect(toggle().props.accessibilityState).toEqual({ checked: true });
   act(() => {
     toggle().props.onPress();
   });
-  expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
+  expect(mockSetRestartOnProfileSwitch).toHaveBeenLastCalledWith(false);
 });
 
 it('no longer lists Moderation or Uploaded media', () => {

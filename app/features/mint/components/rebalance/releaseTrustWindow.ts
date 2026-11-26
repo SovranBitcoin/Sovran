@@ -29,7 +29,8 @@ interface ReleaseTrustWindowResult {
  */
 export async function releaseTrustWindow(
   manager: ManagerLike,
-  temporarilyTrusted: readonly string[]
+  temporarilyTrusted: readonly string[],
+  sessionSignal?: AbortSignal
 ): Promise<ReleaseTrustWindowResult> {
   if (temporarilyTrusted.length === 0) {
     cashuLog.debug('mint.rebalance.trust_window.release.result', {
@@ -54,6 +55,7 @@ export async function releaseTrustWindow(
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];
   for (const url of temporarilyTrusted) {
+    if (sessionSignal?.aborted) break;
     const balance = amountToNumber(balances[url]?.total);
     if (balance > 0) {
       cashuLog.warn('mint.rebalance.trust_window.stranded_balance', {

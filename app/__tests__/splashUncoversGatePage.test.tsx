@@ -175,3 +175,30 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
     }
   });
 });
+
+it('keeps the splash over the outgoing wallet until the switch releases it', () => {
+  jest.useFakeTimers();
+  const anchor = { x: 120, y: 350, width: 72, height: 72, borderRadius: 16 };
+  try {
+    render(<NativeSplashLayoutGate>{null}</NativeSplashLayoutGate>);
+    layOutRoot();
+    act(() => setQRButtonAnchor(anchor));
+    act(() => jest.advanceTimersByTime(600));
+    act(() => jest.advanceTimersByTime(800));
+    expect(getBootMorphCompleted()).toBe(true);
+
+    act(() => initializationStages.holdForProfileSwitch());
+    act(() => jest.advanceTimersByTime(9000));
+    expect(getBootSplashHandoff()).toBe(false);
+    expect(getBootMorphCompleted()).toBe(false);
+
+    act(() => initializationStages.cancelResetStages());
+    act(() => jest.advanceTimersByTime(600));
+    act(() => jest.advanceTimersByTime(800));
+    expect(getBootMorphCompleted()).toBe(true);
+  } finally {
+    act(() => initializationStages.cancelResetStages());
+    setQRButtonAnchor(null);
+    jest.useRealTimers();
+  }
+});

@@ -154,6 +154,8 @@ export interface RebalanceLock {
 
 export interface RebalanceEngineConfig {
   wallet: RebalanceWalletPort;
+  /** Ends observation and new work when the wallet session closes. */
+  sessionSignal?: AbortSignal;
   /** Candidate middleman routes for a no-route failure, best first. */
   findRoutes(fromMintUrl: string, toMintUrl: string): Promise<RebalanceRoute[]>;
   trustedMintUrls: ReadonlySet<string>;
@@ -187,5 +189,4 @@ export interface RebalanceRunCallbacks extends RebalanceRunActivity {
 }
 
 export type RebalanceRunResult =
-  | { status: 'aborted' }
-  | { status: 'finished'; anyFailed: boolean; anyPending: boolean };
+  { status: 'aborted' } | { status: 'finished'; anyFailed: boolean; anyPending: boolean };

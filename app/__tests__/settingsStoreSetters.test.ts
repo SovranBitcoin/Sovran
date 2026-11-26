@@ -130,6 +130,23 @@ describe('migrate', () => {
 });
 
 describe('setters', () => {
+  it('persists the restart preference independently of the legacy field', async () => {
+    preload({ termsAccepted: TERMS, hasSeenOnboarding: true, inProcessProfileSwitch: true }, 4);
+    const store = await loadStore();
+    expect(store.getState().restartOnProfileSwitch).toBe(false);
+
+    store.getState().setRestartOnProfileSwitch(true);
+    await settle();
+    expect(saved()).toMatchObject({
+      version: 4,
+      state: { inProcessProfileSwitch: true, restartOnProfileSwitch: true },
+    });
+
+    store.getState().setRestartOnProfileSwitch(false);
+    await settle();
+    expect(saved().state.restartOnProfileSwitch).toBe(false);
+  });
+
   it('setMiddlemanRouting merges a partial change into the saved routing settings', async () => {
     const store = await loadStore();
     const before = store.getState().middlemanRouting;

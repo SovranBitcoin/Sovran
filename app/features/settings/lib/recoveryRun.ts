@@ -16,10 +16,11 @@ import {
 } from '@/shared/lib/cashu/managerInternals';
 import { withTimeout } from 'wallet';
 import { amountToNumber } from 'wallet/amount';
+import { beginRecoverySuppression } from '@/shared/lib/cashu/recoverySuppression';
 import {
-  beginRecoverySuppression,
-  endRecoverySuppression,
-} from '@/shared/lib/cashu/recoverySuppression';
+  profileSwitchQuiescing,
+  registerProfileSwitchService,
+} from '@/shared/lib/account/accountRegistry';
 import {
   countKnownFailures,
   createInitialMintStates,
@@ -130,9 +131,28 @@ export function isRecoveryActive(run: RecoveryRun): boolean {
  * ref-based guard back to "idle". Module scope is the only thing that survives
  * that, and running two restores against one wallet database races counters.
  */
-let runOwned = false;
-/** Runs started in this process; a run is the latest while no other has started since. */
+let runOwner: number | undefined;
 let runsStarted = 0;
+let accountEpoch = 0;
+
+// A timed-out mint can still be writing. Drain admitted work before closing
+// its database, including mutations left behind by an earlier run.
+const pendingMutations = new Set<Promise<unknown>>();
+
+async function trackRecoveryMutation<T>(mutation: Promise<T>): Promise<T> {
+  pendingMutations.add(mutation);
+  try {
+    return await mutation;
+  } finally {
+    pendingMutations.delete(mutation);
+  }
+}
+
+registerProfileSwitchService('wallet.recovery-run', async () => {
+  accountEpoch += 1;
+  runOwner = undefined;
+  await Promise.allSettled(pendingMutations);
+});
 
 export interface RecoveryRunOwner {
   /** Ask the run to stop after the mint or keyset in flight. */
@@ -185,30 +205,33 @@ export function startRecoveryRun(
     } {
   // Module-scoped, so a remount cannot reset it. Two concurrent recoveries
   // race the same counters and each takes ~1.8x as long.
-  if (runOwned) {
+  if (runOwner !== undefined || profileSwitchQuiescing()) {
     cashuLog.warn('recovery.start.rejected', { reason: 'already_in_flight' });
     return { status: 'busy' };
   }
   if (input.knownMintUrls.length === 0 && input.probeCandidates.length === 0) {
     return { status: 'noMints' };
   }
-  runOwned = true;
   const generation = ++runsStarted;
+  runOwner = generation;
+  const epoch = accountEpoch;
+  const isCurrentAccount = () => accountEpoch === epoch && !profileSwitchQuiescing();
   let run = from;
   // A stop belongs to this run, for good: a mint that timed out is still
   // restoring behind the run, and must not go on once the run has ended.
   let stopped = false;
   const dispatch = (event: RecoveryEvent) => {
+    if (!isCurrentAccount()) return;
     const next = recoveryTransition(run, event);
     if (next === run) return;
     run = next;
     if (run.phase === 'cancelling') stopped = true;
     publish(run);
   };
-  const stopRequested = () => stopped;
+  const stopRequested = () => stopped || !isCurrentAccount();
   // Hold the app-wide refresh storm until the run is over — see the module
   // doc for what it costs when left on.
-  beginRecoverySuppression();
+  const endSuppression = beginRecoverySuppression();
   const done = (async () => {
     const t0 = performance.now();
     let end: RecoveryEnd;
@@ -217,15 +240,16 @@ export function startRecoveryRun(
         dispatch,
         stopRequested,
         rows: () => rowsOf(run),
-        isLatestRun: () => runsStarted === generation,
+        isCurrentAccount,
+        isLatestRun: () => isCurrentAccount() && runsStarted === generation,
       });
     } catch (error) {
       end = { kind: 'error', message: describeError(error, 'cashu').text };
     } finally {
-      runOwned = false;
-      // Replays one refresh per subscriber.
-      endRecoverySuppression();
+      if (runOwner === generation) runOwner = undefined;
+      if (isCurrentAccount()) endSuppression();
     }
+    if (!isCurrentAccount()) end = { kind: 'stopped' };
     dispatch({ type: 'ended', end });
     return { rows: rowsOf(run), end, totalMs: Math.round((performance.now() - t0) * 100) / 100 };
   })();
@@ -272,13 +296,14 @@ interface RunControl {
   dispatch: (event: RecoveryEvent) => void;
   stopRequested: () => boolean;
   rows: () => MintRecoveryState[];
+  isCurrentAccount: () => boolean;
   /** False once another run has started: it may hold this run's mints as its own. */
   isLatestRun: () => boolean;
 }
 
 async function recover(
   { knownMintUrls, probeCandidates, loadMints }: RecoveryInput,
-  { dispatch, stopRequested, rows, isLatestRun }: RunControl
+  { dispatch, stopRequested, rows, isCurrentAccount, isLatestRun }: RunControl
 ): Promise<RecoveryEnd> {
   const t0 = performance.now();
   let allMintUrls = knownMintUrls;
@@ -292,6 +317,7 @@ async function recover(
   // Pending mint operations are read before anything is restored: only those
   // can be stale from before the run (see the cleanup below).
   const pendingBefore = await pendingMintOperationIds(manager);
+  if (!isCurrentAccount()) return { kind: 'stopped' };
 
   // Shallow probe pass. Ask each unknown mint one cheap question — does
   // this seed have anything here — instead of running a full gap walk over
@@ -312,7 +338,7 @@ async function recover(
       });
       const hits = await Promise.all(
         slice.map((url) =>
-          probeMintForHistory(manager, url)
+          trackRecoveryMutation(probeMintForHistory(manager, url))
             .then((found) => (found ? url : null))
             .catch(() => null)
         )
@@ -328,6 +354,7 @@ async function recover(
     allMintUrls = [...knownMintUrls, ...probeMintUrls];
   }
 
+  if (!isCurrentAccount()) return { kind: 'stopped' };
   cashuLog.info('recovery.start', {
     mintCount: allMintUrls.length,
     knownMints: knownMintUrls.length,
@@ -379,7 +406,9 @@ async function recover(
     try {
       // Same call `wallet.restore` makes first, so this stays idempotent —
       // and it is the only way to learn the keyset count up front.
-      const { keysets } = await manager.mint.addMint(mintUrl, { trusted: true });
+      const { keysets } = await trackRecoveryMutation(
+        manager.mint.addMint(mintUrl, { trusted: true })
+      );
       keysetsTotal = keysets.length;
       update(i, {
         mint: mintUrl,
@@ -410,7 +439,9 @@ async function recover(
           });
         } else {
           try {
-            await restoreKeysetForMint(manager, { mintUrl, keysetId: keyset.id, unit });
+            await trackRecoveryMutation(
+              restoreKeysetForMint(manager, { mintUrl, keysetId: keyset.id, unit })
+            );
           } catch (error) {
             if (isAlreadyRecoveredError(error)) {
               // Every proof was already in the database — a second run
@@ -454,6 +485,8 @@ async function recover(
         error: redactError(error),
       });
     }
+
+    if (!isCurrentAccount()) return 'unknown';
 
     // Scoped to this mint. Unscoped, coco falls through to
     // `getAllReadyProofs` — a full ready-proof scan across every mint,
@@ -539,7 +572,7 @@ async function recover(
           });
           return;
         }
-        await untrustProbedMint(manager, mintUrl);
+        await trackRecoveryMutation(untrustProbedMint(manager, mintUrl));
       },
       (error: unknown) => {
         awaitingLateResult.delete(mintUrl);
@@ -603,6 +636,7 @@ async function recover(
     }
   }
 
+  if (!isCurrentAccount()) return { kind: 'stopped' };
   dispatch({ type: 'finalizing' });
 
   // Untrust discovered mints that returned no funds; one that timed out
@@ -622,8 +656,11 @@ async function recover(
   ].filter((url) => !knownMintUrls.includes(url));
   if (untrustUrls.length > 0) {
     dispatch({ type: 'labelled', label: `Tidying up ${untrustUrls.length} probed mints` });
-    await Promise.all(untrustUrls.map((mint) => untrustProbedMint(manager, mint)));
+    await Promise.all(
+      untrustUrls.map((mint) => trackRecoveryMutation(untrustProbedMint(manager, mint)))
+    );
   }
+  if (!isCurrentAccount()) return { kind: 'stopped' };
   if (awaitingLateResult.size > 0) {
     cashuLog.info('recovery.cleanup.timed_out_mints_left_trusted', {
       count: awaitingLateResult.size,
@@ -653,7 +690,8 @@ async function recover(
       // Coco doesn't expose a public abandon API for pending operations,
       // so go through the typed seam in shared/lib/cashu/managerInternals.
       for (const op of stale) {
-        await deleteMintOperation(manager, op.id).catch((e) =>
+        if (!isCurrentAccount()) return { kind: 'stopped' };
+        await trackRecoveryMutation(deleteMintOperation(manager, op.id)).catch((e) =>
           cashuLog.warn('recovery.cleanup.delete_failed', {
             operationId: op.id,
             ...mintUrlLogFields(op.mintUrl),
@@ -677,8 +715,9 @@ async function recover(
     });
   }
 
+  if (!isCurrentAccount()) return { kind: 'stopped' };
   dispatch({ type: 'labelled', label: 'Refreshing your mints' });
-  await loadMints();
+  await trackRecoveryMutation(loadMints());
   const stopped = stopRequested();
   const results = rows();
   const knownFailureCount = countKnownFailures(results);

@@ -5,6 +5,7 @@ import { amountToNumber, requireAmount } from 'wallet/amount';
 import { toRealUnit } from 'wallet/units';
 
 import { releaseTrustWindow } from '@/features/mint/components/rebalance';
+import { trackSwapTrustChange } from '@/shared/lib/cashu/swapGroupPhase';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 
 /**
@@ -12,7 +13,11 @@ import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
  * manager. Single-hop swap preparation, execution, observation and recovery
  * delegate directly to Coco's `manager.ops.mintSwap`.
  */
-export function createRebalanceWalletPort(manager: Manager, unit: string): RebalanceWalletPort {
+export function createRebalanceWalletPort(
+  manager: Manager,
+  unit: string,
+  sessionSignal?: AbortSignal
+): RebalanceWalletPort {
   if (toRealUnit(unit) !== 'sat') throw new Error('Mint swaps require sat balances');
 
   const filter = { units: ['sat'] };
@@ -33,8 +38,9 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     },
     mintSwap: manager.ops.mintSwap,
     async trustMint(mintUrl) {
-      await manager.mint.addMint(mintUrl, { trusted: true });
+      await trackSwapTrustChange(manager.mint.addMint(mintUrl, { trusted: true }));
     },
-    releaseTrust: (mintUrls) => releaseTrustWindow(manager, mintUrls),
+    releaseTrust: (mintUrls) =>
+      trackSwapTrustChange(releaseTrustWindow(manager, mintUrls, sessionSignal)),
   };
 }

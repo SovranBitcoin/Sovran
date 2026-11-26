@@ -15,7 +15,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigationContainerRef } from 'expo-router';
 
-import { resetProfileNavigation } from '@/shared/lib/profile/resetProfileNavigation';
+import {
+  resetProfileNavigation,
+  resetProfileNavigationWhenReady,
+} from '@/shared/lib/profile/resetProfileNavigation';
 import { hasPresentedRoutes, joinOrStart } from '@/shared/lib/profile/suspendHelpers';
 import { registerProfileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 import { DmEcashAutoRedeemProvider } from '@/features/payments/hooks/useDmEcashAutoRedeem';
@@ -40,6 +43,7 @@ import { appRuntime } from './AppRuntime';
 import { useNostrClientLifecycle } from './nostrClient';
 import { WalletCore } from './WalletCore';
 import { WalletProjection } from './WalletProjection';
+import { initializationStages } from './initializationStages';
 
 function NostrClientLifecycle({ accountIndex }: { accountIndex: number }) {
   useNostrClientLifecycle(accountIndex);
@@ -178,41 +182,63 @@ export function AccountSwitchBoundary({ children }: { children: React.ReactNode 
   const [suspended, setSuspended] = useState(false);
   const suspendedRef = useRef(false);
   const suspending = useRef<Promise<void> | null>(null);
+  const resuming = useRef<AbortController | null>(null);
   const acknowledgement = useRef<{ resolve: () => void; reject: (error: unknown) => void } | null>(
     null
   );
-  useEffect(
-    () =>
-      registerProfileSwitchBoundary({
-        suspend: () => {
-          if (suspendedRef.current) return Promise.resolve();
-          // One suspension at a time. A second caller (the fallback hold,
-          // while a timed-out switch is still pending) joins the first; two
-          // would overwrite each other's acknowledgement and one would hang.
-          return joinOrStart(suspending, async () => {
-            await closePresentedSheets(navigation);
-            await new Promise<void>((resolve, reject) => {
-              acknowledgement.current = { resolve, reject };
-              setSuspended(true);
-            });
-          });
-        },
-        resume: () =>
-          new Promise<void>((resolve, reject) => {
+  useEffect(() => {
+    const unregister = registerProfileSwitchBoundary({
+      suspend: () => {
+        resuming.current?.abort();
+        if (suspendedRef.current) {
+          // A timed-out resume may have scheduled a render that has yet to commit.
+          if (acknowledgement.current) {
+            acknowledgement.current.reject(new Error('Profile resume cancelled'));
+            acknowledgement.current = null;
+            setSuspended(true);
+          }
+          return Promise.resolve();
+        }
+        // One suspension at a time. A second caller (the fallback hold,
+        // while a timed-out switch is still pending) joins the first; two
+        // would overwrite each other's acknowledgement and one would hang.
+        return joinOrStart(suspending, async () => {
+          await closePresentedSheets(navigation);
+          await new Promise<void>((resolve, reject) => {
             acknowledgement.current = { resolve, reject };
-            setSuspended(false);
-          }),
-      }),
-    [navigation]
-  );
+            setSuspended(true);
+          });
+        });
+      },
+      resume: () =>
+        new Promise<void>((resolve, reject) => {
+          acknowledgement.current = { resolve, reject };
+          setSuspended(false);
+        }),
+    });
+    return () => {
+      resuming.current?.abort();
+      unregister();
+    };
+  }, [navigation]);
   useEffect(() => {
     suspendedRef.current = suspended;
     if (!acknowledgement.current) return;
     const pending = acknowledgement.current;
     acknowledgement.current = null;
     try {
-      if (!suspended) resetProfileNavigation(navigation);
-      pending.resolve();
+      if (suspended) {
+        initializationStages.resetStages({ keepStagesThatOutliveAccount: true });
+        pending.resolve();
+        return;
+      }
+      const controller = new AbortController();
+      resuming.current = controller;
+      void resetProfileNavigationWhenReady(navigation, controller.signal)
+        .then(pending.resolve, pending.reject)
+        .finally(() => {
+          if (resuming.current === controller) resuming.current = null;
+        });
     } catch (error) {
       pending.reject(error);
     }

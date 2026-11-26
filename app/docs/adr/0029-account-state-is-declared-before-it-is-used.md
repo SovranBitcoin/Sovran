@@ -1,7 +1,7 @@
 # 29. Account state is declared before it is used
 
 Date: 2026-10-09
-Status: Accepted; in-process existing-profile switching is opt-in pending native validation.
+Status: Accepted.
 
 Account isolation needs an inventory that is complete even when a feature has
 never mounted. Store declarations go through `defineStore` (or
@@ -35,23 +35,31 @@ app without importing app infrastructure.
 
 ## Switch protocol
 
-Existing-profile switches may opt into `inProcessProfileSwitch` in developer
-settings (default false). With it disabled, the persist-target/restart path is
-unchanged. Create, recover and delete continue to restart.
+Switching to an existing, newly created or imported profile runs in process by
+default. Developer settings can require a restart with `restartOnProfileSwitch`
+(default false). The legacy `inProcessProfileSwitch` field still parses on
+upgrade. Switching from a stopped account, recovery phrase replacement and
+profile deletion still restart.
 
-The opt-in path quiesces signing/account services, unmounts the account provider
-tree, and awaits strict Coco cleanup (including otherwise swallowed teardown
+The in-process path raises the splash while the outgoing providers remain mounted,
+quiesces account services, suspends the provider tree, and awaits strict Coco cleanup (including otherwise swallowed teardown
 errors) while A still owns persistence. Holder disposal drains final owner-bound
 writes before captured-owner stores detach from the registry. Only then does the
 write barrier drain admitted writes and block reset writes. The switch resets
 profile/session memory, activates and persists B, rehydrates B's profile stores,
-and releases writes before remounting. Navigation uses Expo Router's root
-navigation ref and React Navigation `resetRoot` with a single drawer root route,
-without inherited params or nested state. ThemeProvider stays above the boundary
+and releases writes before remounting. Suspension clears account startup stages
+and preserves the global migration stage. When the target navigator is ready,
+Expo Router's navigation ref resets to a single drawer root route with no
+inherited params or nested state. ThemeProvider stays above the boundary
 and applies the hydrated profile theme. Every awaited step has a five-second
 failure deadline. Hydration must report success: Zustand can resolve after a
 storage error. A second memory reset immediately before each rehydration prevents
 late A hydration from becoming B's merge baseline.
+
+Rebalance stops scheduling work and releases its in-memory holds. Funded swaps
+remain in Coco for reconciliation when their account reopens. A recovery run
+stops admitting work and joins in-flight mutations within the switch deadline.
+Teardown discards deferred refreshes belonging to the outgoing account.
 
 NDK teardown stops subscriptions and both relay pools, drops signing authority
 and event listeners, and replaces ndk-mobile's private store through public

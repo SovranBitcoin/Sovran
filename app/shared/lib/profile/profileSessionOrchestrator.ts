@@ -136,7 +136,7 @@ export async function switchToExistingProfile(opts: {
       return false;
     }
     const inProcess =
-      !opts.fromStoppedAccount && useSettingsStore.getState().inProcessProfileSwitch;
+      !opts.fromStoppedAccount && !useSettingsStore.getState().restartOnProfileSwitch;
     lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
@@ -161,7 +161,7 @@ export async function switchToExistingProfile(opts: {
 }
 
 /**
- * The opt-in switch: stop the old account and start the new one in the same
+ * The in-process switch: stop the old account and start the new one in the same
  * runtime. On any failure it holds the account providers down and restarts,
  * so a half-switched wallet is never mounted.
  */
@@ -196,9 +196,11 @@ async function switchWithoutRestart(
     // Restore the active identity before restarting; never mount a partial B session.
     activateProfileInMemory(previousIndex);
     log.warn('profile.switch.restart_fallback');
+    let recorded = false;
     try {
       const persisted = await switchStep(() => persistSwitchTargetToDisk(accountIndex));
       if (persisted.isErr()) log.warn('profile.switch.restart_target_failed');
+      else recorded = true;
     } catch {
       log.warn('profile.switch.restart_target_failed');
     }
@@ -206,14 +208,23 @@ async function switchWithoutRestart(
     // cleanup nobody awaits. Wait for the wallet database to close, as the
     // restart path does, before the runtime is torn down.
     await cleanupCocoWithTimeout();
-    // If restart is unavailable, keep the held boundary and write barrier.
-    // Resuming after failed teardown would expose a half-switched wallet.
-    return await teardownAndRestart();
+    // Keep the boundary and write barrier held even if invoking the restart fails or throws.
+    try {
+      if (await teardownAndRestart()) return true;
+    } catch (restartError) {
+      log.error('profile.switch.restart_fallback_failed', { error: redactError(restartError) });
+    }
+    await holdUntilReopened(
+      recorded
+        ? 'Please close and reopen the app to finish switching profiles.'
+        : 'Could not switch profiles. Please close and reopen the app.'
+    );
+    return false;
   }
 }
 
 /**
- * The shared ending of the default switch and of add-profile: ask the wallet
+ * The shared ending for switches that require a restart: ask the wallet
  * to close, record the target on disk, restart into it. (The in-process switch
  * has its own fallback.)
  *
@@ -270,6 +281,10 @@ async function holdUntilReopened(message: string): Promise<void> {
 export async function createAndSwitchProfile(opts?: {
   getKeysForAccount?: KeyDerivationFn;
 }): Promise<boolean> {
+  if (isTransitionInFlight() || !CocoManager.isReadyForCleanup()) {
+    log.warn('profile.orchestrator.create_blocked', { ...CocoManager.getCleanupReadiness() });
+    return false;
+  }
   const getKeysForAccount = opts?.getKeysForAccount ?? keyDerivation();
 
   const lock = acquireTransition();
@@ -283,7 +298,8 @@ export async function createAndSwitchProfile(opts?: {
 
   if (!(await lock.takeDiskGuard())) return false;
   try {
-    lock.holdSplash();
+    const inProcess = !useSettingsStore.getState().restartOnProfileSwitch;
+    lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
@@ -315,7 +331,9 @@ export async function createAndSwitchProfile(opts?: {
       return false;
     }
 
-    return await restartInto(nextIndex);
+    return inProcess
+      ? await switchWithoutRestart(nextIndex, () => lock.release())
+      : await restartInto(nextIndex);
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
     await lock.release();
@@ -338,7 +356,7 @@ function importIsConsistent(opts: { accountIndex: number; pubkeyHex: string; nse
 }
 
 type ImportProfileResult =
-  /** The key is stored, the profile added, and the app is restarting into it (or held). */
+  /** The key is stored, the profile added, and the account transition was handed off. */
   | 'switching'
   /** A profile with this identity already exists. Nothing was changed. */
   | 'exists'
@@ -375,7 +393,7 @@ export async function importAndSwitchProfile(opts: {
   if (!lock) return 'busy';
   if (!(await lock.takeDiskGuard())) return 'busy';
   try {
-    const inProcess = useSettingsStore.getState().inProcessProfileSwitch;
+    const inProcess = !useSettingsStore.getState().restartOnProfileSwitch;
     lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
@@ -405,7 +423,7 @@ export async function importAndSwitchProfile(opts: {
         error: redactError(error),
       });
     }
-    // From here on the endings are the switch's own: a restart or a hold.
+    // From here the switch owns the transition, including any restart fallback.
     if (inProcess) await switchWithoutRestart(opts.accountIndex, () => lock.release());
     else await restartInto(opts.accountIndex);
     return 'switching';

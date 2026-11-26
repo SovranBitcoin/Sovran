@@ -6828,6 +6828,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "restartOnProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "sendLocationEnabled": {
           "default": false,
           "type": "boolean",
@@ -7095,6 +7099,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "restartOnProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "sendLocationEnabled": {
           "default": false,
           "type": "boolean",
@@ -7154,6 +7162,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "mockFailPaymentRequest",
         "whitenoiseEnabled",
         "inProcessProfileSwitch",
+        "restartOnProfileSwitch",
         "mockNoGlass",
         "layoutGuides",
         "showTouches",
