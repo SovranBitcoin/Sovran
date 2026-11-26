@@ -46,7 +46,7 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const muted = useThemeColor('muted');
+  const foreground = useThemeColor('foreground');
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
@@ -144,16 +144,16 @@ const CurrentKeyItem: React.FC<{
           className="flex-1"
           testID="keyring-active-copy"
           onPress={handleCopy}>
-          <Icon name="lets-icons:copy" size={16} color={muted} />
-          <PillButton.Label style={{ color: muted }}>Copy</PillButton.Label>
+          <Icon name="lets-icons:copy" size={16} color={foreground} />
+          <PillButton.Label className="text-foreground">Copy</PillButton.Label>
         </PillButton>
         <PillButton
           variant="secondary"
           className="flex-1"
           testID="keyring-active-show-qr"
           onPress={handleShowQR}>
-          <Icon name="stash:qr-code" size={16} color={muted} />
-          <PillButton.Label style={{ color: muted }}>Show QR</PillButton.Label>
+          <Icon name="stash:qr-code" size={16} color={foreground} />
+          <PillButton.Label className="text-foreground">Show QR</PillButton.Label>
         </PillButton>
       </HStack>
     </View>
@@ -167,7 +167,7 @@ const KeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const foreground = useThemeColor('foreground');
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
   const isDerived = keypair.derivationIndex !== undefined;
 
@@ -200,14 +200,14 @@ const KeyItem: React.FC<{
           <Icon
             name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
             size={16}
-            color={withAlpha(foreground, 0.5)}
+            color={foreground}
           />
         </View>
         <ListGroup.ItemContent>
-          <Text size={11} style={{ color: foreground }}>
+          <Text size={11} className="text-foreground">
             {truncateMiddle(displayKey)}
           </Text>
-          <Text size={10} className="mt-0.5" style={{ color: withAlpha(foreground, 0.4) }}>
+          <Text size={10} className="mt-0.5" color={muted}>
             {isDerived ? `Derived Key ${keypair.derivationIndex}` : 'Imported'}
           </Text>
         </ListGroup.ItemContent>
@@ -401,7 +401,7 @@ async function importCurrentNsecImpl(
  */
 export const SettingsKeyringScreen: React.FC = () => {
   useLifecycleLogger('SettingsKeyringScreen');
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  const foreground = useThemeColor('foreground');
   const manager = useManager();
   const { keys: nostrKeys, isReady: nostrKeysReady } = useNostrKeysContext();
   const isFirstScreen = useNavigationState((state) => state.index === 0);
@@ -624,7 +624,7 @@ export const SettingsKeyringScreen: React.FC = () => {
             </VStack>
           ) : keypairs.length === 0 ? (
             <VStack align="center" className="p-6">
-              <Icon name="mdi:key-variant" size={40} color={defaultColor} />
+              <Icon name="mdi:key-variant" size={40} color={withAlpha(foreground, 0.65)} />
               <Text
                 size={14}
                 className="mt-3 text-center"

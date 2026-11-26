@@ -273,10 +273,11 @@ export function CurrencyIcon({
   /** Override for inner symbol/icon color (e.g. #FFFFFF for QR code on dark surface) */
   iconColor?: string;
 }) {
-  const [foreground, surfaceForeground, defaultForeground] = useThemeColor([
+  const [foreground, surfaceForeground, defaultForeground, surface] = useThemeColor([
     'foreground',
     'surface-foreground',
     'default-foreground',
+    'surface',
   ] as const);
   const [shade200, shade300, orange200, orange300, orange400] = useThemeColor([
     'shade-200',
@@ -474,7 +475,14 @@ export function CurrencyIcon({
             alignItems: 'center',
             zIndex: 2,
           }}>
-          <Icon name="solar:key-bold" size={width * 0.5} color={symbolFill} />
+          {/* The key is cut out of the disc in the page colour: a foreground
+              key on a translucent foreground disc reads as one washed-out
+              blob. QR mode (iconColor set) keeps its light-on-dark symbol. */}
+          <Icon
+            name="solar:key-bold"
+            size={width * 0.58}
+            color={iconColor != null ? symbolFill : surface}
+          />
         </View>
       </View>
     );

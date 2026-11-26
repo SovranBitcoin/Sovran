@@ -1,7 +1,7 @@
 /**
  * The left drawer: a vertical account switcher (ADR 0035). One row per saved
  * profile with its cached name, picture and balance; the active one checked;
- * Add and Import at the end. It makes no network reads of its own.
+ * Add and Import below a rule, as tinted buttons rather than avatar-like rows. It makes no network reads of its own.
  *
  * Every account action shares one lock. A switch or add ends in a restart (or
  * an in-process remount), so once one starts nothing else may run until the
@@ -44,7 +44,7 @@ import { PressScale } from '@/shared/ui/primitives/PressScale';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { accountNpub, accountsCountLabel } from './accountSwitcher';
+import { accountNpub } from './accountSwitcher';
 import { AccountRow, PRESS_SCALE, type AccountRowProps } from './AccountRow';
 
 type DrawerNavigation = DrawerContentComponentProps['navigation'];
@@ -109,6 +109,10 @@ function CachedAccountRow(props: Omit<AccountRowProps, 'metadata' | 'activeProgr
   return <AccountRow {...props} metadata={metadata} />;
 }
 
+/**
+ * Add or Import: a tinted, rounded button whose edges line up with the account
+ * rows' highlight, so it reads as an action and not as one more account.
+ */
 function FooterAction({
   icon,
   label,
@@ -136,15 +140,16 @@ function FooterAction({
       onPress={onPress}>
       <PressScale target={locked ? 1 : PRESS_SCALE}>
         <View
-          className={`flex-row items-center gap-3 px-5 py-3 ${locked && !pending ? 'opacity-50' : ''}`}>
-          <View className="bg-surface-secondary h-11 w-11 shrink-0 items-center justify-center rounded-full">
+          testID={`${testID}-surface`}
+          className={`bg-default h-12 flex-row items-center gap-3 rounded-2xl px-4 ${locked && !pending ? 'opacity-50' : ''}`}>
+          <View className="h-5 w-5 shrink-0 items-center justify-center">
             {pending ? (
               <Spinner size={16} color={muted} />
             ) : (
               <Icon name={icon} size={20} color={foreground} />
             )}
           </View>
-          <Text size={16} medium numberOfLines={1} accessible={false}>
+          <Text size={15} medium numberOfLines={1} accessible={false}>
             {label}
           </Text>
         </View>
@@ -158,7 +163,6 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
   // The confirmed active account. The check follows it, never the tap.
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
   const displayBtc = useSettingsStore((s) => s.displayBtc);
-  const muted = useThemeColor('muted');
   const { isOffline } = useOfflineStatus();
   const closeDrawerAndWait = useCloseDrawerAndWait(navigation);
 
@@ -287,16 +291,8 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
     <View className="bg-surface flex-1">
       <ScrollView
         className="flex-1"
-        contentContainerClassName={`grow pb-safe-offset-4 ${isOffline ? 'pt-2' : 'pt-safe-offset-2'}`}
+        contentContainerClassName={`grow pb-safe-offset-4 ${isOffline ? 'pt-3' : 'pt-safe-offset-3'}`}
         showsVerticalScrollIndicator={false}>
-        <View className="px-5 pb-3 pt-2" accessibilityRole="header">
-          <Text size={28} bold numberOfLines={1}>
-            Accounts
-          </Text>
-          <Text size={14} color={muted} numberOfLines={1}>
-            {accountsCountLabel(profiles.length)}
-          </Text>
-        </View>
         {profiles.map((profile) => (
           <CachedAccountRow
             key={profile.accountIndex}
@@ -309,7 +305,9 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
             onOpenMenu={(p, name) => void openAccountMenu(p, name)}
           />
         ))}
-        <View className="pt-3">
+        {/* Same mx-3 inset as the rows, so highlight and buttons share edges. */}
+        <View className="bg-separator h-hairline mx-5 my-4" />
+        <View className="mx-3 gap-2">
           <FooterAction
             icon="la:user-plus"
             label="Add account"

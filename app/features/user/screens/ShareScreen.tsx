@@ -166,7 +166,9 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
               icon={
                 config.iconCurrency ? (
                   <CurrencyIcon
-                    colors={[withAlpha(foreground, 0.4)]}
+                    colors={[
+                      config.iconCurrency === 'p2pk' ? foreground : withAlpha(foreground, 0.4),
+                    ]}
                     width={20}
                     currency={config.iconCurrency}
                   />
