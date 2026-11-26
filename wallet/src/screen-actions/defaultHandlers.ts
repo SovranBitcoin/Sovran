@@ -65,7 +65,8 @@ export async function startNewEcashSendIfFinished(
   machine: PaymentMachine,
   destination: unknown,
 ): Promise<void> {
-  if (destination !== "sendEcash" || machine.getStep() !== "sendComplete") return;
+  if (destination !== "sendEcash" || machine.getStep() !== "sendComplete")
+    return;
   const finished = machine.getContext();
   logger.info("screenAction.amountEntry.newSendAfterFinished", {
     allowedMintCount: finished.supportedMintUrls?.length ?? 0,
@@ -74,8 +75,15 @@ export async function startNewEcashSendIfFinished(
   await machine.startSendEcash({
     reset: true,
     ...(finished.meltTarget ? { meltTarget: finished.meltTarget } : {}),
-    ...(finished.recipientPubkey ? { recipientPubkey: finished.recipientPubkey } : {}),
-    ...(finished.recipientProfile ? { recipientProfile: finished.recipientProfile } : {}),
+    ...(finished.meltTarget && finished.meltTargetIsNpcFallback
+      ? { meltTargetIsNpcFallback: true }
+      : {}),
+    ...(finished.recipientPubkey
+      ? { recipientPubkey: finished.recipientPubkey }
+      : {}),
+    ...(finished.recipientProfile
+      ? { recipientProfile: finished.recipientProfile }
+      : {}),
     ...(finished.p2pkLock ? { p2pkLock: finished.p2pkLock } : {}),
     ...(finished.supportedMintUrls?.length
       ? { allowedMints: finished.supportedMintUrls }
@@ -143,8 +151,7 @@ function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
     fiatSymbol: getNullableString(entry, "fiatSymbol"),
     btcPrice: getNumber(entry, "btcPrice") ?? 0,
     displayFiat: getNullableNumber(entry, "displayFiat"),
-    displayAmount:
-      getNumber(entry, "displayAmount") ?? effective?.value ?? 0,
+    displayAmount: getNumber(entry, "displayAmount") ?? effective?.value ?? 0,
     unit: effective?.unit ?? getString(entry, "unit") ?? "sat",
     autoOptimized: entry.autoOptimized === true,
   };
@@ -301,8 +308,7 @@ export function createDefaultScreenActionHandlers(
         // lookup in the wallet's scan history store. flowCtx.rawInput is the
         // canonical string that was originally recorded by addScan().
         const flowCtx = getMachine()?.getContext?.() as
-          | { rawInput?: string; source?: string }
-          | undefined;
+          { rawInput?: string; source?: string } | undefined;
         const scannedRawInput = flowCtx?.rawInput;
 
         const tokenString = encodeToken(entry);
@@ -393,8 +399,7 @@ export function createDefaultScreenActionHandlers(
           });
 
           const setEntry = (ctx as EntryLike).setEntry as
-            | ((e: EntryLike) => void)
-            | undefined;
+            ((e: EntryLike) => void) | undefined;
           if (result.status === "pending") {
             logger.info("screenAction.receiveToken.redeem.pending", {
               id,
@@ -748,8 +753,7 @@ export function createDefaultScreenActionHandlers(
         // fetches NUT-06 info while `displayName` is unset, and audit comes
         // from the metadata cache, so nothing here waits on the network.
         const item = (ctx as EntryLike).item as
-          | import("../types").MintListItem
-          | undefined;
+          import("../types").MintListItem | undefined;
         const infoEntry: EntryLike = {
           mintUrl,
           seedDisplayName: item?.displayName || undefined,
@@ -819,6 +823,8 @@ export function createDefaultScreenActionHandlers(
         }
         const meltTargetFromEntry =
           typeof entry.meltTarget === "string" ? entry.meltTarget : "";
+        const meltTargetIsNpcFallback =
+          !!meltTargetFromEntry && entry.meltTargetIsNpcFallback === true;
         // Identity fields are accepted from two sources, in priority order:
         //   1. Per-call `execute(params)` — the amount screen passes whatever
         //      it has locally resolved at the moment of submit (NIP-05 +
@@ -856,9 +862,7 @@ export function createDefaultScreenActionHandlers(
         const hasLockParam = "p2pkLock" in (ctx as Record<string, unknown>);
         const requestedLock = hasLockParam
           ? ((ctx as Record<string, unknown>).p2pkLock as
-              | P2pkLockSpec
-              | null
-              | undefined)
+              P2pkLockSpec | null | undefined)
           : undefined;
         // A lock the flow was SEEDED with (a scanned wallet receive key, a Nut
         // Drop) is already on the machine context and is not the screen's to
@@ -904,7 +908,9 @@ export function createDefaultScreenActionHandlers(
           }
         } else if (variantId === "ecash" || variantId === "locked-ecash") {
           if (variantId === "locked-ecash" && !requestedLock && !seededLock) {
-            throw new AuthoredError("Locked ecash requires spending conditions");
+            throw new AuthoredError(
+              "Locked ecash requires spending conditions",
+            );
           }
           if (entryDestination === "mintQuote") {
             // Receive "as Ecash": a single-use NUT-18 request. Route it through
@@ -968,6 +974,9 @@ export function createDefaultScreenActionHandlers(
             ...(mintQuoteMethod ? { mintQuoteMethod } : {}),
             ...(meltQuoteMethod ? { meltQuoteMethod } : {}),
             meltTarget,
+            ...(meltTarget && meltTargetIsNpcFallback
+              ? { meltTargetIsNpcFallback: true }
+              : {}),
             recipientPubkey,
             recipientProfile,
             ...(hasLockParam ? { p2pkLock: lockForDestination } : {}),

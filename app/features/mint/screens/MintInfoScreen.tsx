@@ -58,6 +58,7 @@ import {
   getMintInfoNostrCopyValue,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
+  resolveMintInfoContactIdentity,
   resolveMintInfoNostrContactPubkey,
 } from '../lib/mintInfoContacts';
 
@@ -604,7 +605,6 @@ export function MintInfoScreen() {
                     : rowNostrPubkey === nostrContactPubkey
                       ? nostrContactProfile
                       : (extraContactProfiles.get(rowNostrPubkey) ?? null);
-                  const rowPicture = rowProfile?.picture;
                   const rowResolving = !rowNostrPubkey
                     ? false
                     : rowNostrPubkey === nostrContactPubkey
@@ -613,9 +613,21 @@ export function MintInfoScreen() {
                   const fallbackNpub = c.isNostr
                     ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
                     : undefined;
-                  const title = c.isNostr
-                    ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
-                    : c.info;
+                  // The mint's own operator row borrows the mint's name and icon
+                  // when their Nostr profile has none; extra contacts never do.
+                  const rowIdentity = c.isNostr
+                    ? resolveMintInfoContactIdentity({
+                        profile: rowProfile,
+                        fallbackTitle: fallbackNpub ?? c.info,
+                        loading: rowResolving,
+                        mint:
+                          rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                            ? { name: displayName === mintUrl ? undefined : displayName, iconUrl }
+                            : undefined,
+                      })
+                    : undefined;
+                  const rowPicture = rowIdentity?.picture;
+                  const title = rowIdentity ? rowIdentity.title : c.info;
                   const showNpubSubtitle =
                     c.isNostr && Boolean(fallbackNpub) && title !== fallbackNpub;
                   return (

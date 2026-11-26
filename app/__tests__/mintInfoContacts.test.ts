@@ -6,6 +6,7 @@ import {
   getMintInfoNostrCopyValue,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
+  resolveMintInfoContactIdentity,
   resolveMintInfoNostrContactPubkey,
 } from '@/features/mint/lib/mintInfoContacts';
 
@@ -88,5 +89,59 @@ describe('mint info contacts', () => {
     expect(getMintInfoNostrCopyValue(PUBKEY, PUBKEY)).toBe(NPUB);
     expect(getMintInfoNostrCopyValue(NPUB, PUBKEY)).toBe(NPUB);
     expect(getMintInfoNostrCopyValue('npub\u2026', 'npub\u2026')).toBe('npub\u2026');
+  });
+});
+
+describe('mint info operator contact identity', () => {
+  const mint = { name: 'Cool Mint', iconUrl: 'https://mint.example/icon.png' };
+
+  it('prefers the operator Nostr name and picture', () => {
+    expect(
+      resolveMintInfoContactIdentity({
+        profile: { displayName: 'Op', picture: 'https://op.example/p.png' },
+        fallbackTitle: 'npub1…',
+        loading: false,
+        mint,
+      })
+    ).toEqual({ title: 'Op', picture: 'https://op.example/p.png' });
+  });
+
+  it('falls back to the mint name and icon when Nostr metadata is missing', () => {
+    expect(
+      resolveMintInfoContactIdentity({
+        profile: null,
+        fallbackTitle: 'npub1…',
+        loading: false,
+        mint,
+      })
+    ).toEqual({ title: 'Cool Mint', picture: 'https://mint.example/icon.png' });
+  });
+
+  it('mixes sources per field: Nostr name, mint icon', () => {
+    expect(
+      resolveMintInfoContactIdentity({
+        profile: { name: 'op' },
+        fallbackTitle: 'npub1…',
+        loading: false,
+        mint,
+      })
+    ).toEqual({ title: 'op', picture: 'https://mint.example/icon.png' });
+  });
+
+  it('does not flash the mint identity while the profile is still loading', () => {
+    expect(
+      resolveMintInfoContactIdentity({
+        profile: null,
+        fallbackTitle: 'npub1…',
+        loading: true,
+        mint,
+      })
+    ).toEqual({ title: 'npub1…', picture: undefined });
+  });
+
+  it('keeps the npub title when there is no mint to borrow from', () => {
+    expect(
+      resolveMintInfoContactIdentity({ profile: null, fallbackTitle: 'npub1…', loading: false })
+    ).toEqual({ title: 'npub1…', picture: undefined });
   });
 });

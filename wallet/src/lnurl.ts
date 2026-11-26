@@ -22,21 +22,23 @@
 //     would otherwise reach `mgr.ops.melt.prepare` and drain the user.
 // ---------------------------------------------------------------------------
 
-import { AuthoredError } from './errors';
+import { bech32 } from "@scure/base";
+
+import { AuthoredError } from "./errors";
 import {
   LnurlInvoiceCallback,
   LnurlPayParams as LnurlPayParamsSchema,
   parseWith,
   loggableIssues,
   type LnurlPayParams,
-} from '@sovranbitcoin/schemas';
+} from "@sovranbitcoin/schemas";
 
-import { decodeBolt11Invoice } from './bolt11';
-import { errField, logger } from './logger';
-import { isAbortError, safeFetch, type RequestControls } from './safeFetch';
+import { decodeBolt11Invoice } from "./bolt11";
+import { errField, logger } from "./logger";
+import { isAbortError, safeFetch, type RequestControls } from "./safeFetch";
 
 const LN_ADDRESS_REGEX =
-  /^((?:[^<>()[\]\\.,;:\s@"]+(?:\.[^<>()[\]\\.,;:\s@"]+)*)|(?:".+"))@((?:\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(?:(?:[a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  /^((?:[^<>()[\]\\.,;:\s@"#?/]+(?:\.[^<>()[\]\\.,;:\s@"#?/]+)*)|(?:".+"))@((?:\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(?:(?:[a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
 const LNURLP_REGEX =
   /^lnurlp:\/\/([\w-]+\.)+[\w-]+(:\d{1,5})?(\/[\w-./?%&=]*)?$/;
@@ -46,10 +48,10 @@ interface LightningAddress {
   domain: string;
 }
 
-const parsePayParams = parseWith(LnurlPayParamsSchema, 'lnurl/pay-params');
+const parsePayParams = parseWith(LnurlPayParamsSchema, "lnurl/pay-params");
 const parseInvoiceCallback = parseWith(
   LnurlInvoiceCallback,
-  'lnurl/invoice-callback',
+  "lnurl/invoice-callback",
 );
 
 /**
@@ -57,26 +59,26 @@ const parseInvoiceCallback = parseWith(
  * each case — generic "fetch failed" hides amount-mismatch attacks.
  */
 type LnurlErrorCode =
-  | 'LNURL_INVALID_TARGET'
-  | 'LNURL_PARAMS_FETCH_FAILED'
-  | 'LNURL_INVALID_PARAMS'
-  | 'LNURL_AMOUNT_OUT_OF_RANGE'
-  | 'LNURL_INSECURE_CALLBACK'
-  | 'LNURL_INVOICE_FETCH_FAILED'
-  | 'LNURL_INVALID_INVOICE_RESPONSE'
-  | 'LNURL_INVOICE_AMOUNT_MISMATCH'
-  | 'LNURL_TOR_REQUIRED'
-  | 'LNURL_TIMEOUT';
+  | "LNURL_INVALID_TARGET"
+  | "LNURL_PARAMS_FETCH_FAILED"
+  | "LNURL_INVALID_PARAMS"
+  | "LNURL_AMOUNT_OUT_OF_RANGE"
+  | "LNURL_INSECURE_CALLBACK"
+  | "LNURL_INVOICE_FETCH_FAILED"
+  | "LNURL_INVALID_INVOICE_RESPONSE"
+  | "LNURL_INVOICE_AMOUNT_MISMATCH"
+  | "LNURL_TOR_REQUIRED"
+  | "LNURL_TIMEOUT";
 
 function isOnionHost(host: string): boolean {
-  return host.toLowerCase().endsWith('.onion');
+  return host.toLowerCase().endsWith(".onion");
 }
 
 function summarizeTarget(target: string): Record<string, unknown> {
   const address = parseLightningAddress(target);
   if (address) {
     return {
-      targetType: 'lightningAddress',
+      targetType: "lightningAddress",
       inputLength: target.length,
       usernameLength: address.username.length,
       domain: address.domain,
@@ -87,26 +89,26 @@ function summarizeTarget(target: string): Record<string, unknown> {
     try {
       const parsed = new URL(url);
       return {
-        targetType: 'lnurlp',
+        targetType: "lnurlp",
         inputLength: target.length,
         host: parsed.host,
         pathnameLength: parsed.pathname.length,
       };
     } catch {
       return {
-        targetType: 'lnurlp',
+        targetType: "lnurlp",
         inputLength: target.length,
         host: null,
         pathnameLength: 0,
       };
     }
   }
-  return { targetType: 'unknown', inputLength: target.length };
+  return { targetType: "unknown", inputLength: target.length };
 }
 
 function summarizeCallbackUrl(url: URL): Record<string, unknown> {
   return {
-    protocol: url.protocol.replace(/:$/, ''),
+    protocol: url.protocol.replace(/:$/, ""),
     host: url.host,
     pathnameLength: url.pathname.length,
     queryKeyCount: Array.from(url.searchParams.keys()).length,
@@ -137,7 +139,7 @@ export class LnurlError extends AuthoredError {
   readonly code: LnurlErrorCode;
   constructor(code: LnurlErrorCode, message: string) {
     super(message);
-    this.name = 'LnurlError';
+    this.name = "LnurlError";
     this.code = code;
   }
 }
@@ -150,14 +152,40 @@ export function parseLightningAddress(
   return result ? { username: result[1], domain: result[2] } : null;
 }
 
+/** Decode an `lnurl1…` string to its URL, or null when it is not valid. */
+export function decodeLnurlBech32(input: string): string | null {
+  const value = input.trim();
+  if (!/^lnurl1/i.test(value)) return null;
+  try {
+    const { prefix, words } = bech32.decode(
+      value.toLowerCase() as `${string}1${string}`,
+      2048,
+    );
+    if (prefix !== "lnurl") return null;
+    const url = new TextDecoder().decode(bech32.fromWords(words));
+    const parsed = new URL(url);
+    const onion = parsed.hostname.endsWith(".onion");
+    if (
+      parsed.protocol === "https:" ||
+      (onion && parsed.protocol === "http:")
+    ) {
+      return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function parseLnurlp(url: string): string | null {
   if (!url) return null;
+  if (/^lnurl1/i.test(url.trim())) return decodeLnurlBech32(url);
   if (!LNURLP_REGEX.test(url.toLowerCase())) return null;
-  const withoutProtocol = url.replace(/^lnurlp:\/\//i, '');
-  const slashIndex = withoutProtocol.indexOf('/');
-  const protocol = withoutProtocol.toLowerCase().includes('.onion')
-    ? 'http://'
-    : 'https://';
+  const withoutProtocol = url.replace(/^lnurlp:\/\//i, "");
+  const slashIndex = withoutProtocol.indexOf("/");
+  const protocol = withoutProtocol.toLowerCase().includes(".onion")
+    ? "http://"
+    : "https://";
   if (slashIndex === -1) {
     return `${protocol}${withoutProtocol.toLowerCase()}`;
   }
@@ -170,8 +198,8 @@ export function decodeUrlOrAddress(meltTarget: string): string | null {
   const address = parseLightningAddress(meltTarget);
   if (address) {
     const { username, domain } = address;
-    const protocol = domain.match(/\.onion$/) ? 'http' : 'https';
-    return `${protocol}://${domain}/.well-known/lnurlp/${username}`;
+    const protocol = domain.match(/\.onion$/) ? "http" : "https";
+    return `${protocol}://${domain}/.well-known/lnurlp/${encodeURIComponent(username)}`;
   }
   return parseLnurlp(meltTarget);
 }
@@ -187,26 +215,26 @@ function assertSecureCallback(callback: string): URL {
   try {
     url = new URL(callback);
   } catch {
-    logger.warn('lnurl.callback.invalidUrl', {
+    logger.warn("lnurl.callback.invalidUrl", {
       callbackLength: callback.length,
     });
     throw new LnurlError(
-      'LNURL_INVALID_PARAMS',
-      'LNURL callback is not a valid URL',
+      "LNURL_INVALID_PARAMS",
+      "LNURL callback is not a valid URL",
     );
   }
-  const isOnion = url.hostname.endsWith('.onion');
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isOnion)) {
-    logger.warn('lnurl.callback.insecure', {
+  const isOnion = url.hostname.endsWith(".onion");
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isOnion)) {
+    logger.warn("lnurl.callback.insecure", {
       ...summarizeCallbackUrl(url),
       isOnion,
     });
     throw new LnurlError(
-      'LNURL_INSECURE_CALLBACK',
-      'LNURL callback protocol must be https (or http for .onion)',
+      "LNURL_INSECURE_CALLBACK",
+      "LNURL callback protocol must be https (or http for .onion)",
     );
   }
-  logger.debug('lnurl.callback.secure', {
+  logger.debug("lnurl.callback.secure", {
     ...summarizeCallbackUrl(url),
     isOnion,
   });
@@ -217,7 +245,7 @@ async function getLnurlPayParams(
   meltTarget: string,
   controls: RequestControls = {},
 ): Promise<LnurlPayParams | null> {
-  logger.info('lnurl.payParams.start', {
+  logger.info("lnurl.payParams.start", {
     ...summarizeTarget(meltTarget),
     hasSignal: !!controls.signal,
     signalAborted: controls.signal?.aborted === true,
@@ -225,8 +253,8 @@ async function getLnurlPayParams(
   });
   const url = decodeUrlOrAddress(meltTarget);
   if (!url) {
-    logger.info('lnurl.payParams.skipped', {
-      reason: 'invalid_target',
+    logger.info("lnurl.payParams.skipped", {
+      reason: "invalid_target",
       inputLength: meltTarget.length,
     });
     return null;
@@ -240,19 +268,19 @@ async function getLnurlPayParams(
   try {
     parsedUrl = new URL(url);
   } catch {
-    logger.warn('lnurl.payParams.invalidUrl', {
+    logger.warn("lnurl.payParams.invalidUrl", {
       ...summarizeTarget(meltTarget),
     });
     return null;
   }
   if (isOnionHost(parsedUrl.hostname)) {
-    logger.warn('lnurl.payParams.torRequired', {
+    logger.warn("lnurl.payParams.torRequired", {
       host: parsedUrl.host,
       pathnameLength: parsedUrl.pathname.length,
     });
     throw new LnurlError(
-      'LNURL_TOR_REQUIRED',
-      'LNURL target requires Tor (.onion host)',
+      "LNURL_TOR_REQUIRED",
+      "LNURL target requires Tor (.onion host)",
     );
   }
 
@@ -261,13 +289,13 @@ async function getLnurlPayParams(
     response = await safeFetch(url, controls);
   } catch (e) {
     if (isAbortError(e)) {
-      logger.warn('lnurl.payParams.timeout', {
+      logger.warn("lnurl.payParams.timeout", {
         host: parsedUrl.host,
         pathnameLength: parsedUrl.pathname.length,
       });
-      throw new LnurlError('LNURL_TIMEOUT', 'LNURL pay-params timed out');
+      throw new LnurlError("LNURL_TIMEOUT", "LNURL pay-params timed out");
     }
-    logger.warn('lnurl.payParams.fetchFailed', {
+    logger.warn("lnurl.payParams.fetchFailed", {
       host: parsedUrl.host,
       pathnameLength: parsedUrl.pathname.length,
       error: errField(e),
@@ -276,7 +304,7 @@ async function getLnurlPayParams(
   }
 
   if (!response.ok) {
-    logger.warn('lnurl.payParams.httpError', {
+    logger.warn("lnurl.payParams.httpError", {
       host: parsedUrl.host,
       pathnameLength: parsedUrl.pathname.length,
       status: response.status,
@@ -287,14 +315,14 @@ async function getLnurlPayParams(
   const raw = await response.json();
   const parsed = parsePayParams(raw);
   if (parsed.isErr()) {
-    logger.warn('lnurl.payParams.invalidShape', {
+    logger.warn("lnurl.payParams.invalidShape", {
       host: parsedUrl.host,
       pathnameLength: parsedUrl.pathname.length,
       issues: loggableIssues(parsed.error),
     });
     return null;
   }
-  logger.info('lnurl.payParams.done', {
+  logger.info("lnurl.payParams.done", {
     host: parsedUrl.host,
     pathnameLength: parsedUrl.pathname.length,
     minSendable: parsed.value.minSendable,
@@ -310,7 +338,7 @@ export async function requestInvoiceFromLnurl(
   controls: RequestControls = {},
   getExtras?: LnurlPayExtrasProvider,
 ): Promise<string> {
-  logger.info('lnurl.invoice.start', {
+  logger.info("lnurl.invoice.start", {
     ...summarizeTarget(meltTarget),
     amountSats,
     hasSignal: !!controls.signal,
@@ -319,34 +347,34 @@ export async function requestInvoiceFromLnurl(
   });
   const params = await getLnurlPayParams(meltTarget, controls);
   if (!params || !params.callback) {
-    logger.warn('lnurl.invoice.invalidTarget', {
+    logger.warn("lnurl.invoice.invalidTarget", {
       ...summarizeTarget(meltTarget),
       hasParams: !!params,
       hasCallback: !!params?.callback,
     });
     throw new LnurlError(
-      'LNURL_INVALID_TARGET',
-      'Invalid LNURL or lightning address',
+      "LNURL_INVALID_TARGET",
+      "Invalid LNURL or lightning address",
     );
   }
 
   const amountMsats = amountSats * 1000;
 
   if (amountMsats < params.minSendable || amountMsats > params.maxSendable) {
-    logger.warn('lnurl.invoice.amountOutOfRange', {
+    logger.warn("lnurl.invoice.amountOutOfRange", {
       amountSats,
       amountMsats,
       minSendable: params.minSendable,
       maxSendable: params.maxSendable,
     });
     throw new LnurlError(
-      'LNURL_AMOUNT_OUT_OF_RANGE',
+      "LNURL_AMOUNT_OUT_OF_RANGE",
       `Amount must be between ${params.minSendable / 1000} and ${params.maxSendable / 1000} sats`,
     );
   }
 
   const callbackUrl = assertSecureCallback(params.callback);
-  callbackUrl.searchParams.set('amount', String(amountMsats));
+  callbackUrl.searchParams.set("amount", String(amountMsats));
   if (getExtras) {
     try {
       const extras = await getExtras({
@@ -357,15 +385,15 @@ export async function requestInvoiceFromLnurl(
         commentAllowed: params.commentAllowed,
       });
       if (extras?.nostr) {
-        callbackUrl.searchParams.set('nostr', extras.nostr);
+        callbackUrl.searchParams.set("nostr", extras.nostr);
       }
       if (extras?.comment && params.commentAllowed) {
         callbackUrl.searchParams.set(
-          'comment',
+          "comment",
           extras.comment.slice(0, params.commentAllowed),
         );
       }
-      logger.info('lnurl.invoice.extras', {
+      logger.info("lnurl.invoice.extras", {
         hasNostr: !!extras?.nostr,
         nostrLength: extras?.nostr?.length ?? 0,
         hasComment: !!extras?.comment,
@@ -374,10 +402,10 @@ export async function requestInvoiceFromLnurl(
     } catch (e) {
       // Extras are best-effort decoration — a failed zap-request build must
       // not block the payment. Continue as a plain LNURL pay.
-      logger.warn('lnurl.invoice.extrasFailed', { error: errField(e) });
+      logger.warn("lnurl.invoice.extrasFailed", { error: errField(e) });
     }
   }
-  logger.info('lnurl.invoice.callback', {
+  logger.info("lnurl.invoice.callback", {
     ...summarizeCallbackUrl(callbackUrl),
     amountMsats,
   });
@@ -387,32 +415,32 @@ export async function requestInvoiceFromLnurl(
     response = await safeFetch(callbackUrl.toString(), controls);
   } catch (e) {
     if (isAbortError(e)) {
-      logger.warn('lnurl.invoice.timeout', {
+      logger.warn("lnurl.invoice.timeout", {
         ...summarizeCallbackUrl(callbackUrl),
       });
       throw new LnurlError(
-        'LNURL_TIMEOUT',
+        "LNURL_TIMEOUT",
         `LNURL invoice fetch timed out for ${callbackUrl.host}`,
       );
     }
-    logger.warn('lnurl.invoice.fetchFailed', {
+    logger.warn("lnurl.invoice.fetchFailed", {
       ...summarizeCallbackUrl(callbackUrl),
       errorName: e instanceof Error ? e.name : typeof e,
     });
     throw new LnurlError(
-      'LNURL_INVOICE_FETCH_FAILED',
-      'LNURL invoice fetch failed',
+      "LNURL_INVOICE_FETCH_FAILED",
+      "LNURL invoice fetch failed",
     );
   }
 
   if (!response.ok) {
-    logger.warn('lnurl.invoice.httpError', {
+    logger.warn("lnurl.invoice.httpError", {
       ...summarizeCallbackUrl(callbackUrl),
       status: response.status,
       statusText: response.statusText,
     });
     throw new LnurlError(
-      'LNURL_INVOICE_FETCH_FAILED',
+      "LNURL_INVOICE_FETCH_FAILED",
       `LNURL invoice fetch HTTP ${response.status} ${response.statusText}`,
     );
   }
@@ -420,13 +448,13 @@ export async function requestInvoiceFromLnurl(
   const raw = await response.json();
   const parsed = parseInvoiceCallback(raw);
   if (parsed.isErr()) {
-    logger.warn('lnurl.invoiceCallback.invalidShape', {
+    logger.warn("lnurl.invoiceCallback.invalidShape", {
       ...summarizeCallbackUrl(callbackUrl),
       issues: loggableIssues(parsed.error),
     });
     throw new LnurlError(
-      'LNURL_INVALID_INVOICE_RESPONSE',
-      'No invoice returned from LNURL endpoint',
+      "LNURL_INVALID_INVOICE_RESPONSE",
+      "No invoice returned from LNURL endpoint",
     );
   }
 
@@ -435,19 +463,19 @@ export async function requestInvoiceFromLnurl(
   // reads as a mismatch against the requested amount.
   const decodedMsats = decodeBolt11Invoice(invoice)?.amountMsat ?? null;
   if (decodedMsats !== amountMsats) {
-    logger.warn('lnurl.invoice.amountMismatch', {
+    logger.warn("lnurl.invoice.amountMismatch", {
       ...summarizeCallbackUrl(callbackUrl),
       requestedMsats: amountMsats,
       decodedMsats,
       invoiceLength: invoice.length,
     });
     throw new LnurlError(
-      'LNURL_INVOICE_AMOUNT_MISMATCH',
+      "LNURL_INVOICE_AMOUNT_MISMATCH",
       `LNURL server returned an invoice for ${decodedMsats ?? 0} msats; requested ${amountMsats} msats`,
     );
   }
 
-  logger.info('lnurl.invoice.done', {
+  logger.info("lnurl.invoice.done", {
     ...summarizeCallbackUrl(callbackUrl),
     amountMsats,
     invoiceLength: invoice.length,
@@ -457,19 +485,19 @@ export async function requestInvoiceFromLnurl(
 
 export function isLightningInvoiceBolt11(invoice: string): boolean {
   const lower = invoice.toLowerCase().trim();
-  logger.debug('lnurl.invoice.kindChecked', {
+  logger.debug("lnurl.invoice.kindChecked", {
     invoiceLength: invoice.length,
     trimmedLength: lower.length,
     bolt11:
-      lower.startsWith('lnbc') ||
-      lower.startsWith('lntbs') ||
-      lower.startsWith('lntb') ||
-      lower.startsWith('lnbcrt'),
+      lower.startsWith("lnbc") ||
+      lower.startsWith("lntbs") ||
+      lower.startsWith("lntb") ||
+      lower.startsWith("lnbcrt"),
   });
   return (
-    lower.startsWith('lnbc') ||
-    lower.startsWith('lntbs') ||
-    lower.startsWith('lntb') ||
-    lower.startsWith('lnbcrt')
+    lower.startsWith("lnbc") ||
+    lower.startsWith("lntbs") ||
+    lower.startsWith("lntb") ||
+    lower.startsWith("lnbcrt")
   );
 }

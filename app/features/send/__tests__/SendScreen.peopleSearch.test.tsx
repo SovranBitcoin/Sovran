@@ -64,6 +64,8 @@ jest.mock('wallet', () => ({
   parsePaymentInput: (input: string) => ({ input }),
   defaultDetectors: {},
   describeDestination: () => ({ kind: 'unsupported' }),
+  extractLightningTarget: (profile: { lud16?: string | null; lud06?: string | null }) =>
+    profile.lud16 ?? profile.lud06 ?? null,
 }));
 
 jest.mock('react-native-reanimated', () => {

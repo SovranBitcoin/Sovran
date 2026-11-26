@@ -1,11 +1,11 @@
-import type { ResolvedSocialGraph } from '../social-graph';
-import type { ResolvedProfiles } from '../profiles';
-import type { ResolvedProfileStats } from '../profile-stats';
-import type { ProfileSearchHit } from '../search';
-import type { NaggIdentity } from '../../envelope';
-import type { ProfileMetadata } from '../profiles';
-import type { CacheSource } from './entity-cache';
-import type { NostrEntityCache } from './entity-cache';
+import type { ResolvedSocialGraph } from "../social-graph";
+import type { ResolvedProfiles } from "../profiles";
+import type { ResolvedProfileStats } from "../profile-stats";
+import type { ProfileSearchHit } from "../search";
+import type { NaggIdentity } from "../../envelope";
+import type { ProfileMetadata } from "../profiles";
+import type { CacheSource } from "./entity-cache";
+import type { NostrEntityCache } from "./entity-cache";
 
 // ---------------------------------------------------------------------------
 // Write-through ingest — populate the shared entity cache from a resolved read.
@@ -22,15 +22,28 @@ import type { NostrEntityCache } from './entity-cache';
  */
 const DIRECT_METADATA_SEEN_AT = 1;
 
-export function ingestSocialGraph(cache: NostrEntityCache, graph: ResolvedSocialGraph): void {
+export function ingestSocialGraph(
+  cache: NostrEntityCache,
+  graph: ResolvedSocialGraph,
+): void {
   cache.ingestProfileInfos(graph.profiles, graph.tier);
 }
 
-export function ingestProfiles(cache: NostrEntityCache, resolved: ResolvedProfiles): void {
-  cache.ingestProfileMetadata(resolved.profiles, DIRECT_METADATA_SEEN_AT, resolved.tier);
+export function ingestProfiles(
+  cache: NostrEntityCache,
+  resolved: ResolvedProfiles,
+): void {
+  cache.ingestProfileMetadata(
+    resolved.profiles,
+    DIRECT_METADATA_SEEN_AT,
+    resolved.tier,
+  );
 }
 
-export function ingestProfileStats(cache: NostrEntityCache, resolved: ResolvedProfileStats): void {
+export function ingestProfileStats(
+  cache: NostrEntityCache,
+  resolved: ResolvedProfileStats,
+): void {
   if (resolved.metadata) {
     cache.ingestProfileMetadata(
       { [resolved.pubkey]: resolved.metadata },
@@ -67,9 +80,10 @@ export function ingestSearchHits(
   hits: readonly ProfileSearchHit[],
   source: CacheSource,
 ): void {
-  const metadata: Record<string, ProfileSearchHit['metadata']> = {};
+  const metadata: Record<string, ProfileSearchHit["metadata"]> = {};
   for (const hit of hits) {
-    if (Object.keys(hit.metadata).length > 0) metadata[hit.pubkey] = hit.metadata;
+    if (Object.keys(hit.metadata).length > 0)
+      metadata[hit.pubkey] = hit.metadata;
     const stats = {
       pubkey: hit.pubkey,
       followersCount: numberOrUndefined(hit.followers),
@@ -136,6 +150,7 @@ export function ingestIdentities(
         ...(profile.nip05 ? { nip05: profile.nip05 } : {}),
         ...(profile.website ? { website: profile.website } : {}),
         ...(profile.lud16 ? { lud16: profile.lud16 } : {}),
+        ...(profile.lud06 ? { lud06: profile.lud06 } : {}),
       };
     }
   }
@@ -145,6 +160,10 @@ export function ingestIdentities(
   }
 }
 
-function numberOrUndefined(value: number | null | undefined): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+function numberOrUndefined(
+  value: number | null | undefined,
+): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }

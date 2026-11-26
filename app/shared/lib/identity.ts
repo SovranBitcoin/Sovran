@@ -33,6 +33,13 @@ export interface IdentityNameInputs {
   mintName?: string | null;
 
   /**
+   * Name of a mint this pubkey operates. Unlike `mintName` it ranks BELOW the
+   * person's own Nostr names: it only stands in when they have published none,
+   * instead of a generated word pair or a bare npub.
+   */
+  mintFallbackName?: string | null;
+
+  /**
    * BLE / BitChat advertised nickname. Only consulted when there is no
    * Nostr / mint identity. For pure-BLE peers (no Nostr pubkey known)
    * this is what shows up in the row.
@@ -66,10 +73,11 @@ export interface IdentityNameInputs {
  *   2. `mintName`
  *   3. `nostrProfile.displayName` (or `display_name`)
  *   4. `nostrProfile.name`
- *   5. `bleNickname`
- *   6. `getUsername(pubkey)` — deterministic word pair, drawer-style
- *   7. `fallbackName` — semantic last-resort label
- *   8. `'Unknown'`
+ *   5. `mintFallbackName` — a mint the pubkey operates
+ *   6. `bleNickname`
+ *   7. `getUsername(pubkey)` — deterministic word pair, drawer-style
+ *   8. `fallbackName` — semantic last-resort label
+ *   9. `'Unknown'`
  *
  * Always returns a non-empty string. Pure / synchronous — the caller is
  * responsible for managing the metadata cache (typically via
@@ -84,8 +92,25 @@ export function resolveIdentityName(input: IdentityNameInputs): string {
   if (nostrDisplay) return nostrDisplay;
   const nostrName = input.nostrProfile?.name?.trim();
   if (nostrName) return nostrName;
+  if (input.mintFallbackName?.trim()) return input.mintFallbackName.trim();
   if (input.bleNickname?.trim()) return input.bleNickname.trim();
   if (input.pubkey) return getUsername(input.pubkey);
   if (input.fallbackName?.trim()) return input.fallbackName.trim();
   return 'Unknown';
+}
+
+/**
+ * The mint a pubkey operates, from the mint-metadata cache (keyed by mint URL),
+ * for a profile opened without a mint link. Null when no cached mint names them
+ * as operator. Pure; the caller supplies the store's record.
+ */
+export function findOperatorMintUrl(
+  byMintUrl: Readonly<Record<string, { operatorPubkey?: string }>>,
+  pubkey: string | null | undefined
+): string | null {
+  if (!pubkey) return null;
+  for (const [mintUrl, entry] of Object.entries(byMintUrl)) {
+    if (entry.operatorPubkey === pubkey) return mintUrl;
+  }
+  return null;
 }

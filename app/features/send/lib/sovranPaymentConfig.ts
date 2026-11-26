@@ -1415,6 +1415,7 @@ export function createSovranHandlers({
         selectedMintUrl: preselectedMintUrl ?? '',
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+        ...(constraints.meltTargetIsNpcFallback ? { meltTargetIsNpcFallback: true } : {}),
         ...(constraints.methodContext ? { methodContext: constraints.methodContext } : {}),
         // Snapshot the machine-resolved recipient identity onto the entry so
         // the amount screen renders "Pay <name>" + avatar on first paint

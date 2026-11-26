@@ -67,7 +67,9 @@ import type {
  * ecash left without being taken back, paying again (or choosing another
  * mint to pay from) could pay twice.
  */
-function awaitsPay(phase: PaymentRequestPreviewPhase | MeltPreviewPhase): boolean {
+function awaitsPay(
+  phase: PaymentRequestPreviewPhase | MeltPreviewPhase,
+): boolean {
   switch (phase.kind) {
     case "preview":
       return true;
@@ -430,7 +432,10 @@ export function createPaymentMachine(
    */
   function tell(name: string, call: () => unknown): void {
     const failed = (err: unknown) => {
-      logger.warn("machine.notification.failed", { name, error: errField(err) });
+      logger.warn("machine.notification.failed", {
+        name,
+        error: errField(err),
+      });
     };
     try {
       Promise.resolve(call()).catch(failed);
@@ -708,19 +713,27 @@ export function createPaymentMachine(
    */
   function npcFallbackFor(
     err: unknown,
-    data: { mintUrl: string; amount: number; unit: string; meltTarget?: string },
+    data: {
+      mintUrl: string;
+      amount: number;
+      unit: string;
+      meltTarget?: string;
+    },
   ): StepDataMap["chooseSendFallback"] | null {
     const target = data.meltTarget ?? flowCtx.meltTarget ?? "";
     if (
       isMintOfflineError(err) ||
       !flowCtx.recipientPubkey ||
       !target.includes("@") ||
+      flowCtx.meltTargetIsNpcFallback === true ||
       /@npubx?\.cash$/i.test(target.trim()) ||
       meltMethodForTarget(target) === "onchain"
     ) {
       return null;
     }
-    const npcTarget = operations?.npcAddressForPubkey?.(flowCtx.recipientPubkey);
+    const npcTarget = operations?.npcAddressForPubkey?.(
+      flowCtx.recipientPubkey,
+    );
     if (!npcTarget) return null;
     const { message, authored } = failureText(err, "Lightning payment failed");
     sendFallback = {
@@ -840,9 +853,15 @@ export function createPaymentMachine(
     }
 
     if (variant === "melt") {
-      const fallback = npcFallbackFor(err, { ...data, meltTarget: failedValue });
+      const fallback = npcFallbackFor(err, {
+        ...data,
+        meltTarget: failedValue,
+      });
       if (fallback) {
-        logger.info("machine.sendFallback.offered", { failed: "lightning", id: "lightning-npc" });
+        logger.info("machine.sendFallback.offered", {
+          failed: "lightning",
+          id: "lightning-npc",
+        });
         setStep("chooseSendFallback", fallback);
         return;
       }
@@ -857,7 +876,10 @@ export function createPaymentMachine(
   ): MintListItem[] {
     const walletCtx = getContext();
     const balanceByCandidate = new Map(
-      data.candidates.map((candidate) => [candidate.mintUrl, candidate.balance]),
+      data.candidates.map((candidate) => [
+        candidate.mintUrl,
+        candidate.balance,
+      ]),
     );
     // The same MINTS and the same VERDICTS the enrichment will give. Every
     // trusted mint is listed (`data.candidates` is only what the flow may
@@ -879,7 +901,9 @@ export function createPaymentMachine(
     const items = walletCtx.trustedMintUrls
       .map((mintUrl): MintListItem => {
         const balance =
-          balanceByCandidate.get(mintUrl) ?? walletCtx.mintBalances[mintUrl] ?? 0;
+          balanceByCandidate.get(mintUrl) ??
+          walletCtx.mintBalances[mintUrl] ??
+          0;
         return {
           mintUrl,
           displayName: mintUrl,
@@ -1141,7 +1165,9 @@ export function createPaymentMachine(
       // surface "choose a mint" and re-dispatch the selector handler so the
       // flow can complete instead of dead-ending on an inert Pay button.
       logger.warn("machine.confirm.noMintSelected", { type: event.type });
-      tell("onMissingMintForAmount", () => notifications?.onMissingMintForAmount?.());
+      tell("onMissingMintForAmount", () =>
+        notifications?.onMissingMintForAmount?.(),
+      );
       try {
         await dispatchHandler(step, stepData);
       } finally {
@@ -1228,7 +1254,9 @@ export function createPaymentMachine(
           unit: data.unit,
           // The quote method lives on the flow context, not the step data —
           // lets the wallet gate the in-progress indicator per method.
-          ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
+          ...(flowCtx.meltQuoteMethod
+            ? { method: flowCtx.meltQuoteMethod }
+            : {}),
           // The quote `runConfirmMeltEffect` executes against.
           ...(data.meltQuote ? { quoteId: data.meltQuote.quoteId } : {}),
         }),
@@ -1370,9 +1398,15 @@ export function createPaymentMachine(
             phase: { kind: "undelivered", operationId: cause.operationId },
           });
         }
-        routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data, {
-          undelivered,
-        });
+        routeOperationFailure(
+          cause,
+          "paymentRequest",
+          data.paymentRequest,
+          data,
+          {
+            undelivered,
+          },
+        );
       }
 
       settledPayment = {
@@ -1431,7 +1465,8 @@ export function createPaymentMachine(
         // the old unit's balances standing in for them.
         return {
           ...ctx,
-          mintBalances: ctx.unitBalances?.[switchedUnit.trim().toLowerCase()] ?? {},
+          mintBalances:
+            ctx.unitBalances?.[switchedUnit.trim().toLowerCase()] ?? {},
         };
       };
       // A terminal chooses one unit. Switch the host's whole cached view before
@@ -1619,14 +1654,18 @@ export function createPaymentMachine(
             container: flowCtx.parsed.container ?? undefined,
             optionKinds,
           };
-          tell("onScanResolved", () => notifications?.onScanResolved?.(resolved));
+          tell("onScanResolved", () =>
+            notifications?.onScanResolved?.(resolved),
+          );
         }
       }
 
       if (eventForTransition.type === "AMOUNT_ENTERED") {
         const e = eventForTransition;
         if (e.amount > 0 && !String(e.mintUrl ?? "").trim()) {
-          tell("onMissingMintForAmount", () => notifications?.onMissingMintForAmount?.());
+          tell("onMissingMintForAmount", () =>
+            notifications?.onMissingMintForAmount?.(),
+          );
         }
       }
 
@@ -1648,7 +1687,9 @@ export function createPaymentMachine(
           const shouldPersist = event.persist ?? isPersistOnlyPath;
           if (shouldPersist) {
             tell("onPreferredMintChanged", () =>
-              notifications?.onPreferredMintChanged?.({ mintUrl: event.mintUrl }),
+              notifications?.onPreferredMintChanged?.({
+                mintUrl: event.mintUrl,
+              }),
             );
           }
         }
@@ -1716,7 +1757,8 @@ export function createPaymentMachine(
               const best =
                 options.find(
                   (o) =>
-                    o.option.kind === "paymentRequest" && o.status !== "disabled",
+                    o.option.kind === "paymentRequest" &&
+                    o.status !== "disabled",
                 ) ??
                 options.find(
                   (o) =>
@@ -1735,14 +1777,19 @@ export function createPaymentMachine(
                       )
                     : undefined;
                 nfcAlternative = invoiceAlternative
-                  ? { ctx: { ...flowCtx }, data: optionData, option: invoiceAlternative }
+                  ? {
+                      ctx: { ...flowCtx },
+                      data: optionData,
+                      option: invoiceAlternative,
+                    }
                   : null;
                 logger.info("machine.nfc.optionChosen", {
                   kind: best.option.kind,
                   optionCount: options.length,
                   hasInvoiceFallback: !!invoiceAlternative,
                 });
-                if (!advanceNfc({ type: "OPTION_CHOSEN", option: best.option })) break;
+                if (!advanceNfc({ type: "OPTION_CHOSEN", option: best.option }))
+                  break;
                 continue;
               }
               // No viable option
@@ -1783,7 +1830,9 @@ export function createPaymentMachine(
               // tore the session down and reported "NFC write failed" for a
               // token that was never created.
               let best: (typeof ranked)[number] | undefined;
-              let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
+              let refusal: string | undefined = [
+                ...nfcRefusedMints.values(),
+              ].at(-1);
               for (const candidate of ranked) {
                 const payability = operations?.paymentRequestPayabilityFrom
                   ? await operations.paymentRequestPayabilityFrom({
@@ -1842,7 +1891,10 @@ export function createPaymentMachine(
                 setStep("chooseOption", alternative.data);
                 if (
                   !advanceNfc(
-                    { type: "OPTION_CHOSEN", option: alternative.option.option },
+                    {
+                      type: "OPTION_CHOSEN",
+                      option: alternative.option.option,
+                    },
                     walletCtxInner,
                   )
                 ) {
@@ -1866,7 +1918,8 @@ export function createPaymentMachine(
                 kind: "stopped",
                 error: {
                   code: "NFC_READ_FAILED",
-                  message: "Payment request must include an amount for NFC payment",
+                  message:
+                    "Payment request must include an amount for NFC payment",
                 },
               };
             } else if (
@@ -1885,10 +1938,11 @@ export function createPaymentMachine(
                 !nfcRefusedMints.has(data.mintUrl) &&
                 !nfcPayableMints.has(data.mintUrl)
               ) {
-                const payability = await operations.paymentRequestPayabilityFrom({
-                  mintUrl: data.mintUrl,
-                  unit: data.unit,
-                });
+                const payability =
+                  await operations.paymentRequestPayabilityFrom({
+                    mintUrl: data.mintUrl,
+                    unit: data.unit,
+                  });
                 // Overtaken: the tap's end lets go of the tag and the unit.
                 if (stale("nfc.payability")) {
                   end = { kind: "stopped" };
@@ -1937,7 +1991,9 @@ export function createPaymentMachine(
               if (effect.isOk()) {
                 if (effect.value.kind === "stale") {
                   // Overtaken: a token on the tag is paid, and keeps the unit.
-                  end = effect.value.delivered ? { kind: "paid" } : { kind: "stopped" };
+                  end = effect.value.delivered
+                    ? { kind: "paid" }
+                    : { kind: "stopped" };
                   continue;
                 }
                 setStep(effect.value.step, effect.value.data);
@@ -1970,7 +2026,8 @@ export function createPaymentMachine(
         const tapEnd: NfcTapEnd = end ?? { kind: "stopped" };
         if (!(await endNfcTap(nfcTap, tapEnd, sendGeneration))) return;
         if (tapEnd.kind === "threw") throw tapEnd.error;
-        if (tapEnd.kind === "stopped" && tapEnd.error) setStep("error", tapEnd.error);
+        if (tapEnd.kind === "stopped" && tapEnd.error)
+          setStep("error", tapEnd.error);
       }
 
       // Intercept action steps when operations are provided.
@@ -2036,7 +2093,10 @@ export function createPaymentMachine(
               effect.error.data,
             );
             if (lockFallback) {
-              logger.info("machine.sendFallback.offered", { failed: "locked-ecash", id: "ecash" });
+              logger.info("machine.sendFallback.offered", {
+                failed: "locked-ecash",
+                id: "ecash",
+              });
               setStep("chooseSendFallback", lockFallback);
             } else {
               setStep("error", effect.error.data);
@@ -2228,8 +2288,7 @@ export function createPaymentMachine(
             postDispatchTask,
             new Promise<void>((resolve) => setTimeout(resolve, 0)),
           ]);
-          if (stale("dispatchHandler.postTask"))
-            return;
+          if (stale("dispatchHandler.postTask")) return;
         }
       } finally {
         // A superseded turn returns here, which also swallows its handler's
@@ -2364,7 +2423,9 @@ export function createPaymentMachine(
             return { urInProgress: false };
           }
           if ("error" in result && result.error) {
-            tell("onScanError", () => notifications?.onScanError?.(source, result.error));
+            tell("onScanError", () =>
+              notifications?.onScanError?.(source, result.error),
+            );
             return { urInProgress: false };
           }
           if ("data" in result && result.data) {
@@ -2388,6 +2449,7 @@ export function createPaymentMachine(
       meltQuoteMethod?: MeltQuoteMethod;
       offline?: boolean;
       meltTarget?: string;
+      meltTargetIsNpcFallback?: boolean;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
       /** See the AMOUNT_ENTERED event — tri-state: leave, clear, or set. */
@@ -2405,6 +2467,9 @@ export function createPaymentMachine(
       meltQuoteMethod: opts?.meltQuoteMethod,
       offline: opts?.offline,
       meltTarget: opts?.meltTarget,
+      ...(opts?.meltTargetIsNpcFallback
+        ? { meltTargetIsNpcFallback: true }
+        : {}),
       recipientPubkey: opts?.recipientPubkey,
       recipientProfile: opts?.recipientProfile,
       ...(opts && "p2pkLock" in opts ? { p2pkLock: opts.p2pkLock } : {}),
@@ -2428,8 +2493,12 @@ export function createPaymentMachine(
       return;
     }
     const recipient = {
-      ...(flowCtx.recipientPubkey ? { recipientPubkey: flowCtx.recipientPubkey } : {}),
-      ...(flowCtx.recipientProfile ? { recipientProfile: flowCtx.recipientProfile } : {}),
+      ...(flowCtx.recipientPubkey
+        ? { recipientPubkey: flowCtx.recipientPubkey }
+        : {}),
+      ...(flowCtx.recipientProfile
+        ? { recipientProfile: flowCtx.recipientProfile }
+        : {}),
     };
     const amount = { value: retry.amount, unit: retry.unit };
     if (id === "ecash") {
@@ -2443,6 +2512,7 @@ export function createPaymentMachine(
         destination: "meltQuote",
         meltQuoteMethod: "bolt11",
         meltTarget: retry.npcTarget,
+        meltTargetIsNpcFallback: true,
         ...recipient,
       });
     }
@@ -2459,6 +2529,7 @@ export function createPaymentMachine(
   const startSendEcash = (opts?: {
     reset?: boolean;
     meltTarget?: string;
+    meltTargetIsNpcFallback?: boolean;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
     p2pkLockPubkey?: string;
@@ -2470,6 +2541,9 @@ export function createPaymentMachine(
     return send({
       type: "START_SEND_ECASH",
       ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+      ...(opts?.meltTarget && opts.meltTargetIsNpcFallback
+        ? { meltTargetIsNpcFallback: true }
+        : {}),
       ...(opts?.recipientPubkey
         ? { recipientPubkey: opts.recipientPubkey }
         : {}),
@@ -2500,13 +2574,14 @@ export function createPaymentMachine(
     send({ type: "REVIEW_MINT", mintUrl, token });
 
   const confirmMelt = () => send({ type: "CONFIRM_MELT" });
-  const confirmPaymentRequest = async (): Promise<PaymentRequestConfirmOutcome> => {
-    const holder: { outcome: PaymentRequestConfirmOutcome } = {
-      outcome: { kind: "ignored" },
+  const confirmPaymentRequest =
+    async (): Promise<PaymentRequestConfirmOutcome> => {
+      const holder: { outcome: PaymentRequestConfirmOutcome } = {
+        outcome: { kind: "ignored" },
+      };
+      await runTurn({ type: "CONFIRM_PAYMENT_REQUEST" }, null, holder);
+      return holder.outcome;
     };
-    await runTurn({ type: "CONFIRM_PAYMENT_REQUEST" }, null, holder);
-    return holder.outcome;
-  };
 
   const reset = () => {
     resetInternal();

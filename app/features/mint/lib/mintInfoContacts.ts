@@ -93,3 +93,27 @@ export function getMintInfoNostrDisplayName(
     fallback
   );
 }
+
+/**
+ * Who a mint's operator contact row shows. Their own Nostr kind-0 name and
+ * picture come first; only when those are missing does the row borrow the
+ * mint's name and icon, rather than a bare npub and a generated avatar.
+ * `mint` is passed only for the mint's own operator row, never for an extra
+ * contact, and a profile still loading falls back to nothing so the row does
+ * not flash the mint's icon before the operator's own picture arrives.
+ */
+export function resolveMintInfoContactIdentity(input: {
+  profile: (NostrProfileNameFields & { picture?: string | null }) | null | undefined;
+  fallbackTitle: string;
+  loading: boolean;
+  mint?: { name?: string | null; iconUrl?: string | null };
+}): { title: string; picture: string | undefined } {
+  const nostrName = getMintInfoNostrDisplayName(input.profile, '');
+  const nostrPicture = input.profile?.picture?.trim() || undefined;
+  const mintName = input.loading ? '' : (input.mint?.name?.trim() ?? '');
+  const mintIcon = input.loading ? undefined : input.mint?.iconUrl?.trim() || undefined;
+  return {
+    title: nostrName || mintName || input.fallbackTitle,
+    picture: nostrPicture ?? mintIcon,
+  };
+}

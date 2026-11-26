@@ -52,6 +52,7 @@ function profileFullFromStats(
     ...(m?.nip05 ? { nip05: m.nip05 } : {}),
     ...(m?.website ? { website: m.website } : {}),
     ...(m?.lud16 ? { lud16: m.lud16 } : {}),
+    ...(m?.lud06 ? { lud06: m.lud06 } : {}),
   };
 }
 

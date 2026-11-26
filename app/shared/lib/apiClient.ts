@@ -48,6 +48,7 @@ const NostrProfileFull = NostrProfileFullStrict.extend({
   created_at: z.number().int().nullable(),
   nodes: z.number().int().nonnegative().nullable().optional(),
   topFollowers: z.array(TopFollower).max(500),
+  lud06: z.string().optional(),
 });
 type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
 // `score` is nullable: nagg/colada now surface NIP-87 recommendations posted
@@ -813,6 +814,7 @@ export const fetchNostrProfile = async (
     banner: meta?.banner ?? '',
     nip05: meta?.nip05 ?? '',
     lud16: meta?.lud16 ?? '',
+    ...(meta?.lud06 ? { lud06: meta.lud06 } : {}),
     website: meta?.website ?? '',
     followers: stats?.followersCount,
     follows: stats?.followingCount,

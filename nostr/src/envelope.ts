@@ -1,7 +1,7 @@
-import { z } from 'zod';
-import { NaggFeedEventSchema, NostrHexId } from './schemas';
-import type { NaggFeedEvent } from './map/feed';
-import { supersedes } from './replaceable';
+import { z } from "zod";
+import { NaggFeedEventSchema, NostrHexId } from "./schemas";
+import type { NaggFeedEvent } from "./map/feed";
+import { supersedes } from "./replaceable";
 
 // ---------------------------------------------------------------------------
 // nagg v2 envelope — ONE generic response shape for every app-view route
@@ -27,7 +27,10 @@ import { supersedes } from './replaceable';
 // ---------------------------------------------------------------------------
 
 /** One event's counts: `[rule][metric] = number`. Rule and metric names are short. */
-const AggregateRules = z.record(z.string().max(128), z.record(z.string().max(128), z.number()));
+const AggregateRules = z.record(
+  z.string().max(128),
+  z.record(z.string().max(128), z.number()),
+);
 
 /**
  * `aggregates[id][rule][metric]`, read one id at a time: an id whose counts do
@@ -70,7 +73,7 @@ export const NaggEnvelopeSchema = z
   .object({
     // Ids, or keys built from them; an element longer than any of those is left out.
     order: tolerantArrayOrEmpty(z.string().max(512)),
-    orderBy: z.enum(['created_at', 'rank']).catch('created_at'),
+    orderBy: z.enum(["created_at", "rank"]).catch("created_at"),
     events: tolerantArrayOrEmpty(NaggFeedEventSchema),
     aggregates: NaggAggregatesSchema,
     // Opaque and echoed back; one too long to be a cursor is read as none.
@@ -79,7 +82,10 @@ export const NaggEnvelopeSchema = z
   })
   .passthrough();
 
-const ProviderFields = z.record(z.string().max(64), z.record(z.string().max(64), z.unknown()));
+const ProviderFields = z.record(
+  z.string().max(64),
+  z.record(z.string().max(64), z.unknown()),
+);
 
 /** Per-provider enrichment on the profile routes, e.g. `vertex.{rank,score}`, `nip05.valid`. */
 export const NaggProvidersSchema = z
@@ -100,7 +106,9 @@ export const NaggProvidersSchema = z
 const nullableNumber = z
   .number()
   .nullish()
-  .transform((v): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null));
+  .transform((v): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null,
+  );
 
 /** Mint / provider URL lists; a real operator runs a handful, so 64 is generous. */
 const stringList = z
@@ -135,6 +143,7 @@ export const NaggIdentitySchema = z
         nip05Valid: z.boolean().optional(),
         website: z.string().max(2048).optional(),
         lud16: z.string().max(256).optional(),
+        lud06: z.string().max(2048).optional(),
       })
       .passthrough()
       .nullish(),
@@ -142,12 +151,16 @@ export const NaggIdentitySchema = z
       .object({
         followers: nullableNumber,
         follows: nullableNumber,
-        source: z.enum(['graph', 'vertex', 'relays']).nullish(),
+        source: z.enum(["graph", "vertex", "relays"]).nullish(),
       })
       .nullish()
       .transform((v) => v ?? { followers: null, follows: null, source: null }),
     vertex: z
-      .object({ rank: nullableNumber, score: nullableNumber, fetchedAt: nullableNumber })
+      .object({
+        rank: nullableNumber,
+        score: nullableNumber,
+        fetchedAt: nullableNumber,
+      })
       .nullish()
       .transform((v) => v ?? { rank: null, score: null, fetchedAt: null }),
     operates: z
@@ -190,7 +203,10 @@ export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   vertexFresh: z.boolean().nullish(),
 });
 
-export type NaggAggregates = Record<string, Record<string, Record<string, number>>>;
+export type NaggAggregates = Record<
+  string,
+  Record<string, Record<string, number>>
+>;
 export type NaggEnvelope = z.infer<typeof NaggEnvelopeSchema>;
 export type NaggIdentity = z.infer<typeof NaggIdentitySchema>;
 export type NaggProfilesEnvelope = z.infer<typeof NaggProfilesEnvelopeSchema>;
@@ -201,28 +217,28 @@ export type NaggProfilesEnvelope = z.infer<typeof NaggProfilesEnvelopeSchema>;
 
 export const AGGREGATE_RULES = {
   /** Reaction/like count (distinct reactors). */
-  likeCount: { rule: 'k7_e', metric: 'actors' },
+  likeCount: { rule: "k7_e", metric: "actors" },
   /** Repost count (distinct reposters, kinds 6/16). */
-  repostCount: { rule: 'k6_16_e', metric: 'actors' },
+  repostCount: { rule: "k6_16_e", metric: "actors" },
   /** Reply count (kind 1/1111 replies). */
-  replyCount: { rule: 'k1_1111_e_reply', metric: 'sources' },
+  replyCount: { rule: "k1_1111_e_reply", metric: "sources" },
   /** Quote count (kind-1 q-tag quotes). */
-  quoteCount: { rule: 'k1_q', metric: 'sources' },
+  quoteCount: { rule: "k1_q", metric: "sources" },
   /** Total sats zapped. */
-  satsZapped: { rule: 'k9735_e', metric: 'value_total' },
+  satsZapped: { rule: "k9735_e", metric: "value_total" },
   /** Zap receipt count. */
-  zapCount: { rule: 'k9735_e', metric: 'sources' },
+  zapCount: { rule: "k9735_e", metric: "sources" },
   /** Vertex-gated "real" like count. */
-  realLikeCount: { rule: 'vertex_k7_e', metric: 'actors' },
+  realLikeCount: { rule: "vertex_k7_e", metric: "actors" },
   /** Distinct vertex-scored ("real") engagers across all engagement kinds. */
-  realEngagerCount: { rule: 'vertex_actors', metric: 'actors' },
+  realEngagerCount: { rule: "vertex_actors", metric: "actors" },
   // --- pubkey-keyed (profile routes) ---
   /** Followers: distinct authors whose latest kind-3 p-tags the pubkey. */
-  followers: { rule: 'k3_p_latest', metric: 'actors' },
+  followers: { rule: "k3_p_latest", metric: "actors" },
   /** Following: p-tag count of the pubkey's own latest kind-3. */
-  following: { rule: 'k3_author_latest', metric: 'sources' },
+  following: { rule: "k3_author_latest", metric: "sources" },
   /** Created-event (post) count. */
-  postCount: { rule: 'k1_1111_author', metric: 'sources' },
+  postCount: { rule: "k1_1111_author", metric: "sources" },
 } as const;
 
 export type AggregateRuleName = keyof typeof AGGREGATE_RULES;
@@ -251,6 +267,8 @@ export type ProfileMetadata = {
   banner?: string;
   nip05?: string;
   lud16?: string;
+  /** Legacy LNURL-pay (`lnurl1…`) payment target; `lud16` wins when both are set. */
+  lud06?: string;
   website?: string;
   about?: string;
 };
@@ -266,9 +284,10 @@ export function parseProfileMetadata(content: string): ProfileMetadata | null {
   } catch {
     return null;
   }
-  if (typeof json !== 'object' || json === null) return null;
+  if (typeof json !== "object" || json === null) return null;
   const o = json as Record<string, unknown>;
-  const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
+  const str = (v: unknown): string | undefined =>
+    typeof v === "string" && v ? v : undefined;
   const metadata: ProfileMetadata = {
     name: str(o.name),
     displayName: str(o.display_name) ?? str(o.displayName),
@@ -276,6 +295,7 @@ export function parseProfileMetadata(content: string): ProfileMetadata | null {
     banner: str(o.banner),
     nip05: str(o.nip05),
     lud16: str(o.lud16),
+    lud06: str(o.lud06),
     website: str(o.website),
     about: str(o.about),
   };
@@ -284,7 +304,9 @@ export function parseProfileMetadata(content: string): ProfileMetadata | null {
 }
 
 /** Latest kind-0 event per pubkey found in the envelope's hydration. */
-export function latestKind0ByPubkey(envelope: NaggEnvelope): Map<string, NaggFeedEvent> {
+export function latestKind0ByPubkey(
+  envelope: NaggEnvelope,
+): Map<string, NaggFeedEvent> {
   const latest = new Map<string, NaggFeedEvent>();
   for (const event of envelope.events) {
     if (event.kind !== 0) continue;
@@ -295,7 +317,9 @@ export function latestKind0ByPubkey(envelope: NaggEnvelope): Map<string, NaggFee
 }
 
 /** Full kind-0 metadata per pubkey (for the search/profile surfaces). */
-export function profileMetadataByPubkey(envelope: NaggEnvelope): Record<string, ProfileMetadata> {
+export function profileMetadataByPubkey(
+  envelope: NaggEnvelope,
+): Record<string, ProfileMetadata> {
   const out: Record<string, ProfileMetadata> = {};
   for (const [pubkey, event] of latestKind0ByPubkey(envelope)) {
     const metadata = parseProfileMetadata(event.content);
