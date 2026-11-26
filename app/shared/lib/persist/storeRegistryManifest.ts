@@ -457,14 +457,6 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
-    file: 'shared/stores/runtime/debugTierStore.ts',
-    name: 'useDebugTierStore',
-    scope: 'global',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
     file: 'shared/stores/runtime/defaultMintSetupStore.ts',
     name: 'useDefaultMintSetupStore',
     scope: 'session',

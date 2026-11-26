@@ -38,8 +38,6 @@ import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { runAfterNativeSearchDismiss } from './nativeSearchDismiss';
 import { searchListState, type SearchStatus } from './searchListState';
 
-type PaymentFlowMachine = ReturnType<typeof usePaymentFlowMachine>;
-
 type SearchResultRowsProps = {
   items: SearchListItem[];
   /** The remote people search's status; rows on screen always win over it. */
@@ -206,52 +204,14 @@ function MintRow({ mint }: { mint: Extract<SearchListItem, { type: 'mint' }> }) 
   );
 }
 
-function PersonRow({
-  person,
-  machine,
-}: {
-  person: Extract<SearchListItem, { type: 'person' }>;
-  machine: PaymentFlowMachine;
-}) {
-  const name = person.profile?.displayName ?? person.profile?.name ?? null;
-  const pay = () => {
-    paymentLog.info('search.person.pay', {
-      source: person.source,
-      hasLud16: !!person.profile?.lud16,
-    });
-    void startContactSend(
-      machine,
-      {
-        pubkey: person.pubkey,
-        displayName: name,
-        picture: person.profile?.picture ?? null,
-        nip05: person.profile?.nip05 ?? null,
-        lud16: person.profile?.lud16 ?? null,
-      },
-      { root: 'search.pay_person' }
-    );
-  };
+// Tapping a person opens their profile, where Send Money lives.
+function PersonRow({ person }: { person: Extract<SearchListItem, { type: 'person' }> }) {
   return (
     <ContactRow
       identity={nostrIdentity(person.pubkey, person.profile, {
         isLoadingProfile: person.isLoadingProfile,
       })}
       titleTrailing={<FollowBadge pubkey={person.pubkey} />}
-      trailing={
-        person.isLoadingProfile ? undefined : (
-          <View className="shrink-0 pl-2">
-            <Button
-              text="Pay"
-              size="compact"
-              variant="secondary"
-              onPress={pay}
-              accessibilityLabel={name ? `Pay ${name}` : 'Pay'}
-              testID={`search-pay:${person.pubkey}`}
-            />
-          </View>
-        )
-      }
-      trailingInteractive={!person.isLoadingProfile}
       onPress={() => navigateToProfile(person.pubkey)}
       testID={`contact-row:nostr:${person.pubkey}`}
     />
@@ -330,7 +290,7 @@ export function SearchResultRows({
       case 'mint':
         return <MintRow mint={item} />;
       case 'person':
-        return <PersonRow person={item} machine={machine} />;
+        return <PersonRow person={item} />;
       case 'people-error':
         return <PeopleSearchFailedRow onRetry={onRetry} />;
     }

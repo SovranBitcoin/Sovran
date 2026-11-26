@@ -10,7 +10,6 @@ import type { facade } from 'nostr';
 
 import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
 import { paymentLog } from '@/shared/lib/logger';
-import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
@@ -74,17 +73,7 @@ export async function fetchDmEnvelopes(args: {
         tier: resolved.tier,
         envelopes: resolved.envelopes.length,
       });
-      const page = toDmEnvelopePage(resolved);
-      // Dev-only: stamp each envelope with its serving tier so the contacts
-      // list can badge each conversation's source (n/c/r) — the decrypted
-      // message keeps the wrap's event id, which is the badge key.
-      if (__DEV__) {
-        recordDebugTiers(
-          page.envelopes.map((envelope) => envelope.id),
-          resolved.tier
-        );
-      }
-      return page;
+      return toDmEnvelopePage(resolved);
     },
     (error) => {
       paymentLog.debug('payment.dm.envelopes.exhausted', {

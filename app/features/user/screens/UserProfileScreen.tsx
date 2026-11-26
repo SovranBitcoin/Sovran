@@ -32,7 +32,6 @@ import { Stack, useIsFocused } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -57,6 +56,7 @@ import { StateSwitch } from '@/shared/ui/composed/StateSwitch';
 import { toViewState } from '@/shared/lib/viewState';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
+import { armContactDelivery } from '@/features/send/lib/startContactSend';
 import {
   peekCachedLightningTarget,
   resolveProfileLightningTarget,
@@ -941,7 +941,7 @@ const PROFILE_ADDRESS_WAIT_MS = 1500;
 // Module-scope because the try/catch around startSendEcash bails the React
 // Compiler for the whole component. Verbatim former
 // handleSendMoney IIFE body; the optional-chaining reads moved to the caller.
-async function startSendMoneyToProfile(ctx: {
+export async function startSendMoneyToProfile(ctx: {
   machine: ReturnType<typeof usePaymentFlowMachine>;
   pubkey: string;
   /** The address the profile published (lud16 / lud06), when already known. */
@@ -968,6 +968,8 @@ async function startSendMoneyToProfile(ctx: {
   if (!isCurrent()) return;
   const meltTarget = publishedTarget ?? npcFallback;
   if (!meltTarget) return;
+  // The same encrypted-DM ecash delivery a contact picked in Send gets.
+  armContactDelivery({ pubkey, displayName, picture: avatarUrl, nip05, lud16: publishedTarget });
   try {
     await machine.startSendEcash({
       reset: true,
@@ -985,6 +987,7 @@ async function startSendMoneyToProfile(ctx: {
       meltTargetLength: meltTarget.length,
     });
   } catch (error) {
+    clearPaymentContext('user.profile.send_money_failed');
     paymentLog.warn('user.profile.send_money.failed_to_start', {
       recipientPubkeyLength: pubkey.length,
       meltTargetLength: meltTarget.length,
@@ -1469,13 +1472,7 @@ export function UserProfileScreen() {
 
               <Spacer size={16} />
 
-              {/* Stats Grid (dev tier badge: which source served this profile) */}
               <View style={{ paddingHorizontal: 16 }}>
-                {pubkey ? (
-                  <View style={{ position: 'absolute', right: 20, top: -12, zIndex: 1 }}>
-                    <TierBadge eventId={pubkey} />
-                  </View>
-                ) : null}
                 <ProfileStatsGrid
                   followingCount={followingCount}
                   followerCount={followerCount}

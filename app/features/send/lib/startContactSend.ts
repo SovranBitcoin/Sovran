@@ -1,8 +1,9 @@
 /**
  * @fileoverview The one way to start paying a person picked from a list.
  *
- * Send's search results and recents, Send's detected-action row and the
- * Search tab's Pay buttons all start here, so a person is paid the same way
+ * Send's search results and recents and the detected-action rows (Send and
+ * the Search tab) start here, and a profile's Send Money arms the same
+ * delivery through `armContactDelivery`, so a person is paid the same way
  * wherever they were found: amount entry with their profile on it, a
  * Lightning target (their own address, or npub.cash for any Nostr key), and,
  * when ecash messages ship, the contact-delivery context that sends a bearer
@@ -41,6 +42,31 @@ interface StartContactSendOptions {
   root?: string;
 }
 
+/**
+ * When ecash messages ship, arms the contact-delivery context so a finished
+ * bearer send reaches the person over an encrypted NIP-17 DM. Without them
+ * the contact is paid over Lightning only, so nothing is armed.
+ */
+export function armContactDelivery(contact: {
+  pubkey: string;
+  displayName: string | null;
+  picture: string | null;
+  nip05: string | null;
+  /** The address they published (lud16 / lud06), never the npub.cash fallback. */
+  lud16: string | null;
+}): void {
+  if (!hasFeature('ecashMessages')) return;
+  const { pubkey, displayName, picture, nip05, lud16 } = contact;
+  useContactSendStore.getState().start({
+    pubkey,
+    delivery: 'nip17',
+    ...(displayName ? { displayName } : {}),
+    avatarUrl: picture,
+    nip05,
+    ...(lud16 ? { lud16 } : {}),
+  });
+}
+
 export function startContactSend(
   machine: PaymentFlowMachine,
   target: ContactSendTarget,
@@ -61,18 +87,7 @@ export function startContactSend(
   const lud16 = extractLightningTarget(target) ?? peekCachedLightningTarget(pubkey);
   const npcFallback = lud16 ? undefined : npcAddressForPubkey(pubkey);
   const lightningTarget = lud16 ?? npcFallback;
-  // Without ecash messages the contact is paid over Lightning only, so
-  // no DM delivery is armed.
-  if (hasFeature('ecashMessages')) {
-    useContactSendStore.getState().start({
-      pubkey,
-      delivery: 'nip17',
-      ...(displayName ? { displayName } : {}),
-      avatarUrl: picture,
-      nip05,
-      ...(lud16 ? { lud16 } : {}),
-    });
-  }
+  armContactDelivery({ pubkey, displayName, picture, nip05, lud16: lud16 ?? null });
   return machine.startSendEcash({
     ...(options.root ? { reset: true } : {}),
     recipientPubkey: pubkey,

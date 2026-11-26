@@ -30,6 +30,16 @@ function mockHost(name: string) {
       .createElement(name, null, props.children as React.ReactNode);
 }
 
+let mockSearchClose: { close: () => void; accessibilityLabel: string } | undefined;
+jest.mock('@/shared/ui/composed/search/SearchCloseContext', () => ({
+  SearchCloseProvider: (props: {
+    value: { close: () => void; accessibilityLabel: string };
+    children: React.ReactNode;
+  }) => {
+    mockSearchClose = props.value;
+    return props.children;
+  },
+}));
 jest.mock('@/navigation/DrawerSceneOverlay', () => ({
   DrawerSceneOverlay: () => null,
 }));
@@ -126,5 +136,18 @@ it('says where closing Search returns to', () => {
   expect(mockTriggers.search?.tabBarItemAccessibilityLabel).toBe(
     'Close search. Returns to Settings'
   );
+  act(() => r.unmount());
+});
+
+it("gives the Search header's close button the same way out", () => {
+  const { r, on } = setup();
+  expect(mockSearchClose?.accessibilityLabel).toBe('Close search. Returns to Wallet');
+  act(() => on('settings').focus());
+  act(() => on('search').focus());
+  expect(mockSearchClose?.accessibilityLabel).toBe('Close search. Returns to Settings');
+  act(() => mockSearchClose!.close());
+  // A header press is not a tab re-select, so it leaves at once, unguarded.
+  expect(mockRawNavigate).toHaveBeenCalledWith('/(drawer)/(tabs)/settings');
+  expect(mockRouterNavigate).not.toHaveBeenCalled();
   act(() => r.unmount());
 });

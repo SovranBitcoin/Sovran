@@ -37,7 +37,6 @@ jest.mock('wallet/react', () => ({}), { virtual: true });
 jest.mock('@/shared/ui/primitives/Pressable', () => ({}));
 jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({}));
 jest.mock('@/shared/lib/nav/useRouteParams', () => ({}));
-jest.mock('@/shared/ui/composed/TierBadge', () => ({}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({}));
 jest.mock('@/shared/hooks/useSingleFlight', () => ({}));
 jest.mock('@/shared/lib/debug/fadeRevealProbe', () => ({}));

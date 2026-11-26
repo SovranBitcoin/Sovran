@@ -9,7 +9,6 @@ jest.mock('@/shared/lib/apiClient', () => {
     jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
   return { DiscoverMintsResponse: actual.DiscoverMintsResponse, discoverMints: jest.fn() };
 });
-jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 // The operator write-through reaches the Nostr data layer, which this suite
 // (a discovery-cache test) does not stand up.
 jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({ cacheOperatorStats: jest.fn() }));
