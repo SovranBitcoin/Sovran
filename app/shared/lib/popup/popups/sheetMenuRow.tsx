@@ -42,9 +42,10 @@ export function MenuItem({
 }: MenuItemProps) {
   const [fill, danger] = useThemeColor(['default', 'danger'] as const);
   const pressedFill = variant === 'danger' ? withAlpha(danger, 0.1) : fill;
+  const restFill = withAlpha(fill, 0);
   const pressed = useSharedValue(false);
   const feedback = useAnimatedStyle(() => ({
-    backgroundColor: withTiming(pressed.get() ? pressedFill : withAlpha(fill, 0), {
+    backgroundColor: withTiming(pressed.get() ? pressedFill : restFill, {
       duration: 150,
     }),
     transform: [{ scale: withTiming(pressed.get() ? 0.98 : 1, { duration: 150 }) }],
