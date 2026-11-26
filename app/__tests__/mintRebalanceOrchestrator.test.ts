@@ -118,11 +118,12 @@ function createManager() {
     },
     ops: {
       mintSwap: {
-        prepare: jest.fn(async (input: { id: string; sourceMintUrl: string; destinationMintUrl: string }) =>
-          makeSwapOp(input.id, 'prepared', {
-            sourceMintUrl: input.sourceMintUrl,
-            destinationMintUrl: input.destinationMintUrl,
-          })
+        prepare: jest.fn(
+          async (input: { id: string; sourceMintUrl: string; destinationMintUrl: string }) =>
+            makeSwapOp(input.id, 'prepared', {
+              sourceMintUrl: input.sourceMintUrl,
+              destinationMintUrl: input.destinationMintUrl,
+            })
         ),
         execute: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
         get: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),

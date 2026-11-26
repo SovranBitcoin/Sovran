@@ -10,6 +10,7 @@
 import { act, render, screen } from '@testing-library/react-native';
 
 import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
+import { initializationStages } from '@/runtime/initializationStages';
 import { log } from '@/shared/lib/logger';
 import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 
@@ -114,5 +115,38 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
       jest.advanceTimersByTime(1000);
     });
     expect(splashGone()).toBe(true);
+  });
+
+  it('does not loop the splash when initialization is still running past the fallback timeout', () => {
+    const overlayMounted = () =>
+      screen.UNSAFE_root.findAll(
+        (node) => node.type === 'div' && node.props['data-testid'] === 'boot-splash-overlay'
+      ).length > 0;
+    initializationStages.resetStages();
+    try {
+      render(
+        <NativeSplashLayoutGate>
+          <></>
+        </NativeSplashLayoutGate>
+      );
+      layOutRoot();
+
+      // Past the 8s fallback + fade: overlay unmounts and MUST NOT bounce back to await_init.
+      act(() => jest.advanceTimersByTime(8_500));
+      act(() => jest.advanceTimersByTime(1_000));
+      expect(overlayMounted()).toBe(false);
+
+      // Even after another full cycle, it stays unmounted while the same boot continues.
+      act(() => jest.advanceTimersByTime(10_000));
+      expect(overlayMounted()).toBe(false);
+
+      // Once boot finishes (isInitializing -> false) and a profile switch resets stages
+      // (isInitializing false -> true), the splash replays as expected.
+      act(() => initializationStages.cancelResetStages());
+      act(() => initializationStages.resetStages());
+      expect(overlayMounted()).toBe(true);
+    } finally {
+      act(() => initializationStages.cancelResetStages());
+    }
   });
 });

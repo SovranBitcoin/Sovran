@@ -1006,7 +1006,15 @@ export class CocoManager {
           logger: new CocoCoreLogger('manager'),
           webSocketFactory: this.socketCloses?.factory,
           plugins,
-          processors: { mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS },
+          watchers: {
+            mintOperationWatcher: { watchExistingPendingQuotesOnStart: false },
+            proofStateWatcher: { watchExistingInflightOnStart: false },
+            meltQuoteWatcher: { watchExistingPendingQuotesOnStart: false },
+          },
+          processors: {
+            mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS,
+            meltSettlementProcessor: { initializeExistingPendingOperationsOnStart: false },
+          },
           outputDataCreator,
         })
       );
