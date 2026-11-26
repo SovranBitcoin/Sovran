@@ -11,7 +11,7 @@ import { useCallback, useEffect } from 'react';
 import { z } from 'zod';
 import { useColadaContext, usePaymentFlowMachine } from 'wallet/react';
 
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { cashuLog } from '@/shared/lib/logger';
 

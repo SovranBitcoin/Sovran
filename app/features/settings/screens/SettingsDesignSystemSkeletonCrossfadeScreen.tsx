@@ -1,7 +1,8 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Button as HerouiButton, Card } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { Card } from '@/shared/ui/composed/ListGroup';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { DesignSystemProfileRow } from '@/features/settings/design-system/skeletonCrossfade';
@@ -140,7 +141,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
               testID="design-system-skeleton-crossfade-toggle"
               onPress={toggle}
             />
-            <HerouiButton
+            <PillButton
               variant={auto ? 'primary' : 'secondary'}
               size="sm"
               testID="design-system-skeleton-crossfade-auto"
@@ -148,10 +149,8 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
               accessibilityLabel="Auto-cycle"
               accessibilityState={{ checked: auto }}
               onPress={() => setAuto((v) => !v)}>
-              <HerouiButton.Label>
-                {auto ? 'Stop auto-cycle' : 'Start auto-cycle'}
-              </HerouiButton.Label>
-            </HerouiButton>
+              <PillButton.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</PillButton.Label>
+            </PillButton>
           </Card.Body>
         </Card>
 

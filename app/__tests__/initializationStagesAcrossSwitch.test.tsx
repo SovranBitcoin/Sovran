@@ -3,11 +3,19 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {
-  InitializationProvider,
-  useInitializationReset,
+  initializationStages,
   useInitializationStage,
   useInitializationState,
-} from '@/shared/providers/InitializationProvider';
+} from '@/runtime/initializationStages';
+
+/** A fresh stage graph, as a freshly mounted app root starts with. */
+function freshStageGraph() {
+  act(() => {
+    initializationStages.resetStages();
+    initializationStages.cancelResetStages();
+  });
+}
+beforeEach(freshStageGraph);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -18,7 +26,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 type Probe = {
-  reset: ReturnType<typeof useInitializationReset>;
+  reset: typeof initializationStages;
   migrations: ReturnType<typeof useInitializationStage>;
   keys: ReturnType<typeof useInitializationStage> | null;
   isInitializing: boolean;
@@ -32,7 +40,7 @@ beforeEach(() => {
 /** Mounted above the account providers: never unmounts, never registers twice. */
 function Above({ children }: { children: React.ReactNode }) {
   const migrations = useInitializationStage('global-migrations');
-  const reset = useInitializationReset();
+  const reset = initializationStages;
   const { isInitializing } = useInitializationState();
   probe = { ...probe, migrations, reset, isInitializing };
   return <>{children}</>;
@@ -47,11 +55,11 @@ function Account() {
 
 function tree(account: number) {
   return (
-    <InitializationProvider>
+    <>
       <Above>
         <Account key={account} />
       </Above>
-    </InitializationProvider>
+    </>
   );
 }
 

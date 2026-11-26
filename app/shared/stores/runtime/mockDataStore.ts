@@ -24,9 +24,6 @@ import {
 import { amountToNumber } from 'wallet/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
-// Type-only import — `useRecentContacts` does not import this file at runtime
-// (it reads mock state via getMockState() below), so there's no cycle.
-import type { RecentContact } from '@/features/payments/data/recentContactTypes';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 
 // ---------------------------------------------------------------------------
@@ -233,13 +230,12 @@ function buildMockData() {
 }
 
 // ---------------------------------------------------------------------------
-// Mock contacts + DM threads
+// Mock contacts
 //
 // Fictional demo identities have no signer, payment address, or real person's key.
 interface MockContact {
   pubkey: string;
   metadata: Omit<NostrProfileMetadata, 'fetchedAt'>;
-  thread: readonly { content: string; isOwn: boolean; minutesAgo: number }[];
 }
 const MOCK_CONTACTS: readonly MockContact[] = [
   {
@@ -250,11 +246,6 @@ const MOCK_CONTACTS: readonly MockContact[] = [
       about: 'Fictional demo contact.',
       picture: Asset.fromModule(require('../../../assets/demo/fictional-maya/image.png')).uri,
     },
-    thread: [
-      { content: 'Coffee after the meetup?', isOwn: false, minutesAgo: 38 },
-      { content: 'Sounds good! Same place?', isOwn: true, minutesAgo: 23 },
-      { content: 'Yes! See you there ☕', isOwn: false, minutesAgo: 8 },
-    ],
   },
   {
     pubkey: 'c0068b3c6e1dafed39cf8f0e137857d12715221ad38db5b01fd11a1d5c9baa33',
@@ -264,11 +255,6 @@ const MOCK_CONTACTS: readonly MockContact[] = [
       about: 'Fictional demo contact.',
       picture: Asset.fromModule(require('../../../assets/demo/fictional-jamie/image.png')).uri,
     },
-    thread: [
-      { content: 'Made it home?', isOwn: false, minutesAgo: 46 },
-      { content: 'Just got in. Thanks for dinner!', isOwn: true, minutesAgo: 31 },
-      { content: 'Next one is on me 😊', isOwn: false, minutesAgo: 16 },
-    ],
   },
   {
     pubkey: 'f090f8d7311ac41f64dcd05db9c89a07102d3e79126e98f9d7073ce4f3b8e3c8',
@@ -278,11 +264,6 @@ const MOCK_CONTACTS: readonly MockContact[] = [
       about: 'Fictional demo contact.',
       picture: Asset.fromModule(require('../../../assets/demo/fictional-sofia/image.png')).uri,
     },
-    thread: [
-      { content: 'Found a beautiful trail for Saturday.', isOwn: false, minutesAgo: 54 },
-      { content: 'Send me the details!', isOwn: true, minutesAgo: 39 },
-      { content: 'I’ll bring coffee and a camera.', isOwn: false, minutesAgo: 24 },
-    ],
   },
   {
     pubkey: '6e99ae9ac3aab13dba8595b1acb0594132cf681533e235ef2d9dbe6d8866bb21',
@@ -292,11 +273,6 @@ const MOCK_CONTACTS: readonly MockContact[] = [
       about: 'Fictional demo contact.',
       picture: Asset.fromModule(require('../../../assets/demo/fictional-leo/image.png')).uri,
     },
-    thread: [
-      { content: 'Are you coming to the meetup?', isOwn: false, minutesAgo: 62 },
-      { content: 'Absolutely. See you at six!', isOwn: true, minutesAgo: 47 },
-      { content: 'Great, I saved you a seat.', isOwn: false, minutesAgo: 32 },
-    ],
   },
 ];
 
@@ -306,53 +282,6 @@ export const MOCK_ALLOWED_PUBKEYS_HEX: ReadonlySet<string> = new Set([
   '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
 ]);
 const EFFECTIVE_MOCK_CONTACTS = MOCK_CONTACTS;
-
-interface MockDmMessage {
-  id: string;
-  content: string;
-  isOwn: boolean;
-  created_at: number;
-  pubkey: string;
-}
-
-function buildMockContactsAndThreads(now: number) {
-  const metadataByPubkey: Record<string, Omit<NostrProfileMetadata, 'fetchedAt'>> = {};
-  const threadsByPubkey: Record<string, MockDmMessage[]> = {};
-  const recentContacts: RecentContact[] = [];
-
-  for (const c of EFFECTIVE_MOCK_CONTACTS) {
-    metadataByPubkey[c.pubkey] = c.metadata;
-
-    const messages: MockDmMessage[] = c.thread.map((m, idx) => {
-      const created_at = Math.floor((now - m.minutesAgo * 60_000) / 1000);
-      return {
-        id: `demo-dm-${c.pubkey.slice(0, 8)}-${idx}`,
-        content: m.content,
-        isOwn: m.isOwn,
-        created_at,
-        // Own messages have an empty senderId in the ChatBubble pipeline; the
-        // counterparty's pubkey is what the avatar/name look up. We never
-        // need the *user's* real pubkey here.
-        pubkey: m.isOwn ? '' : c.pubkey,
-      };
-    });
-    threadsByPubkey[c.pubkey] = messages;
-
-    const last = messages[messages.length - 1];
-    recentContacts.push({
-      type: 'contact',
-      pubkey: c.pubkey,
-      // ContactsScreen reads `dmEvent.content` as the row's last-message preview.
-      // Skipping the rest of the NDKEvent shape is fine: nothing else on the
-      // row touches it.
-      dmEvent: last ? { content: last.content, isOwn: last.isOwn } : null,
-      nip17Content: last?.content,
-      timestamp: last?.created_at ?? 0,
-    });
-  }
-
-  return { metadataByPubkey, threadsByPubkey, recentContacts };
-}
 
 const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(EFFECTIVE_MOCK_CONTACTS.map((c) => c.pubkey));
 
@@ -388,17 +317,6 @@ export function getMockFiatBalance(unit: string): number | undefined {
 }
 
 const MOCK = buildMockData();
-const MOCK_DM = buildMockContactsAndThreads(Date.now());
-
-/** Mock RecentContact rows. Consumed by `useRecentContacts` when mockMode is on. */
-export function getMockContacts(): RecentContact[] {
-  return MOCK_DM.recentContacts;
-}
-
-/** Mock DM thread for a counterparty pubkey, oldest-first. */
-export function getMockDmThread(pubkey: string): MockDmMessage[] | null {
-  return MOCK_DM.threadsByPubkey[pubkey] ?? null;
-}
 
 /** Pure profile overlay. Callers must gate this by the reactive mockMode flag. */
 export function getMockProfileMetadata(pubkey: string): NostrProfileMetadata | undefined {
@@ -406,7 +324,7 @@ export function getMockProfileMetadata(pubkey: string): NostrProfileMetadata | u
 }
 
 const MOCK_PROFILE_METADATA: Record<string, NostrProfileMetadata> = Object.fromEntries(
-  Object.entries(MOCK_DM.metadataByPubkey).map(([pubkey, metadata]) => [
+  EFFECTIVE_MOCK_CONTACTS.map(({ pubkey, metadata }) => [
     pubkey,
     { ...metadata, fetchedAt: Date.now() },
   ])

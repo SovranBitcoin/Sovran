@@ -24,7 +24,8 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { withAlpha } from '@/shared/lib/color';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -144,7 +145,7 @@ export function MerchantDetailScreen() {
     'surface',
   ] as const);
   const headerHeight = useHeaderHeight();
-  const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
+  const params = useRouteParams(ParamsSchema, { where: 'app.detail' });
   const placeId = params?.placeId;
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
     useShallow((s) => ({

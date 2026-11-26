@@ -66,7 +66,7 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => undefin
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: mockKeys }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
@@ -339,17 +339,7 @@ describe('unit and operations', () => {
   });
 });
 
-describe('offline flag and lifetime', () => {
-  it('tells the manager whether the app is offline, including the developer mock', async () => {
-    const view = await mount();
-    const manager = mockManagerHolder.current as ReturnType<typeof fakeManager>;
-    expect(manager.setOffline).toHaveBeenLastCalledWith(false);
-
-    await act(async () => useSettingsStore.setState({ mockOffline: true }));
-    expect(manager.setOffline).toHaveBeenLastCalledWith(true);
-    view.unmount();
-  });
-
+describe('lifetime', () => {
   it('disposes the wallet instance on unmount and when the manager changes', async () => {
     const view = await mount();
     const first = props().instance;

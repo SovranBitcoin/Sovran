@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Start the installed development client from this checkout, including on a phone.
 #
-# The session is captured to LOG.txt so it can be read back afterwards — by
-# log-doctor, or by an agent debugging a report:
-#
-#   bun run log-doctor -- timeline --latest < LOG.txt
-#   bun run log-doctor -- errors --latest   < LOG.txt
+# The session is captured to LOG.txt as NDJSON so it can be read back afterwards
+# when debugging a report.
 #
 # Two things make that file readable:
 #
@@ -25,8 +22,7 @@ export EXPO_PUBLIC_LOG_PRETTY="${EXPO_PUBLIC_LOG_PRETTY:-0}"
 LOG_FILE="${SOVRAN_DEV_LOG:-LOG.txt}"
 
 # Truncated per run, so the file is one session and cannot grow without bound
-# across days of development. log-doctor's `--latest` then only has to deal with
-# in-app reloads, not with weeks of history.
+# across days of development.
 : > "$LOG_FILE"
 echo "dev: capturing this session to app/$LOG_FILE" >&2
 

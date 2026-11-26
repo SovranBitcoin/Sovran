@@ -8,7 +8,7 @@
 import { getMintMethodCapability } from 'wallet';
 
 import { getOnchainDepositLimitsNotice } from '@/features/receive/lib/onchainDepositLimits';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { Notice } from '@/shared/ui/composed/Notice';
 
 interface OnchainDepositLimitsCardProps {

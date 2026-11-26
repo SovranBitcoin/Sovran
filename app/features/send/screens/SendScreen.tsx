@@ -41,7 +41,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';
 
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useHandleCameraPermission } from '@/features/camera';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { useStartNearbySend } from '@/features/nearPay/hooks/useStartNearbySend';

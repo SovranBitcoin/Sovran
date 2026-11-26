@@ -87,7 +87,7 @@ jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: 'View' }));
 jest.mock('@/shared/ui/primitives/View/Spacer', () => ({ Spacer: () => null }));
 jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('heroui-native', () => ({ PressableFeedback: 'Pressable' }));
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({ PressableFeedback: 'Pressable' }));
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: { children: React.ReactNode; footer: React.ReactNode }) => (
     <>

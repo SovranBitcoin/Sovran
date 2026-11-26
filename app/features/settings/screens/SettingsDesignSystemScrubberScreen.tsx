@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Slider } from 'heroui-native';
+import { Slider } from '@/shared/ui/primitives/Slider';
 
 import {
   SCRUB_STOPS,
@@ -91,16 +91,9 @@ function FrameSlider({
         minValue={0}
         maxValue={100}
         step={SLIDER_STEP}
-        aria-label={label}
-        onChange={(next: number | number[]) => {
-          const percent = Array.isArray(next) ? (next[0] ?? 0) : next;
-          onChange(percent / 100);
-        }}>
-        <Slider.Track>
-          <Slider.Fill />
-          <Slider.Thumb />
-        </Slider.Track>
-      </Slider>
+        accessibilityLabel={label}
+        onChange={(percent) => onChange(percent / 100)}
+      />
     </View>
   );
 }

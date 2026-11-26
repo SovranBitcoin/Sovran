@@ -54,7 +54,7 @@ Three things that are easy to get wrong:
 
 Disk is keyed. Memory is not.
 
-- The account providers (`app/shared/providers/AccountProviders.tsx`) are keyed by account index,
+- The account providers (`app/runtime/AccountScope.tsx`) are keyed by account index,
   so React state is replaced when the active account changes. Work those providers started can
   still finish afterwards; the key and wallet providers drop results that arrive after unmount.
 - Zustand stores and module-level state live outside React. A per-profile store works out its
@@ -86,7 +86,7 @@ Three separate kinds of readiness, easy to confuse:
 
 - **Storage**: a per-profile store can load once migrations have finished and the profile list has
   loaded (`profileScopedStorage.ts`).
-- **Stages**: `InitializationProvider` tracks the blocking stages `global-migrations`, then
+- **Stages**: `the startup stage graph` tracks the blocking stages `global-migrations`, then
   `nostr`, then `coco`.
 - **The splash**: `NativeSplashLayoutGate` hides the native splash as soon as the root lays out,
   then keeps its own overlay up until the wallet screen publishes its position, a blocking stage
@@ -220,7 +220,7 @@ They do different jobs and are not interchangeable.
 | --------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Transition lock (in memory)                   | two flows running at once                                                             | `acquireTransition`                                                                | `lock.release`, or a reload                                                                                                                                                  | `profileTransition.ts`       |
 | Disk guard (`profile-transition-in-progress`) | a flow starting while one from the previous run may be finishing                      | `lock.takeDiskGuard`                                                               | removed on release and at startup, best effort; one over ten seconds old is ignored and overwritten; a storage error lets the flow in                                        | `profileTransition.ts`       |
-| Splash wait                                   | the app looking ready with no stages registered                                       | `lock.holdSplash` (`resetStages`)                                                  | the first render in which any stage exists, including one kept through the reset; or release                                                                                 | `InitializationProvider.tsx` |
+| Splash wait                                   | the app looking ready with no stages registered                                       | `lock.holdSplash` (`resetStages`)                                                  | the first render in which any stage exists, including one kept through the reset; or release                                                                                 | `runtime/initializationStages.ts` |
 | Quiescing                                     | a service starting up late during a switch or a hold                                  | the in-process switch, and a hold                                                  | the in-process switch finishing; otherwise a reload                                                                                                                          | `accountRegistry.ts`         |
 | Provider boundary                             | account UI and providers mounted during a switch or a hold                            | `boundary.suspend`                                                                 | `boundary.resume` (in-process switch only)                                                                                                                                   | `AccountProviders.tsx`       |
 | Write barrier                                 | per-profile saves during a switch or a hold (global stores are not covered)           | `blockProfilePersistWrites`                                                        | `unblockProfilePersistWrites` (in-process switch only)                                                                                                                       | `profileWriteBarrier.ts`     |
@@ -315,8 +315,8 @@ Rules:
 | Which credentials the next wallet opens with, and when they are cleared | `app/shared/lib/cashu/credentialStaging.ts`                                  |
 | How a per-profile store finds its key, and when a save is dropped       | `app/shared/lib/cashu/profileScopedStorage.ts`                               |
 | What every store's save-and-load options are                            | `app/shared/lib/persist/persistConfig.ts`                                    |
-| Which providers remount with the account, and in what order             | `app/shared/providers/AccountProviders.tsx`                                  |
-| Which startup stages block, and their order                             | `app/shared/providers/InitializationProvider.tsx`                            |
+| Which providers remount with the account, and in what order             | `app/runtime/AccountScope.tsx`                                  |
+| Which startup stages block, and their order                             | `app/runtime/initializationStages.ts`                            |
 | When the splash comes down                                              | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
 | What an account owns outside React                                      | `app/shared/lib/account/accountRegistry.ts`                                  |
 | Decisions                                                               | ADR 0029 (registry and switch), ADR 0030 (removal)                           |

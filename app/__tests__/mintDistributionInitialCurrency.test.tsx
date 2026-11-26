@@ -64,7 +64,6 @@ jest.mock('@/shared/ui/composed/ScreenScrollView', () => ({ ScreenScrollView: ()
 jest.mock('@/shared/ui/composed/Screen', () => ({ Screen: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: () => null }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: () => null }));
-jest.mock('heroui-native', () => ({ ListGroup: () => null }));
 jest.mock('@/shared/ui/primitives/Switch', () => ({ Switch: () => null }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: () => null }));
 jest.mock('@/shared/ui/composed/ButtonHandler', () => ({ ButtonHandler: () => null }));

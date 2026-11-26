@@ -1,36 +1,32 @@
 // ---------------------------------------------------------------------------
-// Rebalance engine — moves funds between mints over Lightning
+// Rebalance engine — moves funds between mints via Coco's `ops.mintSwap`
 //
-// One transfer mints an invoice on the destination and melts proofs on the
-// source to pay it. When Lightning finds no route, the engine retries through
-// middleman mints, one hop at a time. The engine owns:
+// Each hop delegates atomic quote preparation, source debit capping, payment
+// authorization, destination proof verification and durable recovery to Coco's
+// native `manager.ops.mintSwap`. This engine owns only what sits above one hop:
 //
-// - amount decisions (fee headroom, probed fee reserve, capping);
-// - bounded re-preparation: a melt that has not paid is re-prepared with a
-//   slightly smaller invoice when proofs or inputs fall short;
-// - reconciliation: a melt that was sent is never sent again — its outcome is
-//   read back from coco, and an unknown outcome stays `pending`;
-// - hop sequencing, temporary trust of intermediaries, and recipient checks.
-//
-// Wallet access, route discovery, progress reporting, time and logging are
-// injected, so the engine runs the same under tests and in the app.
+// - flexible amount sizing (fee headroom + bounded re-preparation with smaller
+//   amounts before any payment is authorized, when `exactAmount` is not set);
+// - multi-hop middleman routing when a direct swap fails with no route, with
+//   temporary trust of untrusted intermediaries;
+// - sequential batch execution and cross-run locking.
 // ---------------------------------------------------------------------------
 
-import { amountToNumber, requireAmount } from '../amount';
+import type { MintSwapOperation } from '@cashu/coco-core';
+
+import { amountToNumber } from '../amount';
 import { logger as packageLogger, mintUrlFields, errField } from '../logger';
-import { meltDidNotPay, meltSettledUnpaid, outcomeOfFailedMeltExecute } from '../melt-outcome';
 import {
   computeInitialTransferAmount,
   feeHeadroomFor,
-  recapForProbedHeadroom,
   staticFeeHeadroom,
   toWholeSats,
 } from './amounts';
 import {
   classifyRebalanceError,
+  RebalanceExactAmountError,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
-  RebalanceExactAmountError,
   RebalanceSourceDebitCapError,
 } from './errors';
 import { createChainSteps, insertStepsAfter } from './chain';
@@ -38,9 +34,6 @@ import { defaultRebalanceClock } from './lock';
 import type {
   RebalanceEngineConfig,
   RebalanceEventSink,
-  RebalanceMintReceipt,
-  RebalanceMintSnapshot,
-  RebalancePreparedMelt,
   RebalanceRoute,
   RebalanceRunActivity,
   RebalanceRunCallbacks,
@@ -49,55 +42,36 @@ import type {
   RebalanceTransferOutcome,
 } from './types';
 
-/** Re-preparations allowed when proof selection falls short. */
+/** Re-preparations allowed when local proofs cannot cover amount + fees. */
 const MAX_PREPARE_RETRIES = 5;
-/** Re-preparations allowed when the mint rejects the melt inputs. */
-const MAX_EXECUTE_RETRIES = 2;
-/** Sats removed from the invoice per re-preparation. */
+/** Sats removed per re-preparation before any payment is authorized. */
 const RETRY_REDUCE_SATS = 2;
-const DIRECT_SETTLE_WAIT_MS = 20_000;
-const HOP_SETTLE_WAIT_MS = 15_000;
-const SETTLE_POLL_MS = 2_000;
-const INTERMEDIATE_RECEIPT_WAIT_MS = 12_000;
-const FINAL_RECEIPT_WAIT_MS = 15_000;
-const RECEIPT_POLL_MS = 1_000;
+const DIRECT_OUTCOME_WAIT_MS = 35_000;
+const HOP_OUTCOME_WAIT_MS = 27_000;
+const OUTCOME_POLL_MS = 1_500;
 const NEXT_ROUTE_PAUSE_MS = 1_500;
 const NEXT_TRANSFER_PAUSE_MS = 500;
-/** How long a settled melt's receipt is waited for before it is given up on. An invoice lives less. */
-const ARRIVING_MAX_MS = 60 * 60 * 1000;
-
-type Settlement = 'finalized' | 'pending' | 'aborted';
-
-type ArrivingReceipt = { receipt: RebalanceMintReceipt; since: number };
-/** What is in flight, per lock (one lock per screen), by the mint it is arriving at. */
-const arrivingByLock = new WeakMap<object, Map<string, ArrivingReceipt[]>>();
-function arrivingFor(lock: object): Map<string, ArrivingReceipt[]> {
-  let arriving = arrivingByLock.get(lock);
-  if (!arriving) {
-    arriving = new Map();
-    arrivingByLock.set(lock, arriving);
-  }
-  return arriving;
-}
 
 interface TransferRun extends RebalanceRunActivity {
   step: RebalanceTransfer;
   sink: RebalanceEventSink;
-  /** Mints holding a melt whose outcome is unknown; their proofs are never restored. */
+  /** Mints holding a swap whose source outcome is unknown. */
   unsettledMints: Set<string>;
 }
 
-type ChainResult =
-  | { status: 'complete'; finalHopLegId: string; finalReceipt: RebalanceMintReceipt }
-  /** A hop paid and its money has not been seen at the next mint. Nothing after it ran. */
-  | { status: 'settling'; finalHopLegId: string; arrivingAt: string }
-  /** `sentHops` counts hops that paid before the chain stopped: money that has left the source. */
-  | { status: 'incomplete'; finalHopLegId?: string; error?: unknown; sentHops: number };
+type SwapLegResult =
+  | { kind: 'done'; operation: MintSwapOperation }
+  | { kind: 'settling'; operation: MintSwapOperation }
+  | { kind: 'pending'; operationId: string }
+  | { kind: 'skipped' }
+  | { kind: 'aborted' }
+  | { kind: 'no_route'; error: unknown; amount: number };
 
-type HopResult =
-  | { status: 'sent'; receipt: RebalanceMintReceipt }
-  | { status: 'insufficient' }
-  | { status: 'aborted' };
+type ChainResult =
+  | { status: 'complete'; finalHopLegId: string }
+  | { status: 'settling'; finalHopLegId: string }
+  | { status: 'pending'; finalHopLegId: string; operationId: string }
+  | { status: 'incomplete'; finalHopLegId?: string; error?: unknown; sentHops: number };
 
 export interface RebalanceEngine {
   /** Run one transfer to a terminal outcome. Never throws for wallet failures. */
@@ -133,58 +107,19 @@ export interface RebalanceEngine {
     options: RebalanceRunCallbacks & {
       makeId: (label: string) => string;
       onRerouted: (hops: T[]) => void;
-      /**
-       * Told the result while the intermediaries are still trusted, before the
-       * trust is given back: giving it back can take a while, and the caller
-       * should not have to wait for it to show the run as over.
-       */
       onRunFinished?: (result: RebalanceRunResult) => void;
     }
   ): Promise<RebalanceRunResult>;
 }
 
-/**
- * The most a prepared melt can take from its source. A direct melt spends
- * exactly the proofs it reserved, input fee included. A swap-then-melt pays
- * the swap fee and spends the swapped `send` proofs, which carry their own
- * input fee. Without either, the invoice, the Lightning fee reserve and the
- * swap fee. Change can make the real debit lower, never higher. Throws on an
- * amount that is missing, unreadable, fractional, negative or too large to
- * hold exactly, rather than counting it as nothing.
- */
-function preparedMeltDebit(melt: RebalancePreparedMelt, fallbackAmount: number): number {
-  const send = melt.needsSwap === true ? melt.swapOutputData?.send : undefined;
-  const debit =
-    melt.needsSwap === false && melt.inputAmount != null
-      ? requireAmount(melt.inputAmount)
-      : send
-        ? send.reduce((sum, output) => sum + requireAmount(output.blindedMessage?.amount), 0) +
-          requireAmount(melt.swap_fee ?? 0)
-        : requireAmount(melt.amount ?? fallbackAmount) +
-          requireAmount(melt.fee_reserve ?? 0) +
-          requireAmount(melt.swap_fee ?? 0);
-  if (!Number.isSafeInteger(debit)) throw new TypeError('source debit is too large to hold exactly');
-  return debit;
+function isDebitCapError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'MintSwapDebitCapError';
 }
 
-/**
- * Whether a recipient operation is a clean finalization of `expected`. Coco
- * can finalize ALREADY_ISSUED with an error when proofs could not be restored;
- * only a clean finalization of this exact receipt confirms it.
- */
-export function isCleanReceiptFinalization(
-  operation: RebalanceMintSnapshot | null,
-  expected: RebalanceMintReceipt
-): boolean {
+function isArrivingAtMint(op: MintSwapOperation, mintUrl: string): boolean {
   return (
-    operation?.id === expected.id &&
-    operation.mintUrl === expected.mintUrl &&
-    operation.quoteId === expected.quoteId &&
-    operation.method === expected.method &&
-    operation.unit === expected.unit &&
-    operation.amount.equals(expected.amount) &&
-    operation.state === 'finalized' &&
-    !operation.error
+    op.destinationMintUrl === mintUrl &&
+    (op.state === 'destination_funded' || op.state === 'destination_pending')
   );
 }
 
@@ -193,6 +128,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   const clock = config.clock ?? defaultRebalanceClock;
   const log = config.logger ?? packageLogger;
   const debug = (entry: Record<string, unknown>) => log.debug('mint.rebalance.step', entry);
+  let swapSeq = 0;
+
+  function nextSwapId(legId: string): string {
+    swapSeq += 1;
+    return `${legId}:${clock.now()}:${swapSeq}`;
+  }
 
   /** Whether a new leg may open: the caller is asked first, and may end the run. */
   function mayOpenLeg(activity: RebalanceRunActivity): boolean {
@@ -200,300 +141,26 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     return activity.isActive();
   }
 
-  // ── Wallet reads with documented fallbacks ────────────────────────────
-
   async function readWorstCaseInputFee(mintUrl: string): Promise<number | null> {
     try {
       return await wallet.worstCaseInputFee(mintUrl);
     } catch (error) {
-      // Best-effort: the static headroom applies instead, and bounded
-      // re-preparation absorbs any remaining shortfall.
-      log.debug('mint.rebalance.input_fee_unavailable', { ...mintUrlFields(mintUrl), error });
+      log.warn('mint.rebalance.input_fee_unavailable', {
+        ...mintUrlFields(mintUrl),
+        error: errField(error),
+      });
       return null;
     }
   }
 
-  async function probeFeeReserve(mintUrl: string, invoice: string): Promise<number | null> {
+  /** Whether any Coco mintSwap has already paid its source and is still arriving at `mintUrl`. */
+  async function stillArriving(mintUrl: string): Promise<boolean> {
     try {
-      return await wallet.probeMeltFeeReserve(mintUrl, invoice);
-    } catch (error) {
-      // Best-effort: keep the current headroom estimate; bounded
-      // re-preparation absorbs any remaining shortfall.
-      log.debug('mint.rebalance.melt_probe_failed', { ...mintUrlFields(mintUrl), error });
-      return null;
-    }
-  }
-
-  /**
-   * Release a prepared melt that will not run; a failure leaves it to Coco's
-   * recovery. True once the melt is released.
-   */
-  async function cancelPrepared(operationId: string): Promise<boolean> {
-    try {
-      await wallet.cancelPreparedMelt(operationId);
-      return true;
-    } catch (error) {
-      log.warn('mint.rebalance.cancel_prepared_failed', { operationId, error: errField(error) });
-      return false;
-    }
-  }
-
-  async function restoreInflight(run: TransferRun, mintUrl: string): Promise<void> {
-    if (run.unsettledMints.has(mintUrl)) {
-      // A melt from this mint may still pay; its proofs must stay reserved.
-      log.warn('mint.rebalance.restore_skipped_unsettled_melt', { ...mintUrlFields(mintUrl) });
-      return;
-    }
-    await wallet.restoreInflightProofs(mintUrl);
-  }
-
-  // ── Reconciliation ────────────────────────────────────────────────────
-
-  /**
-   * Poll a sent melt until coco reports it settled, a state it reads proves
-   * it did not pay, or time runs out. A read that fails says nothing about
-   * the payment, and the next poll reads again.
-   */
-  async function awaitMeltSettlement(
-    operationId: string,
-    maxWaitMs: number,
-    isActive: () => boolean,
-    provesNotPaid: (state: string) => boolean
-  ): Promise<Settlement | { notPaid: string }> {
-    const start = clock.now();
-    while (clock.now() - start < maxWaitMs) {
-      if (!isActive()) return 'aborted';
-      let state: string | undefined;
-      try {
-        state = (await wallet.refreshMelt(operationId)).state;
-      } catch (error) {
-        log.warn('mint.rebalance.melt_refresh_failed', { operationId, error });
-      }
-      if (state === 'finalized') return 'finalized';
-      if (state !== undefined && provesNotPaid(state)) return { notPaid: state };
-      await clock.sleep(SETTLE_POLL_MS);
-    }
-    return 'pending';
-  }
-
-  /** Read the melt's persisted state after `execute` threw; null when it cannot be read. */
-  async function readMeltState(operationId: string): Promise<string | null> {
-    try {
-      return (await wallet.getMeltOperation(operationId))?.state ?? null;
-    } catch (error) {
-      log.warn('mint.rebalance.melt_state_read_failed', { operationId, error });
-      return null;
-    }
-  }
-
-  /**
-   * Execute a prepared melt once and report how it settled. When `execute`
-   * throws, the error is believed (the melt failed, its proofs freed or
-   * another payment prepared) only once the melt is known not to have paid:
-   * its state says so or, when its state cannot be read, the mint refused it
-   * before paying. Any other melt is awaited as in flight, never repeated,
-   * and stays pending when it does not settle; a later read that proves it
-   * did not pay releases it then.
-   */
-  async function executeMeltOnce(
-    run: TransferRun,
-    melt: RebalancePreparedMelt,
-    mintUrl: string,
-    settleWaitMs: number,
-    rolledBackMessage?: string
-  ): Promise<Settlement> {
-    const rolledBack = (operationId: string) =>
-      new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
-    /** Wait for the melt; once a read proves it did not pay, its mint holds nothing of it. */
-    const settle = async (
-      operationId: string,
-      provesNotPaid: (state: string) => boolean,
-      unpaid: (state: string) => unknown
-    ): Promise<Settlement> => {
-      run.unsettledMints.add(mintUrl);
-      const settled = await awaitMeltSettlement(
-        operationId,
-        settleWaitMs,
-        run.isActive,
-        provesNotPaid
-      );
-      if (typeof settled === 'object') {
-        run.unsettledMints.delete(mintUrl);
-        throw unpaid(settled.notPaid);
-      }
-      if (settled === 'finalized') run.unsettledMints.delete(mintUrl);
-      return settled;
-    };
-
-    // Stopped while the melt was being prepared: nothing has been sent, so it
-    // is never executed and the proofs it reserved go back.
-    if (!run.isActive()) {
-      if (await cancelPrepared(melt.id)) run.sink.meltReleased?.(melt.id);
-      return 'aborted';
-    }
-
-    let result: Awaited<ReturnType<typeof wallet.executeMelt>>;
-    try {
-      result = await wallet.executeMelt(melt.id);
-    } catch (error) {
-      if (!run.isActive()) return 'aborted';
-      if (classifyRebalanceError(error) === 'operation_in_progress') {
-        debug({ event: 'melt_in_progress_reconcile', stepId: run.step.id, operationId: melt.id });
-        // Another call holds the melt and may yet send it: only a settled
-        // state proves anything.
-        return settle(melt.id, meltSettledUnpaid, () => rolledBack(melt.id));
-      }
-      const state = await readMeltState(melt.id);
-      if (outcomeOfFailedMeltExecute(error, state) === 'notPaid') throw error;
-      debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
-      // This execute was the only call that could send it, and it has returned.
-      return settle(melt.id, meltDidNotPay, (unpaidState) =>
-        meltSettledUnpaid(unpaidState) ? rolledBack(melt.id) : error
-      );
-    }
-    if (!run.isActive()) return 'aborted';
-    if (result?.state === 'pending') {
-      const operationId = result.id ?? melt.id;
-      return settle(operationId, meltSettledUnpaid, () => rolledBack(operationId));
-    }
-    return 'finalized';
-  }
-
-  /** Wait for this transfer's own recipient operation, never an unrelated deposit. */
-  async function waitForReceipt(
-    expected: RebalanceMintReceipt,
-    maxWaitMs: number,
-    isActive: () => boolean
-  ): Promise<boolean> {
-    const deadline = clock.now() + maxWaitMs;
-    while (isActive() && clock.now() < deadline) {
-      let operation: RebalanceMintSnapshot | null = null;
-      try {
-        operation = await wallet.getMintOperation(expected.id);
-      } catch (error) {
-        // A read is idempotent; the next poll tries again until the deadline.
-        log.warn('mint.rebalance.recipient_operation_read_failed', {
-          ...mintUrlFields(expected.mintUrl),
-          operationId: expected.id,
-          error,
-        });
-      }
-      if (!isActive()) return false;
-      if (isCleanReceiptFinalization(operation, expected)) return true;
-      await clock.sleep(Math.min(RECEIPT_POLL_MS, Math.max(0, deadline - clock.now())));
-    }
-    if (!isActive()) return false;
-    // The receipt may have finalized during the last sleep.
-    try {
-      return isCleanReceiptFinalization(await wallet.getMintOperation(expected.id), expected);
+      const active = await wallet.mintSwap.listActive();
+      return active.some((op) => isArrivingAtMint(op, mintUrl));
     } catch {
       return false;
     }
-  }
-
-  // ── Preparation ───────────────────────────────────────────────────────
-
-  /**
-   * Prepare a melt, shrinking the invoice when proof selection falls short.
-   * Preparation sends nothing to the mint, so a re-preparation repeats no
-   * side effect.
-   */
-  async function prepareWithShrinkingAmount(options: {
-    stepId: string;
-    amount: number;
-    invoice: string;
-    prepare: (invoice: string) => Promise<RebalancePreparedMelt>;
-    reissue: (amount: number) => Promise<string>;
-  }): Promise<{ prepared: RebalancePreparedMelt; amount: number; invoice: string }> {
-    let { amount, invoice } = options;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return { prepared: await options.prepare(invoice), amount, invoice };
-      } catch (error) {
-        const shortfall = classifyRebalanceError(error) === 'insufficient_proofs';
-        if (!shortfall || attempt >= MAX_PREPARE_RETRIES) throw error;
-        amount -= RETRY_REDUCE_SATS;
-        if (amount < minTransferThreshold) throw error;
-        debug({
-          event: 'prepare_retry',
-          stepId: options.stepId,
-          attempt: attempt + 1,
-          reducedAmount: amount,
-          reason: errField(error),
-        });
-        invoice = await options.reissue(amount);
-      }
-    }
-  }
-
-  // ── Temporary trust ───────────────────────────────────────────────────
-
-  // ── Money in flight ───────────────────────────────────────────────────
-  //
-  // A melt that settled has left its source; until the destination issues, the
-  // money is at neither mint. Whatever would spend it from the destination (the
-  // next hop of a chain, a later step of the plan) must wait: run now it finds
-  // the mint short, and is then failed, skipped or sent by another route, any
-  // of which ends with the first amount paid twice or sitting where nobody put
-  // it. Receipts are remembered by the mint they are arriving at and forgotten
-  // once seen to arrive.
-
-  //
-  // The record belongs to the lock, which a screen keeps for its whole life,
-  // and not to the engine, which the screen rebuilds whenever its inputs
-  // change: a rebuilt engine must not forget what is in flight. An entry is
-  // also dropped after `ARRIVING_MAX_MS`. A melt recorded here may have been
-  // pending and later rolled back, in which case its receipt can never arrive;
-  // without a limit the steps behind it would be held, and its mint kept
-  // trusted, for as long as the screen lived.
-
-  const arriving = arrivingFor(config.lock);
-
-  function noteArriving(receipt: RebalanceMintReceipt): void {
-    arriving.set(receipt.mintUrl, [
-      ...(arriving.get(receipt.mintUrl) ?? []),
-      { receipt, since: clock.now() },
-    ]);
-  }
-
-  /** Forget receipts too old to still be on their way. */
-  function forgetExpired(): void {
-    for (const [mintUrl, entries] of arriving) {
-      const live = entries.filter((entry) => clock.now() - entry.since < ARRIVING_MAX_MS);
-      if (live.length === entries.length) continue;
-      log.warn('mint.rebalance.arriving_expired', {
-        ...mintUrlFields(mintUrl),
-        expired: entries.length - live.length,
-      });
-      if (live.length === 0) arriving.delete(mintUrl);
-      else arriving.set(mintUrl, live);
-    }
-  }
-
-  /** True while money is still on its way to `mintUrl`. */
-  async function stillArriving(mintUrl: string): Promise<boolean> {
-    forgetExpired();
-    const entries = arriving.get(mintUrl);
-    if (!entries) return false;
-    const waiting: ArrivingReceipt[] = [];
-    for (const entry of entries) {
-      const { receipt } = entry;
-      let arrived = false;
-      try {
-        arrived = isCleanReceiptFinalization(await wallet.getMintOperation(receipt.id), receipt);
-      } catch (error) {
-        // Not known to have arrived is treated as not arrived.
-        log.warn('mint.rebalance.recipient_operation_read_failed', {
-          ...mintUrlFields(receipt.mintUrl),
-          operationId: receipt.id,
-          error,
-        });
-      }
-      if (!arrived) waiting.push(entry);
-    }
-    if (waiting.length === 0) arriving.delete(mintUrl);
-    else arriving.set(mintUrl, waiting);
-    return waiting.length > 0;
   }
 
   async function trustIntermediaries(chainPath: readonly string[]): Promise<string[]> {
@@ -504,8 +171,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         await wallet.trustMint(url);
         temporarilyTrusted.push(url);
       } catch (error) {
-        // The route still runs; a hop through a mint coco refuses fails on
-        // its own and the next candidate is tried.
         log.warn('mint.rebalance.trust_failed', { ...mintUrlFields(url), error });
       }
     }
@@ -516,18 +181,22 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     temporarilyTrusted: readonly string[],
     report: { sink: Pick<RebalanceEventSink, 'legUpdated'>; warnLegId?: string }
   ): Promise<void> {
-    // A mint that money is still arriving at stays trusted. Untrusted now, it
-    // has no balance yet to be noticed by, and the money would then arrive at
-    // a mint the wallet no longer lists.
-    forgetExpired();
-    const releasable = temporarilyTrusted.filter((url) => !arriving.has(url));
+    if (temporarilyTrusted.length === 0) return;
+    // Keep any intermediary trusted while a funded Coco mintSwap is still arriving at it.
+    let activeSwaps: MintSwapOperation[] = [];
+    try {
+      activeSwaps = await wallet.mintSwap.listActive();
+    } catch {
+      activeSwaps = [];
+    }
+    const releasable = temporarilyTrusted.filter(
+      (url) => !activeSwaps.some((op) => isArrivingAtMint(op, url))
+    );
     const { stranded, untrustErrors } = await wallet.releaseTrust(releasable);
     for (const { url, error } of untrustErrors) {
       log.warn('mint.rebalance.untrust_failed', { ...mintUrlFields(url), error });
     }
     if (stranded.length === 0) return;
-    // Funds remain on an intermediary the user did not pre-trust: recovery
-    // requires the user to re-trust it.
     log.warn('mint.rebalance.middleman_recovery_required', {
       strandedCount: stranded.length,
       strandedMintUrlLengths: stranded.map((item) => item.url.length),
@@ -546,264 +215,320 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       return await runWithTrust();
     } finally {
-      // The trust window must not outlive the operation.
       await releaseTrust(temporarilyTrusted, report);
     }
   }
 
-  // ── Middleman hops ────────────────────────────────────────────────────
+  // ── Single-hop execution via Coco `ops.mintSwap` ──────────────────────
 
-  async function runHop(
+  async function executeSwapLeg(
     run: TransferRun,
-    hop: {
+    params: {
       legId: string;
-      index: number;
-      path: string[];
-      chainId: string;
-      firstHopCap: number;
+      fromMintUrl: string;
+      toMintUrl: string;
+      requestedAmount: number;
+      sourceDebitCap?: number;
+      exactAmount?: boolean;
+      waitTimeoutMs: number;
+      allowNoRouteFallback: boolean;
+      chainMeta?: { chainId: string; chainPath: string[]; chainHopIndex: number };
     }
-  ): Promise<HopResult> {
+  ): Promise<SwapLegResult> {
     const { sink, isActive } = run;
-    const stepId = run.step.id;
-    const hopFrom = hop.path[hop.index];
-    const hopTo = hop.path[hop.index + 1];
-    const hopCount = hop.path.length - 1;
-    sink.legUpdated(hop.legId, {
-      status: 'creatingInvoice',
-      error: null,
-      routing: {
-        kind: 'hop',
-        hopIndex: hop.index,
-        hopCount,
-        fromMintUrl: hopFrom,
-        toMintUrl: hopTo,
-      },
-    });
+    const {
+      legId,
+      fromMintUrl,
+      toMintUrl,
+      requestedAmount,
+      sourceDebitCap,
+      exactAmount = false,
+      waitTimeoutMs,
+      allowNoRouteFallback,
+      chainMeta,
+    } = params;
 
-    const hopSourceBalance = (await wallet.balancesByMint())[hopFrom] ?? 0;
-    // Each hop's source may charge a different input_fee_ppk.
-    const hopInputFee = await readWorstCaseInputFee(hopFrom);
-    const hopFeeHeadroom =
-      hopInputFee === null
-        ? staticFeeHeadroom(minFeeReserve)
-        : feeHeadroomFor(minFeeReserve, hopInputFee);
-    // The first hop carries the transfer; later hops forward what landed.
-    let hopAmount =
-      hop.index === 0
-        ? (toWholeSats(Math.min(hop.firstHopCap, hopSourceBalance - hopFeeHeadroom)) ?? 0)
-        : (toWholeSats(hopSourceBalance - hopFeeHeadroom) ?? 0);
+    if (!isActive()) return { kind: 'aborted' };
 
-    if (hopAmount < minTransferThreshold) {
-      debug({
-        event: 'chain_hop_insufficient',
-        stepId,
-        hopIdx: hop.index,
-        hopAmount,
-        hopSourceBalance,
-      });
-      return { status: 'insufficient' };
-    }
-    debug({
-      event: 'chain_hop_start',
-      stepId,
-      hopIdx: hop.index,
-      hopAmount,
-      hopSourceBalance,
-    });
+    const balances = await wallet.balancesByMint();
+    const sourceBalance = toWholeSats(balances[fromMintUrl] ?? 0) ?? 0;
+    const worstCaseInputFee = await readWorstCaseInputFee(fromMintUrl);
+    const feeHeadroom =
+      worstCaseInputFee !== null
+        ? feeHeadroomFor(minFeeReserve, worstCaseInputFee)
+        : staticFeeHeadroom(minFeeReserve);
 
-    let receipt = await wallet.createMintReceipt(hopTo, hopAmount);
-    sink.legUpdated(hop.legId, { status: 'invoiceReady', invoice: receipt.request });
-
-    const probedReserve = await probeFeeReserve(hopFrom, receipt.request);
-    if (probedReserve !== null && probedReserve > 0) {
-      const probedHeadroom = probedReserve + ((await readWorstCaseInputFee(hopFrom)) ?? 0);
-      const capped = recapForProbedHeadroom({
-        amount: hopAmount,
-        sourceBalance: hopSourceBalance,
-        headroom: probedHeadroom,
+    let currentAmount: number;
+    if (exactAmount) {
+      const exact = toWholeSats(requestedAmount) ?? 0;
+      if (exact < minTransferThreshold || sourceBalance < exact) {
+        throw new RebalanceExactAmountError(exact, sourceBalance);
+      }
+      currentAmount = exact;
+    } else {
+      const decision = computeInitialTransferAmount({
+        requestedAmount,
+        sourceBalance,
         minTransferThreshold,
+        feeHeadroom,
       });
-      if (capped !== null) {
-        debug({
-          event: 'hop_amount_recapped_after_probe',
-          stepId,
-          hopIdx: hop.index,
-          original: hopAmount,
-          capped,
-          hopSourceBalance,
-          hopProbedHeadroom: probedHeadroom,
+      if (decision.status === 'skip') {
+        sink.legUpdated(legId, { status: 'skipped', error: null });
+        return { kind: 'skipped' };
+      }
+      currentAmount = decision.amount;
+    }
+
+    sink.legOpened(legId, {
+      fromMintUrl,
+      toMintUrl,
+      amount: currentAmount,
+      ...(chainMeta && {
+        chainId: chainMeta.chainId,
+        chainPath: chainMeta.chainPath,
+        chainHopIndex: chainMeta.chainHopIndex,
+      }),
+    });
+    sink.legUpdated(legId, { status: 'creatingInvoice', error: null });
+
+    // 1. Prepare via Coco ops.mintSwap (bounded shrink before any payment if !exactAmount)
+    let prepared: MintSwapOperation | null = null;
+    for (let attempt = 0; attempt <= MAX_PREPARE_RETRIES; attempt++) {
+      if (!isActive()) return { kind: 'aborted' };
+      const swapId = nextSwapId(legId);
+      try {
+        const op = await wallet.mintSwap.prepare({
+          id: swapId,
+          sourceMintUrl: fromMintUrl,
+          destinationMintUrl: toMintUrl,
+          destinationAmount: currentAmount,
+          ...(sourceDebitCap !== undefined && { sourceDebitCap }),
         });
-        hopAmount = capped;
-        receipt = await wallet.createMintReceipt(hopTo, hopAmount);
-        sink.legUpdated(hop.legId, { status: 'invoiceReady', invoice: receipt.request });
+        if (op.state === 'failed') {
+          if (op.failure.code === 'source_debit_cap_exceeded') {
+            const maxDebit =
+              op.lastSafe.state !== 'preparing'
+                ? amountToNumber(op.lastSafe.sourceDebitBounds.maximum)
+                : currentAmount;
+            throw new RebalanceSourceDebitCapError(op.id, maxDebit, sourceDebitCap ?? 0);
+          }
+          if (
+            !exactAmount &&
+            attempt < MAX_PREPARE_RETRIES &&
+            currentAmount - RETRY_REDUCE_SATS >= minTransferThreshold
+          ) {
+            currentAmount -= RETRY_REDUCE_SATS;
+            continue;
+          }
+          throw new Error(`Mint swap preparation rejected (${op.failure.code})`);
+        }
+        prepared = op;
+        break;
+      } catch (err) {
+        if (isDebitCapError(err)) {
+          throw new RebalanceSourceDebitCapError(swapId, currentAmount, sourceDebitCap ?? 0);
+        }
+        const kind = classifyRebalanceError(err);
+        if (kind === 'insufficient_proofs' || kind === 'input_shortfall') {
+          if (
+            !exactAmount &&
+            attempt < MAX_PREPARE_RETRIES &&
+            currentAmount - RETRY_REDUCE_SATS >= minTransferThreshold
+          ) {
+            currentAmount -= RETRY_REDUCE_SATS;
+            continue;
+          }
+          if (exactAmount) {
+            throw new RebalanceExactAmountError(requestedAmount, Math.max(0, currentAmount - 1));
+          }
+        }
+        throw err;
       }
     }
 
-    // Asked last, after the reads and the invoice above: an account switch
-    // during them must open nothing.
-    if (!mayOpenLeg(run)) return { status: 'aborted' };
-    sink.legOpened(hop.legId, {
-      fromMintUrl: hopFrom,
-      toMintUrl: hopTo,
-      amount: hopAmount,
-      chainId: hop.chainId,
-      chainPath: hop.path,
-      chainHopIndex: hop.index,
-    });
-    sink.mintReceiptCreated(hop.legId, receipt);
+    if (!prepared) {
+      throw new Error('Could not prepare mint swap');
+    }
 
-    const { prepared, amount: hopTransferAmount } = await prepareWithShrinkingAmount({
-      stepId,
-      amount: hopAmount,
-      invoice: receipt.request,
-      prepare: (invoice) => wallet.prepareMelt(hopFrom, invoice),
-      reissue: async (amount) => {
-        receipt = await wallet.createMintReceipt(hopTo, amount);
-        sink.mintReceiptCreated(hop.legId, receipt);
-        sink.legUpdated(hop.legId, { status: 'invoiceReady', invoice: receipt.request });
-        return receipt.request;
-      },
-    });
+    sink.swapPrepared(legId, prepared);
+    sink.legUpdated(legId, { status: 'invoiceReady', operationId: prepared.id });
 
-    sink.legUpdated(hop.legId, { status: 'melting' });
-    // An unsettled hop still proceeds: the next hop reconciles through the
-    // intermediary's balance and the recipient operation check.
-    const settlement = await executeMeltOnce(
-      run,
-      prepared,
-      hopFrom,
-      HOP_SETTLE_WAIT_MS,
-      'Hop melt rolled back'
-    );
-    if (settlement === 'aborted' || !isActive()) return { status: 'aborted' };
+    if (!isActive()) {
+      await wallet.mintSwap.cancel(prepared.id).catch(() => undefined);
+      return { kind: 'aborted' };
+    }
 
-    sink.meltPrepared(hop.legId, prepared);
-    sink.legUpdated(hop.legId, { status: 'verifying', operationId: prepared.id });
-    debug({
-      event: 'chain_hop_done',
-      stepId,
-      hopIdx: hop.index,
-      amount: hopTransferAmount,
-    });
-    return { status: 'sent', receipt };
+    // 2. Authorize payment ONCE via Coco ops.mintSwap.execute
+    sink.legUpdated(legId, { status: 'melting', operationId: prepared.id });
+    let op: MintSwapOperation | null = null;
+    let executeError: unknown;
+    try {
+      op = await wallet.mintSwap.execute(prepared.id);
+    } catch (err) {
+      executeError = err;
+      op = await wallet.mintSwap.get(prepared.id).catch(() => null);
+    }
+
+    // 3. Observe durable outcome if Coco left the swap in flight
+    if (
+      op &&
+      (op.state === 'source_pending' ||
+        op.state === 'destination_funded' ||
+        op.state === 'destination_pending')
+    ) {
+      if (op.state === 'destination_funded' || op.state === 'destination_pending') {
+        sink.legUpdated(legId, { status: 'verifying' });
+      }
+      try {
+        const outcome = await wallet.mintSwap.waitForOutcome(op.id, {
+          timeoutMs: waitTimeoutMs,
+          pollIntervalMs: OUTCOME_POLL_MS,
+        });
+        op = outcome.operation;
+      } catch (err) {
+        debug({ event: 'wait_outcome_error', legId, error: errField(err) });
+        op = (await wallet.mintSwap.get(op.id).catch(() => null)) ?? op;
+      }
+    }
+
+    if (!op) {
+      throw executeError ?? new Error('Mint swap operation not found');
+    }
+
+    switch (op.state) {
+      case 'completed':
+        sink.legUpdated(legId, { status: 'done', error: null });
+        return { kind: 'done', operation: op };
+
+      case 'destination_funded':
+      case 'destination_pending':
+        sink.legUpdated(legId, { status: 'settling' });
+        return { kind: 'settling', operation: op };
+
+      case 'source_pending':
+      case 'needs_attention':
+        run.unsettledMints.add(fromMintUrl);
+        sink.legUpdated(legId, { status: 'paymentPending' });
+        return { kind: 'pending', operationId: op.id };
+
+      case 'cancelled':
+        if (!isActive()) return { kind: 'aborted' };
+        throw executeError ?? new RebalanceMeltRolledBackError(op.id);
+
+      case 'failed': {
+        if (op.failure.code === 'source_debit_cap_exceeded') {
+          const maxDebit =
+            op.lastSafe.state !== 'preparing'
+              ? amountToNumber(op.lastSafe.sourceDebitBounds.maximum)
+              : currentAmount;
+          throw new RebalanceSourceDebitCapError(op.id, maxDebit, sourceDebitCap ?? 0);
+        }
+        const failureError =
+          executeError ?? new RebalanceMeltRolledBackError(op.id, 'Lightning payment failed');
+        if (
+          allowNoRouteFallback &&
+          (op.failure.code === 'source_payment_rejected' ||
+            classifyRebalanceError(failureError) === 'no_route')
+        ) {
+          return { kind: 'no_route', error: failureError, amount: currentAmount };
+        }
+        throw failureError;
+      }
+
+      default:
+        throw executeError ?? new Error(`Unexpected mint swap state: ${op.state}`);
+    }
   }
+
+  // ── Middleman routing ─────────────────────────────────────────────────
 
   async function runChain(
     run: TransferRun,
-    attempt: {
+    params: {
       route: RebalanceRoute;
-      index: number;
       chainId: string;
       hopLegIds: string[];
       transferAmount: number;
     }
   ): Promise<ChainResult> {
-    const { route, hopLegIds } = attempt;
+    const { sink } = run;
+    const { route, chainId, hopLegIds, transferAmount } = params;
     const hopCount = route.path.length - 1;
-    let finalHopLegId: string | undefined;
-    let startedHops = 0;
     let sentHops = 0;
-    try {
-      let finalReceipt: RebalanceMintReceipt | null = null;
-      for (let index = 0; index < hopCount; index++) {
-        if (!mayOpenLeg(run)) return { status: 'incomplete', finalHopLegId, sentHops };
-        const legId = hopLegIds[index];
-        finalHopLegId = legId;
-        startedHops = index + 1;
-        const hop = await runHop(run, {
-          legId,
-          index,
-          path: route.path,
-          chainId: attempt.chainId,
-          firstHopCap: attempt.transferAmount,
-        });
-        if (hop.status !== 'sent') return { status: 'incomplete', finalHopLegId, sentHops };
-        sentHops += 1;
-        finalReceipt = hop.receipt;
-        if (index < hopCount - 1) {
-          // Wait for this hop's recipient operation before the next hop spends it.
-          const arrived = await waitForReceipt(
-            hop.receipt,
-            INTERMEDIATE_RECEIPT_WAIT_MS,
-            run.isActive
-          );
-          if (!run.isActive()) return { status: 'incomplete', finalHopLegId, sentHops };
-          if (!arrived) {
-            // The hop paid and its money has not been seen at the next mint.
-            // The next hop would find that mint short and fail, and a failed
-            // chain is sent again by another route or a retry: this hop would
-            // be paid twice. The chain stops here, still settling.
-            run.sink.legUpdated(legId, { status: 'settling', routing: null });
-            noteArriving(hop.receipt);
-            debug({ event: 'chain_hop_settling', stepId: run.step.id, hopIndex: index });
-            return { status: 'settling', finalHopLegId: legId, arrivingAt: hop.receipt.mintUrl };
-          }
-          run.sink.legUpdated(legId, { status: 'done', routing: null });
-        }
+    let lastHopLegId: string | undefined;
+
+    for (let i = 0; i < hopCount; i++) {
+      if (!mayOpenLeg(run)) {
+        return { status: 'incomplete', finalHopLegId: lastHopLegId, sentHops };
       }
-      if (!finalReceipt || !finalHopLegId) return { status: 'incomplete', finalHopLegId, sentHops };
-      return { status: 'complete', finalHopLegId, finalReceipt };
-    } catch (error) {
-      debug({
-        event: 'chain_candidate_error',
-        stepId: run.step.id,
-        candidateIdx: attempt.index,
-        error: errField(error),
+      const fromMintUrl = route.path[i];
+      const toMintUrl = route.path[i + 1];
+      const legId = hopLegIds[i];
+      lastHopLegId = legId;
+
+      sink.legUpdated(run.step.id, {
+        routing: { kind: 'hop', hopIndex: i, hopCount, fromMintUrl, toMintUrl },
       });
-      // Free proofs reserved by the failed hop on every mint of the route so
-      // the next candidate can use them (mints with an unsettled melt excepted).
-      for (const url of route.path) await restoreInflight(run, url);
-      if (finalHopLegId) run.sink.legUpdated(finalHopLegId, { status: 'failed', error });
-      for (const legId of hopLegIds.slice(startedHops)) {
-        run.sink.legUpdated(legId, { status: 'skipped' });
+
+      try {
+        const result = await executeSwapLeg(run, {
+          legId,
+          fromMintUrl,
+          toMintUrl,
+          requestedAmount: transferAmount,
+          waitTimeoutMs: HOP_OUTCOME_WAIT_MS,
+          allowNoRouteFallback: false,
+          chainMeta: { chainId, chainPath: route.path, chainHopIndex: i },
+        });
+        if (result.kind === 'done') {
+          sentHops += 1;
+          continue;
+        }
+        if (result.kind === 'settling') {
+          return { status: 'settling', finalHopLegId: legId };
+        }
+        if (result.kind === 'pending') {
+          return { status: 'pending', finalHopLegId: legId, operationId: result.operationId };
+        }
+        if (result.kind === 'aborted') {
+          return { status: 'incomplete', finalHopLegId: legId, sentHops };
+        }
+        // skipped or no_route inside a hop
+        return {
+          status: 'incomplete',
+          finalHopLegId: legId,
+          error: result.kind === 'no_route' ? result.error : new Error('Hop amount too small'),
+          sentHops,
+        };
+      } catch (err) {
+        sink.legUpdated(legId, { status: 'failed', error: err });
+        return { status: 'incomplete', finalHopLegId: legId, error: err, sentHops };
       }
-      return { status: 'incomplete', finalHopLegId, error, sentHops };
     }
+
+    return { status: 'complete', finalHopLegId: lastHopLegId ?? hopLegIds[hopCount - 1] };
   }
 
-  /**
-   * Retry a no-route transfer through each candidate middleman route in turn.
-   * Returns the final hop's leg and receipt, or throws the last route error.
-   */
   async function routeThroughMiddlemen(
     run: TransferRun,
     noRouteError: unknown,
     transferAmount: number
-  ): Promise<
-    { finalHopLegId: string; finalReceipt: RebalanceMintReceipt } | 'aborted' | 'settling'
-  > {
+  ): Promise<RebalanceTransferOutcome> {
     const { step, sink } = run;
     const { id, fromMintUrl, toMintUrl } = step;
     debug({ event: 'no_route_auto_routing', stepId: id });
     sink.legUpdated(id, { status: 'routing', error: null, routing: { kind: 'searching' } });
 
-    // The melt found no route, so it never paid; free its proofs for the chain.
-    await restoreInflight(run, fromMintUrl);
-
     const routes = await config.findRoutes(fromMintUrl, toMintUrl);
-    debug({
-      event: 'routing_candidates',
-      stepId: id,
-      candidateCount: routes.length,
-      candidates: routes.map((route) => ({ pathLength: route.path.length, source: route.source })),
-    });
     if (routes.length === 0) {
-      debug({ event: 'no_route_no_middleman', stepId: id });
-      throw noRouteError;
+      sink.legUpdated(id, { status: 'failed', error: noRouteError, routing: null });
+      return { status: 'failed', error: noRouteError };
     }
 
     let lastError: unknown = noRouteError;
     for (let index = 0; index < routes.length; index++) {
-      if (!mayOpenLeg(run)) return 'aborted';
+      if (!mayOpenLeg(run)) return { status: 'aborted' };
       const route = routes[index];
-      debug({
-        event: 'trying_candidate_route',
-        stepId: id,
-        candidateIdx: index,
-        candidateCount: routes.length,
-        pathLength: route.path.length,
-        source: route.source,
-      });
       sink.legUpdated(id, {
         routing: {
           kind: 'candidate',
@@ -820,313 +545,74 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         index,
         count: routes.length,
       });
-      const result = await runChain(run, { route, index, chainId, hopLegIds, transferAmount });
+      const result = await runChain(run, { route, chainId, hopLegIds, transferAmount });
       await releaseTrust(temporarilyTrusted, { sink, warnLegId: result.finalHopLegId ?? id });
-      if (!run.isActive()) return 'aborted';
+      if (!run.isActive()) return { status: 'aborted' };
 
-      if (result.status === 'complete') {
-        debug({ event: 'auto_route_chain_complete', stepId: id, candidateIdx: index });
-        return result;
+      if (result.status === 'complete') return { status: 'done' };
+      if (result.status === 'settling') return { status: 'settling' };
+      if (result.status === 'pending') {
+        return { status: 'pending', operationId: result.operationId };
       }
-      // Money is on its way through this route: no other route is tried.
-      if (result.status === 'settling') return 'settling';
       if (result.error !== undefined) lastError = result.error;
-      // A hop of this route already paid, so the amount has left the source
-      // and sits at a mint on the way (the trust release above says where).
-      // Another route would send the same amount from the source again.
       if (result.sentHops > 0) {
-        debug({ event: 'route_abandoned_after_paid_hop', stepId: id, sentHops: result.sentHops });
-        throw lastError;
+        sink.legUpdated(id, { status: 'failed', error: lastError });
+        return { status: 'failed', error: lastError };
       }
-      debug({
-        event: 'candidate_route_failed_trying_next',
-        stepId: id,
-        candidateIdx: index,
-        remainingCandidates: routes.length - index - 1,
-      });
-      // Give coco a moment to settle before the next candidate.
       await clock.sleep(NEXT_ROUTE_PAUSE_MS);
     }
-    if (!run.isActive()) return 'aborted';
-    throw routes.length > 1
-      ? new RebalanceRoutesExhaustedError(routes.length, { cause: lastError })
-      : lastError;
+
+    if (!run.isActive()) return { status: 'aborted' };
+    const finalError =
+      routes.length > 1
+        ? new RebalanceRoutesExhaustedError(routes.length, { cause: lastError })
+        : lastError;
+    sink.legUpdated(id, { status: 'failed', error: finalError });
+    return { status: 'failed', error: finalError };
   }
 
-  // ── Direct transfer ───────────────────────────────────────────────────
+  // ── Direct transfer & batch runner ────────────────────────────────────
 
   async function transfer(run: TransferRun): Promise<RebalanceTransferOutcome> {
-    const { step, sink, isActive } = run;
-    const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
-    debug({
-      event: 'step_start',
-      stepId: id,
-      amount: originalAmount,
-      chainId: step.chainId,
-      chainHopIndex: step.chainHopIndex,
-    });
-
+    const { step, sink } = run;
     try {
-      const sourceBalance = (await wallet.balancesByMint())[fromMintUrl] ?? 0;
-      debug({ event: 'balances_fetched', stepId: id, sourceBalance });
-
-      // Fee headroom from the source's real proof set: with fragmented proofs
-      // and per-proof input fees a static headroom is far too small.
-      const worstCaseInputFee = await readWorstCaseInputFee(fromMintUrl);
-      let feeHeadroom =
-        worstCaseInputFee === null
-          ? staticFeeHeadroom(minFeeReserve)
-          : feeHeadroomFor(minFeeReserve, worstCaseInputFee);
-      if (worstCaseInputFee !== null) {
-        debug({
-          event: 'fee_headroom_computed',
-          stepId: id,
-          inputFee: worstCaseInputFee,
-          feeHeadroom,
-        });
-      }
-
-      const decision = computeInitialTransferAmount({
-        requestedAmount: originalAmount,
-        sourceBalance,
-        minTransferThreshold,
-        feeHeadroom,
+      const result = await executeSwapLeg(run, {
+        legId: step.id,
+        fromMintUrl: step.fromMintUrl,
+        toMintUrl: step.toMintUrl,
+        requestedAmount: step.amount,
+        sourceDebitCap: step.sourceDebitCap,
+        exactAmount: step.exactAmount,
+        waitTimeoutMs: DIRECT_OUTCOME_WAIT_MS,
+        allowNoRouteFallback: !step.directOnly,
+        ...(step.chainId &&
+          step.chainPath &&
+          step.chainHopIndex !== undefined && {
+            chainMeta: {
+              chainId: step.chainId,
+              chainPath: step.chainPath,
+              chainHopIndex: step.chainHopIndex,
+            },
+          }),
       });
-      if (decision.status === 'skip') {
-        // Commonly a prior step's middleman route already swept this mint.
-        debug({
-          event: 'step_skipped_low_balance',
-          stepId: id,
-          sourceBalance,
-          minRequired: decision.minRequired,
-        });
-        sink.legUpdated(id, { status: 'skipped' });
-        return { status: 'skipped' };
-      }
-
-      if (step.exactAmount && decision.status === 'capped') {
-        // Nothing opened or paid: less than the exact amount would move.
-        return { status: 'failed', error: new RebalanceExactAmountError(originalAmount, decision.amount) };
-      }
-
-      // Asked last, after every read above: an account switch during them
-      // must open nothing.
-      if (!mayOpenLeg(run)) return { status: 'aborted' };
-      sink.legOpened(id, {
-        fromMintUrl,
-        toMintUrl,
-        amount: originalAmount,
-        ...(step.chainId && {
-          chainId: step.chainId,
-          chainPath: step.chainPath,
-          chainHopIndex: step.chainHopIndex,
-        }),
-      });
-      sink.legUpdated(id, { status: 'creatingInvoice', error: null });
-
-      let transferAmount = decision.amount;
-      if (decision.status === 'capped') {
-        debug({
-          event: 'amount_capped',
-          stepId: id,
-          original: originalAmount,
-          capped: transferAmount,
-          sourceBalance,
-          feeHeadroom,
-        });
-      }
-
-      // A replaced receipt stays open on the destination until it expires;
-      // logging its id keeps the orphan observable.
-      const issueReceipt = async (amount: number, previous?: RebalanceMintReceipt) => {
-        if (previous?.quoteId) {
-          debug({
-            event: 'mint_quote_orphaned',
-            stepId: id,
-            orphanedQuoteId: previous.quoteId,
-            reason: 'amount_changed',
-          });
-        }
-        const next = await wallet.createMintReceipt(toMintUrl, amount);
-        sink.mintReceiptCreated(id, next);
-        return next;
-      };
-
-      let receipt = await issueReceipt(transferAmount);
-
-      // The mint's fee reserve varies widely; a read-only quote reveals it
-      // so the amount is capped up front instead of by blind retries.
-      const probedReserve = await probeFeeReserve(fromMintUrl, receipt.request);
-      if (probedReserve !== null && probedReserve > 0) {
-        const probedHeadroom = probedReserve + (worstCaseInputFee ?? 0);
-        debug({
-          event: 'melt_probe_result',
-          stepId: id,
-          actualFeeReserve: probedReserve,
-          worstCaseInputFee,
-          probedHeadroom,
-          previousHeadroom: feeHeadroom,
-        });
-        feeHeadroom = Math.max(feeHeadroom, probedHeadroom);
-        const capped = recapForProbedHeadroom({
-          amount: transferAmount,
-          sourceBalance,
-          headroom: feeHeadroom,
-          minTransferThreshold,
-        });
-        if (capped !== null) {
-          debug({
-            event: 'amount_recapped_after_probe',
-            stepId: id,
-            original: transferAmount,
-            capped,
-            sourceBalance,
-            feeHeadroom,
-          });
-          transferAmount = capped;
-          receipt = await issueReceipt(transferAmount, receipt);
-        }
-      }
-
-      sink.legUpdated(id, { status: 'invoiceReady', invoice: receipt.request });
-
-      const prepareForInvoice = async (invoice: string) => {
-        const prepared = await wallet.prepareMelt(fromMintUrl, invoice);
-        sink.meltPrepared(id, prepared);
-        // Checked before execute: over the cap, nothing has been paid, and
-        // the proofs the melt reserved go back.
-        if (step.sourceDebitCap !== undefined) {
-          try {
-            const debit = preparedMeltDebit(prepared, transferAmount);
-            if (debit > step.sourceDebitCap) {
-              throw new RebalanceSourceDebitCapError(prepared.id, debit, step.sourceDebitCap);
-            }
-          } catch (error) {
-            await cancelPrepared(prepared.id);
-            throw error;
-          }
-        }
-        return prepared;
-      };
-      const reissue = async (amount: number) => {
-        receipt = await issueReceipt(amount, receipt);
-        sink.legUpdated(id, { status: 'invoiceReady', invoice: receipt.request });
-        return receipt.request;
-      };
-
-      const initial = await prepareWithShrinkingAmount({
-        stepId: id,
-        amount: transferAmount,
-        invoice: receipt.request,
-        prepare: prepareForInvoice,
-        reissue,
-      });
-      transferAmount = initial.amount;
-      let invoice = initial.invoice;
-      let prepared: RebalancePreparedMelt | null = initial.prepared;
-      debug({
-        event: 'melt_prepared',
-        stepId: id,
-        operationId: initial.prepared.id,
-        invoiceAmount: amountToNumber(initial.prepared.amount ?? transferAmount),
-        feeReserve: amountToNumber(initial.prepared.fee_reserve),
-        swapFee: amountToNumber(initial.prepared.swap_fee),
-        sourceBalance,
-      });
-
-      sink.legUpdated(id, { status: 'melting' });
-
-      let finalHopLegId: string | null = null;
-      let finalReceipt: RebalanceMintReceipt = receipt;
-      try {
-        for (let attempt = 0; ; attempt++) {
-          const melt: RebalancePreparedMelt = prepared ?? (await prepareForInvoice(invoice));
-          prepared = melt;
-          if (step.exactAmount && transferAmount !== originalAmount) {
-            // Fees or proof selection lowered it after all; nothing is sent.
-            await cancelPrepared(melt.id);
-            throw new RebalanceExactAmountError(originalAmount, transferAmount);
-          }
-          try {
-            const settlement = await executeMeltOnce(run, melt, fromMintUrl, DIRECT_SETTLE_WAIT_MS);
-            if (settlement === 'aborted' || !isActive()) return { status: 'aborted' };
-            if (settlement === 'pending') {
-              log.warn('mint.rebalance.melt_pending_unresolved', { stepId: id, operationId: melt.id });
-              sink.legUpdated(id, { status: 'paymentPending', routing: null });
-              return { status: 'pending', operationId: melt.id };
-            }
-            finalReceipt = receipt;
-            break;
-          } catch (error) {
-            // `executeMeltOnce` already established the melt did not pay, so
-            // the mint rejected its inputs before paying anything.
-            const shortfall = classifyRebalanceError(error) === 'input_shortfall';
-            if (!shortfall || attempt >= MAX_EXECUTE_RETRIES) throw error;
-            transferAmount -= RETRY_REDUCE_SATS;
-            if (transferAmount < minTransferThreshold) throw error;
-            debug({
-              event: 'execute_input_retry',
-              stepId: id,
-              attempt: attempt + 1,
-              reducedAmount: transferAmount,
-              reason: errField(error),
-            });
-            await restoreInflight(run, fromMintUrl);
-            invoice = await reissue(transferAmount);
-            prepared = null;
-          }
-        }
-      } catch (meltError) {
-        if (!isActive()) return { status: 'aborted' };
-        // A one-leg transfer leaves routing to its caller.
-        if (step.directOnly || classifyRebalanceError(meltError) !== 'no_route') throw meltError;
-        const routed = await routeThroughMiddlemen(run, meltError, transferAmount);
-        if (routed === 'aborted') return { status: 'aborted' };
-        if (routed === 'settling') {
-          debug({ event: 'step_settling_mid_chain', stepId: id, amount: transferAmount });
+      switch (result.kind) {
+        case 'done':
+          return { status: 'done' };
+        case 'skipped':
+          return { status: 'skipped' };
+        case 'settling':
           return { status: 'settling' };
-        }
-        finalHopLegId = routed.finalHopLegId;
-        finalReceipt = routed.finalReceipt;
+        case 'pending':
+          return { status: 'pending', operationId: result.operationId };
+        case 'aborted':
+          return { status: 'aborted' };
+        case 'no_route':
+          return await routeThroughMiddlemen(run, result.error, result.amount);
       }
-
-      // Coco's background processor claims the paid quote; confirm this
-      // transfer's own recipient operation.
-      const verifyingLegId = finalHopLegId ?? id;
-      sink.legUpdated(verifyingLegId, { status: 'verifying', routing: null });
-      const recipientFinalized = await waitForReceipt(
-        finalReceipt,
-        FINAL_RECEIPT_WAIT_MS,
-        isActive
-      );
-      if (!isActive()) return { status: 'aborted' };
-      if (!recipientFinalized) {
-        // The melt settled; the destination claims its quote on its own
-        // schedule, so a slow claim does not undo the transfer. It is not
-        // done either: the money has not been seen to arrive.
-        log.warn('mint.rebalance.balance_timeout');
-        sink.legUpdated(verifyingLegId, { status: 'settling', routing: null });
-        noteArriving(finalReceipt);
-        debug({ event: 'step_settling', stepId: id, amount: transferAmount });
-        return { status: 'settling' };
-      }
-
-      sink.legUpdated(verifyingLegId, { status: 'done', routing: null });
-      debug({ event: 'step_done', stepId: id, amount: transferAmount });
-      return { status: 'done' };
-    } catch (error) {
-      if (!isActive()) return { status: 'aborted' };
-      // Return proofs a definitively failed melt left inflight.
-      await restoreInflight(run, fromMintUrl);
-      debug({
-        event: 'step_error',
-        stepId: id,
-        amount: originalAmount,
-        error: errField(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      sink.legUpdated(id, { status: 'failed', error, routing: null });
-      return { status: 'failed', error };
+    } catch (err) {
+      if (!run.isActive()) return { status: 'aborted' };
+      sink.legUpdated(step.id, { status: 'failed', error: err });
+      return { status: 'failed', error: err };
     }
   }
 
@@ -1135,8 +621,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     options: RebalanceRunActivity & { sink: RebalanceEventSink }
   ): Promise<RebalanceTransferOutcome> {
     if (!mayOpenLeg(options)) return { status: 'aborted' };
-    // Coco operations are stateful (proof selection, inflight tracking);
-    // transfers run one at a time.
     if (!(await lock.acquire())) {
       log.warn('mint.rebalance.lock_failed', { stepId: step.id });
       return { status: 'busy' };
@@ -1162,11 +646,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       for (const step of steps) {
         if (!mayOpenLeg(callbacks)) return { status: 'aborted' };
-        // Legs settled by an earlier run (e.g. a retry of failed legs only).
         if (callbacks.isSettled(step.id)) continue;
-        // A step that spends money still on its way to its source is left as
-        // it is: not run, not skipped, not failed. A later run takes it up
-        // once the money is in.
         if (await stillArriving(step.fromMintUrl)) {
           anyPending = true;
           log.info('swap.leg.held', { stepId: step.id });
@@ -1187,7 +667,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           duration_ms: Math.round(clock.now() - stepStart),
           status: outcome.status,
         });
-        // Space transfers out so the mints are not overwhelmed.
         if (outcome.status === 'done' || outcome.status === 'settling') {
           await clock.sleep(NEXT_TRANSFER_PAUSE_MS);
         }
@@ -1209,16 +688,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     options: RebalanceRunCallbacks & {
       makeId: (label: string) => string;
       onRerouted: (hops: T[]) => void;
-      /**
-       * Told the result while the intermediaries are still trusted, before the
-       * trust is given back: giving it back can take a while, and the caller
-       * should not have to wait for it to show the run as over.
-       */
       onRunFinished?: (result: RebalanceRunResult) => void;
     }
   ): Promise<RebalanceRunResult> {
-    // The original step stays in the list (the caller marks it skipped); one
-    // transfer per hop follows it.
     const hops = createChainSteps({
       baseStep: step,
       chainPath,
@@ -1227,8 +699,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       makeId: options.makeId,
     });
     const rerouted = insertStepsAfter(steps, step.id, hops);
-    // Coco requires intermediaries to be trusted; the ones the user has not
-    // trusted are trusted only for this run.
     return withTemporaryTrust(
       chainPath,
       { sink: options.sinkFor(step), warnLegId: hops[hops.length - 1]?.id },

@@ -1,4 +1,4 @@
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -169,7 +169,7 @@ export function useNostrProfile(
   pubkey: string | null,
   refreshReputation = false
 ): UseNostrProfileResult {
-  const { ndk } = useNDK();
+  const { client } = useNostrClient();
   // Seeded from the single owner so a known profile paints its counts on the
   // first frame (status: revalidating); an unknown one starts with skeletons.
   const [state, setState] = useState<{
@@ -308,7 +308,7 @@ export function useNostrProfile(
       kind: 'profile',
       target: pubkey,
       stale: refreshReputationRef.current,
-      ndk,
+      client,
       signal,
     });
     if (!signal.aborted && refreshed) {
@@ -341,7 +341,7 @@ export function useNostrProfile(
       }
     }
     await counting;
-  }, [pubkey, ndk, refreshReputationRef]);
+  }, [pubkey, client, refreshReputationRef]);
 
   useEffect(() => {
     void fetchProfile();
@@ -359,7 +359,7 @@ export function useNostrProfile(
       kind: 'profile',
       target: pubkey,
       stale: true,
-      ndk,
+      client,
       signal: controller.signal,
     }).then((refreshed) => {
       if (controller.signal.aborted || !refreshed) return;
@@ -373,7 +373,7 @@ export function useNostrProfile(
     });
     return () => controller.abort();
     // Runs when focus is gained (refreshReputation flips true) for this pubkey.
-  }, [refreshReputation, pubkey, ndk, dataRef]);
+  }, [refreshReputation, pubkey, client, dataRef]);
 
   const refetch = useCallback(() => {
     void fetchProfile();

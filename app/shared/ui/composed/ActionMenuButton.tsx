@@ -19,34 +19,44 @@
  * rendered (`alwaysShowMenu`), making forthcoming methods discoverable.
  *
  * Two presentations:
- * - `popover` (default): an inline anchored heroui Menu. **iOS only** — on
- *   Android the inline popover relies on heroui's async `measure()` to position
- *   its portal, and that callback is routinely slow/stale/dropped on Android, so
- *   the menu intermittently fails to open (first tap does nothing). Android
- *   therefore always routes through the global host regardless of this prop.
- * - `bottom-sheet`: routed through `actionMenuSheet()` — the FullWindowOverlay-
- *   backed `<BottomSheet>` lane on `PopupHost`. Unlike the `actionMenuPopup()`
- *   menu-lane host (which disables FWO and paints UNDER route modals), this
- *   stacks above `(send-flow)` modals, so in-modal CTAs like the amount-screen
- *   "Next" chooser are visible. Android's default-popover path still falls back
- *   to the `actionMenuPopup` global host (inline popover mis-measures there).
+ * - `popover` (default): a menu anchored above the button. **iOS only** —
+ *   Android always routes through the global host regardless of this prop.
+ * - `bottom-sheet`: routed through `actionMenuSheet()` — the custom-sheet
+ *   lane on `PopupHost`, sequenced with the other popups (the amount-screen
+ *   "Next" chooser). Android's default-popover path falls back to the
+ *   `actionMenuPopup` global host.
  *
  * Disabled variants remain visible with their `reason` rendered as the
  * description, matching the pattern used by availability.ts in colada.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
-import { Platform, StyleProp, ViewStyle } from 'react-native';
-import { Menu, type MenuTriggerRef } from 'heroui-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Platform,
+  StyleSheet,
+  View as RNView,
+  useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { MenuRowTint, SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
+import {
+  MenuItem,
+  MenuRowTint,
+  MenuTitle,
+  SheetMenuRowContent,
+} from '@/shared/lib/popup/popups/sheetMenuRow';
 import Icon from 'assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { alpha } from '@/shared/styles/tokens';
+import { OverlayWindow } from '@/shared/ui/composed/Sheet';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   actionMenuPopup,
   getActionMenuSnapshot,
@@ -171,20 +181,17 @@ export function ActionMenuButton({
   // route modals — the menu-lane host (`actionMenuPopup`) disables FWO and
   // paints under any `(send-flow)` modal, hiding the chooser.
   const useFwoSheet = presentation === 'bottom-sheet';
-  // On Android the inline popover races heroui's async `measure()` and can fail
-  // to open, so the default-popover path also routes through a global host
-  // there. iOS keeps the requested presentation (anchored popover by default).
+  // Android has no anchored popover: the default-popover path routes through
+  // the global host there. iOS keeps the requested presentation (anchored popover by default).
   const isBottomSheet = useFwoSheet || Platform.OS === 'android';
 
   const primaryDisabled = disabled || !hasVariants || defaultVariant?.isDisabled;
 
-  // heroui-native `Menu.Trigger asChild` routes through `Slot.Pressable`, which
-  // only composes onPress cleanly with children that are themselves a
-  // `Pressable`. Our `Button` primitive wraps a custom `TouchableOpacity`, so
-  // for the popover path we render an invisible absolute-positioned Trigger and
-  // open it imperatively via ref. The bottom-sheet path skips the inline Menu
-  // entirely and dispatches to the global actionMenuPopup host.
-  const menuTriggerRef = useRef<MenuTriggerRef>(null);
+  // The popover anchors to an invisible 1×1 view laid out beside the trigger
+  // and measured when the menu opens. The bottom-sheet path skips it and
+  // dispatches to the global actionMenuPopup host.
+  const anchorRef = useRef<RNView>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
   const openPresentation = useRef<{ kind: 'sheet' | 'menu'; seq: number } | null>(null);
   useEffect(() => {
     const owner = openPresentation.current;
@@ -216,9 +223,7 @@ export function ActionMenuButton({
       openPresentation.current = { kind: 'menu', seq: getActionMenuSnapshot().seq };
       return;
     }
-    // Defer to the next tick so the Button's press animation doesn't race
-    // with the Trigger's `measure()` call inside heroui's `.open()`.
-    setTimeout(() => menuTriggerRef.current?.open(), 0);
+    anchorRef.current?.measureInWindow((x, y) => setAnchor({ x, y }));
   }, [useFwoSheet, isBottomSheet, variants, menuTitle, testID]);
 
   const handlePrimaryPress = useCallback(async () => {
@@ -241,15 +246,24 @@ export function ActionMenuButton({
   const withMenu = (trigger: React.ReactNode) => {
     if (isBottomSheet) return <>{trigger}</>;
     return (
-      <Menu presentation="popover">
-        <Menu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
+      <>
+        <RNView
+          ref={anchorRef}
+          collapsable={false}
+          pointerEvents="none"
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+        />
         {trigger}
-        {renderPopoverPortal(variants, testID, menuTitle)}
-      </Menu>
+        {anchor ? (
+          <MenuPopover
+            anchor={anchor}
+            variants={variants}
+            rootTestID={testID}
+            title={menuTitle}
+            onClose={() => setAnchor(null)}
+          />
+        ) : null}
+      </>
     );
   };
 
@@ -346,53 +360,92 @@ export function ActionMenuButton({
   );
 }
 
-function renderPopoverPortal(
-  variants: ActionMenuVariant[],
-  rootTestID: string | undefined,
-  title: string | undefined
-) {
+/**
+ * The anchored menu: a scrim and a 260pt card whose bottom sits just above
+ * the anchor and whose trailing edge aligns with it, kept 12pt inside the
+ * screen. A pick closes it, then runs the variant.
+ */
+function MenuPopover({
+  anchor,
+  variants,
+  rootTestID,
+  title,
+  onClose,
+}: {
+  anchor: { x: number; y: number };
+  variants: ActionMenuVariant[];
+  rootTestID: string | undefined;
+  title: string | undefined;
+  onClose: () => void;
+}) {
+  const window = useWindowDimensions();
+  const scrimColor =
+    useColorScheme() === 'light'
+      ? `rgba(255,255,255,${alpha.strong})`
+      : `rgba(0,0,0,${alpha.strong})`;
+  const left = Math.min(Math.max(anchor.x + 1 - MENU_WIDTH, 12), window.width - MENU_WIDTH - 12);
   return (
-    <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-      <MenuScrim />
-      <Menu.Content presentation="popover" placement="top" align="end" width={MENU_WIDTH}>
-        {title ? (
-          <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-            {title}
-          </Menu.Label>
-        ) : null}
-        {variants.map((v) => (
-          <MenuRowTint
-            key={v.id}
-            tone={v.isCaution ? 'caution' : undefined}
-            disabled={v.isDisabled === true}>
-            <Menu.Item
-              testID={v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined)}
-              isDisabled={v.isDisabled}
-              variant={v.isDestructive ? 'danger' : 'default'}
-              onPress={() => {
-                if (v.isDisabled) return;
-                void (async () => {
-                  try {
-                    await v.onPress();
-                  } catch (error) {
-                    log.error('ui.action_menu.menu_action_failed', {
-                      testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
-                      variantId: v.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    });
-                  }
-                })();
-              }}>
-              <SheetMenuRowContent
-                singleLineTitle={false}
-                icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
-                title={v.label}
-                description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}
-              />
-            </Menu.Item>
-          </MenuRowTint>
-        ))}
-      </Menu.Content>
-    </Menu.Portal>
+    <OverlayWindow>
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(200)}
+        style={[StyleSheet.absoluteFill, { backgroundColor: scrimColor }]}>
+        <Pressable
+          testID="action-menu-dismiss"
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss menu"
+          activeOpacity={1}
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+      </Animated.View>
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        className="bg-overlay shadow-overlay absolute rounded-3xl px-1.5 py-3"
+        style={{
+          left,
+          width: MENU_WIDTH,
+          bottom: window.height - anchor.y + 8,
+          borderCurve: 'continuous',
+        }}>
+        {title ? <MenuTitle>{title}</MenuTitle> : null}
+        {variants.map((v) => {
+          const itemTestID = v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined);
+          return (
+            <MenuRowTint
+              key={v.id}
+              tone={v.isCaution ? 'caution' : undefined}
+              disabled={v.isDisabled === true}>
+              <MenuItem
+                testID={itemTestID}
+                isDisabled={v.isDisabled}
+                variant={v.isDestructive ? 'danger' : 'default'}
+                onPress={() => {
+                  if (v.isDisabled) return;
+                  onClose();
+                  void (async () => {
+                    try {
+                      await v.onPress();
+                    } catch (error) {
+                      log.error('ui.action_menu.menu_action_failed', {
+                        testID: itemTestID,
+                        variantId: v.id,
+                        error: error instanceof Error ? error.message : String(error),
+                      });
+                    }
+                  })();
+                }}>
+                <SheetMenuRowContent
+                  singleLineTitle={false}
+                  icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
+                  title={v.label}
+                  description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}
+                />
+              </MenuItem>
+            </MenuRowTint>
+          );
+        })}
+      </Animated.View>
+    </OverlayWindow>
   );
 }

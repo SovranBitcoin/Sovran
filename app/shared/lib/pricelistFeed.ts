@@ -37,7 +37,7 @@ function storeCachedAtSeconds(): number | null {
   return pricelist ? serverUpdatedAt : null;
 }
 
-export interface PricelistFeed {
+interface PricelistFeed {
   /** Start polling. Repeated calls are a no-op. */
   start: () => void;
   /** Refresh stale data after foreground/connectivity recovery. */

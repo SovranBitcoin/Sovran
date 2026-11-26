@@ -312,7 +312,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
             flattens every descendant into this Pressable), so denial — which
             is otherwise silent — stays e2e-observable. */}
       <Pressable
-        onPress={() => router.navigate('/(map-flow)')}
+        onPress={() => router.navigate('/map')}
         accessibilityRole="link"
         activeOpacity={0.85}
         testID={`wallet-location:${permStatus}`}>

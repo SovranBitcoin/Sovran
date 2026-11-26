@@ -1,20 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Log, log } from '@/shared/lib/logger';
 import { TouchIndicatorLayer } from '@/shared/ui/composed/TouchIndicator';
-import {
-  Keyboard,
-  Platform,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from 'react-native';
-import { BottomSheetFooter } from '@gorhom/bottom-sheet';
-import { BottomSheet, Button as HerouiButton, useToast } from 'heroui-native';
+import { Keyboard, Text as RNText, View } from 'react-native';
 import { Button } from '@/shared/ui/primitives/Button';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { Sheet } from '@/shared/ui/composed/Sheet';
+import { ToastHost } from '@/shared/ui/composed/ToastHost';
 import {
   usePopupStore,
   isCustomSheetPayload,
@@ -22,7 +15,6 @@ import {
 } from '@/shared/stores/runtime/popupStore';
 import { blend, sanitize } from '@/shared/lib/color';
 import {
-  registerToast,
   resolvePopupIcon,
   isAmountSegment,
   type PopupTextSegment,
@@ -31,10 +23,6 @@ import {
 import type { SharedValue } from 'react-native-reanimated';
 import Animated, {
   Easing,
-  SlideInLeft,
-  SlideInRight,
-  SlideOutLeft,
-  SlideOutRight,
   cancelAnimation,
   interpolateColor,
   useAnimatedStyle,
@@ -43,44 +31,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { alpha } from '@/shared/styles/tokens';
 import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
-import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
-import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
-  CustomSheetPage,
-  CustomSheetNavDirection,
+  CustomSheetSharedProps,
 } from '@/shared/lib/popup/sheets/types';
-
-function getStickyFooterClass(mode?: 'contentHeight' | 'snapPoints'): string {
-  const px = mode === 'contentHeight' ? 'px-0' : 'px-4';
-  const pb = mode === 'contentHeight' ? 'pb-4' : 'pb-safe-offset-4';
-  return `bg-surface pt-4 ${pb} ${px}`;
-}
-
-function getSheetButtonClassName(variant: 'primary' | 'tertiary'): string | undefined {
-  return variant === 'primary' ? 'bg-foreground' : undefined;
-}
-
-function getSheetButtonLabelClassName(variant: 'primary' | 'tertiary'): string | undefined {
-  return variant === 'primary' ? 'text-background' : undefined;
-}
-
-function ToastRegistrar() {
-  const { toast } = useToast();
-
-  useEffect(() => {
-    registerToast(toast);
-  }, [toast]);
-
-  return null;
-}
 
 function DurationBar({ durationMs }: { durationMs: number }) {
   const progress = useSharedValue(0);
@@ -114,62 +74,6 @@ type ConfirmedAnimation = {
   colorFrom: string;
   colorTo: string;
 };
-
-/** Sanitize a RN style object, stripping spurious "px" units from string values. */
-function sanitizeStyle(style: Record<string, unknown>): ViewStyle {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(style)) {
-    result[key] = typeof value === 'string' && value.includes('px') ? sanitize(value) : value;
-  }
-  return result as ViewStyle;
-}
-
-function LiveSheetBackground({
-  style,
-  pointerEvents,
-  animatedStyle,
-}: {
-  style?: ViewStyle;
-  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
-  animatedIndex?: unknown;
-  animatedPosition?: unknown;
-  animatedStyle: ViewStyle;
-}) {
-  const sanitized = style
-    ? sanitizeStyle(StyleSheet.flatten(style) as Record<string, unknown>)
-    : {};
-  return (
-    <Animated.View
-      pointerEvents={pointerEvents}
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel="Bottom Sheet"
-      style={[sanitized, animatedStyle]}
-    />
-  );
-}
-
-function LiveSheetHandle({
-  style,
-  indicatorStyle,
-  animatedStyle,
-}: {
-  style?: ViewStyle;
-  indicatorStyle?: ViewStyle;
-  animatedStyle: ViewStyle;
-}) {
-  return (
-    <View style={[style, { padding: 10 }]}>
-      <Animated.View
-        style={[
-          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 },
-          indicatorStyle,
-          animatedStyle,
-        ]}
-      />
-    </View>
-  );
-}
 
 function AnimatedSubmessage({
   submessage,
@@ -206,7 +110,7 @@ function SubmessageRenderer({
     if (animation) {
       return <AnimatedSubmessage submessage={submessage} animation={animation} />;
     }
-    return <BottomSheet.Description className="text-center">{submessage}</BottomSheet.Description>;
+    return <RNText className="text-muted text-center text-base">{submessage}</RNText>;
   }
 
   if (Array.isArray(submessage)) {
@@ -234,92 +138,29 @@ function SubmessageRenderer({
   return <>{submessage}</>;
 }
 
-/** Props every custom-sheet renderer receives; `payload` is typed per sheet id. */
-type CustomSheetContentProps<P = unknown> = {
-  payload: P;
-  close: () => void;
-  pushCustomPage: <K extends keyof ActionSheetPayloads>(
-    sheetId: K,
-    payload: ActionSheetPayloads[K]
-  ) => void;
-  popCustomPage: () => void;
-  canPop: boolean;
-  setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-};
-type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
+type CustomSheetRenderer = React.ComponentType<CustomSheetSharedProps & { payload: unknown }>;
 
-// Custom-sheet registry. Surfaces here render through heroui's standalone
-// `<BottomSheet>`, which (unlike heroui `<Menu presentation="bottom-sheet">`)
-// reliably mounts inside iOS FullWindowOverlay — i.e. above route modals.
-// Use this lane only when the menu lane can't deliver above-modal stacking;
-// for everything else, prefer `actionMenuPopup`.
+// Custom-sheet registry: surfaces that need their own body inside the popup
+// lane's sheet. For a plain pick-one-of-N list prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
   'nfc-tap': NfcTapContent as CustomSheetRenderer,
 };
 
-/**
- * Mount snapPoints sheet bodies only once gorhom has given them a bounded
- * height. Every open() nonce is a FRESH gorhom instance (see the `key` on
- * `<BottomSheet>`), and gorhom's content mask carries NO height style until
- * the container's onLayout lands — so a body mounted in the same commit as
- * the sheet lays out unbounded, and a virtualized list inside it (the emoji
- * picker's FlashList) sizes to its entire content and renders every row.
- * That jammed the JS thread for ~2s on device, starving gorhom's own layout
- * callbacks, so the sheet never animated open and `OPEN_WATCHDOG_MS` tore it
- * down (popupHost.open_stalled ×2 → close). The previous host reused one
- * gorhom instance across opens, so its mask was already sized and this never
- * surfaced. contentHeight sheets are NOT gated: gorhom measures their body
- * to derive the dynamic snap point, so it has to mount immediately.
- */
-function SnapPointsContentGate({ children }: { children: React.ReactNode }) {
-  const [bounded, setBounded] = useState(false);
-  return (
-    <View
-      testID="popup-snap-content-gate"
-      style={{ flex: 1 }}
-      onLayout={(event) => {
-        if (!bounded && event.nativeEvent.layout.height > 0) setBounded(true);
-      }}>
-      {bounded ? children : null}
-    </View>
-  );
-}
-
-function SheetContent({
+function StandardContent({
   payload,
-  activeCustomPage,
   close,
-  openCycle,
+  openSeq,
   confirmedAnimation,
-  customNavDirection,
-  isContentHeight,
-  pushCustomPage,
-  popCustomPage,
-  canPopCustomPage,
-  onCustomFooterConfigChange,
 }: {
-  payload: ReturnType<typeof usePopupStore.getState>['current'];
-  activeCustomPage: CustomSheetPage | null;
+  payload: StandardSheetPayload;
   close: () => void;
-  openCycle: number;
+  openSeq: number;
   confirmedAnimation?: ConfirmedAnimation;
-  customNavDirection: CustomSheetNavDirection;
-  isContentHeight: boolean;
-  pushCustomPage: <K extends keyof ActionSheetPayloads>(
-    sheetId: K,
-    payload: ActionSheetPayloads[K]
-  ) => void;
-  popCustomPage: () => void;
-  canPopCustomPage: boolean;
-  onCustomFooterConfigChange: (config: CustomSheetFooterConfig | null) => void;
 }) {
-  const isCustom = isCustomSheetPayload(payload);
-  const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
-  const showDuration = standardPayload?.durationMs != null && standardPayload.durationMs > 0;
-  const hasLiveStatus = standardPayload?.status != null;
-
+  const showDuration = payload.durationMs != null && payload.durationMs > 0;
+  const hasLiveStatus = payload.status != null;
   const titleAnimatedStyle = useAnimatedStyle(() =>
     confirmedAnimation
       ? {
@@ -332,93 +173,48 @@ function SheetContent({
       : {}
   );
 
-  if (!payload) return <View />;
-
-  if (isCustom) {
-    if (!activeCustomPage) return <View />;
-
-    const ContentComponent = CUSTOM_SHEET_CONTENT[activeCustomPage.sheetId];
-    if (!ContentComponent) return <View />;
-    const entering =
-      customNavDirection === 'forward' ? SlideInRight.duration(220) : SlideInLeft.duration(220);
-    const exiting =
-      customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
-    const customContent = (
-      // A sheet draws in its own overlay window, so it carries its own layer
-      // for the "Show taps" recording setting.
-      <TouchIndicatorLayer fill={false}>
-        <ContentComponent
-          payload={activeCustomPage.payload}
-          close={close}
-          pushCustomPage={pushCustomPage}
-          popCustomPage={popCustomPage}
-          canPop={canPopCustomPage}
-          setFooterConfig={onCustomFooterConfigChange}
-        />
-      </TouchIndicatorLayer>
-    );
-    return (
-      <Animated.View
-        key={`${activeCustomPage.sheetId}-${canPopCustomPage ? 'stacked' : 'root'}-${openCycle}`}
-        style={isContentHeight ? undefined : { flex: 1 }}
-        entering={entering}
-        exiting={exiting}>
-        {isContentHeight ? (
-          customContent
-        ) : (
-          <SnapPointsContentGate>{customContent}</SnapPointsContentGate>
-        )}
-      </Animated.View>
-    );
-  }
-
   return (
     <View className="items-center gap-2 px-1 pb-1">
       {/* Same DEV-only probe seam as buttonless toast popups: mirror the
           popup KEY into the toast-probe store so simulator plans can observe
           buttoned (sheet-variant) popups too. */}
-      <E2EStaticToastRenderMarker probeKey={standardPayload?.e2eProbeKey} />
-      <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(standardPayload?.icon, 88)}</View>
+      <E2EStaticToastRenderMarker probeKey={payload.e2eProbeKey} />
+      <View key={`sheet-icon-${openSeq}`}>{resolvePopupIcon(payload.icon, 88)}</View>
       {hasLiveStatus ? (
         <Animated.Text
           style={[{ textAlign: 'center', fontSize: 18, fontWeight: '600' }, titleAnimatedStyle]}>
-          {standardPayload?.message || ''}
+          {payload.message || ''}
         </Animated.Text>
       ) : (
-        <BottomSheet.Title className="text-center">
-          {standardPayload?.message || ''}
-        </BottomSheet.Title>
+        <RNText className="text-foreground text-center text-lg font-medium">
+          {payload.message || ''}
+        </RNText>
       )}
-      <SubmessageRenderer submessage={standardPayload?.submessage} animation={confirmedAnimation} />
+      <SubmessageRenderer submessage={payload.submessage} animation={confirmedAnimation} />
 
-      {(standardPayload?.buttons?.length ?? 0) > 0 ? (
+      {(payload.buttons?.length ?? 0) > 0 ? (
         <View
-          className={
-            standardPayload?.buttonLayout === 'row' ? 'mt-4 w-full flex-row gap-2' : 'mt-4 gap-2'
-          }>
-          {standardPayload?.buttons?.map((button, index) => (
+          className={payload.buttonLayout === 'row' ? 'mt-4 w-full flex-row gap-2' : 'mt-4 gap-2'}>
+          {payload.buttons?.map((button, index) => (
             <SheetActionButton
               key={`${button.text}-${index}`}
               button={button}
               variant={index === 0 ? 'primary' : 'tertiary'}
               feedbackVariant={hasLiveStatus ? 'scale' : undefined}
-              row={standardPayload?.buttonLayout === 'row'}
+              row={payload.buttonLayout === 'row'}
               close={close}
             />
           ))}
         </View>
       ) : null}
 
-      {showDuration ? <DurationBar durationMs={standardPayload!.durationMs!} /> : null}
+      {showDuration ? <DurationBar durationMs={payload.durationMs!} /> : null}
     </View>
   );
 }
 
-// Each sheet button owns its own single-flight slot — declared as a separate
-// component because hooks can't be called inside the parent's `.map` callback.
-// A rapid double-tap on "View Transaction" / "Continue" / etc. would otherwise
-// run `button.onPress` twice and `close()` twice (or run the navigation twice
-// before close lands), which double-stacks the destination on the back stack.
+// Each sheet button owns a single-flight slot (a component, for the hook): a
+// fast double-tap would otherwise navigate twice and double-stack the route.
 type SheetActionButtonProps = {
   button: { text: string; onPress?: () => void | Promise<void>; testID?: string };
   variant: 'primary' | 'tertiary';
@@ -435,36 +231,52 @@ function SheetActionButton({
   row,
   close,
 }: SheetActionButtonProps) {
-  const baseClassName = getSheetButtonClassName(variant);
-  const className = row ? `${baseClassName ?? ''} flex-1`.trim() : baseClassName;
-  const labelClassName = getSheetButtonLabelClassName(variant);
   const handlePress = useSingleFlight(async () => {
     if (button.onPress) await button.onPress();
     close();
   });
 
   return (
-    <HerouiButton
+    <PillButton
       testID={button.testID}
       variant={variant}
-      className={className}
+      className={[variant === 'primary' ? 'bg-foreground' : '', row ? 'flex-1' : '']
+        .join(' ')
+        .trim()}
       feedbackVariant={feedbackVariant}
       onPress={handlePress}>
-      <HerouiButton.Label className={labelClassName}>{button.text}</HerouiButton.Label>
-    </HerouiButton>
+      <PillButton.Label className={variant === 'primary' ? 'text-background' : undefined}>
+        {button.text}
+      </PillButton.Label>
+    </PillButton>
+  );
+}
+
+function FooterButtons({ config }: { config: CustomSheetFooterConfig }) {
+  return (
+    <View className="bg-surface pb-4 pt-4">
+      <View className="gap-2.5">
+        {config.buttons.map((button, index) => {
+          const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+          return (
+            <Button
+              key={`${button.label}-${index}`}
+              testID={button.testID}
+              variant={variant === 'primary' ? 'primary' : 'secondary'}
+              text={button.label}
+              onPress={button.onPress}
+              disabled={button.isDisabled}
+            />
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
 const popupHostLog = log.child({ module: 'popupHost' });
 
 function SheetPopup() {
-  const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  // Captured here (inside the account-scoped providers) and re-provided
-  // across the portal boundary below — sheet content renders in the
-  // PortalHost's subtree, outside NostrKeysProvider. Any other account-scoped
-  // context a sheet needs must be bridged the same way.
-  const nostrKeysContextValue = useNostrKeysContext();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
   const openSeq = usePopupStore((s) => s.openSeq);
@@ -472,43 +284,14 @@ function SheetPopup() {
   const close = usePopupStore((s) => s.close);
   const update = usePopupStore((s) => s.update);
 
-  // Close bound to the sequence current at THIS render. A sheet button whose
-  // onPress opens a follow-on sheet (e.g. the onchain amount chooser launching
-  // the "Network fee" picker) still fires its trailing close() after onPress —
-  // that close carries the chooser's seq, so once the fee sheet has bumped
-  // openSeq it no-ops instead of tearing the fresh sheet down. Same guard on
-  // the gorhom close path below. This is what makes the fee sheet open reliably
-  // rather than intermittently losing the race on a fast/cached quote.
-  const scopedClose = useCallback(() => close(openSeq), [close, openSeq]);
-
-  const wasOpenRef = useRef(false);
-  const [openCycle, setOpenCycle] = useState(0);
-  // The exit-animation payload cache. Held in STATE, not a ref: clearing a ref
-  // left the previous popup's content MOUNTED inside the closed sheet until
-  // some unrelated re-render — including any infinite reanimated loops it runs
-  // (e.g. nfc-tap's pulse), which then animate forever. That previously needed
-  // a ref plus a separate `exitCacheEpoch` counter to force the unmount; one
-  // piece of state does both, and it stops this component reading a ref during
-  // render, which made the React Compiler skip all 34 of its functions.
-  const [lastPayload, setLastPayload] = useState<typeof current>(null);
-  if (current && !Object.is(lastPayload, current)) {
-    setLastPayload(current);
+  // Unmounted at rest; each open() nonce mounts a fresh instance (keyed below).
+  // `shown` is the request it draws, kept through the exit animation.
+  const [shown, setShown] = useState<{ seq: number; payload: NonNullable<typeof current> } | null>(
+    null
+  );
+  if (isOpen && current && (shown?.seq !== openSeq || !Object.is(shown.payload, current))) {
+    setShown({ seq: openSeq, payload: current });
   }
-
-  useEffect(() => {
-    if (isOpen && !wasOpenRef.current) {
-      setOpenCycle((value) => value + 1);
-    }
-    wasOpenRef.current = isOpen;
-    // While `isOpen` is false, the render still falls back to
-    // `lastPayload` so the exit animation has content to draw.
-    // After heroui's exit animation lands (~300ms), drop the cached
-    // payload so a later re-open never flashes the previous popup.
-    if (!isOpen) {
-      const timer = setTimeout(() => setLastPayload(null), 400);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !current || isCustomSheetPayload(current) || !current.live) return;
@@ -517,156 +300,48 @@ function SheetPopup() {
     return unsubscribe;
   }, [isOpen, current, update]);
 
-  // Keep the sheet UNMOUNTED at rest. A parked CLOSED sheet peeks as an empty
-  // detached card at the bottom on Android edge-to-edge (gorhom 5.2.14 derives
-  // the closed position from the short measured container, and the
-  // height-override props are no-ops). So we mount the BottomSheet only while a
-  // popup is live, and unmount it once the exit animation settles.
-  //
-  // Every open() nonce (openSeq) gets a FRESH gorhom instance (see the `key`
-  // on <BottomSheet> below) that mounts already open: gorhom's animate-on-
-  // mount waits for its own layout pass, so there is no frame-count guess and
-  // no partial-height snap. A sheet natively torn down without store.close()
-  // (route navigation ripping the FullWindowOverlay) leaves isOpen stuck
-  // true; keying on the nonce still remounts on the next open(), so a later
-  // open() is never a silent no-op (the amount screen's dead Next).
-  //
-  // `mountedSeq` is the nonce the mounted instance belongs to. Which instance
-  // serves a new open() depends on what it interrupts:
-  //  - nothing mounted → fresh instance (gorhom animate-on-mount, above);
-  //  - a sheet still OPEN (e.g. the onchain chooser launching the fee picker)
-  //    → fresh instance too, so a natively torn-down sheet that left isOpen
-  //    stuck true can never turn the next open() into a silent no-op;
-  //  - a sheet CLOSING (the emoji picker opens 300ms after the Copy menu's
-  //    close; the exit window below is 400ms) and the incoming sheet is a
-  //    snapPoints custom sheet → REUSE the closing instance and let heroui's
-  //    isOpen false→true edge snap it back up. Swapping instances here
-  //    mounted a second FullWindowOverlay while the first was being torn
-  //    down, and on iOS the new overlay came up with its JS touch responder
-  //    dead: every Pressable in the sheet ignored taps while gorhom's native
-  //    pan still dismissed it. A snapPoints sheet's detents derive from the
-  //    already-measured container, so the reused instance's snapToIndex is
-  //    never dropped and its content mask is already sized. contentHeight
-  //    sheets are NOT reused: their detents wait on a fresh content
-  //    measurement, and gorhom parks a closing sheet at the closed position
-  //    when detents change mid-exit — that is the dropped-open case the
-  //    fresh `mountIndex` mount exists for (see 88eb7f2f), so they keep it.
-  const [mountedSeq, setMountedSeq] = useState<number | null>(null);
-  const mounted = mountedSeq !== null;
-  const [presentAttempt, setPresentAttempt] = useState(0);
-  const [presented, setPresented] = useState(false);
-  const lastOpenRef = useRef<{ seq: number; isOpen: boolean }>({ seq: openSeq, isOpen });
-  useEffect(() => {
-    const previous = lastOpenRef.current;
-    lastOpenRef.current = { seq: openSeq, isOpen };
-    if (isOpen) {
-      const incoming = usePopupStore.getState().current;
-      const reusable =
-        isCustomSheetPayload(incoming) &&
-        SHEET_LAYOUT_CONFIG[incoming.sheetId]?.mode === 'snapPoints';
-      const reviveClosingInstance = previous.seq !== openSeq && !previous.isOpen && reusable;
-      if (mountedSeq === null || (mountedSeq !== openSeq && !reviveClosingInstance)) {
-        setMountedSeq(openSeq);
-      } else if (reviveClosingInstance) {
-        // The one branch that serves an open() from a gorhom instance it did
-        // not mount. It exists because swapping instances mid-exit brought up
-        // a second iOS FullWindowOverlay whose JS touch responder was dead —
-        // a sheet that looks present and ignores every tap. Nothing else in
-        // the host records that this path was taken, so a report of "the
-        // sheet opened but nothing in it responds" has no way to name it.
-        popupHostLog.info('popupHost.revive', {
-          openSeq,
-          mountedSeq,
-          sheetId: isCustomSheetPayload(incoming) ? incoming.sheetId : 'standard',
-        });
-      }
-      setPresentAttempt(0);
-      setPresented(false);
-      return;
-    }
-    // Unmount after heroui's exit animation lands (~300ms) — matches the
-    // lastPayload cache window above.
-    const unmountTimer = setTimeout(() => setMountedSeq(null), 400);
-    return () => clearTimeout(unmountTimer);
-  }, [isOpen, openSeq, mountedSeq]);
-
-  // Watchdog for gorhom #2690 / #2719: under JS contention at mount the
-  // sheet's reanimated reactions can die, leaving it parked at -1 with no
-  // onAnimate. Only a remount recovers, so retry once, then release the
-  // request — same policy as ActionMenuHost.
-  useEffect(() => {
-    if (!isOpen || !mounted || presented) return;
-    const watchdog = setTimeout(() => {
-      if (usePopupStore.getState().openSeq !== openSeq) return;
-      popupHostLog.warn('popupHost.open_stalled', {
-        openSeq,
-        attempt: presentAttempt,
-        budgetMs: OPEN_WATCHDOG_MS,
-      });
-      if (presentAttempt === 0) setPresentAttempt(1);
-      else close(openSeq);
-    }, OPEN_WATCHDOG_MS);
-    return () => clearTimeout(watchdog);
-  }, [isOpen, mounted, presented, openSeq, presentAttempt, close]);
-
-  const payload = current ?? lastPayload;
+  const payload = shown?.payload ?? null;
   const isCustom = isCustomSheetPayload(payload);
-  const [customStack, setCustomStack] = useState<CustomSheetPage[]>([]);
-  const [customNavDirection, setCustomNavDirection] = useState<CustomSheetNavDirection>('forward');
-  const [customFooterConfig, setCustomFooterConfig] = useState<CustomSheetFooterConfig | null>(
-    null
-  );
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  const pushCustomPage = useCallback(
-    <K extends keyof ActionSheetPayloads>(sheetId: K, pagePayload: ActionSheetPayloads[K]) => {
-      setCustomNavDirection('forward');
-      setCustomStack((prev) => [...prev, { sheetId, payload: pagePayload }]);
+  const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
+  // Keyed by `shown.seq` so switching to a new sheet clears the previous sheet's
+  // footer synchronously without a parent effect overwriting a child's mount effect
+  // (e.g. NfcTapContent registering its Close button on mount).
+  const [customFooterState, setCustomFooterState] = useState<{
+    seq: number;
+    config: CustomSheetFooterConfig | null;
+  } | null>(null);
+  const customFooterConfig =
+    shown && customFooterState?.seq === shown.seq ? customFooterState.config : null;
+  const shownSeq = shown?.seq;
+  const setCustomFooterConfig = useCallback(
+    (config: CustomSheetFooterConfig | null) => {
+      if (shownSeq == null) return;
+      setCustomFooterState({ seq: shownSeq, config });
     },
-    []
+    [shownSeq]
   );
+  // Close bound to this instance's request: a button that opens a follow-on
+  // sheet (the onchain chooser → "Network fee") still closes after onPress,
+  // and that stale close must not tear the new sheet down. Memoized on
+  // `shownSeq` so custom bodies (e.g. NfcTapContent) that depend on `close`
+  // in their footer effect never re-fire in a loop.
+  const scopedClose = useCallback(() => {
+    if (shownSeq != null) close(shownSeq);
+  }, [close, shownSeq]);
 
-  const popCustomPage = useCallback(() => {
-    setCustomNavDirection('back');
-    setCustomStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = () => setIsKeyboardVisible(true);
+    const hide = () => setIsKeyboardVisible(false);
+    const subscriptions = [
+      Keyboard.addListener('keyboardWillShow', show),
+      Keyboard.addListener('keyboardDidShow', show),
+      Keyboard.addListener('keyboardWillHide', hide),
+      Keyboard.addListener('keyboardDidHide', hide),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
   }, []);
 
-  const activeCustomPage = useMemo(() => {
-    if (!isCustom || !payload) return null;
-    if (customStack.length > 0) return customStack[customStack.length - 1];
-    return { sheetId: payload.sheetId, payload: payload.payload } as CustomSheetPage;
-  }, [customStack, isCustom, payload]);
-
-  const canPopCustomPage = customStack.length > 1;
-
-  useEffect(() => {
-    if (!isOpen || !current || !isCustomSheetPayload(current)) {
-      setCustomStack([]);
-      setCustomNavDirection('forward');
-      setCustomFooterConfig(null);
-      return;
-    }
-
-    setCustomStack([{ sheetId: current.sheetId, payload: current.payload } as CustomSheetPage]);
-    setCustomNavDirection('forward');
-    setCustomFooterConfig(null);
-  }, [isOpen, current]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setIsKeyboardVisible(false);
-    }
-  }, [isOpen]);
-
-  const customRootSheetId =
-    customStack[0]?.sheetId ?? (isCustom && payload ? payload.sheetId : undefined);
-  const layoutConfig =
-    isCustom && customRootSheetId ? SHEET_LAYOUT_CONFIG[customRootSheetId] : undefined;
-  // Scrollable contentHeight sheets pin their footer via gorhom's
-  // footerComponent (an inline footer would scroll away with the body).
-  const isScrollableContentHeight =
-    isCustom && layoutConfig?.mode === 'contentHeight' && layoutConfig.scrollable === true;
-  const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
   const hasLiveStatus = standardPayload?.status != null;
   const [foreground, overlay, success] = useThemeColor([
     'foreground',
@@ -706,325 +381,82 @@ function SheetPopup() {
   );
 
   useEffect(() => {
-    const willShow = Keyboard.addListener('keyboardWillShow', () => setIsKeyboardVisible(true));
-    const didShow = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
-    const willHide = Keyboard.addListener('keyboardWillHide', () => setIsKeyboardVisible(false));
-    const didHide = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
-
-    return () => {
-      willShow.remove();
-      didShow.remove();
-      willHide.remove();
-      didHide.remove();
-    };
-  }, []);
-
-  const customSnapPoints = useMemo(
-    () => (layoutConfig?.mode === 'snapPoints' ? [...layoutConfig.snapPoints] : undefined),
-    [layoutConfig]
-  );
-  const customMaxDynamicContentSize = useMemo(
-    () =>
-      isCustom && layoutConfig?.mode === 'contentHeight'
-        ? Math.max(0, windowHeight - insets.top)
-        : undefined,
-    [insets.top, isCustom, layoutConfig?.mode, windowHeight]
-  );
-
-  // Pinned-footer clearance for scrollable sheets: the gorhom footer overlays
-  // the scroll content, so the content needs bottom padding to scroll fully
-  // clear of it. Measured from the footer's onLayout; estimated until then.
-  const [pinnedFooterHeight, setPinnedFooterHeight] = useState(0);
-  useEffect(() => {
-    if (customFooterConfig === null) setPinnedFooterHeight(0);
-  }, [customFooterConfig]);
-
-  // Patched heroui container flags (see patches/heroui-native+1.0.2.patch):
-  // snapPoints sheets need a plain View so nested gorhom scrollables stay
-  // active; scrollable contentHeight sheets need a BottomSheetScrollView so
-  // tall content scrolls instead of clipping at the dynamic-size cap.
-  const patchedContentContainerProps = useMemo(() => {
-    if (!isCustom || layoutConfig === undefined) return undefined;
-    if (layoutConfig.mode === 'snapPoints') return { useDirectView: true };
-    if (!layoutConfig.scrollable) return undefined;
-    const buttonCount = customFooterConfig?.buttons.length ?? 0;
-    if (buttonCount === 0) return { useScrollableContainer: true };
-    const rows = customFooterConfig?.layout === 'row' ? 1 : buttonCount;
-    const estimatedClearance = rows * 54 + 88;
-    return {
-      useScrollableContainer: true,
-      contentContainerStyle: {
-        paddingBottom: pinnedFooterHeight > 0 ? pinnedFooterHeight + 8 : estimatedClearance,
-      },
-    };
-  }, [isCustom, layoutConfig, customFooterConfig, pinnedFooterHeight]);
-
-  const customContentContainerClassName = useMemo(() => {
-    if (!isCustom) return undefined;
-    if (layoutConfig?.mode === 'snapPoints') return 'h-full px-0 pt-0 pb-0';
-    // When the memo input is focused, gorhom already lifts the sheet above the
-    // keyboard. Drop the inherited safe bottom padding so `Skip` doesn't float
-    // with an extra empty band beneath it.
-    if (customRootSheetId === 'send-memo' && isKeyboardVisible) return 'px-3 pb-0';
-    return 'px-3';
-  }, [customRootSheetId, isCustom, isKeyboardVisible, layoutConfig?.mode]);
-
-  useEffect(() => {
     const standard = !isCustom ? (current as StandardSheetPayload) : null;
-    if (!standard?.durationMs || !isOpen) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      usePopupStore.getState().close();
-    }, standard.durationMs);
-
+    if (!standard?.durationMs || !isOpen) return;
+    const timer = setTimeout(() => usePopupStore.getState().close(), standard.durationMs);
     return () => clearTimeout(timer);
   }, [current, isOpen, isCustom]);
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open && isOpen) {
-      Keyboard.dismiss();
-      scopedClose();
-    }
-  };
+  if (destroyed || !shown || !payload) return null;
 
-  // Authoritative close, straight from gorhom: fires whenever the sheet
-  // settles at the closed position. heroui's own close-detection reaction
-  // can MISS a slow full drag-to-bottom — its prepare closure keys only on
-  // `progress`, and a short (contentHeight) sheet bottoms out while the
-  // finger is still down, so onOpenChange(false) is never delivered and the
-  // store stays open with an INVISIBLE full-screen Overlay eating every
-  // touch in the app. popupStore.close() is idempotent, so double-delivery
-  // alongside heroui's path is safe.
-  const handleNativeSheetClose = () => handleOpenChange(false);
-
-  const handleNativeSheetChange = useCallback(
-    (index: number) => {
-      if (index >= 0 && isOpen && activeCustomPage?.sheetId === 'action-menu') {
-        markE2EActionMenuPresented(openSeq);
-      }
-    },
-    [activeCustomPage?.sheetId, isOpen, openSeq]
-  );
-
-  const renderCustomFooter = useCallback(
-    (props: { animatedFooterPosition: any }) => {
-      if (!isCustom) return null;
-      if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
-      return (
-        <BottomSheetFooter {...props}>
-          <View
-            // Pinned footers over a scrollable body match the sheet surface
-            // (bg-overlay + the content's px-3) so the body scrolls "under"
-            // the sheet's own bottom; snapPoints footers keep their bar look.
-            className={
-              isScrollableContentHeight
-                ? 'bg-overlay pb-safe-offset-4 px-3 pt-3'
-                : getStickyFooterClass(layoutConfig?.mode)
-            }
-            onLayout={
-              isScrollableContentHeight
-                ? (event) => setPinnedFooterHeight(event.nativeEvent.layout.height)
-                : undefined
-            }>
-            <View className={customFooterConfig.layout === 'row' ? 'flex-row gap-2.5' : 'gap-2.5'}>
-              {customFooterConfig.buttons.map((button, index) => {
-                const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
-                const footerButton = (
-                  <Button
-                    key={`${button.label}-${index}`}
-                    testID={button.testID}
-                    variant={variant === 'primary' ? 'primary' : 'secondary'}
-                    text={button.label}
-                    onPress={button.onPress}
-                    disabled={button.isDisabled}
-                  />
-                );
-
-                return customFooterConfig.layout === 'row' ? (
-                  <View key={`${button.label}-${index}`} className="flex-1">
-                    {footerButton}
-                  </View>
-                ) : (
-                  footerButton
-                );
-              })}
-            </View>
-          </View>
-        </BottomSheetFooter>
-      );
-    },
-    [isCustom, customFooterConfig, isScrollableContentHeight, layoutConfig?.mode]
-  );
-
-  if (destroyed || !mounted) return null;
+  const sheetId = isCustomSheetPayload(payload) ? payload.sheetId : 'standard';
+  const ContentComponent = isCustomSheetPayload(payload)
+    ? CUSTOM_SHEET_CONTENT[payload.sheetId]
+    : null;
+  const instanceOpen = isOpen && shown.seq === openSeq;
 
   return (
-    <BottomSheet
-      key={`${mountedSeq}:${presentAttempt}`}
-      isOpen={isOpen}
-      onOpenChange={handleOpenChange}>
-      <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-        <NostrKeysContextBridge value={nostrKeysContextValue}>
-          <BottomSheet.Overlay
-            isCloseOnPress={standardPayload?.dismissable ?? true}
-            testID="popup-sheet-overlay"
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss"
-            accessibilityState={{ disabled: !(standardPayload?.dismissable ?? true) }}
-            onPress={() => Keyboard.dismiss()}
-            style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
-          />
-          <BottomSheet.Content
-            accessible={false}
-            // Patched prop (patches/heroui-native+1.0.9.patch): forwarded to
-            // gorhom `index` so the freshly keyed sheet mounts open and gorhom
-            // animates it up once its layout is calculated.
-            mountIndex={0}
-            onAnimate={(_from, to) => {
-              if (to < 0 || presented) return;
-              // The positive counterpart of `popupHost.open_stalled`: without
-              // it a session that never selected anything is ambiguous between
-              // "the sheet never came up" and "it came up and ate every tap".
-              // Only the first report per open is logged.
-              popupHostLog.info('popupHost.presented', {
-                openSeq,
-                mountedSeq,
-                attempt: presentAttempt,
-                sheetId: isCustom && customRootSheetId ? customRootSheetId : 'standard',
-              });
-              setPresented(true);
-            }}
-            onChange={handleNativeSheetChange}
-            onClose={handleNativeSheetClose}
-            detached={!isCustom}
-            bottomInset={isCustom ? undefined : insets.bottom}
-            snapPoints={isCustom ? customSnapPoints : undefined}
-            enableDynamicSizing={isCustom ? layoutConfig?.mode === 'contentHeight' : undefined}
-            maxDynamicContentSize={customMaxDynamicContentSize}
-            enableOverDrag={isCustom ? false : undefined}
-            // Same keyboard recipe as ActionMenuHost's input forms. Gorhom's
-            // interactive mode lifts the sheet by keyboard height; restore
-            // settles it back after the input blurs.
-            keyboardBehavior="interactive"
-            keyboardBlurBehavior="restore"
-            android_keyboardInputMode="adjustResize"
-            footerComponent={
-              isCustom && (layoutConfig?.mode !== 'contentHeight' || isScrollableContentHeight)
-                ? renderCustomFooter
-                : undefined
-            }
-            handleComponent={
-              isCustom
-                ? // Custom sheets render the same chrome as `ActionMenuHost`'s
-                  // `<Menu>` — heroui's default handle indicator. Suppressing
-                  // it leaves no top breathing room and the title sits flush
-                  // against the sheet edge, which makes the picker look
-                  // cramped vs Select Profile. Both snapPoints and
-                  // contentHeight modes show the default handle.
-                  undefined
-                : hasLiveStatus
-                  ? (props: any) => (
-                      <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
-                    )
-                  : undefined
-            }
-            className={isCustom ? undefined : 'mx-4'}
-            // Custom sheets render the same chrome as `ActionMenuHost`
-            // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
-            // its content background. Match it here so surfaces routed through
-            // PopupHost (the send memo, the NFC tap sheet — all need
-            // FullWindowOverlay above route modals) are visually
-            // indistinguishable from menu-lane surfaces.
-            backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
-            backgroundComponent={
-              hasLiveStatus
-                ? (props: any) => (
-                    <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
-                  )
-                : undefined
-            }
-            contentContainerClassName={
-              // Zero out heroui's default `p-5` and `pb-safe-offset-3` for
-              // custom snapPoints sheets — exact same recipe as
-              // `ActionMenuHost`'s `'h-full px-0 pt-0 pb-0'` for tabbed
-              // menus. The inner content (e.g. `SectionAnchorList`) handles
-              // its own bottom inset via `contentBottomInset` so the last
-              // row clears the iOS home indicator without the wrapper
-              // forcing a visible padding band beneath the BlurView.
-              //
-              // contentHeight custom sheets: tighten horizontal padding from
-              // heroui's default `p-5` (20px) to `px-3` (12px) to match the
-              // menu-lane chrome. heroui's `<Menu presentation="bottom-sheet">`
-              // applies a `px-3` override on top of the same `p-5` base (see
-              // `node_modules/heroui-native/src/components/menu/menu.styles.ts`'s
-              // `contentBottomSheet`), so without this override the FWO-lane
-              // custom sheets render with 8px more horizontal padding per
-              // side than visually-identical menu-lane sheets like "Select
-              // option".
-              customContentContainerClassName
-            }
-            // Patched flag (see patches/heroui-native+1.0.9.patch): snap-point
-            // custom sheets use a plain RN `View` so their nested
-            // gorhom-registered scrollables stay active. Content-height sheets
-            // must keep `BottomSheetView`; it is the wrapper that reports
-            // dynamic content height back to gorhom — unless the sheet opts
-            // into `scrollable`, where the patched `useScrollableContainer`
-            // renders a BottomSheetScrollView instead (still reports dynamic
-            // height, but scrolls rather than clipping past the cap).
-            contentContainerProps={patchedContentContainerProps as never}>
-            <SheetContent
-              payload={payload}
-              activeCustomPage={activeCustomPage}
+    <Sheet
+      key={shown.seq}
+      open={instanceOpen}
+      dismissable={standardPayload?.dismissable ?? true}
+      onDismissRequest={() => {
+        Keyboard.dismiss();
+        scopedClose();
+      }}
+      onPresented={() => {
+        popupHostLog.info('popupHost.presented', { openSeq: shown.seq, sheetId });
+        if (sheetId === 'action-menu') markE2EActionMenuPresented(shown.seq);
+      }}
+      onClosed={() => setShown((value) => (value?.seq === shown.seq ? null : value))}
+      detached={!isCustom}
+      scrimColor={`rgba(0,0,0,${alpha.strong})`}
+      scrimTestID="popup-sheet-overlay"
+      backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface'}
+      surfaceStyle={hasLiveStatus ? liveBackgroundStyle : undefined}
+      handle={!hasLiveStatus}
+      contentClassName={
+        !isCustom
+          ? undefined
+          : // With the memo input focused the sheet already rides above the
+            // keyboard; drop the safe-area bottom padding so `Skip` doesn't
+            // float over an empty band.
+            sheetId === 'send-memo' && isKeyboardVisible
+            ? 'px-3 pb-0'
+            : 'px-3'
+      }>
+      <>
+        {ContentComponent && isCustomSheetPayload(payload) ? (
+          // A sheet draws in its own overlay window, so it carries its own
+          // layer for the "Show taps" recording setting.
+          <TouchIndicatorLayer fill={false}>
+            <ContentComponent
+              payload={payload.payload}
               close={scopedClose}
-              openCycle={openCycle}
-              confirmedAnimation={confirmedAnimation}
-              customNavDirection={customNavDirection}
-              isContentHeight={layoutConfig?.mode === 'contentHeight'}
-              pushCustomPage={pushCustomPage}
-              popCustomPage={popCustomPage}
-              canPopCustomPage={canPopCustomPage}
-              onCustomFooterConfigChange={setCustomFooterConfig}
+              setFooterConfig={setCustomFooterConfig}
             />
-            {/* Inline footer for NON-scrollable contentHeight sheets only —
-                scrollable ones pin their footer via footerComponent above. */}
-            {isCustom &&
-              layoutConfig?.mode === 'contentHeight' &&
-              !isScrollableContentHeight &&
-              customFooterConfig &&
-              customFooterConfig.buttons.length > 0 && (
-                <View className={getStickyFooterClass(layoutConfig?.mode)}>
-                  <View className="gap-2.5">
-                    {customFooterConfig.buttons.map((button, index) => {
-                      const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
-
-                      return (
-                        <Button
-                          key={`${button.label}-${index}`}
-                          testID={button.testID}
-                          variant={variant === 'primary' ? 'primary' : 'secondary'}
-                          text={button.label}
-                          onPress={button.onPress}
-                          disabled={button.isDisabled}
-                        />
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-          </BottomSheet.Content>
-        </NostrKeysContextBridge>
-      </BottomSheet.Portal>
-    </BottomSheet>
+            {customFooterConfig && customFooterConfig.buttons.length > 0 ? (
+              <FooterButtons config={customFooterConfig} />
+            ) : null}
+          </TouchIndicatorLayer>
+        ) : standardPayload ? (
+          <StandardContent
+            payload={standardPayload}
+            close={scopedClose}
+            openSeq={shown.seq}
+            confirmedAnimation={confirmedAnimation}
+          />
+        ) : null}
+      </>
+    </Sheet>
   );
 }
 
 export default function PopupHost() {
   return (
     <Log name="PopupHost">
-      <ToastRegistrar />
       <SheetPopup />
+      <ToastHost />
     </Log>
   );
 }

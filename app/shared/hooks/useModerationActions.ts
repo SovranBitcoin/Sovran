@@ -1,5 +1,4 @@
-import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { actionMenuPopup, replaceActionMenuPopup, popup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import {
@@ -13,16 +12,15 @@ import { REPORT_REASONS, type ReportReason } from '@/shared/lib/nostr/moderation
 import { useFeedIgnoreStore } from '@/shared/stores/profile/ignoreStore';
 
 export function useModerationActions() {
-  const { ndk } = useNDK();
-  const { isInitialized } = useNostrNDKContext();
+  const { client, isInitialized } = useNostrClient();
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const block = async (pubkey: string, blocked: boolean) => {
-    if (!isInitialized || !ndk || !ownPubkey) {
+    if (!isInitialized || !client || !ownPubkey) {
       popup({ message: 'Account is still loading', type: 'error' });
       return;
     }
-    await setPersonBlocked(ndk, ownPubkey, pubkey, blocked).then(
+    await setPersonBlocked(client, ownPubkey, pubkey, blocked).then(
       () => {
         popup({
           message: blocked ? 'Person blocked' : 'Person unblocked',
@@ -72,7 +70,7 @@ export function useModerationActions() {
                   'Your account, the reported account, reason, and public post ID (if selected) will be public on Nostr. Private message text is never included. Relay delivery does not guarantee moderator review or removal.',
                 onPress: (close) => {
                   close();
-                  if (!isInitialized || !ndk || !ownPubkey) {
+                  if (!isInitialized || !client || !ownPubkey) {
                     popup({ message: 'Account is still loading', type: 'error' });
                     return;
                   }
@@ -83,7 +81,7 @@ export function useModerationActions() {
                     return;
                   }
                   void publishReport(
-                    ndk,
+                    client,
                     ownPubkey,
                     target.data,
                     reason as ReportReason,
@@ -134,12 +132,12 @@ export function useModerationActions() {
     });
   };
   const refresh = async () => {
-    if (!isInitialized || !ndk || !ownPubkey) {
+    if (!isInitialized || !client || !ownPubkey) {
       popup({ message: 'Account is still loading', type: 'error' });
       return;
     }
     try {
-      await syncMuteList(ndk, ownPubkey);
+      await syncMuteList(client, ownPubkey);
       popup({ message: 'Blocked people updated', type: 'success', variant: 'toast' });
     } catch {
       popup({

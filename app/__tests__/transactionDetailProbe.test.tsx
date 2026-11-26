@@ -96,8 +96,8 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('@/shared/ui/composed/AndroidSheetRoot', () => ({
   SheetHeaderHeightContext: jest.requireActual<typeof import('react')>('react').createContext(null),
+  SHEET_SCRIM_OVERHANG: 0,
 }));
-jest.mock('@/shared/ui/composed/FlowSheetHeader', () => ({ FLOW_SHEET_SCRIM_OVERHANG: 0 }));
 jest.mock('@/shared/ui/composed/ModalLayoutWrapper', () => ({
   ModalLayoutWrapper: ({
     children,
@@ -318,8 +318,8 @@ describe('TransactionDetailShell device probe', () => {
       renderer.root.findByProps({ testID: 'transaction-counterparty-profile' }).props.onPress();
     });
     expect(mockNavigateToProfile).toHaveBeenCalledWith({
-      pathname: '/(profile-flow)/profile',
-      params: { pubkey: 'fixture-counterparty' },
+      pathname: '/profile',
+      params: { pubkey: 'fixture-counterparty', entry: 'sheet' },
     });
     const frame = renderer.root.findByType(QRCodeFrame);
     // First child is the placeholder's QR layer, sized to the live QR square.

@@ -9,6 +9,12 @@
  *
  * The Contacts tab was removed in the same change; a `sovran://contacts` link
  * (or any `/contacts…` path) opens the Search tab instead of +not-found.
+ *
+ * Seven route groups were flattened onto the root (`(map-flow)`,
+ * `(theme-flow)`, `(filter-flow)`, `(transactions-flow)`, `(user-flow)`,
+ * `(profile-flow)`, `(prompt-flow)`): a link naming one opens the same page at
+ * its root path, with its query and fragment unchanged. Only those seven are
+ * rewritten; the four flow groups that remain resolve as before.
  * Everything else passes through unchanged.
  *
  * Defensive by contract: expo-router documents that throwing here can crash
@@ -30,6 +36,44 @@ const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=/i;
  */
 const CONTACTS_ROUTE_RE =
   /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?(?:\((?:drawer|tabs)\)\/)*contacts(?:[/?#].*)?$/i;
+
+/**
+ * A link into a flattened group: an optional `scheme://` (and host), the
+ * group, then its leaf path and the query or fragment, kept verbatim.
+ */
+const LEGACY_GROUP_RE =
+  /^(?:[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)?)?\/?\((filter|map|theme|user|profile|prompt|transactions)-flow\)(\/[^?#]*)?([?#].*)?$/i;
+
+/**
+ * Both removed `(user-flow)/share` and `(profile-flow)/share` wrappers
+ * defaulted `type` to `npub`, whereas the root `/share` screen defaults to
+ * `profile` (which omits the Lightning tab). Preserve the `npub` default when
+ * a legacy share link omits `type`.
+ */
+function withDefaultShareType(tail: string): string {
+  const hashAt = tail.indexOf('#');
+  const query = hashAt === -1 ? tail : tail.slice(0, hashAt);
+  const hash = hashAt === -1 ? '' : tail.slice(hashAt);
+  if (/(?:^\?|&)type=/i.test(query)) return tail;
+  const nextQuery = query === '' || query === '?' ? '?type=npub' : `${query}&type=npub`;
+  return `${nextQuery}${hash}`;
+}
+
+/** The root path for a link into a flattened group, or null when it names none. */
+function rewriteLegacyGroup(path: string): string | null {
+  const match = LEGACY_GROUP_RE.exec(path);
+  if (!match) return null;
+  const [, group, leaf = '', tail = ''] = match;
+  const bare = leaf === '' || leaf === '/';
+  const lowerGroup = group.toLowerCase();
+  // The map group's index page is the map; no other group had one.
+  if (lowerGroup === 'map' && (bare || /^\/index\/?$/i.test(leaf))) return `/map${tail}`;
+  if (bare) return null;
+  if ((lowerGroup === 'user' || lowerGroup === 'profile') && /^\/share\/?$/i.test(leaf)) {
+    return `${leaf}${withDefaultShareType(tail)}`;
+  }
+  return `${leaf}${tail}`;
+}
 
 function carriesPairingSecret(path: string): boolean {
   if (PAIRING_SCHEME_RE.test(path) || CONNECT_WITH_URI_RE.test(path)) return true;
@@ -56,7 +100,7 @@ export function rewriteSystemPath(path: string): string {
     if (typeof path !== 'string') return path;
     if (carriesPairingSecret(path)) return '/';
     if (CONTACTS_ROUTE_RE.test(path)) return '/search';
-    return path;
+    return rewriteLegacyGroup(path) ?? path;
   } catch {
     return path;
   }

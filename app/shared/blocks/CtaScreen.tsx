@@ -10,7 +10,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Button } from '@/shared/ui/primitives/Button';
-import { ControlField, Label } from 'heroui-native';
+import { ControlField, Label } from '@/shared/ui/primitives/Field';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
@@ -50,8 +50,8 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
   useEffect(() => {
-    // The flow stack's header owns the close action (the same one every modal
-    // page shows); a blocking prompt takes it away along with the gesture.
+    // A blocking prompt takes the dismiss gesture away, and any header close
+    // action with it.
     navigation.setOptions({
       gestureEnabled: !blocking,
       ...(blocking ? { headerLeft: () => null } : {}),
@@ -120,10 +120,10 @@ export function CtaScreen({ id }: { id: CtaId }) {
       return;
     }
     // Starting the backup is never a dismissal; the intro is the next page of
-    // this same prompt flow, so it simply pushes.
+    // the journey and opens over this prompt, which closes with it.
     dismissalHandled.current = true;
     useCtaStore.getState().startBackup();
-    router.navigate('/(prompt-flow)/backup-intro');
+    router.navigate('/backup-intro');
   };
   return (
     <CtaView

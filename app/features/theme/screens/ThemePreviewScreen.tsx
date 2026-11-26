@@ -16,7 +16,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Icon from 'assets/icons';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -128,7 +128,7 @@ export function ThemePreviewScreen() {
 
   const handleUnitPress = useCallback((unitId: string) => {
     router.push({
-      pathname: '/(theme-flow)/background',
+      pathname: '/background',
       params: { unitId },
     });
   }, []);
@@ -194,7 +194,7 @@ export function ThemePreviewScreen() {
 
         <View className="mt-1 flex-row items-center justify-center gap-12">
           <PressableFeedback
-            onPress={() => router.push('/(theme-flow)/gallery')}
+            onPress={() => router.push('/gallery')}
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>

@@ -183,10 +183,9 @@ function FallbackSearchHeader({
     <View
       style={{
         flex: 1,
-        // FlowSheetHeader's titleSlot is a centered column (alignItems
-        // 'center' disables cross-axis stretch), so without an explicit
-        // stretch this collapses to padding-only width — the 'malformed,
-        // no width' search bar.
+        // A header title slot that centres its child (alignItems 'center'
+        // disables cross-axis stretch) would collapse this to padding-only
+        // width — the 'malformed, no width' search bar.
         alignSelf: 'stretch',
         flexDirection: 'row',
         alignItems: 'center',
@@ -580,10 +579,6 @@ export function MintAddScreen() {
 
   const screenOptions = withGlassHeaderItems({
     headerTransparent: true as const,
-    // Declares the page background (bgColor={surface} below) so the Android
-    // sheet header's scrim fades from the page's color, not the darker
-    // theme background. FlowSheetHeader reads this; iOS ignores it under a
-    // transparent header.
     headerTitle: renderHeaderTitle,
     headerRight: renderHeaderRight,
   });

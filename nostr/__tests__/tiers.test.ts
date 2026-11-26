@@ -1,8 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import {
   resolveAcrossTiers,
-  applyOrderingManifest,
-  synthesizeRecencyManifest,
   answered,
   unsupported,
   failed,
@@ -84,66 +82,6 @@ describe('resolveAcrossTiers — fallback engine', () => {
     const result = await resolveAcrossTiers<string>([]);
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().message).toMatch(/no tiers/);
-  });
-});
-
-describe('applyOrderingManifest — anti-reshuffle', () => {
-  const bundle = { a: 'A', b: 'B', c: 'C' };
-
-  test('renders strictly by the manifest order, not the bundle order', () => {
-    const out = applyOrderingManifest({ orderBy: 'rank', elements: ['c', 'a', 'b'] }, bundle);
-    expect(out).toEqual(['C', 'A', 'B']);
-  });
-
-  test('skips a manifest id absent from the bundle and reports it', () => {
-    const missing: string[] = [];
-    const out = applyOrderingManifest(
-      { orderBy: 'rank', elements: ['a', 'missing', 'b'] },
-      bundle,
-      { onMissing: (id) => missing.push(id) },
-    );
-    expect(out).toEqual(['A', 'B']);
-    expect(missing).toEqual(['missing']);
-  });
-
-  test('does NOT render bundle entries absent from the manifest', () => {
-    const out = applyOrderingManifest({ orderBy: 'rank', elements: ['a'] }, bundle);
-    expect(out).toEqual(['A']);
-  });
-
-  test('renders each id at most once even if the manifest repeats it', () => {
-    const out = applyOrderingManifest({ orderBy: 'rank', elements: ['a', 'a', 'b'] }, bundle);
-    expect(out).toEqual(['A', 'B']);
-  });
-
-  test('accepts a Map bundle as well as a record', () => {
-    const map = new Map(Object.entries(bundle));
-    const out = applyOrderingManifest({ orderBy: 'rank', elements: ['b', 'c'] }, map);
-    expect(out).toEqual(['B', 'C']);
-  });
-});
-
-describe('synthesizeRecencyManifest — relay floor', () => {
-  test('orders newest-first with a stable id tiebreak on equal created_at', () => {
-    const manifest = synthesizeRecencyManifest([
-      { id: 'x', created_at: 100 },
-      { id: 'y', created_at: 200 },
-      { id: 'a', created_at: 100 },
-    ]);
-    expect(manifest.orderBy).toBe('created_at');
-    // 200 first; then the two 100s tiebreak by id descending (x before a).
-    expect(manifest.elements).toEqual(['y', 'x', 'a']);
-  });
-
-  test('round-trips through applyOrderingManifest to a coherent ordered set', () => {
-    const events = [
-      { id: 'old', created_at: 1 },
-      { id: 'new', created_at: 9 },
-    ];
-    const bundle = { old: events[0], new: events[1] };
-    const manifest = synthesizeRecencyManifest(events);
-    const out = applyOrderingManifest(manifest, bundle);
-    expect(out.map((e) => e.id)).toEqual(['new', 'old']);
   });
 });
 

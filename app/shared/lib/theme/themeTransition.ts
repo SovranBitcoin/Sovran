@@ -1,7 +1,7 @@
 /**
- * Theme/wallpaper transition seam (module-level reanimated mutables so
- * ThemeProvider — which mounts ABOVE BackgroundProvider — can drive layers
- * that BackgroundView renders, without provider-order gymnastics).
+ * Theme/wallpaper transition seam (module-level reanimated mutables so the
+ * theme applier in the app root can drive layers that BackgroundView renders,
+ * without provider-order gymnastics).
  *
  * The wallpaper is a stack of PERSISTENT per-carousel-page layers whose
  * opacities are a pure function of one shared value: the account pager's

@@ -12,8 +12,6 @@ export interface FiatCurrencyPillProps {
   showToggleGlyph?: boolean;
   /** Text size for both iOS + non-iOS renderers */
   textSize?: number;
-  /** Enable the iOS ContextMenu for fiat currency selection (wallet UX). */
-  enableCurrencyMenu?: boolean;
   /** Stable id for the tappable pill (e2e). */
   testID?: string;
   /** AX label for the tappable pill — required for the id to reach the AX tree on iOS. */
@@ -26,7 +24,6 @@ interface FiatCurrencyPillShared {
   iosHeight: number;
   iosWidth: number;
   onPress?: () => void;
-  enableCurrencyMenu: boolean;
   /**
    * The tap/long-press arbitration, as data: with an external `onPress`, tap
    * toggles sats/fiat and long-press opens the currency menu; otherwise tap
@@ -50,7 +47,6 @@ export function useFiatCurrencyPill({
   onSelectCurrency,
   showToggleGlyph = false,
   textSize = 14,
-  enableCurrencyMenu = true,
   testID,
   accessibilityLabel,
 }: FiatCurrencyPillProps): FiatCurrencyPillShared {
@@ -71,9 +67,9 @@ export function useFiatCurrencyPill({
   const iosHeight = 34;
   const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
 
-  const menuOpensOnLongPress = enableCurrencyMenu && !!onPress;
+  const menuOpensOnLongPress = !!onPress;
   const handlersFor = (openMenu: () => void) => ({
-    primaryHandler: enableCurrencyMenu && !onPress ? openMenu : onPress,
+    primaryHandler: onPress ?? openMenu,
     longPressHandler: menuOpensOnLongPress ? openMenu : undefined,
   });
 
@@ -83,7 +79,6 @@ export function useFiatCurrencyPill({
     iosHeight,
     iosWidth,
     onPress,
-    enableCurrencyMenu,
     menuOpensOnLongPress,
     handlersFor,
     textSize,

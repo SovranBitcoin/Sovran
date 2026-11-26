@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
+import { useWalletContextWithOverride } from '@/runtime/WalletProjection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';

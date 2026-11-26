@@ -9,3 +9,4 @@ export * from './transport';
 export * as recipes from './recipes';
 export * as tiers from './tiers';
 export * as facade from './facade';
+export * as client from './client';

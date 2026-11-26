@@ -12,14 +12,7 @@ jest.mock('react-native-web/dist/exports/Keyboard', () => ({
     removeListener: jest.fn(),
   },
 }));
-jest.mock('@gorhom/bottom-sheet', () => ({
-  BottomSheetScrollView: 'BottomSheetScrollView',
-  BottomSheetTextInput: 'BottomSheetTextInput',
-}));
 jest.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
-jest.mock('heroui-native', () => ({
-  BottomSheet: { Title: 'BottomSheet.Title' },
-}));
 jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
   withAlpha: jest.fn((color: string, value: number) => `${color}:${value}`),

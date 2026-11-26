@@ -17,7 +17,7 @@
  * Two devices publishing at the same moment can still overwrite each other;
  * that is how the list works on Nostr.
  */
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
 import { Contacts } from 'nostr-tools/kinds';
 import { supersedes, tiers, type facade } from 'nostr';
 import { z } from 'zod';
@@ -271,7 +271,7 @@ async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed
 }
 
 /** One pass for one account, with the account and its signer pinned across every wait. */
-async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
+async function syncOnce(client: NostrClient, ownPubkey: string): Promise<void> {
   const scope = captureActiveProfile(ownPubkey);
   const social = () => useNostrSocialStore.getState();
   try {
@@ -280,9 +280,9 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       if (!useNostrSocialStore.persist.hasHydrated()) return;
       if (Object.keys(selectFollowIntents(social())).length === 0) return;
 
-      const signer = await matchingSigner(ndk, ownPubkey);
+      const signer = await matchingSigner(client, ownPubkey);
       scope.check();
-      const raw = await readForEdit(ndk, ownPubkey, Contacts);
+      const raw = await readForEdit(client, ownPubkey, Contacts);
       scope.check();
       // Until the account's relay list is known its write relays read as the
       // defaults, which may not be where its follow list is.
@@ -345,7 +345,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // A signer replaced during the read never signs. Signing can fail but
       // never refuses (the only signer is the account's own key), so a
       // failure keeps the taps for the next pass.
-      const event = await signReplacement(ndk, signer, scope, {
+      const event = await signReplacement(client, signer, scope, {
         kind: Contacts,
         pubkey: ownPubkey,
         replaces: plan.base.createdAt,
@@ -356,11 +356,11 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // or the write relays changed since the read: read and build again.
       if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.asked, ownPubkey)) continue;
 
-      const published = await publishToRelaysRead(ndk, event, raw.relays);
+      const published = await publishToRelaysRead(client, event, raw.relays);
       scope.check();
       if (published.isErr()) throw new Error(`Follow list publish failed: ${published.error.type}`);
       // Published, but not recorded for a signer that changed meanwhile: the next pass reads it back.
-      if (ndk.signer !== signer) throw new Error('Account signer changed');
+      if (client.signer !== signer) throw new Error('Account signer changed');
       nostrLog.info('nostr.follow.published', {
         intents: Object.keys(intents).length,
         tags: plan.tags.length,
@@ -387,26 +387,26 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
   }
 }
 
-type Worker = { ndk: NDK; again: boolean; done: Promise<void> };
+type Worker = { client: NostrClient; again: boolean; done: Promise<void> };
 
 /** At most one worker per account; a request while it runs makes it go round once more. */
 const workers = new Map<string, Worker>();
 
 /** Publish the account's outstanding follow intents. Resolves when its worker stops. */
-export function requestFollowSync(ndk: NDK, ownPubkey: string): Promise<void> {
+export function requestFollowSync(client: NostrClient, ownPubkey: string): Promise<void> {
   const running = workers.get(ownPubkey);
   if (running) {
-    running.ndk = ndk;
+    running.client = client;
     running.again = true;
     return running.done;
   }
-  const worker: Worker = { ndk, again: true, done: Promise.resolve() };
+  const worker: Worker = { client, again: true, done: Promise.resolve() };
   workers.set(ownPubkey, worker);
   worker.done = (async () => {
     try {
       while (worker.again) {
         worker.again = false;
-        await syncOnce(worker.ndk, ownPubkey);
+        await syncOnce(worker.client, ownPubkey);
       }
     } finally {
       workers.delete(ownPubkey);

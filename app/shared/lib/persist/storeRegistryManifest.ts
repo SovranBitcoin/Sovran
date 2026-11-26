@@ -41,22 +41,6 @@ export const storeRegistryManifest = [
     profileStorage: true,
   },
   {
-    file: 'features/payments/data/dmSnapshotCaches.ts',
-    name: 'dm-conversations-cache',
-    scope: 'session',
-    persisted: false,
-    queryCache: true,
-    profileStorage: true,
-  },
-  {
-    file: 'features/payments/data/dmSnapshotCaches.ts',
-    name: 'dm-thread-cache',
-    scope: 'session',
-    persisted: false,
-    queryCache: true,
-    profileStorage: true,
-  },
-  {
     file: 'features/payments/data/profileSearchCache.ts',
     name: 'profile-search-cache',
     scope: 'global',
@@ -491,14 +475,6 @@ export const storeRegistryManifest = [
   {
     file: 'shared/stores/runtime/detailsSheetStore.ts',
     name: 'useDetailsSheetStore',
-    scope: 'session',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
-    file: 'shared/stores/runtime/dmEchoStore.ts',
-    name: 'useDmEchoStore',
     scope: 'session',
     persisted: false,
     queryCache: false,

@@ -23,7 +23,7 @@ export function navigateToProfile(pubkey: string | null | undefined, mintUrl?: s
   // follower from inside a profile then back returns to the previous one.
   runAfterNativeSearchDismiss(() => {
     guardedRouter.push({
-      pathname: '/(user-flow)/profile',
+      pathname: '/profile',
       params: { pubkey, ...(mintUrl ? { mintUrl } : {}) },
     });
   });

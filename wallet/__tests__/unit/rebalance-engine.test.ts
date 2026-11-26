@@ -1,986 +1,514 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  Amount,
-  MintOperationError,
-  NetworkError,
-  OperationInProgressError,
-  ProofValidationError,
-} from '@cashu/coco-core';
+import { Amount, ProofValidationError, type MintSwapOperation } from '@cashu/coco-core';
 
-import { insertStepsAfter } from '../../src/rebalance/chain';
 import { createRebalanceEngine } from '../../src/rebalance/engine';
-import { RebalanceMeltRolledBackError, RebalanceRoutesExhaustedError } from '../../src/rebalance/errors';
 import { createRebalanceLock } from '../../src/rebalance/lock';
+import {
+  RebalanceExactAmountError,
+  RebalanceRoutesExhaustedError,
+  RebalanceSourceDebitCapError,
+} from '../../src/rebalance/errors';
 import type {
   RebalanceClock,
   RebalanceEventSink,
   RebalanceLegUpdate,
-  RebalanceMintReceipt,
-  RebalanceMintSnapshot,
+  RebalanceMintSwapApi,
   RebalanceRoute,
   RebalanceTransfer,
   RebalanceWalletPort,
 } from '../../src/rebalance/types';
 
-const SOURCE = 'https://source.example';
-const DESTINATION = 'https://destination.example';
-const MIDDLEMAN = 'https://middleman.example';
-const STEP: RebalanceTransfer = {
-  id: 'step-1',
-  fromMintUrl: SOURCE,
-  toMintUrl: DESTINATION,
-  amount: 100,
-};
+const MINT_A = 'https://a.mint.example';
+const MINT_B = 'https://b.mint.example';
+const MINT_MID = 'https://mid.mint.example';
+const MINT_MID2 = 'https://mid2.mint.example';
 
-function fakeClock(): RebalanceClock & { elapsed: () => number } {
-  let now = 0;
+function makeClock(start = 1_000): RebalanceClock {
+  let now = start;
   return {
     now: () => now,
-    sleep: async (ms) => {
+    sleep: async (ms: number) => {
       now += ms;
-      await Promise.resolve();
-    },
-    elapsed: () => now,
-  };
-}
-
-/**
- * In-memory wallet: receipts finalize when their invoice is paid, melts
- * finalize on execute unless a test overrides the behaviour.
- */
-function fakeWallet(balances: Record<string, number> = { [SOURCE]: 1000 }) {
-  const receipts = new Map<string, RebalanceMintReceipt & { state: string }>();
-  let nextReceipt = 0;
-  let nextMelt = 0;
-  const invoiceByMelt = new Map<string, string>();
-  const payInvoice = (invoice: string) => {
-    for (const receipt of receipts.values()) {
-      if (receipt.request === invoice) receipt.state = 'finalized';
-    }
-  };
-  const port = {
-    balancesByMint: vi.fn(async () => ({ ...balances })),
-    worstCaseInputFee: vi.fn(async (_mintUrl: string) => 0),
-    probeMeltFeeReserve: vi.fn(async (_mintUrl: string, _invoice: string) => 0),
-    createMintReceipt: vi.fn(async (mintUrl: string, amount: number) => {
-      const quoteId = `quote-${++nextReceipt}`;
-      const receipt = {
-        id: `mint-${quoteId}`,
-        quoteId,
-        mintUrl,
-        method: 'bolt11',
-        unit: 'sat',
-        amount: Amount.from(amount),
-        request: `invoice-${quoteId}`,
-        state: 'pending',
-      };
-      receipts.set(receipt.id, receipt);
-      return receipt;
-    }),
-    getMintOperation: vi.fn(
-      async (operationId: string): Promise<RebalanceMintSnapshot | null> =>
-        receipts.get(operationId) ?? null
-    ),
-    prepareMelt: vi.fn(async (_mintUrl: string, invoice: string) => {
-      const id = `melt-${++nextMelt}`;
-      invoiceByMelt.set(id, invoice);
-      return { id, quoteId: `melt-quote-${nextMelt}`, amount: 100, fee_reserve: 0, swap_fee: 0 };
-    }),
-    executeMelt: vi.fn(async (operationId: string) => {
-      payInvoice(invoiceByMelt.get(operationId) ?? '');
-      return { id: operationId, state: 'finalized' };
-    }),
-    refreshMelt: vi.fn(async (operationId: string) => ({ id: operationId, state: 'finalized' })),
-    getMeltOperation: vi.fn(async (_operationId: string) => null as { state: string } | null),
-    restoreInflightProofs: vi.fn(async (_mintUrl: string) => {}),
-    cancelPreparedMelt: vi.fn(async (_operationId: string) => {}),
-    trustMint: vi.fn(async (_mintUrl: string) => {}),
-    releaseTrust: vi.fn(async (_mintUrls: readonly string[]) => ({
-      stranded: [],
-      untrustErrors: [],
-    })),
-  } satisfies RebalanceWalletPort;
-  return { port, receipts, payInvoice, invoiceByMelt };
-}
-
-function recordingSink() {
-  const events: { type: string; legId: string; update?: RebalanceLegUpdate }[] = [];
-  const statuses = (legId: string) =>
-    events
-      .filter((event) => event.legId === legId && event.update?.status)
-      .map((event) => event.update?.status);
-  let hopRun = 0;
-  const sink: RebalanceEventSink = {
-    legOpened: (legId) => events.push({ type: 'legOpened', legId }),
-    legUpdated: (legId, update) => events.push({ type: 'legUpdated', legId, update }),
-    mintReceiptCreated: (legId) => events.push({ type: 'mintReceiptCreated', legId }),
-    meltPrepared: (legId) => events.push({ type: 'meltPrepared', legId }),
-    routeAttemptStarted: (stepId, { route }) => {
-      hopRun += 1;
-      return {
-        chainId: `chain-${hopRun}`,
-        hopLegIds: route.path.slice(1).map((_, index) => `${stepId}-hop-${hopRun}-${index}`),
-      };
     },
   };
-  return { sink, events, statuses };
 }
 
-function setup(
-  options: {
-    balances?: Record<string, number>;
-    routes?: RebalanceRoute[];
-    trusted?: string[];
-  } = {}
-) {
-  const wallet = fakeWallet(options.balances);
-  const clock = fakeClock();
-  const findRoutes = vi.fn(async () => options.routes ?? []);
-  const engine = createRebalanceEngine({
-    wallet: wallet.port,
-    findRoutes,
-    trustedMintUrls: new Set(options.trusted ?? [SOURCE, DESTINATION]),
-    minTransferThreshold: 5,
-    minFeeReserve: 5,
-    lock: createRebalanceLock(clock),
-    clock,
+function makeSwapOp(
+  overrides: Omit<Partial<MintSwapOperation>, 'destinationAmount'> & {
+    id: string;
+    state: MintSwapOperation['state'];
+    sourceMintUrl?: string;
+    destinationMintUrl?: string;
+    destinationAmount?: number;
+  }
+): MintSwapOperation {
+  const amount = Amount.from(overrides.destinationAmount ?? 100);
+  const base = {
+    id: overrides.id,
+    revision: 1,
+    sourceMintUrl: overrides.sourceMintUrl ?? MINT_A,
+    destinationMintUrl: overrides.destinationMintUrl ?? MINT_B,
+    unit: 'sat' as const,
+    destinationAmount: amount,
+    sourceQuote: { mintUrl: overrides.sourceMintUrl ?? MINT_A, method: 'bolt11' as const, quoteId: `mq-${overrides.id}` },
+    destinationQuote: { mintUrl: overrides.destinationMintUrl ?? MINT_B, method: 'bolt11' as const, quoteId: `dq-${overrides.id}` },
+    sourceOperationId: `melt-${overrides.id}`,
+    destinationOperationId: `mint-${overrides.id}`,
+    paymentRequestHash: '00'.repeat(32),
+    createdAt: 1_000,
+    updatedAt: 1_000,
+    stateEnteredAt: 1_000,
+    retry: { attemptCount: 0, lastAttemptAt: null, nextAttemptAt: null, lastError: null },
+  };
+  return { ...base, ...overrides } as MintSwapOperation;
+}
+
+function makeWallet(options: {
+  balances?: Record<string, number>;
+  inputFee?: number;
+  mintSwap?: Partial<RebalanceMintSwapApi>;
+  releaseTrust?: RebalanceWalletPort['releaseTrust'];
+} = {}) {
+  const balances = { [MINT_A]: 500, [MINT_B]: 0, [MINT_MID]: 500, ...options.balances };
+  const ops = new Map<string, MintSwapOperation>();
+
+  const defaultPrepare = vi.fn(async (input) => {
+    const op = makeSwapOp({
+      id: input.id,
+      state: 'prepared',
+      sourceMintUrl: input.sourceMintUrl,
+      destinationMintUrl: input.destinationMintUrl,
+      destinationAmount: Number(input.destinationAmount),
+      sourceDebitBounds: {
+        minimum: Amount.from(Number(input.destinationAmount)),
+        maximum: Amount.from(Number(input.destinationAmount) + 2),
+        reserved: Amount.from(Number(input.destinationAmount) + 2),
+      },
+    } as never);
+    ops.set(op.id, op);
+    return op;
   });
-  const recorder = recordingSink();
-  const run = (step = STEP, isActive = () => true) =>
-    engine.executeTransfer(step, { isActive, sink: recorder.sink });
-  return { engine, wallet, clock, findRoutes, recorder, run };
+
+  const defaultExecute = vi.fn(async (id: string) => {
+    const existing = ops.get(id);
+    const completed = makeSwapOp({
+      id,
+      state: 'completed',
+      sourceMintUrl: existing?.sourceMintUrl,
+      destinationMintUrl: existing?.destinationMintUrl,
+      destinationAmount: existing ? Number(existing.destinationAmount.toString()) : 100,
+    });
+    ops.set(id, completed);
+    return completed;
+  });
+
+  const mintSwap: RebalanceMintSwapApi = {
+    prepare: options.mintSwap?.prepare ?? defaultPrepare,
+    execute: options.mintSwap?.execute ?? defaultExecute,
+    get: options.mintSwap?.get ?? vi.fn(async (id: string) => ops.get(id) ?? null),
+    listActive: options.mintSwap?.listActive ?? vi.fn(async () => []),
+    refresh: options.mintSwap?.refresh ?? vi.fn(async (id: string) => ops.get(id)!),
+    cancel: options.mintSwap?.cancel ?? vi.fn(async (id: string) => makeSwapOp({ id, state: 'cancelled' })),
+    waitForOutcome:
+      options.mintSwap?.waitForOutcome ??
+      vi.fn(async (id: string) => {
+        const op = ops.get(id)!;
+        return { kind: op.state as 'completed', operation: op } as never;
+      }),
+  };
+
+  const port: RebalanceWalletPort = {
+    balancesByMint: vi.fn(async () => ({ ...balances })),
+    worstCaseInputFee: vi.fn(async () => options.inputFee ?? 0),
+    mintSwap,
+    trustMint: vi.fn(async () => undefined),
+    releaseTrust:
+      options.releaseTrust ?? vi.fn(async () => ({ stranded: [], untrustErrors: [] })),
+  };
+
+  return { port, mintSwap, ops };
 }
 
-describe('rebalance engine — direct transfer', () => {
-  it('mints, melts once and settles on the recipient operation', async () => {
-    const { run, wallet, recorder } = setup();
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-    expect(wallet.port.getMintOperation).toHaveBeenCalledWith('mint-quote-1');
-    expect(recorder.statuses('step-1')).toEqual([
+function makeSink() {
+  const updates: { legId: string; update: RebalanceLegUpdate }[] = [];
+  const opened: { legId: string; amount: number }[] = [];
+  const prepared: { legId: string; op: MintSwapOperation }[] = [];
+  const sink: RebalanceEventSink = {
+    legOpened: vi.fn((legId, leg) => {
+      opened.push({ legId, amount: leg.amount });
+    }),
+    legUpdated: vi.fn((legId, update) => {
+      updates.push({ legId, update });
+    }),
+    swapPrepared: vi.fn((legId, op) => {
+      prepared.push({ legId, op });
+    }),
+    routeAttemptStarted: vi.fn((stepId, { route, index }) => ({
+      chainId: `chain-${index}`,
+      hopLegIds: route.path.slice(0, -1).map((_: string, i: number) => `${stepId}-hop-${index}-${i}`),
+    })),
+  };
+  return { sink, updates, opened, prepared };
+}
+
+function step(overrides: Partial<RebalanceTransfer> = {}): RebalanceTransfer {
+  return {
+    id: 'step-1',
+    fromMintUrl: MINT_A,
+    toMintUrl: MINT_B,
+    amount: 100,
+    ...overrides,
+  };
+}
+
+describe('createRebalanceEngine (Coco ops.mintSwap)', () => {
+  it('executes a direct swap through ops.mintSwap.prepare -> execute and emits done', async () => {
+    const wallet = makeWallet();
+    const { sink, updates, prepared } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
+
+    expect(outcome).toEqual({ status: 'done' });
+    expect(wallet.mintSwap.prepare).toHaveBeenCalledTimes(1);
+    expect(wallet.mintSwap.execute).toHaveBeenCalledTimes(1);
+    expect(prepared).toHaveLength(1);
+    expect(updates.map((u) => u.update.status).filter(Boolean)).toEqual([
       'creatingInvoice',
       'invoiceReady',
       'melting',
-      'verifying',
       'done',
     ]);
-    expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
   });
 
-  it('skips a transfer the source can no longer cover', async () => {
-    const { run, wallet } = setup({ balances: { [SOURCE]: 8 } });
-    await expect(run()).resolves.toEqual({ status: 'skipped' });
-    expect(wallet.port.createMintReceipt).not.toHaveBeenCalled();
-  });
-
-  it('caps the amount to the probed fee reserve before preparing', async () => {
-    const { run, wallet } = setup({ balances: { [SOURCE]: 110 } });
-    wallet.port.probeMeltFeeReserve.mockResolvedValue(12);
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    // 100 + static headroom 7 fits 110; the probed 12 sat reserve does not.
-    expect(wallet.port.createMintReceipt.mock.calls.map(([, amount]) => amount)).toEqual([
-      100, 98,
-    ]);
-  });
-
-  it('re-prepares with a smaller invoice while proof selection falls short', async () => {
-    const { run, wallet } = setup();
-    wallet.port.prepareMelt
-      .mockRejectedValueOnce(new ProofValidationError('Not enough proofs to send'))
-      .mockRejectedValueOnce(new ProofValidationError('Not enough proofs to send'));
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.createMintReceipt.mock.calls.map(([, amount]) => amount)).toEqual([
-      100, 98, 96,
-    ]);
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-  });
-
-  it('stops re-preparing at the transfer threshold and never executes', async () => {
-    const { run, wallet } = setup({ balances: { [SOURCE]: 20 } });
-    wallet.port.prepareMelt.mockRejectedValue(new ProofValidationError('Not enough proofs to send'));
-    const outcome = await run();
-    expect(outcome.status).toBe('failed');
-    expect(wallet.port.executeMelt).not.toHaveBeenCalled();
-  });
-
-  it('re-prepares after the mint rejects the inputs, once state confirms nothing paid', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(11005, 'unbalanced'));
-    wallet.port.getMeltOperation.mockResolvedValueOnce({ state: 'rolled_back' });
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.getMeltOperation).toHaveBeenCalledWith('melt-1');
-    expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-    expect(wallet.port.createMintReceipt.mock.calls.map(([, amount]) => amount)).toEqual([
-      100, 98,
-    ]);
-    expect(wallet.port.executeMelt.mock.calls.map(([id]) => id)).toEqual(['melt-1', 'melt-2']);
-  });
-
-  it('bounds input-shortfall re-preparation', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockRejectedValue(new MintOperationError(11005, 'unbalanced'));
-    const outcome = await run();
-    expect(outcome.status).toBe('failed');
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(3);
-  });
-
-  it('reconciles an input-shortfall error whose melt coco reports in flight instead of paying again', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(11005, 'unbalanced'));
-    wallet.port.getMeltOperation.mockResolvedValueOnce({ state: 'pending' });
-    wallet.port.refreshMelt.mockImplementationOnce(async (id) => {
-      wallet.payInvoice('invoice-quote-1');
-      return { id, state: 'finalized' };
-    });
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-    expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-  });
-
-  it('waits on an operation already in progress and never executes it twice', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockRejectedValueOnce(new OperationInProgressError('melt-1'));
-    wallet.port.refreshMelt
-      .mockResolvedValueOnce({ id: 'melt-1', state: 'pending' })
-      .mockImplementationOnce(async (id) => {
-        wallet.payInvoice('invoice-quote-1');
-        return { id, state: 'finalized' };
-      });
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-    expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-  });
-
-  it('reconciles a lost execute response against the persisted melt state', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
-    wallet.port.getMeltOperation.mockResolvedValueOnce({ state: 'executing' });
-    wallet.port.refreshMelt.mockImplementationOnce(async (id) => {
-      wallet.payInvoice('invoice-quote-1');
-      return { id, state: 'finalized' };
-    });
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-  });
-
-  describe('a melt whose execute threw is failed only once it is known not to have paid', () => {
-    it.each([
-      ['finds nothing', () => null],
-      [
-        'cannot be read',
-        () => {
-          throw new Error('database is locked');
-        },
-      ],
-    ])(
-      'keeps it pending, its proofs reserved, when the response was lost and its state %s',
-      async (_name, readState) => {
-        const { run, wallet, recorder, findRoutes } = setup();
-        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
-        wallet.port.getMeltOperation.mockImplementation(async () => readState());
-        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
-        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-        expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
-        expect(recorder.statuses('step-1')).not.toContain('failed');
-        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-        expect(findRoutes).not.toHaveBeenCalled();
-      }
-    );
-
-    it.each([
-      ['reads as no route', new Error('no_route')],
-      ['reads as short inputs', new Error('not enough inputs provided for melt')],
-    ])(
-      'never routes or pays again when an error that is not the mint answering %s',
-      async (_name, error) => {
-        const { run, wallet, findRoutes } = setup();
-        wallet.port.executeMelt.mockRejectedValueOnce(error);
-        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
-        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-        expect(findRoutes).not.toHaveBeenCalled();
-        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-      }
-    );
-
-    it('settles it from the mint once a read answers, paying nothing twice', async () => {
-      const { run, wallet } = setup();
-      wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
-      wallet.port.refreshMelt.mockImplementationOnce(async (id) => {
-        wallet.payInvoice('invoice-quote-1');
-        return { id, state: 'finalized' };
-      });
-      await expect(run()).resolves.toEqual({ status: 'done' });
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+  it('skips when source balance is below minTransferThreshold + feeHeadroom', async () => {
+    const wallet = makeWallet({ balances: { [MINT_A]: 10 } });
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
     });
 
-    it.each(['prepared', 'rolled_back', 'failed'])(
-      'fails it and frees its proofs when its state reads %s: nothing was paid',
-      async (state) => {
-        const { run, wallet } = setup();
-        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
-        wallet.port.getMeltOperation.mockResolvedValueOnce({ state });
-        const outcome = await run();
-        expect(outcome.status).toBe('failed');
-        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      }
-    );
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
 
-    it.each([
-      [10001, 'Proof verification failed'],
-      [20004, 'Lightning payment failed'],
-    ])(
-      'fails it when the mint refused it before paying (%s), though its state cannot be read',
-      async (code, detail) => {
-        const { run, wallet } = setup();
-        wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(code, detail));
-        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
-        const outcome = await run();
-        expect(outcome.status).toBe('failed');
-        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-      }
-    );
+    expect(outcome).toEqual({ status: 'skipped' });
+    expect(wallet.mintSwap.prepare).not.toHaveBeenCalled();
+  });
 
-    // Proofs already spent, or the invoice already paid, may be this very melt having paid.
-    it.each([
-      [11001, 'Token already spent'],
-      [20006, 'Invoice already paid'],
-      [11003, 'Outputs already signed'],
-      [12002, 'Keyset is inactive'],
-      // CDK answers a unit mismatch after its backend reported the payment paid.
-      [11010, 'Unit mismatch'],
-    ])(
-      'keeps it pending, its proofs reserved, when the mint answered %s and its state cannot be read',
-      async (code, detail) => {
-        const { run, wallet, findRoutes } = setup();
-        wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(code, detail));
-        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
-        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
-        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-        expect(findRoutes).not.toHaveBeenCalled();
-      }
-    );
-
-    it.each(['prepared', 'failed', 'rolled_back'])(
-      'fails it and frees its proofs once a later read shows it %s, after the first read failed',
-      async (state) => {
-        const { run, wallet } = setup();
-        const lost = new NetworkError('socket hang up');
-        wallet.port.executeMelt.mockRejectedValueOnce(lost);
-        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
-        wallet.port.refreshMelt
-          .mockRejectedValueOnce(new NetworkError('socket hang up'))
-          .mockResolvedValue({ id: 'melt-1', state });
-        const outcome = await run();
-        expect(outcome.status).toBe('failed');
-        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      }
-    );
-
-    it('keeps a melt another call is executing pending though a read shows it prepared', async () => {
-      const { run, wallet } = setup();
-      wallet.port.executeMelt.mockRejectedValueOnce(new OperationInProgressError('melt-1'));
-      wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'prepared' });
-      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  it('shrinks destinationAmount on insufficient_proofs prepare failure with fresh swap IDs', async () => {
+    const seenIds: string[] = [];
+    const seenAmounts: number[] = [];
+    let attempt = 0;
+    const wallet = makeWallet({
+      mintSwap: {
+        prepare: vi.fn(async (input) => {
+          seenIds.push(input.id);
+          seenAmounts.push(Number(input.destinationAmount));
+          attempt += 1;
+          if (attempt === 1) {
+            throw new ProofValidationError('Not enough proofs to cover amount + fee');
+          }
+          return makeSwapOp({
+            id: input.id,
+            state: 'prepared',
+            destinationAmount: Number(input.destinationAmount),
+          });
+        }),
+        execute: vi.fn(async (id) => makeSwapOp({ id, state: 'completed' })),
+      },
     });
-  });
-
-  it('fails a pending melt that coco then settles as failed, and frees its proofs', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-    wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'failed' });
-    const outcome = await run();
-    expect(outcome.status === 'failed' && outcome.error).toBeInstanceOf(
-      RebalanceMeltRolledBackError
-    );
-    expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps a melt that never settles pending, without failing it or freeing its proofs', async () => {
-    const { run, wallet, recorder } = setup();
-    wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-    wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-    await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-    expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
-    expect(recorder.statuses('step-1')).not.toContain('failed');
-    expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-  });
-
-  describe('a melt status read that fails says nothing about the payment', () => {
-    it('keeps the melt pending, its proofs reserved, when every read fails', async () => {
-      const { run, wallet, recorder, findRoutes } = setup();
-      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-      wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
-      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-      expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
-      expect(recorder.statuses('step-1')).not.toContain('failed');
-      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      expect(findRoutes).not.toHaveBeenCalled();
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
     });
 
-    it('reads again, and settles the melt once a read answers', async () => {
-      const { run, wallet } = setup();
-      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-      wallet.port.refreshMelt
-        .mockRejectedValueOnce(new NetworkError('socket hang up'))
-        .mockImplementationOnce(async (id) => {
-          wallet.payInvoice('invoice-quote-1');
-          return { id, state: 'finalized' };
-        });
-      await expect(run()).resolves.toEqual({ status: 'done' });
-      expect(wallet.port.refreshMelt).toHaveBeenCalledTimes(2);
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      ['reads as no route', new Error('no_route')],
-      ['reads as short inputs', new MintOperationError(11005, 'unbalanced')],
-    ])('never routes or pays again when the failed read %s', async (_name, error) => {
-      const { run, wallet, findRoutes } = setup();
-      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-      wallet.port.refreshMelt.mockRejectedValue(error);
-      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-      expect(findRoutes).not.toHaveBeenCalled();
-      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-    });
-  });
-
-  it('fails a rolled-back melt with a typed error and does not pay again', async () => {
-    const { run, wallet } = setup();
-    wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
-    wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'rolled_back' });
-    const outcome = await run();
-    expect(outcome.status).toBe('failed');
-    expect(outcome.status === 'failed' && outcome.error).toBeInstanceOf(
-      RebalanceMeltRolledBackError
-    );
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-    expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
-  });
-
-  it('publishes nothing after the run is cancelled mid-melt', async () => {
-    const { run, wallet, recorder } = setup();
-    let active = true;
-    wallet.port.executeMelt.mockImplementation(async (id) => {
-      active = false;
-      return { id, state: 'finalized' };
-    });
-    await expect(run(STEP, () => active)).resolves.toEqual({ status: 'aborted' });
-    expect(recorder.statuses('step-1')).not.toContain('done');
-    expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
-  });
-});
-
-describe('rebalance engine — middleman routing', () => {
-  const route: RebalanceRoute = {
-    path: [SOURCE, MIDDLEMAN, DESTINATION],
-    pathNames: ['Source', 'Middleman', 'Destination'],
-    source: 'local_history',
-  };
-  const balances = { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 };
-
-  it('routes a no-route melt through a temporarily trusted middleman', async () => {
-    const { run, wallet, recorder } = setup({ balances, routes: [route] });
-    wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(20004, 'no_route'));
-    await expect(run()).resolves.toEqual({ status: 'done' });
-
-    expect(wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
-    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-    // The abandoned direct receipt is never verified; each hop's receipt is.
-    expect(wallet.port.getMintOperation.mock.calls.map(([id]) => id)).toEqual([
-      'mint-quote-2',
-      'mint-quote-3',
-    ]);
-    expect(recorder.statuses('step-1-hop-1-0')).toContain('done');
-    expect(recorder.statuses('step-1-hop-1-1').at(-1)).toBe('done');
-  });
-
-  it('skips unstarted hops and tries the next route when a hop fails', async () => {
-    const second: RebalanceRoute = { ...route, source: 'graph' };
-    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
-    // Coco rolled the refused melts back: they did not pay.
-    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
-    wallet.port.executeMelt
-      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-      .mockRejectedValueOnce(new MintOperationError(11001, 'Token already spent'));
-    await expect(run()).resolves.toEqual({ status: 'done' });
-    expect(recorder.statuses('step-1-hop-1-0').at(-1)).toBe('failed');
-    expect(recorder.statuses('step-1-hop-1-1')).toEqual(['skipped']);
-    expect(wallet.port.releaseTrust).toHaveBeenCalledTimes(2);
-  });
-
-  it('fails with the exhausted-routes error, keeping the last route error as its cause', async () => {
-    const { run, wallet } = setup({ balances, routes: [route, { ...route, source: 'graph' }] });
-    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
-    const lastError = new MintOperationError(11001, 'Token already spent');
-    wallet.port.executeMelt
-      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-      .mockRejectedValue(lastError);
-    const outcome = await run();
-    expect(outcome.status).toBe('failed');
-    const error = outcome.status === 'failed' ? outcome.error : null;
-    expect(error).toBeInstanceOf(RebalanceRoutesExhaustedError);
-    expect((error as Error).cause).toBe(lastError);
-  });
-
-  it('fails with the original no-route error when no middleman is known', async () => {
-    const { run, wallet } = setup();
-    const noRoute = new MintOperationError(20004, 'FAILURE_REASON_NO_ROUTE');
-    wallet.port.executeMelt.mockRejectedValueOnce(noRoute);
-    await expect(run()).resolves.toEqual({ status: 'failed', error: noRoute });
-  });
-});
-
-describe('rebalance engine — runs', () => {
-  it('runs transfers in order, skips settled ones and reports failures', async () => {
-    const { engine, wallet, recorder } = setup();
-    wallet.port.prepareMelt.mockRejectedValueOnce(new Error('mint offline'));
-    const settled: string[] = [];
-    const steps = [
-      { ...STEP, id: 'a' },
-      { ...STEP, id: 'b' },
-      { ...STEP, id: 'c' },
-    ];
-    const result = await engine.runTransfers(steps, {
+    const outcome = await engine.executeTransfer(step({ amount: 100 }), {
       isActive: () => true,
-      isSettled: (id) => id === 'b',
-      sinkFor: () => recorder.sink,
-      onTransferSettled: (step, outcome) => settled.push(`${step.id}:${outcome.status}`),
+      sink,
     });
-    expect(result).toEqual({ status: 'finished', anyFailed: true, anyPending: false });
-    expect(settled).toEqual(['a:failed', 'c:done']);
+
+    expect(outcome).toEqual({ status: 'done' });
+    expect(seenAmounts).toEqual([100, 98]);
+    expect(new Set(seenIds).size).toBe(2);
   });
 
-  describe('a caller that ends the run before a leg opens', () => {
-    /** Ends the run at the next leg once `switched` is set, as an account switch does. */
-    function endsAtNextLeg() {
-      const state = { switched: false, active: true };
-      return {
-        state,
-        isActive: () => state.active,
-        beforeLegOpens: () => {
-          if (state.switched) state.active = false;
-        },
-      };
+  it('fails without shrinking when exactAmount is set and source balance is insufficient', async () => {
+    const wallet = makeWallet({ balances: { [MINT_A]: 50 } });
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step({ amount: 100, exactAmount: true }), {
+      isActive: () => true,
+      sink,
+    });
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error).toBeInstanceOf(RebalanceExactAmountError);
     }
-
-    it('lets the transfer in flight finish and starts no other', async () => {
-      const { engine, wallet, recorder } = setup();
-      const control = endsAtNextLeg();
-      wallet.port.executeMelt.mockImplementation(async (id) => {
-        control.state.switched = true;
-        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
-        return { id, state: 'finalized' };
-      });
-      const settled: string[] = [];
-      const result = await engine.runTransfers(
-        [
-          { ...STEP, id: 'a' },
-          { ...STEP, id: 'b' },
-        ],
-        {
-          isActive: control.isActive,
-          beforeLegOpens: control.beforeLegOpens,
-          isSettled: () => false,
-          sinkFor: () => recorder.sink,
-          onTransferSettled: (step, outcome) => settled.push(`${step.id}:${outcome.status}`),
-        }
-      );
-      expect(result).toEqual({ status: 'aborted' });
-      expect(settled).toEqual(['a:done']);
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-      expect(recorder.statuses('b')).toEqual([]);
-    });
-
-    it('opens no leg when the switch comes while the balances and fees are read', async () => {
-      const { engine, wallet, recorder } = setup();
-      const control = endsAtNextLeg();
-      wallet.port.worstCaseInputFee.mockImplementation(async () => {
-        control.state.switched = true;
-        return 0;
-      });
-      await expect(
-        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
-      ).resolves.toEqual({ status: 'aborted' });
-      expect(recorder.events.filter((event) => event.type === 'legOpened')).toEqual([]);
-      expect(wallet.port.createMintReceipt).not.toHaveBeenCalled();
-      expect(wallet.port.prepareMelt).not.toHaveBeenCalled();
-    });
-
-    it('opens no hop leg when the switch comes while the hop is being set up', async () => {
-      const route: RebalanceRoute = {
-        path: [SOURCE, MIDDLEMAN, DESTINATION],
-        pathNames: ['Source', 'Middleman', 'Destination'],
-        source: 'local_history',
-      };
-      const { engine, wallet, recorder } = setup({
-        balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 },
-        routes: [route],
-      });
-      const control = endsAtNextLeg();
-      wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(20004, 'no_route'));
-      // The hop reads the balances and its fee, and asks for its invoice, before its leg opens.
-      wallet.port.probeMeltFeeReserve.mockImplementation(async () => {
-        if (wallet.port.prepareMelt.mock.calls.length > 0) control.state.switched = true;
-        return 0;
-      });
-      await expect(
-        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
-      ).resolves.toEqual({ status: 'aborted' });
-      expect(
-        recorder.events.filter((event) => event.type === 'legOpened').map((event) => event.legId)
-      ).toEqual(['step-1']);
-      expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
-      expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-    });
-
-    it('stops a middleman chain before its next hop', async () => {
-      const route: RebalanceRoute = {
-        path: [SOURCE, MIDDLEMAN, DESTINATION],
-        pathNames: ['Source', 'Middleman', 'Destination'],
-        source: 'local_history',
-      };
-      const { engine, wallet, recorder } = setup({
-        balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 },
-        routes: [route],
-      });
-      const control = endsAtNextLeg();
-      wallet.port.executeMelt
-        .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-        .mockImplementationOnce(async (id) => {
-          control.state.switched = true;
-          wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
-          return { id, state: 'finalized' };
-        });
-      await expect(
-        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
-      ).resolves.toEqual({ status: 'aborted' });
-      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
-      expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
-      expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-    });
+    expect(wallet.mintSwap.prepare).not.toHaveBeenCalled();
   });
 
-  it('serializes transfers that start concurrently', async () => {
-    const { run, wallet } = setup();
-    let executing = 0;
-    let overlap = false;
-    wallet.port.executeMelt.mockImplementation(async (id) => {
-      executing += 1;
-      overlap ||= executing > 1;
-      await Promise.resolve();
-      wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
-      executing -= 1;
-      return { id, state: 'finalized' };
+  it('fails with RebalanceSourceDebitCapError when Coco rejects source_debit_cap_exceeded', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        prepare: vi.fn(async (input) =>
+          makeSwapOp({
+            id: input.id,
+            state: 'failed',
+            failure: { code: 'source_debit_cap_exceeded' },
+            lastSafe: {
+              state: 'prepared',
+              stateEnteredAt: 1_000,
+              sourceDebitBounds: {
+                minimum: Amount.from(100),
+                maximum: Amount.from(108),
+                reserved: Amount.from(108),
+              },
+            },
+          } as never)
+        ),
+      },
     });
-    const outcomes = await Promise.all([run({ ...STEP, id: 'x' }), run({ ...STEP, id: 'y' })]);
-    expect(outcomes).toEqual([{ status: 'done' }, { status: 'done' }]);
-    expect(overlap).toBe(false);
-  });
-
-  it('releases temporary trust even when the guarded run throws', async () => {
-    const { engine, wallet, recorder } = setup({ trusted: [SOURCE, DESTINATION] });
-    await expect(
-      engine.withTemporaryTrust([SOURCE, MIDDLEMAN, DESTINATION], { sink: recorder.sink }, () =>
-        Promise.reject(new Error('boom'))
-      )
-    ).rejects.toThrow('boom');
-    expect(wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
-    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-  });
-});
-
-describe('rebalance engine — routing a transfer through chosen mints', () => {
-  const PATH = [SOURCE, MIDDLEMAN, DESTINATION];
-
-  function routeThrough(settled: Set<string> = new Set([STEP.id])) {
-    const harness = setup({
-      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 1000 },
-      trusted: [SOURCE, DESTINATION],
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
     });
-    const rerouted: RebalanceTransfer[][] = [];
-    const started: string[] = [];
-    const finished: string[] = [];
-    const result = harness.engine.routeThrough(STEP, PATH, [STEP], {
+
+    const outcome = await engine.executeTransfer(step({ amount: 100, sourceDebitCap: 105 }), {
       isActive: () => true,
-      isSettled: (stepId) => settled.has(stepId),
-      sinkFor: () => harness.recorder.sink,
-      onTransferStart: (step) => started.push(step.id),
-      makeId: (label) => `id:${label}`,
-      onRerouted: (hops) => {
-        // Told once the intermediary is trusted and before anything is sent.
-        expect(harness.wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
-        expect(harness.wallet.port.prepareMelt).not.toHaveBeenCalled();
-        rerouted.push(hops);
-      },
-      onRunFinished: (result) => {
-        // Told the result before the trust is given back.
-        expect(result.status).toBe('finished');
-        expect(harness.wallet.port.releaseTrust).not.toHaveBeenCalled();
-        finished.push(result.status);
+      sink,
+    });
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error).toBeInstanceOf(RebalanceSourceDebitCapError);
+    }
+    expect(wallet.mintSwap.execute).not.toHaveBeenCalled();
+  });
+
+  it('returns pending (paymentPending) when source_pending times out in waitForOutcome', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        execute: vi.fn(async (id) => makeSwapOp({ id, state: 'source_pending' })),
+        waitForOutcome: vi.fn(async (id) => ({
+          status: 'timeout' as const,
+          operation: makeSwapOp({ id, state: 'source_pending' }) as never,
+        })),
       },
     });
-    return { ...harness, result, rerouted, started, finished };
-  }
+    const { sink, updates } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
 
-  it('runs one transfer per hop, in order, and then gives the trust back', async () => {
-    const { result, rerouted, started, finished, wallet } = routeThrough();
-    await expect(result).resolves.toEqual({ status: 'finished', anyFailed: false, anyPending: false });
-    expect(finished).toEqual(['finished']);
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
 
-    // Swap history refers to legs by these ids.
-    expect(rerouted).toEqual([
-      [
-        {
-          ...STEP,
-          id: 'id:reroute-step-1-0',
-          fromMintUrl: SOURCE,
-          toMintUrl: MIDDLEMAN,
-          chainId: 'id:chain',
-          chainPath: PATH,
-          chainHopIndex: 0,
-        },
-        {
-          ...STEP,
-          id: 'id:reroute-step-1-1',
-          fromMintUrl: MIDDLEMAN,
-          toMintUrl: DESTINATION,
-          chainId: 'id:chain',
-          chainPath: PATH,
-          chainHopIndex: 1,
-        },
+    expect(outcome.status).toBe('pending');
+    expect(updates.at(-1)?.update.status).toBe('paymentPending');
+  });
+
+  it('returns settling when destination_funded times out in waitForOutcome', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        execute: vi.fn(async (id) => makeSwapOp({ id, state: 'destination_funded' })),
+        waitForOutcome: vi.fn(async (id) => ({
+          status: 'timeout' as const,
+          operation: makeSwapOp({ id, state: 'destination_funded' }) as never,
+        })),
+      },
+    });
+    const { sink, updates } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
+
+    expect(outcome).toEqual({ status: 'settling' });
+    expect(updates.map((u) => u.update.status).filter(Boolean)).toContain('verifying');
+    expect(updates.at(-1)?.update.status).toBe('settling');
+  });
+
+  it('routes through middleman mints when direct swap fails with source_payment_rejected', async () => {
+    let directFailed = false;
+    const wallet = makeWallet({
+      mintSwap: {
+        execute: vi.fn(async (id) => {
+          if (!directFailed) {
+            directFailed = true;
+            return makeSwapOp({
+              id,
+              state: 'failed',
+              failure: { code: 'source_payment_rejected' },
+            } as never);
+          }
+          return makeSwapOp({ id, state: 'completed' });
+        }),
+      },
+    });
+    const { sink } = makeSink();
+    const route: RebalanceRoute = {
+      path: [MINT_A, MINT_MID, MINT_B],
+      pathNames: ['A', 'Mid', 'B'],
+      source: 'graph',
+    };
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [route],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
+
+    expect(outcome).toEqual({ status: 'done' });
+    expect(wallet.port.trustMint).toHaveBeenCalledWith(MINT_MID);
+    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MINT_MID]);
+    expect(wallet.mintSwap.execute).toHaveBeenCalledTimes(3); // 1 direct + 2 hops
+  });
+
+  it('returns RebalanceRoutesExhaustedError when multiple candidate middleman routes all fail', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        execute: vi.fn(async (id) =>
+          makeSwapOp({
+            id,
+            state: 'failed',
+            failure: { code: 'source_payment_rejected' },
+          } as never)
+        ),
+      },
+    });
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [
+        { path: [MINT_A, MINT_MID, MINT_B], pathNames: ['A', 'Mid', 'B'], source: 'graph' },
+        { path: [MINT_A, MINT_MID2, MINT_B], pathNames: ['A', 'Mid2', 'B'], source: 'graph' },
       ],
-    ]);
-    expect(started).toEqual(['id:reroute-step-1-0', 'id:reroute-step-1-1']);
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
-    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-  });
-
-  it('gives the trust back when the run throws', async () => {
-    const harness = setup({ trusted: [SOURCE, DESTINATION] });
-    await expect(
-      harness.engine.routeThrough(STEP, PATH, [STEP], {
-        isActive: () => true,
-        isSettled: () => false,
-        sinkFor: () => harness.recorder.sink,
-        makeId: (label) => `id:${label}`,
-        onRerouted: () => {
-          throw new Error('boom');
-        },
-      })
-    ).rejects.toThrow('boom');
-    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
-  });
-});
-
-describe('chain steps', () => {
-  it('puts inserted steps straight after the named step, and copies the list when it is absent', () => {
-    const a = { ...STEP, id: 'a' };
-    const b = { ...STEP, id: 'b' };
-    const hop = { ...STEP, id: 'hop' };
-    expect(insertStepsAfter([a, b], 'a', [hop]).map((step) => step.id)).toEqual(['a', 'hop', 'b']);
-    expect(insertStepsAfter([a, b], 'missing', [hop]).map((step) => step.id)).toEqual(['a', 'b']);
-  });
-});
-
-describe('rebalance engine — money still on its way', () => {
-  const route: RebalanceRoute = {
-    path: [SOURCE, MIDDLEMAN, DESTINATION],
-    pathNames: ['Source', 'Middleman', 'Destination'],
-    source: 'local_history',
-  };
-  const balances = { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 };
-  /** A melt that settles at the source while the destination has not issued yet. */
-  const paidNotIssued = async (id: string) => ({ id, state: 'finalized' });
-
-  it('stops a middleman chain at a hop whose money has not arrived, and pays nothing twice', async () => {
-    const second: RebalanceRoute = { ...route, source: 'graph' };
-    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
-    wallet.port.executeMelt
-      // The direct melt finds no route...
-      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-      // ...and the first hop pays, but the middleman has not issued.
-      .mockImplementationOnce(paidNotIssued);
-
-    await expect(run()).resolves.toEqual({ status: 'settling' });
-
-    // The direct attempt and the one hop: no second hop from a mint that is
-    // short, and no second route sending the same amount again.
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
-    expect(recorder.statuses('step-1-hop-1-0').at(-1)).toBe('settling');
-    // The next hop is left as it was: not failed, not skipped.
-    expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
-    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
-    // The middleman the money is arriving at is not untrusted from under it.
-    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([]);
-  });
-
-  it('holds a plan step that spends money still arriving at its source, then runs it once it is in', async () => {
-    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
-    const second: RebalanceTransfer = {
-      ...STEP,
-      id: 'onward',
-      fromMintUrl: MIDDLEMAN,
-      toMintUrl: DESTINATION,
-    };
-    const { engine, wallet, recorder } = setup({
-      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
-      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
     });
-    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
-    const outcomes = new Map<string, string>();
-    const callbacks = {
+
+    const outcome = await engine.executeTransfer(step(), { isActive: () => true, sink });
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error).toBeInstanceOf(RebalanceRoutesExhaustedError);
+    }
+  });
+
+  it('cancels a prepared swap if the run is cancelled before execute', async () => {
+    let active = true;
+    const wallet = makeWallet({
+      mintSwap: {
+        prepare: vi.fn(async (input) => {
+          active = false;
+          return makeSwapOp({ id: input.id, state: 'prepared' });
+        }),
+      },
+    });
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step(), { isActive: () => active, sink });
+
+    expect(outcome).toEqual({ status: 'aborted' });
+    expect(wallet.mintSwap.cancel).toHaveBeenCalledTimes(1);
+    expect(wallet.mintSwap.execute).not.toHaveBeenCalled();
+  });
+
+  it('holds a downstream step when an active Coco mintSwap is still arriving at its source mint', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        listActive: vi.fn(async () => [
+          makeSwapOp({
+            id: 'arriving-1',
+            state: 'destination_funded',
+            sourceMintUrl: MINT_B,
+            destinationMintUrl: MINT_A,
+          }),
+        ]),
+      },
+    });
+    const { sink } = makeSink();
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes: async () => [],
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const result = await engine.runTransfers([step()], {
       isActive: () => true,
-      isSettled: (stepId: string) =>
-        ['done', 'settling', 'skipped'].includes(outcomes.get(stepId) ?? ''),
-      sinkFor: () => recorder.sink,
-      onTransferSettled: (step: RebalanceTransfer, outcome: { status: string }) =>
-        void outcomes.set(step.id, outcome.status),
-    };
-
-    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
-      status: 'finished',
-      anyFailed: false,
-      anyPending: true,
-    });
-    expect(outcomes.get('to-middle')).toBe('settling');
-    // Not run, not skipped, not failed: nothing was reported for it at all.
-    expect(outcomes.has('onward')).toBe(false);
-    expect(recorder.statuses('onward')).toEqual([]);
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-
-    // The middleman issues. A later run takes the held step up and sends it once.
-    wallet.payInvoice(wallet.invoiceByMelt.get('melt-1') ?? '');
-    wallet.port.balancesByMint.mockResolvedValue({ [SOURCE]: 900, [MIDDLEMAN]: 100 });
-    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
-      status: 'finished',
-      anyFailed: false,
-      anyPending: false,
-    });
-    expect(outcomes.get('onward')).toBe('done');
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
-  });
-
-  it('tries no other route once a hop has paid: the amount has already left the source', async () => {
-    const second: RebalanceRoute = { ...route, source: 'graph' };
-    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
-    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
-    const refused = new MintOperationError(11001, 'Token already spent');
-    wallet.port.executeMelt
-      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-      // Hop one pays and arrives at the middleman (the default behaviour)...
-      .mockImplementationOnce(async (id: string) => {
-        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
-        return { id, state: 'finalized' };
-      })
-      // ...and hop two is turned down for good.
-      .mockRejectedValueOnce(refused);
-
-    const outcome = await run();
-
-    expect(outcome).toEqual({ status: 'failed', error: refused });
-    // Direct attempt, hop one, hop two. No second route from the source.
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(3);
-    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
-  });
-
-  it('remembers what is in flight when the engine is rebuilt for the same screen', async () => {
-    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
-    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
-    const wallet = fakeWallet({ [SOURCE]: 1000, [MIDDLEMAN]: 0 });
-    const clock = fakeClock();
-    const lock = createRebalanceLock(clock);
-    const build = () =>
-      createRebalanceEngine({
-        wallet: wallet.port,
-        findRoutes: async () => [],
-        trustedMintUrls: new Set([SOURCE, MIDDLEMAN, DESTINATION]),
-        minTransferThreshold: 5,
-        minFeeReserve: 5,
-        lock,
-        clock,
-      });
-    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
-    const recorder = recordingSink();
-    const settled = new Set<string>();
-    const callbacks = {
-      isActive: () => true,
-      isSettled: (stepId: string) => settled.has(stepId),
-      sinkFor: () => recorder.sink,
-      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
-    };
-
-    await build().runTransfers([first, second], callbacks);
-    // The screen rebuilds its engine (its inputs changed) and runs again.
-    const result = await build().runTransfers([first, second], callbacks);
-
-    expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
-    expect(settled.has('onward')).toBe(false);
-    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-  });
-
-  it('gives up on money that has not arrived after an hour, so nothing is held for good', async () => {
-    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
-    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
-    const { engine, wallet, clock, recorder } = setup({
-      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100 },
-      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
-    });
-    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
-    const settled = new Set<string>();
-    const callbacks = {
-      isActive: () => true,
-      isSettled: (stepId: string) => settled.has(stepId),
-      sinkFor: () => recorder.sink,
-      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
-    };
-    await engine.runTransfers([first, second], callbacks);
-    expect(settled.has('onward')).toBe(false);
-
-    await clock.sleep(60 * 60 * 1000);
-    await engine.runTransfers([first, second], callbacks);
-    // No longer held: it runs on what the mint actually holds.
-    expect(settled.has('onward')).toBe(true);
-  });
-
-  it('keeps a manually routed middleman trusted while the first hop is still arriving', async () => {
-    const harness = setup({
-      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
-      trusted: [SOURCE, DESTINATION],
-    });
-    harness.wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
-    const outcomes = new Map<string, string>();
-
-    const result = await harness.engine.routeThrough(STEP, route.path, [STEP], {
-      isActive: () => true,
-      isSettled: (stepId) => stepId === STEP.id || outcomes.has(stepId),
-      sinkFor: () => harness.recorder.sink,
-      onTransferSettled: (step, outcome) => void outcomes.set(step.id, outcome.status),
-      makeId: (label) => `id:${label}`,
-      onRerouted: () => {},
+      isSettled: () => false,
+      sinkFor: () => sink,
     });
 
     expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
-    expect(outcomes.get('id:reroute-step-1-0')).toBe('settling');
-    expect(outcomes.has('id:reroute-step-1-1')).toBe(false);
-    expect(harness.wallet.port.executeMelt).toHaveBeenCalledTimes(1);
-    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([]);
+    expect(wallet.mintSwap.prepare).not.toHaveBeenCalled();
   });
 });

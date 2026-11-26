@@ -33,17 +33,23 @@ jest.mock('@/features/settings/screens/SettingsProfileRecoveryScreen', () => ({
   SettingsProfileRecoveryScreen: 'Recovery',
 }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PillButton', () => {
+  const React = require('react');
+  const host = (name: string) =>
+    function MockHost(props: Record<string, unknown>) {
+      return React.createElement(name, props);
+    };
+  return { PillButton: Object.assign(host('Button'), { Label: 'Label' }) };
+});
+jest.mock('@/shared/ui/primitives/Field', () => {
   const React = require('react');
   const host = (name: string) =>
     function MockHost(props: Record<string, unknown>) {
       return React.createElement(name, props);
     };
   return {
-    Button: Object.assign(host('Button'), { Label: 'Label' }),
     ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
     Label: Object.assign(host('Label'), { Text: 'LabelText' }),
-    Card: Object.assign(host('Card'), { Body: 'Body' }),
   };
 });
 function render(props: React.ComponentProps<typeof TermsAndConditionsScreen>) {

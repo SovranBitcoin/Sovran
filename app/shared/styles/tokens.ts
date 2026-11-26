@@ -127,7 +127,7 @@ export const zIndex = {
   sticky: 10,
   /** 100 — dropdowns, popovers, tooltips. */
   dropdown: 100,
-  /** 1000 — modals, sheets (gorhom BottomSheet's host layer). */
+  /** 1000 — modals, sheets. */
   modal: 1000,
   /** 2000 — toasts, popups that float above modals. */
   toast: 2000,

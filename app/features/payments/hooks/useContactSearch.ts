@@ -1,4 +1,4 @@
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNostrClient } from '@/runtime/nostrClient';
 import { useMemo } from 'react';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';
@@ -51,7 +51,7 @@ function seedProfiles(data: SearchUsersResponse): void {
  * upgraded in place; a failed search is `error`, never a fake "no results".
  */
 export function useContactSearch(searchQuery: string) {
-  const { ndk } = useNDK();
+  const { client } = useNostrClient();
   const normalized = searchQuery.trim().toLowerCase();
   const tooShort = normalized.length < CONTACT_SEARCH_MIN_LENGTH;
   // A query below the minimum follows immediately (clearing must not wait out
@@ -77,7 +77,7 @@ export function useContactSearch(searchQuery: string) {
       };
       const result = await searchProfilesViaFacade({
         query,
-        ndk,
+        client,
         limit: 10,
         signal,
         readId,

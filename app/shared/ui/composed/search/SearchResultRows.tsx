@@ -21,7 +21,7 @@ import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { paymentLog, cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import {
   ContactRow,
@@ -131,7 +131,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       onPress={() => {
         paymentLog.info('contact.geohash.press', { geohash, source: 'search' });
         runAfterNativeSearchDismiss(() => {
-          router.push({ pathname: '/(user-flow)/geohashChat', params: { geohash } });
+          router.push({ pathname: '/geohashChat', params: { geohash } });
         });
       }}
       testID={`contact-row:geohash:${geohash}`}
@@ -159,7 +159,7 @@ function TierRow({ tier }: { tier: TierEntry }) {
         });
         runAfterNativeSearchDismiss(() => {
           router.push({
-            pathname: '/(user-flow)/geohashChat',
+            pathname: '/geohashChat',
             params: { geohash: tier.geohash, tierLabel: tier.label, transport: tier.transport },
           });
         });

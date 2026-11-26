@@ -149,7 +149,7 @@ export function GeohashChatScreen({
               icon="mdi:account-group"
               size={22}
               color={bleConnectedCount > 0 ? foreground : shade400}
-              onPress={() => router.push('/(user-flow)/bitchatNetwork')}
+              onPress={() => router.push('/bitchatNetwork')}
               accessory={
                 bleConnectedCount > 0 ? (
                   <View

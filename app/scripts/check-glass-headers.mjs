@@ -79,15 +79,10 @@ for (const file of files) {
         `${rel}: native opaque navigation header; use Screen headerAppearance="opaque" for pinned chrome`
       );
     }
-    // Screen's Android-only declaration colors FlowSheetHeader's gradient;
-    // it never fills an iOS native bar. All other native header fills are transparent.
-    if (rel !== 'shared/ui/composed/Screen.tsx') {
-      for (const match of src.matchAll(
-        /headerStyle\s*:\s*\{\s*backgroundColor\s*:\s*([^,}\n]+)/g
-      )) {
-        if (!/^['"]transparent['"]/.test(match[1].trim())) {
-          violations.push(`${rel}: use transparent headerStyle and shared gradient chrome`);
-        }
+    // Every native header fill is transparent.
+    for (const match of src.matchAll(/headerStyle\s*:\s*\{\s*backgroundColor\s*:\s*([^,}\n]+)/g)) {
+      if (!/^['"]transparent['"]/.test(match[1].trim())) {
+        violations.push(`${rel}: use transparent headerStyle and shared gradient chrome`);
       }
     }
   }

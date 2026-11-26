@@ -11,7 +11,7 @@ import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedee
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { paymentLog, mintUrlLogFields, redactError } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import {
   fitsNutDropQueue,
   useNutDropRedeemQueueStore,
@@ -19,7 +19,7 @@ import {
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
 /**
- * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside
+ * App-wide Nut Drop receive pipeline. Mounted in useBitchatAccountServices (inside
  * AccountScopedProviders, so it remounts per profile and classifies against
  * the ACTIVE profile's P2PK key).
  *

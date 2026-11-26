@@ -81,7 +81,7 @@ function queryPairs(query: string): [string, string][] {
  * Whether `href` names the route that is focused right now: the same path once
  * dynamic segments are filled, `index` dropped and groups set aside, the same
  * search params, and every group it names among the focused route's groups
- * (so `/(map-flow)`, which is `/` too, is not the wallet home). Anything that
+ * (so `/(send-flow)/send` is not a root `/send`). Anything that
  * cannot be read answers false, so an unreadable href or router state never
  * blocks a navigation.
  */

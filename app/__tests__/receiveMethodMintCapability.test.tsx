@@ -27,7 +27,7 @@ const mockQuote = jest.fn((_input: unknown, _store: unknown) => ({
   rotate: jest.fn(),
 }));
 
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => mockContext,
 }));
 jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({

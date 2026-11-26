@@ -10,20 +10,18 @@
  * literal 'transparent', which would fade through black.
  *
  * Two geometries:
- * - Custom JS sheet headers (FlowSheetHeader / FormSheetChrome) pass a
- *   `height` taller than the bar — native-stack's custom-header wrapper has
- *   no overflow clip, so the fade tail paints below the bar over scrolling
- *   content.
+ * - The Android sheet chrome (FormSheetChrome) passes a `height` taller than
+ *   the bar — its overlay has no overflow clip, so the fade tail paints below
+ *   the bar over scrolling content.
  * - A native headerBackground consumer must NOT pass height: native-stack clips that wrapper
  *   to the header bounds (styles.background has overflow:'hidden'), so the
  *   scrim fills it (flex:1) with a lower solid anchor instead.
  *
- * Immersive surfaces (stories, camera) may omit the gradient. Per-screen `headerBackground: () => null` remains the
- * sanctioned opt-out on flow sheets.
+ * Immersive surfaces (stories, camera) may omit the gradient. Per-screen
+ * `headerBackground: () => null` is the sanctioned opt-out.
  *
- * Lives in its own module (not config/flowLayoutOptions) so FlowSheetHeader
- * can import it without an import cycle — flowLayoutOptions already imports
- * FlowSheetHeader.
+ * Lives in its own module so the sheet chrome and the navigation header
+ * options can both import it.
  */
 import { memo, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';

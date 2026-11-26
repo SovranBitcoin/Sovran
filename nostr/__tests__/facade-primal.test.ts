@@ -1,17 +1,10 @@
 import { describe, test, expect } from 'vitest';
-import { ok, type Result } from 'neverthrow';
 import {
-  demuxPrimalFeed,
-  demuxPrimalThread,
   demuxPrimalProfileStats,
   demuxPrimalSocialGraph,
-  createPrimalTier,
   createPrimalWebSocketConnection,
-  type PrimalConnection,
   type RawPrimalEvent,
 } from '../src/facade/primal';
-import { createNostrDataLayer } from '../src/facade';
-import { pendingFeedTier } from './pendingFeedTier';
 import type { NaggError } from '../src/errors';
 
 const ID_A = 'a'.repeat(64);
@@ -34,122 +27,6 @@ const BATCH: RawPrimalEvent[] = [
   },
   { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ID_A, ID_B] }) },
 ];
-
-describe('demuxPrimalFeed — Primal batch → contract bundle', () => {
-  test('demuxes notes, profiles, stats, actions, and the manifest', () => {
-    const bundle = demuxPrimalFeed(BATCH);
-
-    expect([...bundle.itemsById.keys()].sort()).toEqual([ID_A, ID_B].sort());
-    expect(bundle.manifest).toEqual({ orderBy: 'rank', elements: [ID_A, ID_B] });
-    expect(bundle.stats[ID_A]).toEqual({ likes: 5, reposts: 2, replies: 1, zaps: 3, satsZapped: 2100 });
-    expect(bundle.actions?.[ID_A]).toEqual({
-      liked: true,
-      reposted: false,
-      replied: false,
-      zapped: true,
-      bookmarked: false,
-    });
-    expect(bundle.profiles[PUB]).toEqual({ name: 'alice', picture: 'http://x/a.png' });
-    // cursor = oldest rendered item's (created_at, id)
-    expect(bundle.cursor).toEqual({ createdAt: 1_700_000_100, id: ID_B });
-  });
-
-  test('cursor carries the FeedRange `since` bound so a ranked page continues the ranking', () => {
-    // A trending page: Primal orders by SCORE and pages by echoing `since` back
-    // as `until`. A created_at cursor would resume at "score <= unix time",
-    // i.e. far below the current page.
-    const ranked = BATCH.map((e) =>
-      e.kind === 10_000_113
-        ? {
-            kind: 10_000_113,
-            content: JSON.stringify({ order_by: 'score', since: 13_186_813_162, until: 29_340_659_303, elements: [ID_A, ID_B] }),
-          }
-        : e,
-    );
-    const bundle = demuxPrimalFeed(ranked);
-    expect(bundle.manifest).toEqual({ orderBy: 'rank', elements: [ID_A, ID_B] });
-    expect(bundle.cursor).toEqual({ createdAt: 13_186_813_162, id: ID_B });
-  });
-
-  test('synthesizes a recency manifest when Primal sends no FeedRange', () => {
-    const noRange = BATCH.filter((e) => e.kind !== 10_000_113);
-    const bundle = demuxPrimalFeed(noRange);
-    // newest-first by created_at
-    expect(bundle.manifest.orderBy).toBe('created_at');
-    expect(bundle.manifest.elements).toEqual([ID_A, ID_B]);
-  });
-
-  test('reconstructs a repost: original content inline in the kind-6, keyed by the original id', () => {
-    const ID_ORIG = 'd'.repeat(64);
-    const ID_REPOST = 'e'.repeat(64);
-    const REPOSTER = 'f'.repeat(64);
-    const original = {
-      id: ID_ORIG,
-      pubkey: PUB,
-      kind: 1,
-      content: 'the reposted note',
-      tags: [],
-      created_at: 1_700_000_050,
-    };
-    const bundle = demuxPrimalFeed([
-      // Primal inlines the original note as stringified JSON in the repost content.
-      {
-        id: ID_REPOST,
-        pubkey: REPOSTER,
-        kind: 6,
-        content: JSON.stringify(original),
-        tags: [['e', ID_ORIG]],
-        created_at: 1_700_000_300,
-      },
-      { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ID_ORIG] }) },
-    ]);
-
-    // Item is keyed by the ORIGINAL note id, not the kind-6 event id.
-    expect([...bundle.itemsById.keys()]).toEqual([ID_ORIG]);
-    const item = bundle.itemsById.get(ID_ORIG)!;
-    expect(item.type).toBe('repost');
-    if (item.type !== 'repost') throw new Error('expected repost');
-    expect(item.originalEventId).toBe(ID_ORIG);
-    expect(item.originalEvent?.content).toBe('the reposted note');
-    expect(item.repostEvent.id).toBe(ID_REPOST);
-    expect(item.reposters?.map((r) => r.pubkey)).toEqual([REPOSTER]);
-    // Manifest renders the item even though feedRange referenced the original id.
-    expect(bundle.manifest.elements).toEqual([ID_ORIG]);
-    // Cursor uses the repost's feed-position timestamp (kind-6 created_at).
-    expect(bundle.cursor).toEqual({ createdAt: 1_700_000_300, id: ID_ORIG });
-  });
-
-  test('collapses multiple reposts of the same note into one item with many reposters', () => {
-    const ID_ORIG = 'd'.repeat(64);
-    const original = { id: ID_ORIG, pubkey: PUB, kind: 1, content: 'hi', tags: [], created_at: 1 };
-    const mk = (repostId: string, who: string, at: number): RawPrimalEvent => ({
-      id: repostId,
-      pubkey: who,
-      kind: 6,
-      content: JSON.stringify(original),
-      tags: [['e', ID_ORIG]],
-      created_at: at,
-    });
-    const bundle = demuxPrimalFeed([
-      mk('1'.repeat(64), 'a'.repeat(64), 100),
-      mk('2'.repeat(64), 'b'.repeat(64), 200),
-    ]);
-    expect([...bundle.itemsById.keys()]).toEqual([ID_ORIG]);
-    const item = bundle.itemsById.get(ID_ORIG)!;
-    if (item.type !== 'repost') throw new Error('expected repost');
-    expect(item.reposters?.map((r) => r.pubkey).sort()).toEqual(['a'.repeat(64), 'b'.repeat(64)]);
-  });
-
-  test('skips a synthetic event with malformed content instead of crashing', () => {
-    const bundle = demuxPrimalFeed([
-      ...BATCH,
-      { kind: 10_000_100, content: '{not json' },
-      { kind: 10_000_115, content: JSON.stringify({ missing: 'event_id' }) },
-    ]);
-    // original valid stats survive; the malformed ones are dropped
-    expect(Object.keys(bundle.stats)).toEqual([ID_A]);
-  });
-});
 
 describe('demuxPrimalProfileStats — user_profile batch → profile header', () => {
   test('maps kind-0 metadata + the USER_PROFILE (10000105) counts and time_joined', () => {
@@ -219,64 +96,6 @@ describe('demuxPrimalSocialGraph — contact_list → follows + bundled profiles
     expect(graph.follows.sort()).toEqual([FOLLOW_A, FOLLOW_B].sort());
     expect(graph.contactsUpdatedAt).toBe(1_700_000_500);
     expect(graph.profiles[FOLLOW_A]).toEqual({ name: 'bob', picture: 'http://x/b.png' });
-  });
-});
-
-describe('Primal tier through the facade', () => {
-  function fakeConnection(events: RawPrimalEvent[]): PrimalConnection {
-    return {
-      request(): Promise<Result<RawPrimalEvent[], NaggError>> {
-        return Promise.resolve(ok(events));
-      },
-    };
-  }
-
-  test('Primal answers For-You when nagg cannot (fallthrough to tier 2)', async () => {
-    const layer = createNostrDataLayer({
-      tiers: [
-        pendingFeedTier('nagg'), // nagg unsupported here → fall through
-        createPrimalTier({ connection: fakeConnection(BATCH) }),
-        pendingFeedTier('relay'),
-      ],
-    });
-
-    const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
-    expect(result.isOk()).toBe(true);
-    const page = result._unsafeUnwrap();
-    expect(page.tier).toBe('primal');
-    expect(page.items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_A, ID_B]);
-    expect(page.actions?.[ID_A]?.liked).toBe(true);
-  });
-
-  test('a spec Primal cannot serve is `unsupported`, not a failure', async () => {
-    const tier = createPrimalTier({ connection: fakeConnection(BATCH) });
-    // following-recent has no Primal directive wired → falls through to the floor.
-    const outcome = await tier.feedPage!({ spec: { kind: 'following-recent', authors: [PUB] } });
-    expect(outcome.kind).toBe('unsupported');
-  });
-
-  test('for-you maps to a valid Primal feed directive (global-trending)', async () => {
-    let captured: { verb: string; params: Record<string, unknown> } | undefined;
-    const tier = createPrimalTier({
-      connection: {
-        request: (req) => {
-          captured = req;
-          return Promise.resolve(ok(BATCH));
-        },
-      },
-    });
-    await tier.feedPage!({ spec: { kind: 'for-you', viewerPubkey: PUB } });
-    expect(captured?.verb).toBe('mega_feed_directive');
-    // Exactly Primal's own "Trending 24h" home feed (get_home_feeds).
-    expect(JSON.parse(String(captured?.params.spec))).toEqual({ id: 'global-trending', kind: 'notes', hours: 24 });
-    expect(captured?.params.until).toBeUndefined();
-
-    // Page 2 echoes the previous page's FeedRange bound (a score) as `until`.
-    await tier.feedPage!({
-      spec: { kind: 'for-you', viewerPubkey: PUB },
-      cursor: { createdAt: 13_186_813_162, id: ID_B },
-    });
-    expect(captured?.params.until).toBe(13_186_813_162);
   });
 });
 
@@ -394,29 +213,5 @@ describe('Primal WebSocket connection — protocol plumbing', () => {
     const result = await connection.request({ verb: 'mega_feed_directive', params: { limit: 30 } });
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toHaveLength(BATCH.length);
-  });
-});
-
-describe('demuxPrimalThread — replies survive a non-reply feedRange', () => {
-  const ROOT = 'd'.repeat(64);
-  const R1 = 'e'.repeat(64);
-  const R2 = 'f'.repeat(64);
-
-  test('renders every reply even when feedRange lists only the root', () => {
-    // Reproduces the live bug: Primal thread_view streams the reply notes, but
-    // its feedRange points at the primary note / pagination window — NOT the
-    // replies. The old manifest filtered replies through it and dropped them.
-    const batch: RawPrimalEvent[] = [
-      { id: ROOT, pubkey: PUB, kind: 1, content: 'root', tags: [], created_at: 1_700_000_000 },
-      { id: R1, pubkey: PUB, kind: 1, content: 'reply 1', tags: [], created_at: 1_700_000_100 },
-      { id: R2, pubkey: PUB, kind: 1, content: 'reply 2', tags: [], created_at: 1_700_000_200 },
-      { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ROOT] }) },
-    ];
-
-    const bundle = demuxPrimalThread(batch, ROOT);
-    expect(bundle).not.toBeNull();
-    expect([...bundle!.itemsById.keys()].sort()).toEqual([R1, R2].sort());
-    // Both replies are in the manifest (root excluded), so they actually render.
-    expect(bundle!.manifest.elements.sort()).toEqual([R1, R2].sort());
   });
 });

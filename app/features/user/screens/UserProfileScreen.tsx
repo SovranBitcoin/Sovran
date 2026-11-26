@@ -53,12 +53,14 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import { StateSwitch } from '@/shared/ui/composed/StateSwitch';
+import { toViewState } from '@/shared/lib/viewState';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useModerationActions } from '@/shared/hooks/useModerationActions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -75,9 +77,9 @@ import { ProfileBody } from '@/features/user/components/ProfileBody';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getContrastColors, withAlpha } from '@/shared/lib/color';
+import { withAlpha } from '@/shared/lib/color';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
+import { buildProfileHref, useProfileEntry } from '@/shared/lib/nav/profileRoutes';
 import { buildMintInfoHref, getProfileMintInfoUrl } from '@/shared/lib/nav/mintInfoRoutes';
 import {
   selectIsFollowingPubkey,
@@ -86,8 +88,8 @@ import {
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
-import { useDominantColor } from '@/shared/lib/colorExtraction';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
@@ -173,12 +175,6 @@ function safeNpubEncode(pubkey: string): string {
   } catch {
     return '';
   }
-}
-
-/** [base, contrast] gradient pair for a header color extracted from an image. */
-function gradientPair(base: string): readonly [string, string] {
-  const { contrastColor } = getContrastColors(base, 0.3);
-  return [base, contrastColor] as const;
 }
 
 interface ProfileInfoItem {
@@ -419,7 +415,7 @@ function TopFollowers({
   visualScope: string;
 }) {
   const foreground = useThemeColor('foreground');
-  const profileFlowGroup = useActiveProfileFlowGroup();
+  const profileEntry = useProfileEntry();
   const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useSharedValue(0);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
@@ -451,12 +447,18 @@ function TopFollowers({
     deadlineMs: 1400,
   });
 
-  if (!isLoading && followersWithProfiles.length === 0) return null;
+  // Loading until the follower list lands; then the followers that have a
+  // name or picture, or nothing (the whole section steps aside).
+  const followersState = toViewState({
+    data: isLoading ? undefined : followersWithProfiles,
+    isLoading,
+  });
+  if (followersState.status === 'empty') return null;
 
   const handleFollowerPress = (follower: TopFollower) => {
     // push (not navigate) so each profile pushes a new stack entry; tapping
     // through follower → follower-of-follower then back returns step by step.
-    router.push(buildProfileHref('profile', { npub: follower.npub }, profileFlowGroup) as never);
+    router.push(buildProfileHref('profile', { npub: follower.npub }, profileEntry) as never);
   };
 
   const renderItem = (follower: TopFollower) => (
@@ -533,16 +535,24 @@ function TopFollowers({
         style={{ color: withAlpha(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
       </Text>
-      {isLoading ? (
-        <View style={styles.topFollowersGrid}>
-          {TOP_FOLLOWER_SKELETON_INDICES.map(renderSkeleton)}
-          <SkeletonLoadingShimmer active />
-        </View>
-      ) : (
-        <Animated.View style={fadeSettled ? styles.settledReveal : fadeStyle}>
-          <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
-        </Animated.View>
-      )}
+      {/* The region wave sweeps the skeleton grid; the loaded grid keeps its
+          own fade-in, so the switch itself swaps without a crossfade. */}
+      <StateSwitch
+        state={followersState}
+        exit="none"
+        renderLoading={() => (
+          <View style={styles.topFollowersGrid}>
+            {TOP_FOLLOWER_SKELETON_INDICES.map(renderSkeleton)}
+          </View>
+        )}
+        renderData={(followers) => (
+          <Animated.View style={fadeSettled ? styles.settledReveal : fadeStyle}>
+            <View style={styles.topFollowersGrid}>{followers.map(renderItem)}</View>
+          </Animated.View>
+        )}
+        visualKey="profile.topFollowers"
+        visualSurface="profile"
+      />
       <Spacer size={16} />
     </VisualLayoutProbe>
   );
@@ -650,7 +660,6 @@ function BannerWithAvatar({
   const [avatarSettled, setAvatarSettled] = useState(false);
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
-  const fallbackIndex = pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0;
   const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
   // Mirror Avatar's state model for the banner:
@@ -661,35 +670,17 @@ function BannerWithAvatar({
   // `isResolving` (not just isLoading) gates the fallback so a seeded
   // name-only record revalidating in the background never flashes the seeded
   // gradient before the real banner arrives — always placeholder → final.
-  const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
-  const bannerColors = useDominantColor(
-    !pictureUrl && hasBannerImage ? bannerUrl : undefined,
-    fallbackIndex
-  );
-
+  // The header always draws the pubkey-seeded palette; it no longer samples
+  // colours out of the avatar or banner image.
   const bannerState: 'loading' | 'image' | 'fallback' = hasBannerImage
     ? bannerStatus === 'loaded'
       ? 'image'
       : 'loading'
-    : isLoading || isResolving || (!!pictureUrl && !pfpColors.hasLoaded)
+    : isLoading || isResolving
       ? 'loading'
       : 'fallback';
 
   const bannerGradientTheme = generateSeededGradient(`${pubkey || 'default'}`);
-
-  const gradientSource =
-    pictureUrl && pfpColors.hasExtractedColors
-      ? 'pfp'
-      : hasBannerImage && bannerColors.hasExtractedColors
-        ? 'banner'
-        : 'seeded';
-
-  const imageGradientColors =
-    gradientSource === 'pfp'
-      ? gradientPair(pfpColors.baseColor)
-      : gradientSource === 'banner'
-        ? gradientPair(bannerColors.baseColor)
-        : null;
 
   useEffect(() => {
     setBannerStatus('loading');
@@ -789,51 +780,7 @@ function BannerWithAvatar({
               recyclingKey={bannerUrl}
               onError={() => setBannerStatus('failed')}
             />
-            {imageGradientColors ? (
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { backgroundColor: withAlpha(imageGradientColors[0], 0.05) },
-                  ]}
-                />
-                <LinearGradient
-                  colors={[withAlpha(imageGradientColors[0], 0.28), 'transparent']}
-                  locations={[0, 0.8]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={[
-                    withAlpha(imageGradientColors[1], 0.2),
-                    'transparent',
-                    withAlpha(imageGradientColors[0], 0.18),
-                  ]}
-                  locations={[0, 0.55, 1]}
-                  start={{ x: 1, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.06)', 'transparent']}
-                  locations={[0, 0.7]}
-                  start={{ x: 0.5, y: 0 }}
-                  end={{ x: 0.5, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </View>
-            ) : null}
           </>
-        ) : imageGradientColors ? (
-          <View style={StyleSheet.absoluteFill}>
-            <LinearGradient
-              colors={imageGradientColors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
         ) : (
           seededGradientFill
         )}
@@ -944,7 +891,7 @@ function BannerWithAvatar({
                 testID="profile-edit-button"
               />
             ))}
-          {isLoading && <SkeletonLoadingShimmer active />}
+          <SkeletonLoadingShimmer active={isLoading} />
         </View>
 
         {/* Send Money / Message / QR Code — the wallet circle-action
@@ -1048,10 +995,9 @@ export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const profileFlowGroup = useActiveProfileFlowGroup();
   const { keys: nostrKeys } = useNostrKeysContext();
   const params = useRouteParams(UserProfileParamsSchema, {
-    where: 'user-flow.profile',
+    where: 'app.profile',
   });
   const npubParam = params?.npub;
   const pubkeyParam = params?.pubkey;
@@ -1077,7 +1023,7 @@ export function UserProfileScreen() {
   // The same hook drives `UserMessagesScreen`, so navigating
   // Profile → Send Message hits a warm cache and the conversation
   // header renders instantly with the right name + avatar (and the
-  // /(user-flow)/userMessages route avoids a duplicate kind-0
+  // /userMessages route avoids a duplicate kind-0
   // fetch). First open per session pays one round-trip; the cache
   // entry is shared across surfaces and persists across launches.
   const {
@@ -1261,15 +1207,11 @@ export function UserProfileScreen() {
   // only when it exists is what makes that choice.
   const handleShareQr = () => {
     router.push(
-      buildProfileHref(
-        'share',
-        {
-          type: 'npub',
-          data: npub,
-          ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-        },
-        profileFlowGroup
-      ) as never
+      buildProfileHref('share', {
+        type: 'npub',
+        data: npub,
+        ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+      }) as never
     );
   };
 

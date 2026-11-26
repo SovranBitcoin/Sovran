@@ -88,7 +88,7 @@ jest.mock('@/features/payments/lib/parkedMessageEcash', () => ({
   nextMessageEcashRetryAt: () => mockRetryAt,
   hasDueMessageEcash: () => mockDue,
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({

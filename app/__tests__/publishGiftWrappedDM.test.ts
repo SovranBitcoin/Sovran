@@ -3,14 +3,17 @@
  *
  * Characterization of `publishGiftWrappedDM`, the publisher the Send flow
  * uses to hand a bearer ecash token to a Nostr contact. The real NIP-17
- * construction and unwrap run; only NDK publication is replaced, by an
- * `NDKEvent` whose `publish()` records the event and can be made to fail.
+ * construction and unwrap run, and so does the publish seam; only the relay is
+ * replaced, by a client whose `publishToRelay` records each event it is sent
+ * and can be made to refuse it. The seam retries a refused event twice.
  */
 
-import { generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
+import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
+import { NoDirectMessageRelaysError } from '@/shared/lib/nostr/sendDirectMessage';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
+import { fakeClient } from './helpers/fakeNostrClient';
 
 type Published = {
   kind: number;
@@ -25,31 +28,9 @@ type Published = {
 const mockPublished: Published[] = [];
 const mockOutcomes: (() => Promise<unknown>)[] = [];
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => {
-  class NDKEvent {
-    kind = 0;
-    content = '';
-    tags: string[][] = [];
-    created_at = 0;
-    pubkey = '';
-    id = '';
-    sig = '';
-    publish() {
-      mockPublished.push({
-        kind: this.kind,
-        content: this.content,
-        tags: this.tags,
-        created_at: this.created_at,
-        pubkey: this.pubkey,
-        id: this.id,
-        sig: this.sig,
-      });
-      const next = mockOutcomes.shift();
-      return next ? next() : Promise.resolve(new Set(['wss://relay.example']));
-    }
-  }
-  return { __esModule: true, default: class NDK {}, NDKEvent };
-});
+jest.mock('@/shared/lib/logger', () => ({
+  nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
 // A dummy bearer token: these tests never touch real proofs.
 const TOKEN = 'cashuBdummy-bearer-token-for-tests';
@@ -60,11 +41,34 @@ const recipientKey = generateSecretKey();
 const recipientPub = getPublicKey(recipientKey);
 const outsiderKey = generateSecretKey();
 
-const ndk: never = Object.create(null) as never;
+const recipientDmRelayList = finalizeEvent(
+  {
+    kind: 10050,
+    created_at: 1_700_000_000,
+    tags: [['relay', 'wss://relay.example/']],
+    content: '',
+  },
+  recipientKey
+);
+
+/** One relay, which advertises recipientPub's kind-10050 inbox and takes each publish's next outcome. */
+const client = fakeClient({
+  relays: ['wss://relay.example/'],
+  queryRelay: async () => ({ events: [recipientDmRelayList], eose: true }),
+  publishToRelay: async (_url, event) => {
+    mockPublished.push({ ...event });
+    const next = mockOutcomes.shift();
+    if (next) await next();
+  },
+});
+
+/** Each distinct event sent, in the order first sent (a retry sends the same one again). */
+const distinct = () =>
+  mockPublished.filter((e, i) => mockPublished.findIndex((o) => o.id === e.id) === i);
 
 function send(extra: { extraTags?: string[][] } = {}) {
   return publishGiftWrappedDM({
-    ndk,
+    client,
     senderPrivateKey: senderKey,
     recipientPublicKey: recipientPub,
     content: TOKEN,
@@ -135,34 +139,34 @@ test('it returns the self-copy wrap id, not the recipient wrap id', async () => 
 });
 
 test('a refused recipient wrap rejects and the self-copy is never published', async () => {
-  mockOutcomes.push(() => Promise.reject(new Error('Not enough relays received the event')));
+  const refuse = () => Promise.reject(new Error('blocked: not accepted'));
+  mockOutcomes.push(refuse, refuse, refuse);
 
-  await expect(send()).rejects.toThrow('Not enough relays received the event');
-  expect(mockPublished).toHaveLength(1);
+  await expect(send()).rejects.toThrow('not accepted by any relay');
+  expect(mockPublished).toHaveLength(3);
+  expect(distinct()).toHaveLength(1);
   expect(mockPublished[0].tags).toContainEqual(['p', recipientPub]);
 });
 
 test('a refused self-copy still resolves with the self-copy wrap id', async () => {
-  mockOutcomes.push(
-    () => Promise.resolve(new Set(['wss://relay.example'])),
-    () => Promise.reject(new Error('self copy refused'))
-  );
+  const refuse = () => Promise.reject(new Error('self copy refused'));
+  mockOutcomes.push(() => Promise.resolve(), refuse, refuse, refuse);
 
   const { selfWrapId } = await send();
 
   // QUIRK: the self-copy is best effort. Its id is returned (and used as the
   // local echo's dedup key) even though no relay holds that event.
-  expect(mockPublished).toHaveLength(2);
-  expect(selfWrapId).toBe(mockPublished[1].id);
+  expect(distinct()).toHaveLength(2);
+  expect(selfWrapId).toBe(distinct()[1].id);
 });
 
 test('it waits for the self-copy publish to settle before resolving', async () => {
   let releaseSelfCopy: () => void = () => {};
   mockOutcomes.push(
-    () => Promise.resolve(new Set(['wss://relay.example'])),
+    () => Promise.resolve(),
     () =>
-      new Promise((resolve) => {
-        releaseSelfCopy = () => resolve(new Set());
+      new Promise<void>((resolve) => {
+        releaseSelfCopy = () => resolve();
       })
   );
 
@@ -185,4 +189,52 @@ test('extra tags reach the decrypted message for both parties', async () => {
 
   expect(unwrapGiftWrap(mockPublished[0], recipientKey)?.tags).toContainEqual(['subject', 'ecash']);
   expect(unwrapGiftWrap(mockPublished[1], senderKey)?.tags).toContainEqual(['subject', 'ecash']);
+});
+
+test('routes the recipient wrap to the recipient kind-10050 DM relays when advertised', async () => {
+  const publishedUrls: string[] = [];
+  const dmRelayList = finalizeEvent(
+    {
+      kind: 10050,
+      created_at: 1_700_000_100,
+      tags: [['relay', 'wss://inbox.recipient.example/']],
+      content: '',
+    },
+    recipientKey
+  );
+  const routingClient = fakeClient({
+    relays: ['wss://sender.pool.example/'],
+    queryRelay: async () => ({ events: [dmRelayList], eose: true }),
+    publishToRelay: async (url) => {
+      publishedUrls.push(url);
+    },
+  });
+
+  await publishGiftWrappedDM({
+    client: routingClient,
+    senderPrivateKey: senderKey,
+    recipientPublicKey: recipientPub,
+    content: TOKEN,
+  });
+
+  expect(publishedUrls).toEqual(['wss://inbox.recipient.example/', 'wss://sender.pool.example/']);
+});
+
+test('refuses with NoDirectMessageRelaysError when the recipient has no kind-10050 inbox relays', async () => {
+  const publishToRelay = jest.fn(async () => undefined);
+  const noInboxClient = fakeClient({
+    relays: ['wss://sender.pool.example/'],
+    queryRelay: async () => ({ events: [], eose: true }),
+    publishToRelay,
+  });
+
+  await expect(
+    publishGiftWrappedDM({
+      client: noInboxClient,
+      senderPrivateKey: senderKey,
+      recipientPublicKey: recipientPub,
+      content: TOKEN,
+    })
+  ).rejects.toBeInstanceOf(NoDirectMessageRelaysError);
+  expect(publishToRelay).not.toHaveBeenCalled();
 });

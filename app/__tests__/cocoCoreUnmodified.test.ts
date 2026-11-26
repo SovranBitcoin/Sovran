@@ -31,59 +31,33 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
-const OFFLINE_SEND_PATCH = '@cashu+coco-core+2.0.0.patch';
 const PATCHES_DIR = resolve(__dirname, '..', 'patches');
 
-describe('@cashu/coco-core carries one patch', () => {
+describe('@cashu/coco-core ships unmodified', () => {
   it('found the installed bundle to check', () => {
     expect(bundlePath).toBeTruthy();
   });
 
-  it('has only the offline-send patch registered against a coco package', () => {
+  it('has no patch registered against any coco package', () => {
     const root = JSON.parse(
       readFileSync(resolve(__dirname, '..', '..', 'package.json'), 'utf8')
     ) as { patchedDependencies?: Record<string, string> };
     const patched = Object.entries(root.patchedDependencies ?? {}).filter(([name]) =>
       name.startsWith('@cashu/coco-')
     );
-    expect(patched).toEqual([['@cashu/coco-core@2.0.0', `app/patches/${OFFLINE_SEND_PATCH}`]]);
+    expect(patched).toEqual([]);
   });
 
-  it('has no other coco patch file waiting to be registered', () => {
+  it('has no coco patch file waiting to be registered', () => {
     const files = readdirSync(PATCHES_DIR).filter(
       (name) => /coco/i.test(name) && /\.patch$/.test(name)
     );
-    expect(files).toEqual([OFFLINE_SEND_PATCH]);
-  });
-
-  it('changes the bundle and its type declarations, nothing else', () => {
-    const patch = readFileSync(resolve(PATCHES_DIR, OFFLINE_SEND_PATCH), 'utf8');
-    const files = patch
-      .split('\n')
-      .filter((line) => line.startsWith('diff --git '))
-      .map((line) => line.split(' b/')[1]);
-    expect(files).toEqual(['dist/index-CvKNFBXJ.d.ts', 'dist/index.d.ts', 'dist/index.js']);
-  });
-
-  it('carries the offline prepare option and refuses what needs a swap', () => {
-    expect(bundle).toContain(
-      'return this.sendOperationService.prepare(initOp, { offline: input.offline });'
-    );
-    expect(bundle).toContain('async getOfflineWallet(mintUrl, unit) {');
-    expect(bundle).toContain('Offline send needs proofs that add up to exactly');
-    expect(bundle).toContain('requires the mint and cannot be prepared offline');
-  });
-
-  it('keeps the online path refreshing stale mint data', () => {
-    expect(bundle).toContain(
-      'const { mint, keysets } = await this.mintService.ensureUpdatedMint(normalizedMintUrl);'
-    );
+    expect(files).toEqual([]);
   });
 
   it('carries none of the reclaim code the earlier patch added', () => {
     expect(bundle).not.toContain('collectSigningKeys');
     expect(bundle).not.toContain('assertReclaimable');
-    expect(bundle).not.toContain('getP2PKExpectedWitnessPubkeys');
     expect(bundle).not.toContain('no key held that may spend it yet');
   });
 });
@@ -158,10 +132,13 @@ describe('@cashu/coco-core and a P2PK send that has left', () => {
 
   it('refuses to reclaim it and leaves it pending', async () => {
     const manager = await walletWithPendingLockedSend();
-
-    await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
-      'Cannot rollback pending P2PK send operation'
-    );
-    expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+    try {
+      await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
+        'P2PK Send Operation in pending state can not be rolled back.'
+      );
+      expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+    } finally {
+      await manager.dispose();
+    }
   });
 });

@@ -138,38 +138,21 @@ export const siteCopy = {
         { id: 'onchain-lightning-05', status: 'planned', text: 'Add reusable Lightning offers (BOLT-12) for sending and receiving. One static code could accept repeated payments once the engine and release pipeline can support another payment type.' },
         { id: 'onchain-lightning-06', status: 'planned', text: 'Add Payjoin to on-chain sends once everyday payments are reliable enough to introduce it clearly. These collaborative transactions aim to save fees and make common chain-analysis methods less effective.' },
       ] },
-      { id: 'social-feed', title: 'Reading and replying on Nostr', status: 'in-progress', text: 'Improve the feed and its supporting services, then make it easier to join conversations.', items: [
-        { id: 'social-feed-01', status: 'in-progress', text: 'The home feed ranks notes by relevance rather than only recency, opens full reply chains, and shows reposts, zaps (tips), and post metrics alongside unified search and grouped notifications. Improve ranking, threading, and notification quality.' },
-        { id: 'social-feed-02', status: 'planned', text: 'Add a reply composer in the thread view, keeping each reply nested under its parent instead of detaching it into the wider feed.' },
-        { id: 'social-feed-03', status: 'planned', text: 'Let a connected X account mirror an update from Sovran, starting with an opt-in share path and expanding to managed posting later.' },
-        { id: 'social-feed-04', status: 'planned', text: 'Teach Nagg, the feed backend, to extract image and video dimensions, aspect ratios, and safe layout metadata. Clients can reserve space before media loads and filter or downrank extreme aspect ratios.' },
-        { id: 'social-feed-05', status: 'planned', text: "Have Nagg fetch and cache a link's Open Graph preview image and include it in the feed response, so each client does not need to fetch that metadata separately." },
+      { id: 'messaging', title: 'Encrypted payment messages', status: 'in-progress', text: 'Send and receive ecash directly over encrypted Nostr messages (NIP-17).', items: [
+        { id: 'messaging-01', status: 'complete', text: 'Send ecash to a Nostr contact over NIP-17 encrypted direct messages when their inbox relays are reachable, with fallback to copying or sharing the token.' },
       ] },
-      { id: 'notifications', title: 'More useful notifications', status: 'in-progress', text: 'Help the inbox recognize people you engage with and bring app and mint news into the same place.', items: [
-        { id: 'notifications-01', status: 'in-progress', text: 'Keep the manual Relaxed, Moderate, Strict, and Follows policies and Direct/Thread reply scope. Add adaptive ranking: opening or replying to someone raises their future prominence, while people you never answer become less prominent without needing to block them.' },
-        { id: 'notifications-02', status: 'in-progress', text: 'Grow the Notifications App tab from its static welcome card into a real feed of release notes and live mint status, so product news and mint health share an inbox.' },
-      ] },
-      { id: 'messaging', title: 'Messaging and private groups', status: 'in-progress', text: 'Bring payments into conversations and extend encrypted messaging beyond one-to-one chats.', items: [
-        { id: 'messaging-01', status: 'complete', text: 'Pay from the chat composer to a contact who publishes a Lightning address, without leaving the thread. Ecash appears as an inline card that the recipient can tap to redeem.' },
-        { id: 'messaging-02', status: 'in-progress', text: 'Extend encrypted messaging to private multi-member groups. An opt-in MLS-encrypted transport over Marmot exists for two-party conversations; multi-member group chats are the remaining work.' },
-      ] },
-      { id: 'identity', title: 'An identity people can pay by name', status: 'in-progress', text: 'Connect Nostr profiles, Lightning addresses, and the communities people belong to.', items: [
+      { id: 'identity', title: 'An identity people can pay by name', status: 'in-progress', text: 'Connect Nostr profiles and Lightning addresses so contacts are easy to verify and pay.', items: [
         { id: 'identity-01', status: 'complete', text: 'Give each profile an npub.cash Lightning address tied to its Nostr key, with one-tap copy on the receive screen and free names to claim, so receiving can start with sharing a username.' },
-        { id: 'identity-02', status: 'planned', text: 'Add the npub.cash address to the Lightning address field (LUD) on the Nostr profile, so zaps can resolve from the profile itself, not only the receive screen.' },
+        { id: 'identity-02', status: 'planned', text: 'Add the npub.cash address to the Lightning address field (LUD) on the Nostr profile, so payments can resolve from the profile itself, not only the receive screen.' },
         { id: 'identity-03', status: 'planned', text: "Use npub.cash to identify who sent an incoming Lightning address payment. Show the sender's Nostr name and avatar in history when available, instead of a generic mint receive." },
-        { id: 'identity-04', status: 'planned', text: 'Tag a profile with a group, event, or community, such as a meetup or cohort. People sharing the tag would share a feed and appear as suggested follows.' },
       ] },
       { id: 'history-insights', title: 'History that explains itself', status: 'in-progress', text: 'Explain individual payments and make spending across months easier to follow.', items: [
         { id: 'history-insights-01', status: 'complete', text: 'Show a live payment timeline with the source (QR, NFC, clipboard, or deep link), how money moved, and how it settled. Group by date with month tabs that stay pinned while paging back. The source marks this item complete but still calls for richer recipient and originating-request context on each row.' },
         { id: 'history-insights-02', status: 'in-progress', text: 'Extend the wallet chart of current-month spending and receipts, including its projected trend line, to past months with running totals and optional breakdowns by mint or currency.' },
       ] },
-      { id: 'ai', title: 'AI paid with ecash, under your control', status: 'in-progress', text: 'Connect AI spending to the wallet and offer writing help only when requested, with you confirming every send.', items: [
-        { id: 'ai-01', status: 'in-progress', text: 'Let AI use your wallet balance rather than a separate Routstr balance. The AI tab streams OpenAI, Claude, and Grok responses paid with ecash, but its standalone Routstr balance needs a token top-up; combining the balances is the remaining work.' },
-        { id: 'ai-02', status: 'planned', text: 'Offer opt-in AI-drafted replies to help you write, with you confirming every send. A model should not send a reply or move money on its own.' },
-      ] },
-      { id: 'open-stack', title: 'Code others can build on', status: 'in-progress', text: 'Keep source public and make the Nostr tools, payment engine, and translation workflow easier to understand and reuse.', items: [
+      { id: 'open-stack', title: 'Code others can build on', status: 'in-progress', text: 'Keep source public and make the Nostr client, payment engine, and translation workflow easier to understand and reuse.', items: [
         { id: 'open-stack-01', status: 'complete', text: 'Keep the app and its supporting libraries public on GitHub for reading, auditing, and reuse under their respective licenses. Public source is not proof that every hosted service or store build is reproducible.' },
-        { id: 'open-stack-02', status: 'in-progress', text: 'Package the search, notification, and feed recipes behind Sovran into nagg-ts, a Nostr client that other apps can use without adopting a particular user interface.' },
+        { id: 'open-stack-02', status: 'in-progress', text: 'Keep the direct Nostr client, relay pool, and NIP-17 payment transport in the in-repo nostr package so other wallets can reuse them without adopting a particular user interface.' },
         { id: 'open-stack-03', status: 'in-progress', text: 'Document how Colada parses, routes, and sequences payments over Coco, covering ecash and Lightning first and on-chain next, so other wallets can reuse the payment flow.' },
         { id: 'open-stack-04', status: 'planned', text: 'Translate into Spanish first, then establish a repeatable translation workflow and regular public progress notes so more people can read and follow the project.' },
       ] },

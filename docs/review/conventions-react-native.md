@@ -98,7 +98,7 @@ Scope: `**/*.tsx`, `app/shared/lib/popup/**/*.ts`, `app/shared/lib/profile/**/*.
 
 Text typed into an ordinary input is learned by the keyboard, offered to autofill and shown in clear; `secureTextEntry` does not apply to multiline inputs.
 
-Does `hunk` add or configure an input that receives a recovery phrase, nsec, private key, bunker/pairing secret or PIN — a `TextInput`, `BottomSheetTextInput`, heroui `Input`, or an `actionMenu`/popup `inputs: [{…}]` descriptor — without `secureTextEntry`, or, where it must be multiline (so `secureTextEntry` cannot work), without all of `autoCorrect={false}`, `spellCheck={false}`, `autoCapitalize="none"` and `autoComplete="off"` (plus `importantForAutofill="no"` on Android)?
+Does `hunk` add or configure an input that receives a recovery phrase, nsec, private key, bunker/pairing secret or PIN — a `TextInput`, the house `Input`, or an `actionMenu`/popup `inputs: [{…}]` descriptor — without `secureTextEntry`, or, where it must be multiline (so `secureTextEntry` cannot work), without all of `autoCorrect={false}`, `spellCheck={false}`, `autoCapitalize="none"` and `autoComplete="off"` (plus `importantForAutofill="no"` on Android)?
 
 Allowed cases: Inputs for public values (npub, mint URL, Lightning address, amounts, invoices, search); single-line secret inputs with `secureTextEntry` and a reveal toggle; read-only `editable={false}` display fields; design-system catalogue screens under `features/settings`.
 
@@ -161,16 +161,6 @@ A query param repeated in a URL arrives as an array and every param arrives as a
 Does `hunk` read route params through `useLocalSearchParams<{…}>()` or `useGlobalSearchParams<{…}>()` and then let an unchecked value flow onward as a single string, number, boolean or enum — `Number(id)`, `parseInt`, a template string, a store key, a prop, `as SomeUnion` — instead of `useRouteParams(ParamsSchema, { where })` from `@/shared/lib/nav/useRouteParams`?
 
 Allowed cases: `useRouteParams` with a module-level Zod schema; a param that is narrowed in the hunk (`typeof x === 'string'`, `Array.isArray`) before use; a strict `===` comparison against one literal whose false branch is the same default state as the param being absent (`flag === '1'`), since an array or any other string simply compares false; params only forwarded untouched to another route.
-
-## sheets/dynamic-detent
-
-Scope: `app/shared/blocks/popup/**`, `**/*Sheet*.tsx`
-
-@gorhom/bottom-sheet 5 defaults `enableDynamicSizing` to `true` and then inserts a content-height detent into `snapPoints`, shifting every index.
-
-Does `hunk` render `BottomSheet`/`BottomSheetModal` with `snapPoints` and index-based control (`index=`, `snapToIndex(n)`, `onChange` comparing an index) without setting `enableDynamicSizing` explicitly, so that the extra dynamic detent can change which position an index means?
-
-Allowed cases: `enableDynamicSizing={false}` with fixed `snapPoints`; dynamic sizing on with no `snapPoints` and only `expand()`/`close()`/`snapToPosition`; the popup hosts' computed `enableDynamicSizing={…}` expressions.
 
 ## a11y/live-region-ios
 

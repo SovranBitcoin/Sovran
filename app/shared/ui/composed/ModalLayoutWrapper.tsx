@@ -26,11 +26,13 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
-import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
+import {
+  SHEET_SCRIM_OVERHANG,
+  SheetHeaderHeightContext,
+} from '@/shared/ui/composed/AndroidSheetRoot';
 import { useSettledHeaderHeight } from '@/shared/ui/composed/settledHeaderHeight';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
-import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
 import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
@@ -195,7 +197,7 @@ export function ModalLayoutWrapper({
   // stacks do not extend past the measured header height.
   const androidSheetScrimOverhang =
     Platform.OS === 'android' && sheetHeaderHeight != null && headerAppearance === 'gradient'
-      ? FLOW_SHEET_SCRIM_OVERHANG
+      ? SHEET_SCRIM_OVERHANG
       : 0;
   // Navigator geometry owns both card and sheet clearance on every platform.
   const stableHeaderBottom = headerHeight + androidSheetScrimOverhang;

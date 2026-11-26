@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Animated, { measure } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 

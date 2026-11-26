@@ -2,10 +2,7 @@
   "app/(drawer)/_layout.tsx": {
     "stylesheet-create": 1
   },
-  "app/(transactions-flow)/transactions.tsx": {
-    "inline-style": 1
-  },
-  "app/_layout.tsx": {
+  "app/transactions.tsx": {
     "inline-style": 1
   },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
@@ -426,7 +423,7 @@
     "inline-style": 1
   },
   "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.liquid.tsx": {
-    "inline-style": 3
+    "inline-style": 1
   },
   "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.shell.tsx": {
     "inline-style": 2,
@@ -451,10 +448,16 @@
     "stylesheet-create": 1,
     "content-container-style": 1
   },
+  "runtime/AppRoot.tsx": {
+    "inline-style": 1
+  },
   "shared/blocks/NotFoundScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 2,
     "stack-layout-props": 2
+  },
+  "shared/blocks/OfflineShell.tsx": {
+    "stylesheet-create": 1
   },
   "shared/blocks/PaymentInfo.tsx": {
     "inline-style": 2
@@ -464,12 +467,9 @@
     "inline-style": 1
   },
   "shared/blocks/popup/ActionMenuHost.tsx": {
-    "inline-style": 7,
+    "inline-style": 5,
     "stack-layout-props": 1,
     "content-container-style": 1
-  },
-  "shared/blocks/popup/PopupHost.tsx": {
-    "inline-style": 2
   },
   "shared/blocks/status/LoadingIndicator.tsx": {
     "inline-style": 2
@@ -505,7 +505,7 @@
     "inline-style": 5
   },
   "shared/lib/popup/ToastSlab.tsx": {
-    "inline-style": 1
+    "inline-style": 2
   },
   "shared/lib/popup/popups/nfcTapSheet.tsx": {
     "stylesheet-create": 1,
@@ -517,11 +517,8 @@
     "content-container-style": 1
   },
   "shared/lib/popup/popups/sheetMenuRow.tsx": {
-    "inline-style": 3,
+    "inline-style": 2,
     "stack-layout-props": 1
-  },
-  "shared/providers/OfflineProvider.tsx": {
-    "stylesheet-create": 1
   },
   "shared/styles/tokens.ts": {
     "inline-style": 1
@@ -538,9 +535,6 @@
     "stylesheet-create": 1,
     "inline-style": 3,
     "stack-layout-props": 3
-  },
-  "shared/ui/composed/AmountFormatter.tsx": {
-    "inline-style": 1
   },
   "shared/ui/composed/AndroidSheetRoot.tsx": {
     "inline-style": 1
@@ -621,11 +615,6 @@
     "inline-style": 1,
     "stack-layout-props": 1
   },
-  "shared/ui/composed/FlowSheetHeader.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 1,
-    "stack-layout-props": 1
-  },
   "shared/ui/composed/FollowBadge.tsx": {
     "stylesheet-create": 1,
     "inline-style": 1,
@@ -678,7 +667,7 @@
     "content-container-style": 1
   },
   "shared/ui/composed/ProfileTierRing.tsx": {
-    "inline-style": 4
+    "inline-style": 3
   },
   "shared/ui/composed/QRButton/QRButton.android.tsx": {
     "stylesheet-create": 1
@@ -732,6 +721,9 @@
   "shared/ui/composed/Surface.tsx": {
     "stylesheet-create": 1
   },
+  "shared/ui/composed/ToastHost.tsx": {
+    "inline-style": 1
+  },
   "shared/ui/composed/UnderlineTabs.tsx": {
     "stylesheet-create": 1
   },
@@ -774,6 +766,9 @@
     "inline-style": 1,
     "stack-layout-props": 1
   },
+  "shared/ui/primitives/PressableFeedback.tsx": {
+    "stylesheet-create": 1
+  },
   "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
     "inline-style": 1
   },
@@ -782,6 +777,9 @@
   },
   "shared/ui/primitives/Spinner.tsx": {
     "stylesheet-create": 1
+  },
+  "shared/ui/primitives/Switch.tsx": {
+    "inline-style": 1
   },
   "shared/ui/primitives/View/Spacer.tsx": {
     "inline-style": 1

@@ -177,7 +177,7 @@ describe('iOS native search bar dismissal before navigation', () => {
     });
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith({
-      pathname: '/(user-flow)/profile',
+      pathname: '/profile',
       params: { pubkey: 'abcdef' },
     });
 

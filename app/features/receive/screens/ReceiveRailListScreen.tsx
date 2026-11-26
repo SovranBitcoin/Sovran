@@ -15,7 +15,8 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 
 import { Stack } from 'expo-router';
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { setStringAsync } from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';

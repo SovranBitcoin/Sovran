@@ -2,7 +2,7 @@ import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../map/feed';
 import { shouldReplace } from '@sovranbitcoin/schemas';
 import type { RequestControls } from '../timeout';
-import type { ReadProvenance, TierOutcome } from '../tiers';
+import type { ReadProvenance } from '../tiers';
 
 // ---------------------------------------------------------------------------
 // Social-graph surface — contacts / profiles / relay-lists
@@ -37,11 +37,6 @@ export type SocialGraphRequest = RequestControls & {
 };
 
 export type ResolvedSocialGraph = { tier: NostrTier; provenance?: ReadProvenance } & SocialGraph;
-
-export interface SocialGraphTier {
-  readonly tier: NostrTier;
-  getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
-}
 
 // --- event parsing (latest kind-3 / 10002 / 10000) --------------------------
 //

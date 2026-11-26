@@ -8,7 +8,7 @@ import {
 } from 'wallet';
 
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { paymentLog } from '@/shared/lib/logger';

@@ -33,20 +33,20 @@ jest.mock('@/shared/styles/appStyle', () => ({
     style: { space: { pad: 16, item: 12 } },
   }),
 }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PillButton', () => {
   const React = require('react');
   const host = (name: string) =>
     function MockHost(props: Record<string, unknown>) {
       return React.createElement(name, props);
     };
-  return {
-    Button: Object.assign(host('Button'), { Label: 'Label' }),
-    Input: 'Input',
-    Label: 'Label',
-    Description: 'Description',
-    TextField: 'TextField',
-  };
+  return { PillButton: Object.assign(host('Button'), { Label: 'Label' }) };
 });
+jest.mock('@/shared/ui/primitives/Field', () => ({
+  Input: 'Input',
+  Label: 'Label',
+  Description: 'Description',
+  TextField: 'TextField',
+}));
 
 test('shared Settings recovery fields mask before reveal, hide on background, and preserve explicit copy', async () => {
   const listener = jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
@@ -91,7 +91,7 @@ test('shared Settings recovery fields mask before reveal, hide on background, an
   void act(() => {
     screen.root.findByProps({ testID: 'settings-backup-row' }).props.onPress();
   });
-  expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockPush).toHaveBeenCalledWith('/backup-intro');
   expect(input().props.value).not.toBe('test-root-placeholder');
   expect(screen.root.findAllByProps({ testID: 'profile-recovery-written' })).toHaveLength(0);
   void act(() => screen.unmount());

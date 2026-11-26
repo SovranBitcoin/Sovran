@@ -4,7 +4,7 @@
  * nagg exposes an HTTP `/healthz` (JSON `{ ok: "true", … }`). Primal's cache has
  * no health endpoint, so we treat a WebSocket round-trip — a minimal Nostr REQ
  * answered by any frame before a timeout — as "online". Raw relay liveness comes
- * from the NDK pool via `useRelayHealth`; `foldRelayStatus` collapses that
+ * from the Nostr client pool via `useRelayHealth`; `foldRelayStatus` collapses that
  * per-URL map into one tier status.
  *
  * These are pure functions (no React, no module globals) so the screen hook
@@ -96,7 +96,7 @@ export function probePrimalHealth(
 }
 
 /**
- * Collapse the per-relay NDK-pool health map into one tier status: online if any
+ * Collapse the per-relay client-pool health map into one tier status: online if any
  * relay is connected, checking if any is connecting (and none connected), else
  * offline (including an empty pool).
  */

@@ -16,7 +16,7 @@ import { FlatList, ScrollView, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { PressableFeedback } from 'heroui-native';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -137,7 +137,7 @@ function SectionHeader({
   const openProfile = () => {
     if (author?.pubkey) {
       router.navigate({
-        pathname: '/(user-flow)/profile',
+        pathname: '/profile',
         params: { pubkey: author.pubkey },
       });
     }

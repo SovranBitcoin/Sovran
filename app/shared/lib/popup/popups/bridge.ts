@@ -35,10 +35,7 @@ function describeSubmessage(value: unknown): string | undefined {
 
 type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
 
-type ToastManager = {
-  show: (options: string | Record<string, unknown>) => string;
-  hide: (ids?: string | string[] | 'all') => void;
-};
+type ToastManager = { show: (options: Record<string, unknown>) => string };
 
 let toastManagerRef: ToastManager | null = null;
 let toastSequence = 0;
@@ -48,7 +45,8 @@ function nextToastId(): string {
   return `toast-${Date.now().toString(36)}-${toastSequence.toString(36)}`;
 }
 
-export function registerToast(manager: ToastManager) {
+/** Connects the toast stack; pass `null` when it unmounts so later toasts warn instead of vanishing. */
+export function registerToast(manager: ToastManager | null) {
   toastManagerRef = manager;
 }
 
@@ -151,7 +149,6 @@ export function showToast(config: ToastConfig) {
         }),
         React.createElement(CompactToast, {
           ...props,
-          variant: config.variant,
           label: config.label,
           description: config.description,
           icon: config.icon,

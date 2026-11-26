@@ -1,8 +1,15 @@
+import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Amount, getEncodedToken } from '@cashu/cashu-ts';
 import type { BLEPrivateMessageEvent } from 'bitchat-module';
 
-import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
+import { useBitchatAccountServices } from '@/features/bitchat/hooks/useBitchatAccountServices';
+
+/** The account scope's BitChat services, around its children. */
+function BitchatBLEProvider({ children }: { children?: React.ReactNode }) {
+  useBitchatAccountServices();
+  return <>{children}</>;
+}
 
 /**
  * Which private BitChat messages the provider puts in the chat thread.
@@ -10,7 +17,7 @@ import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
  * Sovran's own nearby formats travel as BitChat private messages with a
  * versioned prefix (features/nearPay/lib/nearbyCapability.ts `CAPABILITY_PREFIX`,
  * features/nearPay/lib/nearbyPayments.ts `NEARBY_PAYMENT_PREFIX`). The provider's
- * app-wide listener (shared/providers/BitchatBLEProvider.tsx) keeps the whole
+ * app-wide listener (features/bitchat/hooks/useBitchatAccountServices.ts) keeps the whole
  * `sovran:` namespace, whatever its kind or version, and a DM that is nothing
  * but a token, out of the chat store. The prefixes come from the real modules;
  * only the native module and the hooks the provider also mounts are stubbed.

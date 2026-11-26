@@ -15,10 +15,6 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
  * Pill fill is `surface-tertiary`: `surface` is palette 900 against a 950
  * canvas — one step of separation, which renders as invisible.
  *
- * The thread opens inside the SAME flow group (`(transactions-flow)/thread`)
- * so it pushes in FRONT of the modal — pushing the root `(user-flow)` stack
- * from here opened the thread BEHIND the transactions modal.
- *
  * The annotation keeps the post's id and a text preview, not the note itself,
  * so there is no event to hand the thread through `threadSeedCache`. The card
  * warms the entity cache instead (`prefetchThread`) while it is on screen, so

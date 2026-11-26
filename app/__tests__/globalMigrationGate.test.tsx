@@ -11,11 +11,16 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
-import {
-  InitializationProvider,
-  useInitializationReset,
-  useInitializationState,
-} from '@/shared/providers/InitializationProvider';
+import { initializationStages, useInitializationState } from '@/runtime/initializationStages';
+
+/** A fresh stage graph, as a freshly mounted app root starts with. */
+function freshStageGraph() {
+  act(() => {
+    initializationStages.resetStages();
+    initializationStages.cancelResetStages();
+  });
+}
+beforeEach(freshStageGraph);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,10 +45,10 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 let state: ReturnType<typeof useInitializationState>;
-let reset: ReturnType<typeof useInitializationReset>;
+let reset: typeof initializationStages;
 function Probe() {
   state = useInitializationState();
-  reset = useInitializationReset();
+  reset = initializationStages;
   return null;
 }
 function App() {
@@ -55,12 +60,12 @@ let renderer: TestRenderer.ReactTestRenderer;
 async function render() {
   await act(async () => {
     renderer = TestRenderer.create(
-      <InitializationProvider>
+      <>
         <Probe />
         <GlobalMigrationGate>
           <App />
         </GlobalMigrationGate>
-      </InitializationProvider>
+      </>
     );
   });
 }

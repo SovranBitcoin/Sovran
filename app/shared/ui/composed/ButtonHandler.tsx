@@ -234,12 +234,8 @@ export function ButtonHandler({
     ];
   }, [visibleButtons]);
 
-  // The overflow sheet is the FullWindowOverlay-backed `actionMenuSheet()`
-  // lane (PopupHost's standalone <BottomSheet>). ButtonHandler footers live
-  // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), and
-  // the `actionMenuPopup()` host disables FWO — it paints UNDER a native iOS
-  // route modal, leaving the menu invisible. The global-host routing (vs the
-  // old inline heroui menu, which mis-positioned on Android) is preserved.
+  // The overflow sheet is the `actionMenuSheet()` lane on PopupHost, so it
+  // is sequenced with the popups ButtonHandler footers raise.
   const openMoreMenu = () => {
     actionMenuSheet({
       title: 'Select option',

@@ -1,10 +1,4 @@
-import type { NotificationSortKey } from "../notifications";
-import type { NostrCursor } from '@sovranbitcoin/schemas';
-import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
-import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
-import type { ThreadBundle, ThreadRequest } from '../thread';
-import type { NotificationItem, NotificationsBundle, NotificationsRequest } from '../notifications';
-import { ownActionKinds, type OwnHistoryBundle, type OwnHistoryRequest } from '../own-state';
+import { answered, failed, type TierOutcome } from '../../tiers';
 import {
   summarizeReviews,
   discoverFromReviews,
@@ -35,194 +29,23 @@ import {
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
-import {
-  demuxRelayFeed,
-  demuxRelayThread,
-  demuxRelayNotifications,
-  demuxRelayOwnHistory,
-  relayNotificationItem,
-} from './demux';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
-import { noteStatsFromRelayEvents, type NoteStatsRequest } from '../note-stats';
-import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 
 // ---------------------------------------------------------------------------
 // Raw-relay tier (tier 3, the floor)
 //
-// The honest-decentralisation source. Feature ceilings are accepted here, per
-// the per-surface matrix: For-You is OUT OF REACH on relays, so it degrades to
-// a recent feed; a spec that needs server-side context the floor can't provide
-// returns `unsupported` (the engine has already exhausted the better tiers by
-// the time we reach the floor, so unsupported there surfaces as an honest error).
+// The honest-decentralisation source: mint reviews, the social graph, DM
+// envelopes, profiles and NIP-50 profile search straight off relays. Feature
+// ceilings are accepted here (no follower counts, unranked search).
 // ---------------------------------------------------------------------------
 
 export type RelayTierConfig = {
   connection: RelayConnection;
 };
 
-/** Engagement events counted per read; beyond this the floor reports a lower bound. */
-const NOTE_STATS_RELAY_EVENT_LIMIT = 1000;
-
 export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   return {
     tier: 'relay',
-    async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
-      let spec = request.spec;
-      if (spec.kind === 'following-recent' && !spec.authors && spec.viewerPubkey) {
-        const follows = await config.connection.request(
-          [{ kinds: [3], authors: [spec.viewerPubkey], limit: 1 }],
-          { signal: request.signal, timeoutMs: request.timeoutMs },
-        );
-        if (follows.isErr()) return failed(follows.error);
-        const latest = toFeedEvents(follows.value).sort((a, b) => b.created_at - a.created_at)[0];
-        const authors = latest?.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1]) ?? [];
-        if (!authors.length) return answered(demuxRelayFeed([]));
-        spec = { ...spec, authors };
-      }
-      const filters = filtersForSpec(spec, {
-        until: request.cursor?.createdAt,
-        limit: request.cursor ? (request.limit ?? 30) + 1 : request.limit,
-      });
-      if (!filters) return unsupported();
-
-      const result = await config.connection.request(filters, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<FeedBundle>>(
-        (events) => answered(demuxRelayFeed(withoutBoundary(events, request.cursor))),
-        (error) => failed(error),
-      );
-    },
-
-    async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
-      // The root by id, plus its direct replies (#e references to it). The floor
-      // can't rank — replies render newest-first via the synthesized manifest.
-      const filters: NostrFilter[] = [
-        { ids: [request.noteId] },
-        { kinds: [1], '#e': [request.noteId], limit: request.limit ?? 100 },
-      ];
-      const result = await config.connection.request(filters, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      if (result.isErr()) return failed(result.error);
-      let events: ReadonlyArray<RawRelayEvent> = result.value;
-
-      // Second phase: fetch the root's ANCESTORS (its NIP-10 `e` referents — the
-      // thread root + immediate parent), so the parent context renders AND caches.
-      // The floor has no server-side thread view, so without this the parent of a
-      // tapped reply isn't in the cache and flashes in from the network.
-      const ancestorIds = rootAncestorIds(events, request.noteId);
-      if (ancestorIds.length > 0) {
-        const ancestors = await config.connection.request([{ ids: ancestorIds }], {
-          signal: request.signal,
-          timeoutMs: request.timeoutMs,
-        });
-        if (ancestors.isOk()) events = [...events, ...ancestors.value];
-      }
-
-      // Third phase: batch kind-0 for every author (now including ancestors), so
-      // relay-mode threads render pfp/name. Tolerate a profile-fetch failure —
-      // render the notes rather than failing the thread.
-      events = await withThreadAuthorProfiles(config.connection, events, request);
-      const bundle = demuxRelayThread(events, request.noteId);
-      return bundle ? answered(bundle) : unsupported();
-    },
-
-    async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
-      const limit = request.limit ?? 50;
-      const isMentions = request.tab === 'MENTIONS';
-      const bounds = {
-        ...(request.since !== undefined ? { since: request.since } : {}),
-        ...(request.cursor ? { until: request.cursor.createdAt } : {}),
-      };
-      // MENTIONS is replies + quotes + @-mentions (all kind-1); ALL also carries
-      // reaction/repost/zap. The demux is the source of truth on tab semantics —
-      // these filters just avoid pulling engagement kinds we'd discard.
-      const filters: NostrFilter[] = [
-        { kinds: isMentions ? [1] : [1, 6, 7, 9735], '#p': [request.viewerPubkey], limit, ...bounds },
-      ];
-      // The load-bearing #e backstop: replies/engagement that omit #p but reference
-      // my events. It MUST page with the same since/until as the primary filter, or
-      // every page re-fetches the full backstop set from newest (stale duplicates).
-      if (request.ownEventIds && request.ownEventIds.length > 0) {
-        filters.push({ kinds: [1], '#e': request.ownEventIds, limit, ...bounds });
-        // Quotes of my events that don't p-tag me (NIP-18 q reference).
-        filters.push({ kinds: [1], '#q': request.ownEventIds, limit, ...bounds });
-      }
-
-      const result = await config.connection.request(filters, {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<NotificationsBundle>>(
-        (events) =>
-          answered(
-            demuxRelayNotifications(
-              withoutBoundary(events, request.cursor),
-              request.viewerPubkey,
-              request.ownEventIds,
-              { tab: request.tab, replyScope: request.replyScope },
-            ),
-          ),
-        (error) => failed(error),
-      );
-    },
-
-    notificationsLiveSubscribe(
-      request: NotificationsRequest,
-      since: NotificationSortKey | undefined,
-      onItems: (items: readonly NotificationItem[]) => void,
-    ): () => void {
-      if (!config.connection.subscribe) return () => {};
-      const isMentions = request.tab === 'MENTIONS';
-      // Open stream: same kinds/#p (+#e/#q backstop) shape as the one-shot
-      // notifications, minus `limit`. `since` only bounds relay-side backfill
-      // volume — classification stays unbounded so evidence for already-known
-      // rows still merges as count bumps.
-      const bounds = since?.createdAtSec ? { since: since.createdAtSec } : {};
-      const filters: NostrFilter[] = [
-        { kinds: isMentions ? [1] : [1, 6, 7, 9735], '#p': [request.viewerPubkey], ...bounds },
-      ];
-      if (request.ownEventIds && request.ownEventIds.length > 0) {
-        filters.push({ kinds: [1], '#e': request.ownEventIds, ...bounds });
-        filters.push({ kinds: [1], '#q': request.ownEventIds, ...bounds });
-      }
-      const own =
-        request.ownEventIds && request.ownEventIds.length > 0
-          ? new Set(request.ownEventIds)
-          : null;
-      return config.connection.subscribe(filters, (raw) => {
-        const item = relayNotificationItem(raw, request.viewerPubkey, own, {
-          tab: request.tab,
-          replyScope: request.replyScope,
-        });
-        if (item) onItems([item]);
-      });
-    },
-
-    async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
-      // A zap receipt isn't authored by the sender, so the floor can't cleanly
-      // list zaps-sent (it would have to scan every 9735) — accepted ceiling.
-      if (request.actionType === 'zaps-sent') return unsupported();
-
-      const filter: NostrFilter = {
-        kinds: ownActionKinds(request.actionType),
-        authors: [request.viewerPubkey],
-        limit: request.limit ?? 100,
-        ...(request.cursor ? { until: request.cursor.createdAt } : {}),
-      };
-      const result = await config.connection.request([filter], {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<OwnHistoryBundle>>(
-        (events) => answered(demuxRelayOwnHistory(withoutBoundary(events, request.cursor), request.actionType)),
-        (error) => failed(error),
-      );
-    },
-
     async getMintReviews(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>> {
       const filter: NostrFilter = {
         kinds: [MINT_REVIEW_KIND],
@@ -253,25 +76,6 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
         (events) => answered(discoverFromReviews(toFeedEvents(events))),
-        (error) => failed(error),
-      );
-    },
-
-    async getNoteStats(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>> {
-      if (request.ids.length === 0) return answered({});
-      // Count the engagement events referencing the ids. A lower bound: the
-      // limit caps what one round-trip can count for a very popular note.
-      const filter: NostrFilter = {
-        kinds: [1, 6, 7, 9735],
-        '#e': request.ids,
-        limit: NOTE_STATS_RELAY_EVENT_LIMIT,
-      };
-      const result = await config.connection.request([filter], {
-        signal: request.signal,
-        timeoutMs: request.timeoutMs,
-      });
-      return result.match<TierOutcome<NoteStatsMap>>(
-        (events) => answered(noteStatsFromRelayEvents(request.ids, toFeedEvents(events))),
         (error) => failed(error),
       );
     },
@@ -390,61 +194,6 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   };
 }
 
-/**
- * Drop the exact boundary event the previous page already showed. NIP-01 `until`
- * is INCLUSIVE, so paging with `until: cursor.createdAt` re-returns the cursor's
- * own event at the top of the next page; the cursor carries `id` precisely to
- * disambiguate it. Same-second siblings (different ids) are kept.
- */
-function withoutBoundary(
-  events: ReadonlyArray<RawRelayEvent>,
-  cursor: NostrCursor | undefined,
-): ReadonlyArray<RawRelayEvent> {
-  return cursor ? events.filter((e) => e.id !== cursor.id) : events;
-}
-
-/** The root note's NIP-10 `e` referents (thread root + immediate parent) to fetch as ancestors. */
-function rootAncestorIds(events: ReadonlyArray<RawRelayEvent>, rootId: string): string[] {
-  const root = events.find((event) => event.id === rootId);
-  if (!root || !Array.isArray(root.tags)) return [];
-  const ids = new Set<string>();
-  for (const tag of root.tags as unknown[]) {
-    if (Array.isArray(tag) && tag[0] === 'e' && typeof tag[1] === 'string' && tag[1] !== rootId) {
-      ids.add(tag[1]);
-    }
-  }
-  return [...ids];
-}
-
-/**
- * Batch a kind-0 fetch for every author in a thread's events and append the
- * results, so the relay floor's thread path resolves pfp/name. A profile-fetch
- * failure is tolerated — the notes still render, authors just stay unresolved.
- */
-async function withThreadAuthorProfiles(
-  connection: RelayConnection,
-  events: ReadonlyArray<RawRelayEvent>,
-  request: ThreadRequest,
-): Promise<ReadonlyArray<RawRelayEvent>> {
-  const authors = [
-    ...new Set(
-      events
-        .filter((event) => event.kind !== 0)
-        .map((event) => event.pubkey)
-        .filter((pubkey): pubkey is string => typeof pubkey === 'string'),
-    ),
-  ];
-  if (authors.length === 0) return events;
-  const result = await connection.request([{ kinds: [0], authors }], {
-    signal: request.signal,
-    timeoutMs: request.timeoutMs,
-  });
-  return result.match(
-    (profiles) => [...events, ...profiles],
-    () => events,
-  );
-}
-
 function toFeedEvents(events: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {
   const out: NaggFeedEvent[] = [];
   for (const raw of events) {
@@ -452,31 +201,4 @@ function toFeedEvents(events: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {
     if (event) out.push(event);
   }
   return out;
-}
-
-export function filtersForSpec(
-  spec: FeedSpec,
-  paging: { until?: number; since?: number; limit?: number },
-): NostrFilter[] | null {
-  const bounds = {
-    ...(paging.until !== undefined ? { until: paging.until } : {}),
-    ...(paging.since !== undefined ? { since: paging.since } : {}),
-  };
-  switch (spec.kind) {
-    case 'for-you':
-      // For-You can't be ranked on the floor — degrade to recent global notes.
-      return [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
-    case 'following-popular':
-      // The floor cannot rank a follow feed: the pager asks this lane for
-      // `following-recent` instead, so this spec is not served here.
-      return null;
-    case 'following-recent':
-      // The floor can serve an explicit author list; `feedPage` resolves a
-      // viewer anchor to its kind-3 authors before it gets here.
-      if (!spec.authors) return spec.viewerPubkey ? null : [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
-      if (spec.authors.length === 0) return null;
-      return [{ kinds: [1], authors: spec.authors, limit: paging.limit ?? 30, ...bounds }];
-    case 'user':
-      return [{ kinds: [1], authors: [spec.pubkey], limit: paging.limit ?? 30, ...bounds }];
-  }
 }

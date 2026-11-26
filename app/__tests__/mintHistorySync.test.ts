@@ -147,6 +147,7 @@ describe('background sweep', () => {
       active -= 1;
       return { ok: true } as const;
     });
+    jest.useFakeTimers();
     let resume!: () => void;
     const stop = startMintHistorySweep({
       trustedMintUrls: async () => urls,
@@ -158,7 +159,8 @@ describe('background sweep', () => {
       startDelayMs: 60_000,
     });
     resume();
-    await new Promise((r) => setTimeout(r, 20));
+    // Each check takes 1 ms on the fake clock; 20 ms covers both rounds of three.
+    await jest.advanceTimersByTimeAsync(20);
     expect(checked.sort()).toEqual(urls.slice(0, 4).sort());
     expect(peak).toBeLessThanOrEqual(SWEEP_CONCURRENCY);
     expect(held(MINT)?.trusted).toBe(true);
@@ -166,6 +168,7 @@ describe('background sweep', () => {
   });
 
   it('stops on a profile switch, and a sweep started for another profile writes nothing', async () => {
+    jest.useFakeTimers();
     const check = jest.fn(async () => ({ ok: true }) as const);
     let resume!: () => void;
     startMintHistorySweep({
@@ -181,7 +184,7 @@ describe('background sweep', () => {
     expect(stopForSwitch).toBeDefined();
     await stopForSwitch!();
     resume();
-    await new Promise((r) => setTimeout(r, 5));
+    await jest.advanceTimersByTimeAsync(5);
     expect(check).not.toHaveBeenCalled();
 
     // Started for A, the active profile is now B: nothing runs.
@@ -196,7 +199,7 @@ describe('background sweep', () => {
     });
     mockActive = B;
     resume();
-    await new Promise((r) => setTimeout(r, 5));
+    await jest.advanceTimersByTimeAsync(5);
     expect(check).not.toHaveBeenCalled();
     stop();
   });

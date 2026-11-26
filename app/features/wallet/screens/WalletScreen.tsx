@@ -9,7 +9,7 @@ import {
   Transactions,
 } from '@/features/transactions';
 import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
-import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { useBackgroundConfig } from '@/shared/lib/theme/backgroundBlur';
 import { Account } from '@/features/wallet/components/Account';
 import { MessageEcashToReview } from '@/features/payments/components/MessageEcashToReview';
 import { hasFeature } from '@/shared/config/features';
@@ -24,7 +24,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
@@ -125,7 +125,7 @@ export function WalletScreen() {
 
   const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
-    router.navigate('/(theme-flow)/preview');
+    router.navigate('/preview');
   };
 
   const handleSplit = () => {
@@ -152,14 +152,14 @@ export function WalletScreen() {
     // Opens on the account the wallet is showing, as the pending and
     // View-all links do, rather than the sat default.
     router.navigate({
-      pathname: '/(transactions-flow)/transactions',
+      pathname: '/transactions',
       params: transactionsRouteParams({ currency: account.unit }),
     });
   };
 
   const handleMap = () => {
     walletLog.info('wallet.map.tap');
-    router.navigate('/(map-flow)');
+    router.navigate('/map');
   };
 
   // Every home action, once. The active style's layout decides where each one

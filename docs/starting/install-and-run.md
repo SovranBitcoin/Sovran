@@ -54,11 +54,11 @@ bun run docs:preview   # preview the build
 - **Expo SDK 56** / **React Native 0.85.3** / **React 19.2.3** / **Hermes**
 - **Bun** as package manager and CI runtime
 - **TypeScript** with `noImplicitOverride`, type-aware ESLint, `eslint-plugin-react-perf`
-- **Reanimated v4** (legacy `Animated` banned by lint), **Gesture Handler**, **Nitro Modules**, **Worklets**
+- **Reanimated v4** (legacy `Animated` banned by lint), **Gesture Handler**, **Worklets**
 - **Zustand** with Zod-validated persistence
 - **Zod v4**; `@sovranbitcoin/schemas` for shared payloads
 - **`neverthrow`** for `Result` / `ResultAsync` return types
-- **`react-native-quick-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
+- **`expo-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
 - **Uniwind + Tailwind variants** for styling
 - **`expo-sqlite`** for Coco wallet storage, **`expo-secure-store`** for seeds and nsec
 - **`@shopify/flash-list`** (v2) for high-performance lists across feed, DMs, and AI chat

@@ -15,7 +15,11 @@ import {
   BACKUP_SNOOZE_MS,
   LATEST_VERSION_MAX_AGE_MS,
 } from '@/shared/lib/cta/definitions';
-let mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+type MockRoute = { name: string; state?: { routes: MockRoute[] } };
+let mockNavigation: { key: string; routes: MockRoute[] } = {
+  key: 'root',
+  routes: [{ name: '(drawer)' }],
+};
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
@@ -33,17 +37,6 @@ const mockScreenNavigation = {
 let mockBalance = 100;
 /** What the wallet holds in units other than sat, in each unit's smallest part. */
 let mockOtherUnits: Record<string, number> = {};
-jest.mock('heroui-native', () => {
-  const React = require('react');
-  const host = (name: string) =>
-    function MockHost(props: Record<string, unknown>) {
-      return React.createElement(name, props);
-    };
-  return {
-    ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
-    Label: Object.assign(host('Label'), { Text: 'LabelText' }),
-  };
-});
 jest.mock('expo-router', () => ({
   router: {
     push: (...args: unknown[]) => mockPush(...args),
@@ -77,7 +70,7 @@ jest.mock('@cashu/coco-react', () => ({
   }),
 }));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ getLatestVersion: jest.fn() }));
@@ -167,7 +160,7 @@ afterEach(() => {
 it('reserves one modal and re-evaluates on close with a version received while covered', async () => {
   const view = render(<HostWithScreen />);
   expect(mockPush).toHaveBeenCalledTimes(1);
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   view.rerender(<HostWithScreen />);
   await act(async () =>
     useSettingsStore.getState().setLastKnownAppVersion({ version: '2.0.0', fetchedAt: Date.now() })
@@ -179,11 +172,32 @@ it('reserves one modal and re-evaluates on close with a version received while c
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
   expect(mockPush).toHaveBeenLastCalledWith({
-    pathname: '/(prompt-flow)/cta',
+    pathname: '/cta',
     params: { id: 'update-required' },
   });
   expect(mockPush).toHaveBeenCalledTimes(2);
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toBeDefined();
+});
+it('presents no prompt while a backup page is open, with or without its prompt beneath', () => {
+  // Settings opens the backup with no prompt beneath it, and Expo Router wraps
+  // the app stack inside `__root.state.routes`.
+  for (const routes of [
+    [{ name: '(drawer)' }, { name: '(settings-flow)' }, { name: 'backup-intro' }],
+    [{ name: '(drawer)' }, { name: 'cta' }, { name: 'backup-intro' }, { name: 'backup-verify' }],
+    [
+      {
+        name: '__root',
+        state: {
+          routes: [{ name: '(drawer)' }, { name: '(settings-flow)' }, { name: 'backup-intro' }],
+        },
+      },
+    ],
+  ]) {
+    mockNavigation = { key: 'root', routes };
+    const view = render(<HostWithScreen />);
+    expect(mockPush).not.toHaveBeenCalled();
+    view.unmount();
+  }
 });
 it('re-evaluates an expired snooze on foreground', async () => {
   const now = Date.now();
@@ -237,7 +251,7 @@ it('asks a new wallet holding only dollars to back up, and says it holds money',
   mockOtherUnits = { usd: 500 };
   const view = render(<HostWithScreen id="backup-recovery-phrase" />);
   expect(mockPush).toHaveBeenCalledWith({
-    pathname: '/(prompt-flow)/cta',
+    pathname: '/cta',
     params: { id: 'backup-recovery-phrase' },
   });
   expect(view.getByText(/You have money here now/)).toBeTruthy();
@@ -255,7 +269,7 @@ it('suppresses automation but allows preview, close and reopening a dismissed CT
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useCtaStore.getState().preview('backup-recovery-phrase'));
   expect(mockPush).toHaveBeenCalledTimes(1);
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   view.rerender(<HostWithScreen />);
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
@@ -296,7 +310,7 @@ it('forces a fresh check and closes the optional route when the corrected versio
   );
   const view = render(<HostWithScreen />);
   expect(getLatestVersion).toHaveBeenCalledTimes(1);
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   view.rerender(<HostWithScreen id="update-required" />);
   expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
   await act(async () => finish(ok({ version: '1.0.0' })));
@@ -318,7 +332,7 @@ it.each(['confirmed', 'unavailable'])(
         result === 'confirmed' ? ok({ version: '2.0.0' }) : err(new Error('offline'))
       );
     const view = render(<HostWithScreen />);
-    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
     view.rerender(<HostWithScreen id="update-required" />);
     await act(async () => {});
     expect(getLatestVersion).toHaveBeenCalledTimes(1);
@@ -333,7 +347,7 @@ it.each(['primary', 'secondary'])(
     const now = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
     const view = render(<HostWithScreen />);
-    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
     view.rerender(<HostWithScreen id="backup-recovery-phrase" />);
     fireEvent.press(view.UNSAFE_getByProps({ testID: `cta-${action}` }));
     await act(async () => {});
@@ -344,7 +358,7 @@ it.each(['primary', 'secondary'])(
       expect(useCtaStore.getState().dismissed).toEqual({});
       expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
       // The intro opens inside the prompt flow; the host never pushes it.
-      expect(mockNavigate).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+      expect(mockNavigate).toHaveBeenCalledWith('/backup-intro');
     } else {
       expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
         at: now,
@@ -369,7 +383,7 @@ it('closes an offline update prompt when its cache becomes stale on foreground',
   const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
   useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: now } });
   const view = render(<HostWithScreen />);
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   view.rerender(<HostWithScreen id="update-required" />);
   await act(async () => {});
   const foreground = jest.mocked(AppState.addEventListener).mock.calls[1][1];
@@ -380,17 +394,17 @@ it('closes an offline update prompt when its cache becomes stale on foreground',
 });
 
 it('hands off a directly opened CTA route even without a reserved active ID', async () => {
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   const view = render(<HostWithScreen id="backup-recovery-phrase" />);
   expect(useCtaStore.getState().activeId).toBeNull();
   fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' }));
   await act(async () => {});
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
-  expect(mockNavigate).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockNavigate).toHaveBeenCalledWith('/backup-intro');
 });
 it('holds an optional update prompt while the prompt flow is open and shows it once it closes', async () => {
-  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   const view = render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () =>
@@ -401,7 +415,7 @@ it('holds an optional update prompt while the prompt flow is open and shows it o
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
   expect(mockPush).toHaveBeenCalledWith({
-    pathname: '/(prompt-flow)/cta',
+    pathname: '/cta',
     params: { id: 'update-required' },
   });
 });
@@ -429,9 +443,9 @@ describe('ecash from before 0.0.45 at a mint the wallet does not trust', () => {
     claiming: null,
     updatedAt: 0,
   };
-  const CTA_ROUTE = { pathname: '/(prompt-flow)/cta', params: { id: 'claim-old-ecash' } };
+  const CTA_ROUTE = { pathname: '/cta', params: { id: 'claim-old-ecash' } };
   const open = () => {
-    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
     return render(<HostWithScreen id="claim-old-ecash" />);
   };
   const text = (view: ReturnType<typeof render>) =>

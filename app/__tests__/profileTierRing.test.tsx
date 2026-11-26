@@ -20,54 +20,34 @@ const host = (name: string) => {
 jest.mock('react-native-svg', () => ({
   __esModule: true,
   default: host('svg-root'),
+  Circle: host('svg-circle'),
+  ClipPath: host('svg-clip'),
   Defs: host('svg-defs'),
+  FeGaussianBlur: host('svg-blur'),
+  Filter: host('svg-filter'),
+  G: host('svg-group'),
   Path: host('svg-path'),
+  RadialGradient: host('svg-radial'),
+  Stop: host('svg-stop'),
   Text: host('svg-text'),
   TextPath: host('svg-text-path'),
 }));
 
-jest.mock('@shopify/react-native-skia', () => ({
-  BlurMask: host('sk-blur'),
-  Canvas: host('sk-canvas'),
-  Circle: host('sk-circle'),
-  FillType: { EvenOdd: 'evenOdd' },
-  Group: host('sk-group'),
-  Path: host('sk-path'),
-  RadialGradient: host('sk-radial'),
-  Skia: {
-    Path: {
-      Make: () => {
-        const circles: number[][] = [];
-        const path = {
-          circles,
-          fillType: '',
-          addCircle: (x: number, y: number, r: number) => circles.push([x, y, r]),
-          setFillType: (fillType: string) => (path.fillType = fillType),
-        };
-        return path;
-      },
-    },
-  },
-  vec: (x: number, y: number) => ({ x, y }),
-}));
-
 let mockReducedMotion = false;
 const mockCancel = jest.fn();
+const mockWithRepeat = jest.fn((...args: unknown[]) => args[0]);
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
-  default: { View: host('animated-view') },
+  default: {
+    View: host('animated-view'),
+  },
   Easing: { linear: 'linear', cubic: 'cubic', out: (e: unknown) => e },
   cancelAnimation: (...args: unknown[]) => mockCancel(...args),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withSequence: (...steps: unknown[]) => steps[steps.length - 1],
-  useDerivedValue: (fn: () => unknown) => ({
-    get value() {
-      return fn();
-    },
-  }),
   useReducedMotion: () => mockReducedMotion,
   useSharedValue: (value: number) => ({ value }),
-  withRepeat: (value: unknown) => value,
+  withRepeat: (...args: unknown[]) => mockWithRepeat(...args),
   withTiming: (value: unknown) => value,
 }));
 
@@ -89,6 +69,7 @@ const byTestId = (root: TestRenderer.ReactTestInstance, testID: string) =>
 beforeEach(() => {
   mockReducedMotion = false;
   mockCancel.mockReset();
+  mockWithRepeat.mockClear();
 });
 
 describe('ProfileTierRing', () => {
@@ -99,66 +80,71 @@ describe('ProfileTierRing', () => {
       const frame = byTestId(root, 'profile-tier-ring')[0]!;
       expect(frame.props.style).toEqual({ width: outer, height: outer });
       expect(root.findAll((n) => n.props.children === 'pfp').length).toBeGreaterThan(0);
-      expect(byTestId(root, 'sk-canvas')).toHaveLength(tier ? 1 : 0);
-      expect(byTestId(root, 'svg-root')).toHaveLength(tier ? 1 : 0);
+      expect(byTestId(root, 'svg-root')).toHaveLength(tier ? 3 : 0);
     }
   });
 
-  it('drifts colour blobs through the band, clipped to it, under fixed lighting', () => {
+  const blobsIn = (node: TestRenderer.ReactTestInstance) =>
+    byTestId(node, 'svg-circle').filter((c) => String(c.props.fill).startsWith('url(#'));
+  const bandCircle = (root: TestRenderer.ReactTestInstance) =>
+    byTestId(root, 'svg-circle').find((c) => c.props.stroke && c.props.strokeWidth > 6)!;
+  const centreOf = (root: TestRenderer.ReactTestInstance) =>
+    byTestId(root, 'svg-root')[0]!.props.width / 2;
+
+  it('uses GPU-rotated radial gradients with zero FeGaussianBlur filters under fixed lighting', () => {
     const { root } = mount('gold');
-    const [glow, film] = byTestId(root, 'sk-group');
-    // Glow: a blurred wide band plus blurred blobs.
-    expect(byTestId(glow!, 'sk-circle')[0]!.props.strokeWidth).toBeGreaterThan(6);
-    const glowBlobs = byTestId(glow!, 'sk-radial');
+    // Zero SVG blur filters — CoreImage FeGaussianBlur pegs the iOS UI thread at 60fps.
+    expect(byTestId(root, 'svg-filter')).toHaveLength(0);
+    expect(byTestId(root, 'svg-blur')).toHaveLength(0);
+
+    const [glow, film] = byTestId(root, 'svg-group');
+    const glowBlobs = blobsIn(glow!);
     expect(glowBlobs.length).toBeGreaterThanOrEqual(4);
-    // Film: the same blobs, sharp, clipped to the band annulus (two circles, even-odd).
-    const blobs = byTestId(film!, 'sk-radial');
+    const blobs = blobsIn(film!);
     expect(blobs).toHaveLength(glowBlobs.length);
-    expect(film!.props.clip.circles).toHaveLength(2);
-    expect(film!.props.clip.fillType).toBe('evenOdd');
-    expect(byTestId(film!, 'sk-blur')).toHaveLength(0);
-    // Each blob rides the ring's centre line, driven by the shared clock.
-    const ringRadius = byTestId(root, 'sk-circle').find((c) => c.props.color)!.props.r;
-    const centre = byTestId(root, 'sk-canvas')[0]!.props.style.width / 2;
+
+    const clipId = /^url\(#(.*)\)$/.exec(film!.props.clipPath)![1];
+    const clip = byTestId(root, 'svg-clip').find((c) => c.props.id === clipId)!;
+    const annulus = byTestId(clip, 'svg-path')[0]!;
+    expect(annulus.props.clipRule).toBe('evenodd');
+    expect(annulus.props.d.match(/M /g)).toHaveLength(2);
+
+    const ringRadius = bandCircle(root).props.r;
+    const centre = centreOf(root);
     for (const blob of blobs) {
-      const { x, y } = blob.props.c.value;
-      expect(Math.hypot(x - centre, y - centre)).toBeCloseTo(ringRadius, 6);
-      expect(blob.props.r.value).toBeGreaterThan(0);
+      expect(Math.hypot(blob.props.cx - centre, blob.props.cy - centre)).toBeCloseTo(ringRadius, 6);
+      expect(blob.props.r).toBeGreaterThan(0);
     }
-    // Bevel arcs, kisses and rim sit OUTSIDE the film group.
-    expect(byTestId(root, 'sk-path')).toHaveLength(2);
-    expect(byTestId(film!, 'sk-path')).toHaveLength(0);
+
+    // Bevel arcs, kisses and rim sit outside the rotating film layer.
+    const bevels = byTestId(root, 'svg-path').filter((n) => n.props.strokeLinecap === 'round');
+    expect(bevels).toHaveLength(2);
+    expect(byTestId(film!, 'svg-path')).toHaveLength(0);
+
     // Engraved: the same word twice — an offset dark copy under a light face.
     const inscriptions = byTestId(root, 'svg-text-path');
     expect(inscriptions.map((n) => n.props.children)).toEqual(['GOLD', 'GOLD']);
     const [shadow, face] = byTestId(root, 'svg-text');
     expect(shadow!.props.dy).toBeLessThan(0);
     expect(face!.props.dy).toBeUndefined();
-    // Both inks are tints of the band's hue (gold = 44), centred on the band's
-    // centre line and on the arc.
     expect(shadow!.props.fill).toMatch(/^hsla\(44,/);
     expect(face!.props.fill).toMatch(/^hsla\(44,/);
     expect(face!.props.alignmentBaseline).toBe('central');
-    const bandRadius = byTestId(root, 'sk-circle').find((c) => c.props.color)!.props.r;
-    const d: string = byTestId(root, 'svg-path')[0]!.props.d;
-    expect(Number(d.split(' ')[4])).toBeCloseTo(bandRadius, 6);
-    expect(byTestId(root, 'svg-text-path')[0]!.props.startOffset).toBeCloseTo(
-      (bandRadius * 110 * Math.PI) / 360,
-      6
-    );
     expect(byTestId(root, 'svg-root')[0]!.props.accessibilityLabel).toBe('GOLD tier');
   });
 
   it('bleeds the canvas past the layout box so the glow is never clipped, lettering lower-right', () => {
     const { root } = mount('gold');
     const outer = 90 + profileTierRingInset(90) * 2;
-    const canvas = byTestId(root, 'sk-canvas')[0]!.props.style;
+    const canvas = byTestId(root, 'svg-root')[0]!.props.style;
     expect(canvas.left).toBeLessThan(0);
     expect(canvas.top).toBe(canvas.left);
     expect(canvas.width).toBe(outer - 2 * canvas.left);
-    // The word's arc runs from below the centre to the right of it.
-    const d: string = byTestId(root, 'svg-path')[0]!.props.d;
-    const [, mx, my, , , , , , , ex, ey] = d.split(' ').map(Number);
+
+    const labelPath = byTestId(root, 'svg-path').find((p) =>
+      String(p.props.id).endsWith('label-path')
+    )!;
+    const [, mx, my, , , , , , , ex, ey] = labelPath.props.d.split(' ').map(Number);
     const c = canvas.width / 2;
     expect(my).toBeGreaterThan(c);
     expect(mx).toBeLessThan(c);
@@ -166,17 +152,15 @@ describe('ProfileTierRing', () => {
     expect(ey).toBeLessThan(c);
   });
 
-  it('the film loops seamlessly: a blob is where it started when the clock wraps', () => {
-    // The mocked clock lands on the loop's end (1); the blob must sit exactly
-    // where a clock of 0 would put it.
+  it('rotates the film layer continuously and holds still under reduced motion', () => {
     const { root } = mount('new');
-    const film = byTestId(root, 'sk-group')[1]!;
-    const blob = byTestId(film, 'sk-radial')[0]!;
-    const atWrap = blob.props.c.value;
-    mockReducedMotion = true; // clock held at 0
-    const still = byTestId(byTestId(mount('new').root, 'sk-group')[1]!, 'sk-radial')[0]!;
-    expect(atWrap.x).toBeCloseTo(still.props.c.value.x, 6);
-    expect(atWrap.y).toBeCloseTo(still.props.c.value.y, 6);
-    expect(blob.props.r.value).toBeCloseTo(still.props.r.value, 6);
+    const spinLayer = byTestId(root, 'animated-view')[1]!;
+    expect(spinLayer.props.style[1]).toEqual({ transform: [{ rotate: '0deg' }] });
+    expect(mockWithRepeat).toHaveBeenCalledTimes(1);
+
+    mockWithRepeat.mockClear();
+    mockReducedMotion = true;
+    mount('new');
+    expect(mockWithRepeat).not.toHaveBeenCalled();
   });
 });

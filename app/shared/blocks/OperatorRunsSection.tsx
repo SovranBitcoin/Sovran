@@ -13,7 +13,8 @@
  * Renders nothing when nothing is known: it sits below the page's fixed
  * blocks, so its absence never moves what the reader is looking at.
  */
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

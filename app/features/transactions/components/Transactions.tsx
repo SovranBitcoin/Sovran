@@ -30,6 +30,8 @@ import { SectionHeading } from '@/shared/ui/composed/SectionHeading';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { StateSwitch } from '@/shared/ui/composed/StateSwitch';
+import { toViewState } from '@/shared/lib/viewState';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
@@ -745,21 +747,27 @@ export const Transactions = React.memo(
     );
 
     const emptyComponent = useMemo(
-      () =>
+      () => (
         // While the first page is in flight the list is empty, so this renders
         // in place of the rows. Match the feed's loading affordance (a centered
         // spinner) instead of flashing the "No transactions found" card, which
         // reads as "you have none" when we simply haven't loaded yet.
-        isFetching ? (
-          <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
-        ) : (
-          <View className="pt-8">
-            <EmptyStateCard
-              title="No transactions found"
-              subtitle="Try adjusting your filters or check back later"
-            />
-          </View>
-        ),
+        <StateSwitch
+          state={toViewState<never[]>({ data: isFetching ? undefined : [], isLoading: isFetching })}
+          wave="none"
+          exit="none"
+          renderLoading={() => <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />}
+          renderEmpty={() => (
+            <View className="pt-8">
+              <EmptyStateCard
+                title="No transactions found"
+                subtitle="Try adjusting your filters or check back later"
+              />
+            </View>
+          )}
+          renderData={() => null}
+        />
+      ),
       [isFetching]
     );
 

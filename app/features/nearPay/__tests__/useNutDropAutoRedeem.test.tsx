@@ -31,7 +31,7 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: { pubkey: 'ab' } }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({

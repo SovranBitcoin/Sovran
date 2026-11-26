@@ -17,7 +17,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE, SPLASH_QR_BASE } from '@/shared/lib/brandColors';
 import { initLog, log, useInitMount } from '@/shared/lib/logger';
-import { useInitializationState } from '@/shared/providers/InitializationProvider';
+import { useInitializationState } from '@/runtime/initializationStages';
 import {
   getQRButtonAnchor,
   getWalletTabFocused,
@@ -160,18 +160,21 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     });
   }, []);
 
-  // Reset the machine on a profile switch. Only honored AFTER we've unmounted
-  // from a prior cycle — during boot the same `isInitializing=true` signal
-  // fires (gates registering) and we don't want it to bounce us back to
-  // await_init from a later phase. Profile switches go through resetStages()
-  // which makes isInitializing true again, so the unmount→isInitializing=true
-  // transition is the unambiguous "switch happened" signal.
+  // Reset the machine on a profile switch. Only honored on an actual
+  // `false → true` transition of `isInitializing` after we've unmounted from
+  // a prior cycle — never when `phase` reaches `'unmounted'` via the fallback
+  // timeout while `isInitializing` is STILL `true` (which would otherwise
+  // loop the splash screen every 8 seconds whenever startup takes longer than
+  // `MORPH_FALLBACK_TIMEOUT_MS`).
+  const wasInitializingRef = useRef(isInitializing);
   useEffect(() => {
-    if (!isInitializing) return;
-    if (phase !== 'unmounted') return;
-    setBootMorphCompleted(false);
-    setBootSplashHandoff(false);
-    setPhase('await_init');
+    const wasInitializing = wasInitializingRef.current;
+    wasInitializingRef.current = isInitializing;
+    if (!wasInitializing && isInitializing && phase === 'unmounted') {
+      setBootMorphCompleted(false);
+      setBootSplashHandoff(false);
+      setPhase('await_init');
+    }
   }, [isInitializing, phase]);
 
   // Phase 1 — await_init: hide the native splash as soon as our root view

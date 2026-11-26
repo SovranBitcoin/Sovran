@@ -16,6 +16,7 @@ interface OperationSnapshot {
 
 interface SwapLegOperations {
   ops: {
+    mintSwap?: { get(operationId: string): Promise<OperationSnapshot | null> };
     mint: { get(operationId: string): Promise<OperationSnapshot | null> };
     melt: {
       get(operationId: string): Promise<OperationSnapshot | null>;
@@ -94,6 +95,7 @@ export async function reconcileSwapLegs(
         if (
           !current ||
           current.localStatus !== status ||
+          current.mintSwapOperationId !== leg.mintSwapOperationId ||
           current.meltOperationId !== leg.meltOperationId ||
           current.mintOperationId !== leg.mintOperationId
         ) {
@@ -109,6 +111,25 @@ export async function reconcileSwapLegs(
         return true;
       };
 
+      // Native Coco mintSwap parent operation: single source of truth for new swaps.
+      if (leg.mintSwapOperationId && manager.ops.mintSwap) {
+        const swap = await manager.ops.mintSwap.get(leg.mintSwapOperationId);
+        if (swap) {
+          if (swap.state === 'completed') {
+            move({ localStatus: 'done' });
+          } else if (swap.state === 'failed' || swap.state === 'cancelled') {
+            move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
+          } else if (
+            (swap.state === 'destination_funded' || swap.state === 'destination_pending') &&
+            status !== 'settling'
+          ) {
+            move({ localStatus: 'settling' });
+          }
+          continue;
+        }
+      }
+
+      // Legacy pre-upgrade legs without a parent mintSwapOperationId.
       if (leg.meltOperationId) {
         const melt = await manager.ops.melt.get(leg.meltOperationId);
         if (melt && meltSettledUnpaid(melt.state)) {

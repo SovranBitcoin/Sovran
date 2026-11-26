@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
@@ -9,25 +9,19 @@ const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
 const LINE = StyleSheet.hairlineWidth * 2;
 
 /**
- * Whether the guides are switched on. Supplied by `LayoutGuidesProvider` from the
- * review setting, so this file reads no store and a surface that draws in its
- * own window (a system sheet) can mount `<LayoutGuides />` unconditionally.
- */
-export const LayoutGuidesEnabled = createContext(false);
-
-/**
  * Thin red lines where content is supposed to sit: the active style's gutter
  * on both sides, and the top and bottom safe-area edges. Drawn over the screen it is mounted in and never
  * takes a touch. Renders nothing while the guides are switched off.
  *
  * It exists for reviews. Whether a card lines up with the heading above it is
- * read off the line in a screenshot rather than estimated.
+ * read off the line in a screenshot rather than estimated. `enabled` comes
+ * from the review setting, read by the app root, so this file reads no store.
  */
-export function LayoutGuides() {
+export function LayoutGuides({ enabled }: { enabled: boolean }) {
   // Read with a fallback: a preview or a test may have no provider above.
   const insets = useContext(SafeAreaInsetsContext) ?? NO_INSETS;
   const { gutter } = useAppStyle().space;
-  if (!useContext(LayoutGuidesEnabled)) return null;
+  if (!enabled) return null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="layout-guides">
       <View style={[styles.vertical, { left: gutter }]} />

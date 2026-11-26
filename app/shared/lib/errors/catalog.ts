@@ -140,13 +140,13 @@ export const ERROR_COPY = {
     'No relay confirmed this publish. Check your connection and relay settings before trying again.',
   'nostr.rejected':
     'The relay rejected this event. Check the relay’s access rules or try another relay.',
-  'nagg.unknown': 'The feed service could not complete this request. Try again later.',
-  'nagg.unavailable': 'The feed service is unavailable. Try again later.',
+  'nagg.unknown': 'The Nostr service could not complete this request. Try again later.',
+  'nagg.unavailable': 'The Nostr service is unavailable. Try again later.',
   'nagg.not_found':
-    'The feed service could not find the requested resource or endpoint. Refresh and try again later.',
+    'The Nostr service could not find the requested resource or endpoint. Refresh and try again later.',
   'nagg.invalid_response':
-    'The feed service returned an unexpected response. Try again later. If this continues, contact support.',
-  'nagg.not_configured': 'The feed service is not configured. Check your backend settings.',
+    'The Nostr service returned an unexpected response. Try again later. If this continues, contact support.',
+  'nagg.not_configured': 'The Nostr service is not configured. Check your backend settings.',
   network: 'Could not connect to the service. Check your internet connection and try again.',
   timeout: 'The service took too long to respond. Try again later.',
   cancelled: 'The request was cancelled.',

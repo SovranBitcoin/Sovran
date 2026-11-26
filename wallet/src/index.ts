@@ -146,11 +146,10 @@ export type {
   ColadaSubscriptionEvent,
 } from "./subscriptions";
 
-// Mint rebalance engine (melt/mint hops between mints, bounded
-// re-preparation, reconciliation, error classification)
+// Mint rebalance engine (Coco ops.mintSwap hops, middleman routing,
+// bounded re-preparation, error classification)
 export {
   createChainSteps,
-  createEngineSingleLegTransferPort,
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
@@ -165,7 +164,6 @@ export type {
   RebalanceRoutingInfo,
   RebalanceTransferOutcome,
   RebalanceWalletPort,
-  SingleLegTransferPort,
 } from "./rebalance";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)

@@ -76,6 +76,10 @@ jest.mock('@sovranbitcoin/schemas', () => ({
 }));
 
 jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
+// No account Nostr client here: backup discovery is skipped.
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: undefined, isInitialized: false }),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   storeLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
@@ -160,32 +164,24 @@ jest.mock('@/shared/ui/composed/Surface', () => {
       ReactActual.createElement('MockSurface', null, children),
   };
 });
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const Button = Object.assign(
-    ({
-      children,
-      ...props
-    }: React.PropsWithChildren<{
-      onPress?: () => void;
-      testID?: string;
-      isDisabled?: boolean;
-    }>) => ReactActual.createElement('MockButton', props, children),
-    {
-      Label: ({ children }: React.PropsWithChildren) =>
-        ReactActual.createElement('MockButtonLabel', null, children),
-    }
-  );
-  return {
-    Button,
-    Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
-  };
-});
 
 const mockReclaimRoutstrBalances = jest.fn();
 jest.mock('@/shared/lib/routstr/reclaim', () => ({
   reclaimRoutstrBalances: () => mockReclaimRoutstrBalances(),
-  recoverPendingPayments: jest.fn(async () => 0),
+  recoverPendingPaymentsDetailed: jest.fn(async () => ({
+    recovered: 0,
+    retryable: 0,
+    unknownIssuer: 0,
+    spentReplay: 0,
+  })),
+  recoverSdkRecords: jest.fn(async () => ({
+    collected: 0,
+    retryable: 0,
+    unknownIssuer: 0,
+    spentReplay: 0,
+  })),
+  readSdkRecoveryRecords: jest.fn(async () => ({})),
+  countSdkRecords: () => ({ total: 0, unknownIssuer: 0 }),
 }));
 
 describe('SettingsRecoveryScreen gate confirmation', () => {
@@ -512,6 +508,68 @@ describe('SettingsRecoveryScreen AI leftovers', () => {
       "Couldn't check AI nodes. Your credentials are kept — try again later."
     );
     expect(button().props.disabled).toBe(false);
+    await act(async () => renderer!.unmount());
+  });
+  const pendingRow = {
+    'payment-a': {
+      encoded: 'cashuB-test',
+      nodeBaseUrl: 'https://node.example',
+      operationId: 'op-a',
+      startedAt: 1,
+    },
+  };
+  const textsOf = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAll((node) => node.type === ('MockText' as unknown))
+      .map((node) => node.props.children);
+
+  it('shows a settled pass on its own, outside the row with the action', async () => {
+    useRoutstrStore.setState({ pendingPayments: pendingRow });
+    mockReclaimRoutstrBalances.mockResolvedValueOnce({
+      attempted: 1,
+      reclaimed: 1,
+      deferred: 0,
+      unknownIssuer: 0,
+      spentReplay: 0,
+    });
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen />);
+    });
+    await act(async () => {
+      await renderer!.root.findByProps({ testID: 'recovery-reclaim-ai' }).props.onPress();
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'recovery-reclaim-ai' })).toHaveLength(0);
+    expect(renderer!.root.findByProps({ testID: 'recovery-reclaim-ai-done' }).props.children).toBe(
+      'Collected leftover AI ecash into your wallet.'
+    );
+    await act(async () => renderer!.unmount());
+  });
+
+  it('keeps the action beside a spent replay or an unknown node', async () => {
+    useRoutstrStore.setState({ pendingPayments: pendingRow });
+    mockReclaimRoutstrBalances.mockResolvedValueOnce({
+      attempted: 2,
+      reclaimed: 0,
+      deferred: 2,
+      unknownIssuer: 1,
+      spentReplay: 1,
+    });
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen />);
+    });
+    await act(async () => {
+      await renderer!.root.findByProps({ testID: 'recovery-reclaim-ai' }).props.onPress();
+    });
+    expect(textsOf(renderer!)).toContain(
+      'Some records name no AI node to ask, so they are kept as they are. ' +
+        'Some refunds were already spent at the mint. They are kept so nothing is lost.'
+    );
+    expect(renderer!.root.findAllByProps({ testID: 'recovery-reclaim-ai-done' })).toHaveLength(0);
+    expect(renderer!.root.findByProps({ testID: 'recovery-reclaim-ai' }).props.disabled).toBe(
+      false
+    );
     await act(async () => renderer!.unmount());
   });
 });

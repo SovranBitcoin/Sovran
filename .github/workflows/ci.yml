@@ -52,6 +52,9 @@ jobs:
       - name: Claims and copy consistency
         run: bun run copy:lint
 
+      - name: Rebuild size and dependency ratchet
+        run: bun run rebuild:metrics
+
       - name: Native smoke & e2e helper tests
         working-directory: ${{ env.APP_DIR }}
         run: bun run e2e:test

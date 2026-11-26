@@ -25,7 +25,7 @@ import {
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { accountMintUrls, isAccountUnit, toAccountUnit, toRealUnit } from 'wallet';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
 import { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';

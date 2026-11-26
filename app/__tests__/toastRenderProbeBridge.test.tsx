@@ -43,7 +43,6 @@ describe('HeroUI static-toast render probe bridge', () => {
         toastOptions = options as Record<string, unknown>;
         return 'manager-toast-id';
       },
-      hide: jest.fn(),
     });
 
     let renderer: TestRenderer.ReactTestRenderer;

@@ -2,8 +2,8 @@ import { initPhase, initPhaseSync, log } from '@/shared/lib/logger';
 
 type Entry = { level: string; event: string; params?: Record<string, unknown> };
 
-/** Emits reach the ring buffer on a microtask. */
-const flushLogs = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+/** Emits reach the ring buffer on a microtask; one turn of the loop drains them. */
+const flushLogs = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 /**
  * The logger collapses consecutive same-event `info` emits inside a 50 ms
@@ -13,13 +13,20 @@ const flushLogs = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const DEDUP_WINDOW_MS = 50;
 const OUTLAST_DEDUP_MS = DEDUP_WINDOW_MS + 20;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-const busyWait = (ms: number) => {
-  const until = Date.now() + ms;
-  while (Date.now() < until) {
-    /* spin: initPhaseSync must not yield */
-  }
+/**
+ * The logger's clock (`performance.now`), moved by hand: a phase "takes" time
+ * without the test waiting on the wall clock. `elapse` is synchronous, so it
+ * also stands in for a sync phase that must not yield.
+ */
+let clockMs = 1_000_000;
+const elapse = (ms: number) => {
+  clockMs += ms;
 };
+const sleep = async (ms: number) => {
+  elapse(ms);
+  await flushLogs();
+};
+const busyWait = elapse;
 
 function timingEntriesFor(tag: string): Entry[] {
   return (log.getRecentLogs() as Entry[]).filter(
@@ -30,7 +37,13 @@ function timingEntriesFor(tag: string): Entry[] {
 describe('initPhase / initPhaseSync emit one init.timing taxonomy', () => {
   // The dedup window is global to the shared logger, so let it lapse between
   // tests or one test's terminal emit swallows the next test's `start`.
-  beforeEach(() => sleep(OUTLAST_DEDUP_MS));
+  beforeEach(() => {
+    jest.spyOn(performance, 'now').mockImplementation(() => clockMs);
+    return sleep(OUTLAST_DEDUP_MS);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('emits start then end for a resolved async phase and returns its value', async () => {
     const result = await initPhase('test.async.ok', async () => {

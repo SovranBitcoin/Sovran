@@ -29,9 +29,7 @@ function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsRes
     lastUpdated: null,
     fromCache: false,
     tier: resolved.tier,
-    // A fallback tier carries no reviewer identities (names fall back to the
-    // entity cache) — and a nagg answer with a failed sibling is still marked.
-    degraded: resolved.tier !== 'nagg' || resolved.provenance?.degraded === true,
+    degraded: resolved.provenance?.degraded === true,
   };
 }
 

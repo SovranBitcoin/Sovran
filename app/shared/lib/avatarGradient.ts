@@ -175,7 +175,7 @@ export function generateClayAvatarTheme(seedInput: string): ClayAvatarTheme {
 
 /** One soft colour blob drifting around the band. All motion terms are
  *  integer multiples of one loop so the film is seamless at the wrap. */
-export type TierRingBlob = {
+type TierRingBlob = {
   color: string;
   /** Start angle, radians. */
   angle: number;

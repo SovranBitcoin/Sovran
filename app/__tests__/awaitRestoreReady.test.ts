@@ -1,4 +1,4 @@
-import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { awaitRestoreReady } from '@/runtime/awaitRestoreReady';
 import type { RestoreStatus as RestoreReadyStatus } from '@/shared/stores/global/walletRestorePhase';
 
 type Listener = (
@@ -89,6 +89,17 @@ describe('awaitRestoreReady (audit 28.json F-004 / 40.json F-003)', () => {
     const promise = awaitRestoreReady(store);
     queueMicrotask(() => store.setState('complete'));
     await expect(promise).resolves.toBeUndefined();
+  });
+
+  it('unsubscribes and resolves immediately when aborted mid-restore', async () => {
+    const store = makeFakeStore('pending');
+    const controller = new AbortController();
+    const promise = awaitRestoreReady(store, controller.signal);
+    expect(store.listenerCount()).toBe(1);
+
+    controller.abort();
+    await expect(promise).resolves.toBeUndefined();
+    expect(store.listenerCount()).toBe(0);
   });
 });
 

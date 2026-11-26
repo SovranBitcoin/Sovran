@@ -38,6 +38,12 @@ interface PubkeyScopedCacheOpts<T> {
    * against partial / corrupt blobs without wiping the whole cache.
    */
   validate: (value: unknown) => value is T;
+  /**
+   * Optional predicate controlling whether an in-memory entry may be written
+   * to AsyncStorage. Return `false` for sensitive payloads (e.g. bearer ecash
+   * tokens) that should remain memory-only and never reach plaintext disk.
+   */
+  shouldPersist?: (value: T) => boolean;
 }
 
 interface PubkeyScopedCache<T> {
@@ -157,7 +163,11 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
     const writes: Promise<unknown>[] = [];
     if (wasDirty) {
       const obj: Record<string, CacheEntry<T>> = {};
-      for (const [k, v] of s.memory) obj[k] = v;
+      for (const [k, v] of s.memory) {
+        if (!opts.shouldPersist || opts.shouldPersist(v.value)) {
+          obj[k] = v;
+        }
+      }
       writes.push(AsyncStorage.setItem(s.storageKey, JSON.stringify(obj)));
     }
     if (wasDirtyNeg && s.storageKeyNeg) {

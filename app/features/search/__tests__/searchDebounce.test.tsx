@@ -12,6 +12,10 @@ import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
 
 const mockFieldProps: Record<string, unknown>[] = [];
 
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: undefined, isInitialized: false }),
+}));
+
 jest.mock('expo-router', () => {
   function Stack({ children }: { children: unknown }) {
     return children;

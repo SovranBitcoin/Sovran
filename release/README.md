@@ -23,7 +23,7 @@ case-level upgrade failures. Refresh the published-release evidence before prepa
 review the catalog diff separately from the frozen historical disks.
 `releaseFixturesCompleteness.test.ts` fails, naming what is missing, until one of the two is
 done, and again when a store changes after the fixture was written. After the release is
-published, run `python3 .agents/skills/persistence-release-safety/epochs.py builds` and commit
+published, run `python3 release/epochs.py builds` and commit
 the updated `docs/architecture/persistence/store-builds.tsv`, so the builds that shipped are
 the ones the fixtures are checked against.
 

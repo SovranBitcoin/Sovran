@@ -5,9 +5,9 @@ import { SEARCH_DEBOUNCE_MS, useContactSearch } from '@/features/payments/hooks/
 import { profileSearchCache } from '@/features/payments/data/profileSearchCache';
 
 const mockSearch = jest.fn();
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: undefined }) }), {
-  virtual: true,
-});
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: undefined, isInitialized: false }),
+}));
 jest.mock('@/shared/lib/nostr/searchProfiles', () => ({
   searchProfilesViaFacade: (...args: unknown[]) => mockSearch(...args),
 }));

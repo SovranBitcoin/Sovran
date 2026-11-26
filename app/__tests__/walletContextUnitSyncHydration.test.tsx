@@ -8,7 +8,7 @@
  */
 import { act, renderHook } from '@testing-library/react-native';
 
-import { WalletContextProvider, useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { WalletProjection, useWalletContext } from '@/runtime/WalletProjection';
 
 const MINT = 'https://mint.example';
 const SECOND_MINT = 'https://second.example';
@@ -81,7 +81,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <WalletContextProvider>{children}</WalletContextProvider>
+  <WalletProjection>{children}</WalletProjection>
 );
 
 beforeEach(() => {

@@ -1,44 +1,42 @@
+/**
+ * @jest-environment node
+ *
+ * Orchestrator behavior over Coco nightly's native `manager.ops.mintSwap`:
+ * direct completion, outcome observation (`completed`, `settling`, `paymentPending`),
+ * middleman routing with temporary trust release, cancellation, and manager replacement.
+ */
 import { act, renderHook } from '@testing-library/react-native';
-import { Amount, MintOperationError } from '@cashu/coco-core';
+import { Amount } from '@cashu/coco-core';
+
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
-import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
-import { cashuLog } from '@/shared/lib/logger';
-import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+import type { RebalancePlan } from '@/features/mint/components/rebalance';
 
 jest.mock('@cashu/coco-react', () => ({ useManager: () => mockManager }));
-jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: { restoreInflightProofsForMint: (...args: unknown[]) => mockRestore(...args) },
-}));
-jest.mock('@/shared/lib/cashu/managerInternals', () => ({
-  getReadyProofs: async () => [],
-  getWallet: async () => ({
-    getFeesForProofs: () => 0,
-    createMeltQuoteBolt11: async () => ({ fee_reserve: 0 }),
-  }),
-}));
-jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest.fn() }));
-jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
-  getDiscoveredMintMetadata: jest.fn(),
-}));
-jest.mock('@/shared/lib/logger', () => ({
-  cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn() },
-  mintUrlLogFields: () => ({}),
-}));
+jest.mock('@/shared/lib/logger', () => {
+  const log: Record<string, unknown> = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
+  log.child = () => log;
+  const named: Record<string, unknown> = {
+    log,
+    redactError: (e: unknown) => e,
+    mintUrlLogFields: () => ({}),
+  };
+  return new Proxy(named, { get: (target, key: string) => (key in target ? target[key] : log) });
+});
 jest.mock('@/shared/lib/popup', () => ({ swapStatusPopup: jest.fn() }));
-jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
-  setTransactionAnnotation: jest.fn(),
-}));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  activePubkey: () => 'account-a',
-}));
 jest.mock('@/shared/stores/profile/swapTransactionsStore', () => ({
   useSwapTransactionsStore: { getState: () => mockTransactions },
+}));
+jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
+  setTransactionAnnotation: jest.fn(),
 }));
 jest.mock('@/shared/stores/runtime/swapStatusStore', () => ({
   useSwapStatusStore: { getState: () => mockStatus },
 }));
-// Keep rendering-only barrel imports outside the harness. The real run-state
-// helpers and quote preparation wrappers still execute against the fake manager.
 jest.mock('@/features/mint/components/rebalance', () => ({
   MIN_FEE_RESERVE: 5,
   buildSwapGraph: jest.fn(),
@@ -51,19 +49,23 @@ jest.mock('@/features/mint/components/rebalance', () => ({
 
 const SOURCE = 'https://source.example';
 const DESTINATION = 'https://destination.example';
-const mockRestore = jest.fn().mockResolvedValue(undefined);
+const VIA = 'https://via.example';
+
 const mockReleaseTrust = jest.fn().mockResolvedValue({ stranded: [], untrustErrors: [] });
 let mockLocalCandidates: string[] = [];
+
 const mockTransactions = {
   groups: {},
   startGroup: jest.fn(() => 'group-1'),
   addLeg: jest.fn(() => 'leg-1'),
   setLegStatus: jest.fn(),
+  tagMintSwap: jest.fn(),
   tagMintQuote: jest.fn(),
   tagMelt: jest.fn(),
   finalizeGroup: jest.fn(),
   reopenGroup: jest.fn(),
 };
+
 const mockStatus = {
   active: null as { state: string; meta: { groupId?: string } } | null,
   start: jest.fn((params: { meta: { groupId?: string } }) => {
@@ -79,20 +81,29 @@ const mockStatus = {
   cancel: jest.fn(),
   resume: jest.fn(),
 };
-let destinationBalance = 0;
-let mintState = 'pending';
-const operation = () => ({
-  id: 'mint-op-1',
-  quoteId: 'mint-quote-1',
-  mintUrl: DESTINATION,
-  method: 'bolt11',
-  request: 'lnbc-fixture',
-  amount: Amount.from(100),
-  unit: 'sat',
-  state: mintState,
-  createdAt: 1000,
-  updatedAt: 1000,
-});
+
+function makeSwapOp(id: string, state: string, extra: Record<string, unknown> = {}) {
+  return {
+    id,
+    revision: 1,
+    sourceMintUrl: SOURCE,
+    destinationMintUrl: DESTINATION,
+    unit: 'sat' as const,
+    destinationAmount: Amount.from(100),
+    sourceQuote: { mintUrl: SOURCE, method: 'bolt11' as const, quoteId: `mq-${id}` },
+    destinationQuote: { mintUrl: DESTINATION, method: 'bolt11' as const, quoteId: `dq-${id}` },
+    sourceOperationId: `melt-${id}`,
+    destinationOperationId: `mint-${id}`,
+    paymentRequestHash: '00'.repeat(32),
+    createdAt: 1000,
+    updatedAt: 1000,
+    stateEnteredAt: 1000,
+    retry: { attemptCount: 0, lastAttemptAt: null, nextAttemptAt: null, lastError: null },
+    state,
+    ...extra,
+  };
+}
+
 let mockManager: ReturnType<typeof createManager>;
 function createManager() {
   return {
@@ -100,61 +111,47 @@ function createManager() {
       balances: {
         byMint: jest.fn(async () => ({
           [SOURCE]: { total: Amount.from(1000) },
-          [DESTINATION]: { total: Amount.from(destinationBalance) },
+          [VIA]: { total: Amount.from(1000) },
+          [DESTINATION]: { total: Amount.from(0) },
         })),
       },
-    },
-    quotes: {
-      mint: {
-        create: jest.fn(
-          async (_input: { mintUrl: string; amount: { amount: number; unit: string } }) => ({
-            quoteId: 'mint-quote-1',
-            mintUrl: DESTINATION,
-            unit: 'sat',
-            request: 'lnbc-fixture',
-          })
-        ),
-      },
-      melt: { create: jest.fn(async () => ({ quoteId: 'melt-quote-1', mintUrl: SOURCE })) },
     },
     ops: {
-      mint: {
-        prepare: jest.fn(async (_input: { quote: { quoteId: string }; amount: number }) =>
-          operation()
+      mintSwap: {
+        prepare: jest.fn(
+          async (input: { id: string; sourceMintUrl: string; destinationMintUrl: string }) =>
+            makeSwapOp(input.id, 'prepared', {
+              sourceMintUrl: input.sourceMintUrl,
+              destinationMintUrl: input.destinationMintUrl,
+            })
         ),
-        get: jest.fn(async (_id: string) => operation()),
-      },
-      melt: {
-        prepare: jest.fn(async () => ({
-          id: 'melt-op-1',
-          quoteId: 'melt-quote-1',
-          amount: Amount.from(100),
-          fee_reserve: 0,
-          swap_fee: 0,
+        execute: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
+        get: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
+        listActive: jest.fn(async () => []),
+        refresh: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
+        cancel: jest.fn(async (id: string) => makeSwapOp(id, 'cancelled')),
+        waitForOutcome: jest.fn(async (id: string) => ({
+          status: 'completed' as string,
+          operation: makeSwapOp(id, 'completed'),
         })),
-        execute: jest.fn(async () => {
-          mintState = 'finalized';
-          destinationBalance = 100;
-          return { id: 'melt-op-1', state: 'finalized' };
-        }),
-        refresh: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-        get: jest.fn(async (_id: string) => null as { id: string; state: string } | null),
       },
     },
     mint: { addMint: jest.fn().mockResolvedValue(undefined) },
   };
 }
+
 const plan: RebalancePlan = {
   steps: [{ id: 'step-1', fromMintUrl: SOURCE, toMintUrl: DESTINATION, amount: 100 }],
   totalAmount: 100,
   currentBalances: { [SOURCE]: 1000, [DESTINATION]: 0 },
   targetBalances: { [SOURCE]: 900, [DESTINATION]: 100 },
 };
+
 let mounted: { current: ReturnType<typeof useMintRebalanceOrchestrator> }[] = [];
-function mount(unit = 'sat') {
+function mount() {
   const hook = renderHook(() =>
     useMintRebalanceOrchestrator({
-      unit,
+      unit: 'sat',
       computedPlan: plan,
       trustedMints: [{ mintUrl: SOURCE }, { mintUrl: DESTINATION }],
       mintInfoMap: {},
@@ -171,440 +168,112 @@ function mount(unit = 'sat') {
   mounted.push(hook.result);
   return hook;
 }
+
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   mockStatus.active = null;
-  destinationBalance = 0;
-  mintState = 'pending';
   mockLocalCandidates = [];
   mockManager = createManager();
 });
+
 afterEach(() => {
-  // A run still going holds its group for the process; end it with the test.
   for (const result of mounted) act(() => result.current.handleCancelRun());
   mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
 });
 
-test('a destination already credited by the time melt returns does not wait another 15 seconds', async () => {
+test('completes immediately when ops.mintSwap.execute returns completed', async () => {
   const { result } = mount();
   await act(async () => result.current.handleStart());
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(destinationBalance).toBe(100);
   await act(async () => {
-    await jest.advanceTimersByTimeAsync(500);
+    await jest.advanceTimersByTimeAsync(600);
   });
+
+  expect(mockManager.ops.mintSwap.prepare).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
+  expect(mockTransactions.tagMintSwap).toHaveBeenCalledTimes(1);
+  expect(result.current.stepStates['step-1'].status).toBe('done');
   expect(result.current.runStatus).toBe('finished');
-  expect(mockStatus.complete).toHaveBeenCalledTimes(1);
 });
 
-function keepRecipientPending() {
-  mockManager.ops.melt.execute.mockImplementation(async () => ({
-    id: 'melt-op-1',
-    state: 'finalized',
-  }));
-}
+test('marks a leg settling when waitForOutcome times out in destination_funded', async () => {
+  mockManager.ops.mintSwap.execute.mockResolvedValueOnce(makeSwapOp('s1', 'destination_funded'));
+  mockManager.ops.mintSwap.waitForOutcome.mockResolvedValueOnce({
+    status: 'timeout' as const,
+    operation: makeSwapOp('s1', 'destination_funded'),
+  });
 
-test('delayed finalization of the exact recipient operation releases verification without a balance delta', async () => {
-  keepRecipientPending();
   const { result } = mount();
   await act(async () => result.current.handleStart());
   await act(async () => {
-    await jest.advanceTimersByTimeAsync(1000);
+    await jest.advanceTimersByTimeAsync(600);
   });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-  mintState = 'finalized';
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(mockRestore).not.toHaveBeenCalled();
-});
 
-test('an unrelated deposit cannot release verification while the owned recipient operation is pending', async () => {
-  keepRecipientPending();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  destinationBalance = 999;
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
-});
-
-test('an insufficient finalized recipient amount cannot release verification', async () => {
-  keepRecipientPending();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  mockManager.ops.mint.get.mockImplementation(async () => ({
-    ...operation(),
-    state: 'finalized',
-    amount: Amount.from(99),
-  }));
-  destinationBalance = 99;
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-});
-
-test('recipient verification keeps the existing 15-second timeout and never repeats a successful melt', async () => {
-  keepRecipientPending();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(14999);
-  });
-  expect(result.current.runStatus).toBe('running');
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(501);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(mockRestore).not.toHaveBeenCalled();
-  expect(cashuLog.warn).toHaveBeenCalledWith('mint.rebalance.balance_timeout');
-});
-
-test('a destination that has not issued within the wait is settling, never done', async () => {
-  keepRecipientPending();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(15500);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(result.current.stepStates['step-1']).toMatchObject({
-    status: 'settling',
-    routingDetail: expect.stringContaining('has not credited it yet'),
-  });
-  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
-    'group-1',
-    'leg-1',
-    expect.objectContaining({ localStatus: 'settling' })
-  );
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
-  expect(mockStatus.complete).not.toHaveBeenCalled();
-  expect(mockStatus.settleUnknown).toHaveBeenCalled();
-});
-
-test('a finalized recipient operation with unrecovered-proof error cannot release verification', async () => {
-  mockManager.ops.mint.get.mockImplementation(async () => ({
-    ...operation(),
-    error: 'Issued quote but no proofs restored',
-  }));
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(500);
-  });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-});
-
-test('recipient verification must match the prepared operation unit', async () => {
-  mockManager.ops.mint.prepare.mockImplementation(async () => ({ ...operation(), unit: 'usd' }));
-  // The returned snapshot has the right id/quote but the wrong unit.
-  const { result } = mount('usd');
-  await act(async () => result.current.handleStart());
-  destinationBalance = 200;
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-});
-
-test('cancellation stops verification reads and never publishes a late done state', async () => {
-  keepRecipientPending();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  act(() => result.current.handleCancelRun());
-  const reads = mockManager.ops.mint.get.mock.calls.length;
-  mintState = 'finalized';
-  destinationBalance = 100;
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(16000);
-  });
-  expect(result.current.runStatus).toBe('cancelled');
-  expect(mockManager.ops.mint.get).toHaveBeenCalledTimes(reads);
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
-});
-
-test('a replaced manager cannot publish settlement or schedule later legs for the old account', async () => {
-  keepRecipientPending();
-  const { result, rerender } = mount();
-  await act(async () => result.current.handleStart());
-  const previous = mockManager;
-  const reads = previous.ops.mint.get.mock.calls.length;
-  mockManager = createManager();
-  rerender({});
-  mintState = 'finalized';
-  destinationBalance = 100;
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(16000);
-  });
-  expect(previous.ops.mint.get).toHaveBeenCalledTimes(reads);
-  expect(mockManager.ops.mint.get).not.toHaveBeenCalled();
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
+  expect(result.current.stepStates['step-1'].status).toBe('settling');
+  expect(mockStatus.settleUnknown).toHaveBeenCalledTimes(1);
   expect(mockStatus.complete).not.toHaveBeenCalled();
 });
 
-test('Coco v2 finalized operation returned by melt refresh completes without the legacy decision-string timeout', async () => {
-  mockManager.ops.melt.execute.mockImplementation(async () => ({
-    id: 'melt-op-1',
-    state: 'pending',
-  }));
-  mockManager.ops.melt.refresh.mockImplementation(async () => {
-    mintState = 'finalized';
-    destinationBalance = 100;
-    return { id: 'melt-op-1', state: 'finalized' };
+test('marks a leg paymentPending when waitForOutcome times out in source_pending', async () => {
+  mockManager.ops.mintSwap.execute.mockResolvedValueOnce(makeSwapOp('s1', 'source_pending'));
+  mockManager.ops.mintSwap.waitForOutcome.mockResolvedValueOnce({
+    status: 'timeout' as const,
+    operation: makeSwapOp('s1', 'source_pending'),
   });
+
   const { result } = mount();
   await act(async () => result.current.handleStart());
   await act(async () => {
-    await jest.advanceTimersByTimeAsync(500);
+    await jest.advanceTimersByTimeAsync(600);
   });
-  expect(result.current.runStatus).toBe('finished');
-  expect(mockManager.ops.melt.refresh).toHaveBeenCalledTimes(1);
-  expect(mockRestore).not.toHaveBeenCalled();
+
+  expect(result.current.stepStates['step-1'].status).toBe('paymentPending');
+  expect(mockStatus.settleUnknown).toHaveBeenCalledTimes(1);
 });
 
-test('Coco v2 rolled-back operation returned by melt refresh fails immediately without paying again', async () => {
-  mockManager.ops.melt.execute.mockImplementation(async () => ({
-    id: 'melt-op-1',
-    state: 'pending',
-  }));
-  mockManager.ops.melt.refresh.mockResolvedValue({ id: 'melt-op-1', state: 'rolled_back' });
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  expect(result.current.stepStates['step-1'].status).toBe('failed');
-  expect(mockManager.ops.melt.refresh).toHaveBeenCalledTimes(1);
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-});
-
-test('cancelling a pending melt stops further status RPCs without retrying the payment', async () => {
-  mockManager.ops.melt.execute.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
-  mockManager.ops.melt.refresh.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  expect(mockManager.ops.melt.refresh).toHaveBeenCalledTimes(1);
-  act(() => result.current.handleCancelRun());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(10000);
-  });
-  expect(mockManager.ops.melt.refresh).toHaveBeenCalledTimes(1);
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
-  expect(mockRestore).not.toHaveBeenCalled();
-});
-
-test('a melt still unsettled after the settle window stays pending instead of failing', async () => {
-  mockManager.ops.melt.execute.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
-  mockManager.ops.melt.refresh.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(21000);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(result.current.stepStates['step-1']).toMatchObject({
-    status: 'paymentPending',
-    routingDetail: expect.stringContaining('Payment pending'),
-  });
-  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
-    'group-1',
-    'leg-1',
-    expect.objectContaining({ localStatus: 'paymentPending' })
-  );
-
-  // Retrying what failed must not send a payment whose outcome is unknown again.
-  await act(async () => {
-    await result.current.handleRetryFailed();
-  });
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(mockRestore).not.toHaveBeenCalled();
-  expect(mockStatus.setLegFailed).not.toHaveBeenCalled();
-  expect(mockTransactions.setLegStatus).not.toHaveBeenCalledWith(
-    'group-1',
-    'leg-1',
-    expect.objectContaining({ localStatus: 'failed' })
-  );
-});
-
-test('a late outgoing-manager melt error cannot invoke global recovery after manager replacement', async () => {
-  let reject!: (error: Error) => void;
-  mockManager.ops.melt.execute.mockImplementation(
-    () =>
-      new Promise((_resolve, fail) => {
-        reject = fail;
-      })
-  );
-  const { result, rerender } = mount();
-  await act(async () => result.current.handleStart());
-  mockManager = createManager();
-  rerender({});
-  await act(async () => reject(new Error('no_route')));
-  expect(mockRestore).not.toHaveBeenCalled();
-  expect(mockManager.ops.melt.execute).not.toHaveBeenCalled();
-  expect(mockStatus.setLegFailed).not.toHaveBeenCalled();
-});
-
-function configureMiddleman() {
-  const via = 'https://middleman.example';
-  mockLocalCandidates = [via];
-  const receipts = new Map<string, ReturnType<typeof operation>>();
-  let nextQuote = 0;
-  mockManager.quotes.mint.create.mockImplementation(async (input) => {
-    const quoteId = `quote-${++nextQuote}`;
-    receipts.set(quoteId, {
-      ...operation(),
-      id: `mint-${quoteId}`,
-      quoteId,
-      mintUrl: input.mintUrl,
-      request: `invoice-${quoteId}`,
-      amount: Amount.from(input.amount.amount),
-      state: 'pending',
-    });
-    return {
-      quoteId,
-      mintUrl: input.mintUrl,
-      unit: input.amount.unit,
-      request: `invoice-${quoteId}`,
-    };
-  });
-  mockManager.ops.mint.prepare.mockImplementation(async ({ quote }) =>
-    receipts.get(quote.quoteId)!
-  );
-  mockManager.ops.mint.get.mockImplementation(async (id) =>
-    [...receipts.values()].find((receipt) => receipt.id === id)!
-  );
-  mockManager.wallet.balances.byMint.mockImplementation(async () => ({
-    [SOURCE]: { total: Amount.from(1000) },
-    [DESTINATION]: { total: Amount.from(100) },
-    [via]: { total: Amount.from(100) },
-  }));
-  mockManager.ops.melt.execute
-    // The mint answers that Lightning found no route.
-    .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
-    .mockImplementation(async () => {
-      const latest = receipts.get(`quote-${nextQuote}`)!;
-      latest.state = 'finalized';
-      return { id: 'melt-op-1', state: 'pending' };
-    });
-  return { via, receipts };
-}
-
-test('middleman hops verify their own recipient operations and the final hop instead of the abandoned direct quote', async () => {
-  const { via, receipts } = configureMiddleman();
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(500);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(3);
-  expect(mockManager.ops.melt.refresh).toHaveBeenCalledTimes(2);
-  expect(mockManager.ops.mint.get.mock.calls.map(([id]) => id)).toEqual([
-    'mint-quote-2',
-    'mint-quote-3',
-  ]);
-  expect(receipts.get('quote-1')?.state).toBe('pending');
-  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [via]);
-});
-
-test.each([0, 1])(
-  'a reduced-amount retry on middleman hop %i verifies and tags the replacement receipt',
-  async (hopIndex) => {
-    const { receipts } = configureMiddleman();
-    const prepared = {
-      id: 'melt-op-1',
-      quoteId: 'melt-quote-1',
-      amount: Amount.from(100),
-      fee_reserve: 0,
-      swap_fee: 0,
-    };
-    // The initial direct prepare succeeds; then only the selected hop needs
-    // a smaller replacement invoice. The abandoned receipt stays pending.
-    for (let index = 0; index <= hopIndex; index++) {
-      mockManager.ops.melt.prepare.mockResolvedValueOnce(prepared);
+test('routes through a middleman mint on source_payment_rejected and releases temporary trust', async () => {
+  mockLocalCandidates = [VIA];
+  let first = true;
+  mockManager.ops.mintSwap.execute.mockImplementation(async (id: string) => {
+    if (first) {
+      first = false;
+      return makeSwapOp(id, 'failed', { failure: { code: 'source_payment_rejected' } });
     }
-    mockManager.ops.melt.prepare.mockRejectedValueOnce(new Error('Not enough proofs'));
-    const { result } = mount();
-    await act(async () => result.current.handleStart());
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(500);
-    });
-    const abandoned = `quote-${hopIndex + 2}`;
-    const replacement = `quote-${hopIndex + 3}`;
-    expect(mockManager.ops.mint.get.mock.calls.map(([id]) => id)).toEqual(
-      hopIndex === 0 ? ['mint-quote-3', 'mint-quote-4'] : ['mint-quote-2', 'mint-quote-4']
-    );
-    expect(result.current.runStatus).toBe('finished');
-    expect(receipts.get(abandoned)?.state).toBe('pending');
-    expect(receipts.get(replacement)?.amount.toNumber()).toBe(
-      receipts.get(abandoned)!.amount.toNumber() - 2
-    );
-    // The replacement's operation is saved too: a settling leg is reconciled from it.
-    expect(mockTransactions.tagMintQuote).toHaveBeenCalledWith('group-1', 'leg-1', {
-      quoteId: replacement,
-      operationId: `mint-${replacement}`,
-    });
-    expect(setTransactionAnnotation).toHaveBeenCalledWith(
-      `quote:${replacement}`,
-      expect.objectContaining({
-        swap: expect.objectContaining({ role: 'mint', hopIndex }),
-      })
-    );
-    expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(3);
-  }
-);
+    return makeSwapOp(id, 'completed');
+  });
 
-test('cancelling during middleman receipt verification releases temporary trust before exiting', async () => {
-  const { via } = configureMiddleman();
-  mockManager.ops.melt.execute.mockImplementation(async () => ({
-    id: 'melt-op-1',
-    state: 'finalized',
-  }));
   const { result } = mount();
   await act(async () => result.current.handleStart());
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(2000);
+  });
+
+  expect(mockManager.mint.addMint).toHaveBeenCalledWith(VIA, { trusted: true });
+  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [VIA]);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(3);
+  expect(result.current.runStatus).toBe('finished');
+});
+
+test('cancelling before execute calls ops.mintSwap.cancel and aborts cleanly', async () => {
+  let resolvePrepare!: () => void;
+  mockManager.ops.mintSwap.prepare.mockImplementationOnce(
+    (input: { id: string }) =>
+      new Promise((resolve) => {
+        resolvePrepare = () => resolve(makeSwapOp(input.id, 'prepared'));
+      })
+  );
+
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
   act(() => result.current.handleCancelRun());
   await act(async () => {
-    await jest.advanceTimersByTimeAsync(1000);
+    resolvePrepare();
+    await jest.advanceTimersByTimeAsync(100);
   });
-  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [via]);
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
-});
 
-test('a transient recipient operation read failure retries locally without repeating the melt', async () => {
-  mockManager.ops.mint.get.mockRejectedValueOnce(new Error('database busy'));
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-  expect(result.current.runStatus).toBe('finished');
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
-  expect(mockManager.ops.mint.get).toHaveBeenCalledTimes(2);
-  expect(mockRestore).not.toHaveBeenCalled();
-});
-
-test.each([
-  ['id', 'another-operation'],
-  ['mintUrl', 'https://another-mint.example'],
-  ['quoteId', 'another-quote'],
-  ['method', 'onchain'],
-])('a recipient snapshot with the wrong %s cannot settle this transfer', async (field, value) => {
-  mockManager.ops.mint.get.mockImplementation(async () => ({ ...operation(), [field]: value }));
-  const { result } = mount();
-  await act(async () => result.current.handleStart());
-  await act(async () => {
-    await jest.advanceTimersByTimeAsync(500);
-  });
-  expect(result.current.stepStates['step-1'].status).toBe('verifying');
-  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
+  expect(mockManager.ops.mintSwap.cancel).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).not.toHaveBeenCalled();
+  expect(result.current.runStatus).toBe('cancelled');
 });

@@ -35,7 +35,7 @@ import {
   importAndSwitchProfile,
   switchToExistingProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -260,7 +260,7 @@ export function AccountSwitcherDrawer({ navigation }: { navigation: DrawerNaviga
           testID: `drawer-profile-view-${profile.accountIndex}`,
           onPress: () => {
             router.navigate({
-              pathname: '/(user-flow)/profile',
+              pathname: '/profile',
               params: { pubkey: profile.pubkey },
             });
           },

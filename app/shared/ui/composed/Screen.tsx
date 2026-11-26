@@ -35,7 +35,10 @@ import {
   ScreenTopPaddingContext,
 } from '@/shared/hooks/useScreenInsets';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
-import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
+import {
+  SHEET_SCRIM_OVERHANG,
+  SheetHeaderHeightContext,
+} from '@/shared/ui/composed/AndroidSheetRoot';
 import { useSettledHeaderHeight } from '@/shared/ui/composed/settledHeaderHeight';
 import type { NativeStackNavigationOptions } from 'expo-router';
 
@@ -45,7 +48,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
 import { TouchIndicatorLayer } from './TouchIndicator';
-import { FLOW_SHEET_SCRIM_OVERHANG, FlowSheetHeader } from './FlowSheetHeader';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
 type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
@@ -187,29 +189,6 @@ export function Screen({
   const themeBackground = useThemeColor('surface');
   const resolvedBgColor = bgColor ?? themeBackground;
 
-  // Inside an Android formSheet, declare the page's actual background to the
-  // sheet header: FlowSheetHeader reads headerStyle.backgroundColor for its
-  // scrim color. Without this, screens that override bgColor get a scrim
-  // fading from the default page surface — a
-  // visibly wrong-colored slab across the top of the page.
-  const navigation = useNavigation();
-  useLayoutEffect(() => {
-    if (Platform.OS !== 'android' || sheetHeaderHeight == null) return;
-    if (bgColor != null) navigation.setOptions({ headerStyle: { backgroundColor: bgColor } });
-    // Use the custom header itself: native headerBackground creates an elevated
-    // duplicate layer above Android sheet titles and actions.
-    const options: Partial<NativeStackNavigationOptions> = {
-      header: (props) => (
-        <FlowSheetHeader
-          {...props}
-          appearance={headerAppearance}
-          gradientStyle={headerGradientStyle}
-        />
-      ),
-    };
-    navigation.setOptions(options);
-  }, [navigation, sheetHeaderHeight, bgColor, headerAppearance, headerGradientStyle]);
-
   const footerClearance = footer
     ? measuredFooterHeight > 0
       ? measuredFooterHeight + FOOTER_CLEARANCE
@@ -222,11 +201,11 @@ export function Screen({
   // When a Stack header is present we already get insets.top baked into
   // headerHeight, so adding insets.top would double-count. Outside a Stack
   // headerHeight is 0 and we fall back to insets.top. Inside an Android
-  // formSheet, also reserve the FlowSheetHeader scrim's fade overhang so custom
+  // formSheet, also reserve the sheet header scrim's fade overhang so custom
   // scroll content clears the fade at rest (mirrors ModalLayoutWrapper).
   const androidSheetScrimOverhang =
     Platform.OS === 'android' && sheetHeaderHeight != null && headerAppearance === 'gradient'
-      ? FLOW_SHEET_SCRIM_OVERHANG
+      ? SHEET_SCRIM_OVERHANG
       : 0;
   const safeAreaTopPadding =
     (headerHeight > 0 ? headerHeight : insets.top) + androidSheetScrimOverhang;

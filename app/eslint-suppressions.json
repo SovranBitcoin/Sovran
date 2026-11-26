@@ -77,19 +77,6 @@
       "count": 1
     }
   },
-  "shared/blocks/popup/ActionMenuHost.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "shared/blocks/popup/PopupHost.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 2
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "shared/blocks/transfer/TransferEntryRow.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -103,11 +90,6 @@
   "shared/hooks/useThemeColor.ts": {
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "shared/lib/colorExtraction.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "shared/lib/downloadedThemeRegistry.ts": {
@@ -130,16 +112,6 @@
       "count": 3
     }
   },
-  "shared/lib/popup/ToastSlab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "shared/lib/utils.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
   "shared/providers/hero-transition/HeroTransitionProvider.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
@@ -155,11 +127,6 @@
   },
   "shared/stores/profile/restoreActiveSessionView.ts": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/AmountFormatter.tsx": {
-    "no-restricted-imports": {
       "count": 1
     }
   },

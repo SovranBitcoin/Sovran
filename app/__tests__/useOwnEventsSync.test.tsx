@@ -4,8 +4,8 @@
  * Characterization of `useOwnEventsSync`, the one live subscription for the
  * person's own Nostr events. Batches of events are fed through a fake relay
  * subscription into the real partition and the real profile, social, own
- * content and own-profile stores. Only the NDK subscription, the keys
- * provider, the mute-list fetch, the follow worker, the Nostr cache layer and
+ * content and own-profile stores. Only the relay (a fake client whose
+ * subscriptions are sent `mockEvents`), the keys provider, the mute-list fetch, the follow worker, the Nostr cache layer and
  * storage are replaced.
  */
 
@@ -15,6 +15,8 @@ import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import type { RelaySubscriptionHandlers } from 'nostr/client';
+import { asVerified, fakeClient, type FakeClient } from './helpers/fakeNostrClient';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 
 type RawEvent = {
@@ -43,16 +45,20 @@ function mockMatches(filters: Filter[] | null, event: RawEvent): boolean {
   );
 }
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
-  useSubscribe: ({ filters }: { filters: Filter[] | null }) => {
-    mockSubscribeFilters.push(filters);
-    return {
-      events: mockRelayHonoursFilters
-        ? mockEvents.filter((event) => mockMatches(filters, event))
-        : mockEvents,
-    };
-  },
+/** The relay's open subscriptions. */
+const mockSubscriptions = new Set<{ filters: Filter[]; handlers: RelaySubscriptionHandlers }>();
+let mockClient: FakeClient;
+
+/** The relay sends a subscription every event it holds (that the filters ask for, when it honours them). */
+function mockSend(subscription: { filters: Filter[]; handlers: RelaySubscriptionHandlers }) {
+  for (const event of mockEvents) {
+    if (mockRelayHonoursFilters && !mockMatches(subscription.filters, event)) continue;
+    subscription.handlers.onEvent(asVerified({ ...event, sig: 'sig' }));
+  }
+}
+
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: mockClient, isInitialized: true }),
 }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: mockPubkey ? { pubkey: mockPubkey } : null }),
@@ -106,7 +112,10 @@ function activate(pubkey: string, accountIndex: number) {
 
 function deliver(rerender: () => void, events: RawEvent[]) {
   mockEvents = events;
-  act(() => rerender());
+  act(() => {
+    for (const subscription of mockSubscriptions) mockSend(subscription);
+    rerender();
+  });
 }
 
 function latestProfileId(): string | undefined {
@@ -134,6 +143,17 @@ beforeEach(() => {
   mockEvents = [];
   mockSubscribeFilters.length = 0;
   mockRelayHonoursFilters = false;
+  mockSubscriptions.clear();
+  mockClient = fakeClient({
+    relays: ['wss://relay.example/'],
+    subscribeRelay: (_url, filters, handlers) => {
+      mockSubscribeFilters.push(filters);
+      const subscription = { filters: filters as Filter[], handlers };
+      mockSubscriptions.add(subscription);
+      mockSend(subscription);
+      return { stop: () => mockSubscriptions.delete(subscription) };
+    },
+  });
   activate(A, 0);
   useOwnProfileMetadataStore.setState({ latest: null });
   useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
@@ -201,7 +221,7 @@ describe('useOwnEventsSync', () => {
     mockPubkey = undefined;
     const { unmount } = mount();
 
-    expect(mockSubscribeFilters.at(-1)).toBeNull();
+    expect(mockSubscribeFilters).toEqual([]);
     unmount();
   });
 

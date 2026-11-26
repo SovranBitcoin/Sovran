@@ -1,9 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-jest.mock('wallet', () => ({
-  ...jest.requireActual('wallet'),
-  configureEnabledPaymentMethods: jest.fn(),
-}));
 
 import { configureEnabledPaymentMethods } from 'wallet';
 import {
@@ -18,6 +14,10 @@ import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { featureDetectors } from '@/shared/config/featureDetectors';
 import { disabledFeatureForRoute } from '@/shared/lib/nav/featureRoutes';
 import { remoteSearchText } from '@/features/search/lib/searchAction';
+jest.mock('wallet', () => ({
+  ...jest.requireActual('wallet'),
+  configureEnabledPaymentMethods: jest.fn(),
+}));
 
 describe('feature set', () => {
   it('ships the payments edition by default', () => {
@@ -40,11 +40,8 @@ describe('feature set', () => {
     // No build ships conversation pages, so ecash sent as a message is only
     // claimed because a provider mounts with `ecashMessages`. If that mount is
     // ever gated on anything else, money could arrive that nobody claims.
-    const layout = readFileSync(
-      join(__dirname, '..', 'shared', 'providers', 'AccountProviders.tsx'),
-      'utf8'
-    );
-    expect(layout).toContain("hasFeature('ecashMessages') ? [DmEcashAutoRedeemProvider] : []");
+    const layout = readFileSync(join(__dirname, '..', 'runtime', 'AccountScope.tsx'), 'utf8');
+    expect(layout).toMatch(/hasFeature\('ecashMessages'\) \? \(\s*<DmEcashAutoRedeemProvider>/);
     expect(resolveFeatureSet('payments').ecashMessages).toBe(true);
   });
 
@@ -98,7 +95,7 @@ describe('feature route guard', () => {
 
   it('blocks entry screens of a disabled module', () => {
     expect(disabledFeatureForRoute(['(send-flow)', 'sendToken'], enabled)).toBe('ecash');
-    expect(disabledFeatureForRoute(['(user-flow)', 'profile'], enabled)).toBe('nostr');
+    expect(disabledFeatureForRoute(['profile'], enabled)).toBe('nostr');
     expect(disabledFeatureForRoute(['(send-flow)', 'lightningSend'], enabled)).toBeNull();
   });
 
@@ -106,7 +103,7 @@ describe('feature route guard', () => {
     const payments = resolveFeatureSet('payments');
     const on = (f: keyof typeof payments) => payments[f];
     expect(disabledFeatureForRoute(['(drawer)', '(tabs)', 'index'], on)).toBeNull();
-    expect(disabledFeatureForRoute(['(user-flow)', 'profile'], on)).toBeNull();
+    expect(disabledFeatureForRoute(['profile'], on)).toBeNull();
   });
 
   it('keeps every tab open in every build, nostr or not', () => {
@@ -120,7 +117,101 @@ describe('feature route guard', () => {
   });
 
   it('keeps history viewable', () => {
-    expect(disabledFeatureForRoute(['(transactions-flow)', 'sendToken'], enabled)).toBeNull();
+    const sendEntry = JSON.stringify({
+      id: 'send-1',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      createdAt: 1_752_000_000_000,
+    });
+    const meltEntry = JSON.stringify({
+      id: 'melt-1',
+      type: 'melt',
+      quoteId: 'quote-1',
+      mintUrl: 'https://mint.example',
+      createdAt: 1_752_000_000_000,
+    });
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        sendHistoryEntry: sendEntry,
+      })
+    ).toBeNull();
+    expect(
+      disabledFeatureForRoute(['lightningSend'], enabled, {
+        historyView: '1',
+        meltHistoryEntry: meltEntry,
+      })
+    ).toBeNull();
+  });
+
+  it('opens a disabled rail from history only with a valid persisted history row', () => {
+    const validSend = JSON.stringify({
+      id: 'send-1',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      createdAt: 1_752_000_000_000,
+    });
+    const validMelt = JSON.stringify({
+      id: 'melt-1',
+      type: 'melt',
+      quoteId: 'quote-1',
+      mintUrl: 'https://mint.example',
+      createdAt: 1_752_000_000_000,
+    });
+    const syntheticMeltPreview = JSON.stringify({
+      id: 'melt-preview',
+      type: 'melt',
+      quoteId: '',
+      mintUrl: 'https://mint.example',
+      createdAt: 1_752_000_000_000,
+    });
+    const noLightningSet = resolveFeatureSet('onchainOnly');
+    const noLightning = (f: keyof typeof noLightningSet) => noLightningSet[f];
+
+    // The marker alone, an empty object, malformed JSON, wrong type, or a synthetic preview cannot bypass a disabled rail.
+    expect(disabledFeatureForRoute(['sendToken'], enabled, { historyView: '1' })).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        sendHistoryEntry: '{}',
+      })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        sendHistoryEntry: 'not-json',
+      })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        sendHistoryEntry: validMelt,
+      })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['sendToken'], enabled, {
+        historyView: '1',
+        meltHistoryEntry: validMelt,
+      })
+    ).toBe('ecash');
+    expect(disabledFeatureForRoute(['sendToken'], enabled, { sendHistoryEntry: validSend })).toBe(
+      'ecash'
+    );
+    expect(
+      disabledFeatureForRoute(['(send-flow)', 'sendToken'], enabled, { historyView: '0' })
+    ).toBe('ecash');
+    expect(
+      disabledFeatureForRoute(['lightningSend'], noLightning, {
+        historyView: '1',
+        meltHistoryEntry: '{}',
+      })
+    ).toBe('lightning');
+    expect(
+      disabledFeatureForRoute(['lightningSend'], noLightning, {
+        historyView: '1',
+        meltHistoryEntry: syntheticMeltPreview,
+      })
+    ).toBe('lightning');
   });
 });
 

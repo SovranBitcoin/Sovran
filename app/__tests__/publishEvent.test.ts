@@ -1,32 +1,18 @@
 /**
- * Unit tests for the central publish seam. The real @nostr-dev-kit/ndk-mobile
- * pulls native bits, so it is mocked down to the symbols publishEvent imports;
- * the relays-omitted path drives a fully fake `ndk.pool`.
+ * Unit tests for the central publish seam, over a fake `NostrClient` whose
+ * relays accept or refuse each publish as the test says.
  */
 /* eslint-disable import/first */
-
-// Match the configured ndk-mobile module mapper so this suite uses its own double.
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  default: class NDK {},
-  NDKEvent: class NDKEvent {},
-  NDKRelaySet: {
-    // Resolve an explicit url set against the fake pool (mirrors NDK).
-    fromRelayUrls: jest.fn((urls: string[], ndk: { pool: { relays: Map<string, unknown> } }) => ({
-      relays: urls.map((u) => ndk.pool.relays.get(u)).filter(Boolean),
-    })),
-  },
-  normalizeRelayUrl: (url: string) => url,
-}));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { NDKRelaySet, type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient, UnsignedNostrEvent } from 'nostr/client';
+import type { VerifiedEvent } from 'nostr-tools/pure';
 
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { asVerified } from './helpers/fakeNostrClient';
 
 type FakeRelay = { url: string; publish: jest.Mock };
 
@@ -34,15 +20,32 @@ function relay(url: string, impl: () => Promise<boolean>): FakeRelay {
   return { url, publish: jest.fn(impl) };
 }
 
-function fakeNdk(relays: FakeRelay[], signer: unknown = {}): NDK {
+/** A client whose pool is `relays`; a url names a relay with or without its trailing slash. */
+function fakeClient(relays: FakeRelay[], signer: unknown = {}): NostrClient {
+  const find = (url: string) => relays.find((r) => r.url === url.replace(/\/$/, ''));
   return {
     signer,
-    pool: { relays: new Map(relays.map((r) => [r.url, r])) },
-  } as unknown as NDK;
+    relayUrls: () => relays.map((r) => r.url),
+    signEvent: (template: UnsignedNostrEvent) =>
+      (signer as { sign: (t: UnsignedNostrEvent) => VerifiedEvent }).sign(template),
+    publishToRelay: async (url: string) => {
+      const target = find(url);
+      if (!target) throw new Error(`not in pool: ${url}`);
+      await target.publish();
+    },
+  } as unknown as NostrClient;
 }
 
-function signedEvent(id = 'evt1'): NDKEvent {
-  return { id, kind: 7, sig: 'sig', sign: jest.fn() } as unknown as NDKEvent;
+function signedEvent(id = 'evt1'): VerifiedEvent {
+  return asVerified({
+    id,
+    kind: 7,
+    sig: 'sig',
+    pubkey: 'p',
+    created_at: 1,
+    tags: [],
+    content: '',
+  });
 }
 
 const accept = () => Promise.resolve(true);
@@ -55,8 +58,8 @@ const fastRetry = { attempts: 2, baseDelayMs: 0, maxDelayMs: 0 };
 
 describe('publishEvent', () => {
   it('returns ok with all relays accepted', async () => {
-    const ndk = fakeNdk([relay('wss://a', accept), relay('wss://b', accept)]);
-    const res = await publishEvent({ ndk, event: signedEvent(), retry: fastRetry });
+    const client = fakeClient([relay('wss://a', accept), relay('wss://b', accept)]);
+    const res = await publishEvent({ client, event: signedEvent(), retry: fastRetry });
 
     expect(res.isOk()).toBe(true);
     const value = res._unsafeUnwrap();
@@ -73,9 +76,9 @@ describe('publishEvent', () => {
       return bCalls >= 2 ? Promise.resolve(true) : Promise.reject(new Error('temp'));
     });
     const a = relay('wss://a', accept);
-    const ndk = fakeNdk([a, b]);
+    const client = fakeClient([a, b]);
 
-    const res = await publishEvent({ ndk, event: signedEvent(), retry: fastRetry });
+    const res = await publishEvent({ client, event: signedEvent(), retry: fastRetry });
 
     expect(res.isOk()).toBe(true);
     expect(a.publish).toHaveBeenCalledTimes(1); // accepted first round, never retried
@@ -87,9 +90,9 @@ describe('publishEvent', () => {
 
   it('errors all-failed after exhausting retries', async () => {
     const a = relay('wss://a', reject('nope'));
-    const ndk = fakeNdk([a]);
+    const client = fakeClient([a]);
 
-    const res = await publishEvent({ ndk, event: signedEvent(), retry: fastRetry });
+    const res = await publishEvent({ client, event: signedEvent(), retry: fastRetry });
 
     expect(res.isErr()).toBe(true);
     const error = res._unsafeUnwrapErr();
@@ -100,10 +103,10 @@ describe('publishEvent', () => {
   it('first-ok short-circuits without retrying the failing relay', async () => {
     const good = relay('wss://good', accept);
     const bad = relay('wss://bad', reject());
-    const ndk = fakeNdk([good, bad]);
+    const client = fakeClient([good, bad]);
 
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent(),
       resolveOn: 'first-ok',
       retry: fastRetry,
@@ -115,9 +118,9 @@ describe('publishEvent', () => {
 
   it('classifies a timeout failure', async () => {
     const a = relay('wss://a', reject('Publish timed out'));
-    const ndk = fakeNdk([a]);
+    const client = fakeClient([a]);
 
-    const res = await publishEvent({ ndk, event: signedEvent(), retry: fastRetry });
+    const res = await publishEvent({ client, event: signedEvent(), retry: fastRetry });
     const error = res._unsafeUnwrapErr();
     expect(error.type).toBe('all-failed');
     if (error.type === 'all-failed') {
@@ -128,40 +131,39 @@ describe('publishEvent', () => {
   });
 
   it('errors no-signer when an unsigned event has no signer', async () => {
-    const ndk = fakeNdk([relay('wss://a', accept)], null);
-    const unsigned = { id: 'x', kind: 1, sig: undefined, sign: jest.fn() } as unknown as NDKEvent;
+    const client = fakeClient([relay('wss://a', accept)], null);
+    const unsigned: UnsignedNostrEvent = { kind: 1, tags: [], content: '' };
 
-    const res = await publishEvent({ ndk, event: unsigned, retry: fastRetry });
+    const res = await publishEvent({ client, event: unsigned, retry: fastRetry });
     expect(res._unsafeUnwrapErr().type).toBe('no-signer');
   });
 
   it('errors sign-failed when signing throws', async () => {
-    const ndk = fakeNdk([relay('wss://a', accept)], {});
-    const unsigned = {
-      id: 'x',
-      kind: 1,
-      sig: undefined,
-      sign: jest.fn(() => Promise.reject(new Error('keystore locked'))),
-    } as unknown as NDKEvent;
+    const client = fakeClient([relay('wss://a', accept)], {
+      sign: () => {
+        throw new Error('keystore locked');
+      },
+    });
+    const unsigned: UnsignedNostrEvent = { kind: 1, tags: [], content: '' };
 
-    const res = await publishEvent({ ndk, event: unsigned, retry: fastRetry });
+    const res = await publishEvent({ client, event: unsigned, retry: fastRetry });
     expect(res._unsafeUnwrapErr().type).toBe('sign-failed');
   });
 
   it('errors no-relays when the pool is empty and no relays are given', async () => {
-    const ndk = fakeNdk([]);
-    const res = await publishEvent({ ndk, event: signedEvent(), retry: fastRetry });
+    const client = fakeClient([]);
+    const res = await publishEvent({ client, event: signedEvent(), retry: fastRetry });
     expect(res._unsafeUnwrapErr().type).toBe('no-relays');
   });
 
   it('single-flights concurrent publishes of the same event id', async () => {
     const a = relay('wss://a', accept);
-    const ndk = fakeNdk([a]);
+    const client = fakeClient([a]);
     const event = signedEvent('dup');
 
     const [r1, r2] = await Promise.all([
-      publishEvent({ ndk, event, retry: fastRetry }),
-      publishEvent({ ndk, event, retry: fastRetry }),
+      publishEvent({ client, event, retry: fastRetry }),
+      publishEvent({ client, event, retry: fastRetry }),
     ]);
 
     expect(r1.isOk()).toBe(true);
@@ -170,11 +172,11 @@ describe('publishEvent', () => {
   });
 
   it('streams terminal per-relay results to onRelayResult', async () => {
-    const ndk = fakeNdk([relay('wss://a', accept), relay('wss://b', reject())]);
+    const client = fakeClient([relay('wss://a', accept), relay('wss://b', reject())]);
     const seen: string[] = [];
 
     await publishEvent({
-      ndk,
+      client,
       event: signedEvent(),
       retry: { attempts: 0, baseDelayMs: 0, maxDelayMs: 0 },
       onRelayResult: (r) => seen.push(`${r.url}:${r.ok}`),
@@ -200,10 +202,10 @@ describe('publishEvent optimistic mode', () => {
       badCalls += 1;
       return badCalls >= 2 ? Promise.resolve(true) : Promise.reject(new Error('temp'));
     });
-    const ndk = fakeNdk([good, bad]);
+    const client = fakeClient([good, bad]);
 
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent('opt1'),
       relays: ['wss://good', 'wss://bad'],
       resolveOn: 'optimistic',
@@ -219,10 +221,10 @@ describe('publishEvent optimistic mode', () => {
 
   it('fails fast with no background retries when the first round accepts nowhere', async () => {
     const bad = relay('wss://bad', reject('down'));
-    const ndk = fakeNdk([bad]);
+    const client = fakeClient([bad]);
 
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent('opt2'),
       relays: ['wss://bad'],
       resolveOn: 'optimistic',
@@ -240,10 +242,10 @@ describe('publishEvent optimistic mode', () => {
   it('fans out to background recipient relays once the post is assured', async () => {
     const own = relay('wss://own', accept);
     const recipient = relay('wss://recipient', accept);
-    const ndk = fakeNdk([own, recipient]);
+    const client = fakeClient([own, recipient]);
 
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent('opt3'),
       relays: ['wss://own'],
       backgroundRelays: Promise.resolve(['wss://recipient']),
@@ -259,16 +261,15 @@ describe('publishEvent optimistic mode', () => {
   });
 
   it('settles with an error (never hangs) when relay resolution throws', async () => {
-    const ndk = fakeNdk([relay('wss://x', accept)]);
-    (NDKRelaySet.fromRelayUrls as jest.Mock).mockImplementationOnce(() => {
-      throw new Error('relay set boom');
-    });
+    const client = fakeClient([relay('wss://x', accept)]);
 
     // If `assured` failed to settle this `await` would hang and time out.
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent('throw1'),
-      relays: ['wss://x'],
+      get relays(): string[] {
+        throw new Error('relay set boom');
+      },
       resolveOn: 'optimistic',
       retry: fastRetry,
     });
@@ -280,10 +281,10 @@ describe('publishEvent optimistic mode', () => {
   it('skips background recipient relays when the post failed', async () => {
     const own = relay('wss://own', reject('down'));
     const recipient = relay('wss://recipient', accept);
-    const ndk = fakeNdk([own, recipient]);
+    const client = fakeClient([own, recipient]);
 
     const res = await publishEvent({
-      ndk,
+      client,
       event: signedEvent('opt4'),
       relays: ['wss://own'],
       backgroundRelays: Promise.resolve(['wss://recipient']),

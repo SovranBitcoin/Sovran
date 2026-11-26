@@ -12,9 +12,9 @@
 import { create as createQrCode } from 'qrcode';
 
 export const QR_PLACEHOLDER_FRAME_COUNT = 6;
-/** Mirrors react-native-qrcode-svg's default so the junk lands in the same
- * QR version as the live code encoded from a payload of equal length. */
-const QR_PLACEHOLDER_ECL = 'M';
+/** The live QR's error-correction level (`QrMatrix`), so the junk lands in
+ * the same QR version as the live code encoded from a payload of equal length. */
+const QR_ECL = 'M';
 /** Byte mode caps out at ~2.3k chars for version 40 at ECL M; the live QR
  * splits anything longer into UR fragments anyway. */
 const MAX_PLACEHOLDER_LENGTH = 2000;
@@ -46,9 +46,9 @@ export function qrJunkPayload(seed: number, length: number): string {
   return out;
 }
 
-/** The same run-length path react-native-qrcode-svg draws for a module
- * matrix (`M x y L x y` per run, stroked at `cellSize`), so the placeholder
- * renders with the live QR's exact stroke geometry. */
+/** The run-length path both the live QR (`QrMatrix`) and the placeholder
+ * draw for a module matrix (`M x y L x y` per run, stroked at `cellSize`),
+ * so the placeholder renders with the live QR's exact stroke geometry. */
 export function qrMatrixPath(
   data: ArrayLike<number>,
   modules: number,
@@ -75,8 +75,10 @@ export function qrMatrixPath(
   return { d, cellSize };
 }
 
-function qrPlaceholderFrame(payload: string, size: number): QrPlaceholderFrame {
-  const { modules } = createQrCode(payload, { errorCorrectionLevel: QR_PLACEHOLDER_ECL });
+/** Encode `value` and draw it at `size` points. Throws on input `qrcode`
+ * cannot encode (empty, or over capacity at `QR_ECL`). */
+export function encodeQrPath(value: string, size: number): QrPlaceholderFrame {
+  const { modules } = createQrCode(value, { errorCorrectionLevel: QR_ECL });
   return { modules: modules.size, ...qrMatrixPath(modules.data, modules.size, size) };
 }
 
@@ -97,7 +99,7 @@ export function qrPlaceholderFrames(
   const cached = frameCache.get(key);
   if (cached) return cached;
   const frames = Array.from({ length: count }, (_, seed) =>
-    qrPlaceholderFrame(qrJunkPayload(seed, junkLength), size)
+    encodeQrPath(qrJunkPayload(seed, junkLength), size)
   );
   frameCache.set(key, frames);
   return frames;

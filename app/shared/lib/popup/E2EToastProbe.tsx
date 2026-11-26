@@ -97,9 +97,9 @@ function showE2EStaticToastProbe(key: string, durationMs = 5_000): void {
   );
 }
 
-/** Mark a static toast only after HeroUI has rendered its component.
+/** Mark a static toast only after ToastHost has rendered its component.
  *
- * HeroUI toasts live in a FullWindowOverlay that iOS screenshots can see but
+ * Toasts live in a FullWindowOverlay that iOS screenshots can see but
  * serve-sim AX cannot. The bridge mounts this marker beside the real toast
  * component, then the ordinary screen probe below mirrors only its closed key
  * into the app AX tree. No message, description, or payment value crosses this
@@ -117,7 +117,7 @@ export function E2EStaticToastRenderMarker({
 
 /** Mirror a dynamic payment toast into the ordinary app tree.
  *
- * HeroUI owns the visible FullWindowOverlay toast, while serve-sim observes the
+ * ToastHost owns the visible FullWindowOverlay toast, while serve-sim observes the
  * ordinary React Native accessibility tree. This DEV-only marker publishes
  * closed lifecycle names and the existing View callback only. Payment ids,
  * amounts, mints, invoices, and copy never enter the bridge. */

@@ -7,9 +7,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { StyleSheet } from 'react-native';
 
-import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions, useColadaTransactionAnnotation } from 'wallet/react';
 import {
@@ -43,7 +43,7 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import {
   useSendReachability,
   useSendReachabilityStore,
@@ -321,12 +321,11 @@ export function SendTokenScreen({
         <>
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
-              <Alert status="warning" className="bg-surface-secondary">
-                <Alert.Content>
-                  <Alert.Title>{reachabilityWarning.title}</Alert.Title>
-                  <Alert.Description>{reachabilityWarning.description}</Alert.Description>
-                </Alert.Content>
-              </Alert>
+              <Notice
+                status="warning"
+                title={reachabilityWarning.title}
+                description={reachabilityWarning.description}
+              />
             </View>
           )}
 

@@ -2,7 +2,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, Share } from 'react-native';
 
-import { Button as HerouiButton } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -414,15 +414,15 @@ export const SettingsStorageScreen = () => {
               profile/account data and reports which currently exist.
             </Text>
             <View className="flex-row gap-2">
-              <HerouiButton
+              <PillButton
                 variant="secondary"
                 size="sm"
                 testID="settings-storage-refresh"
                 accessibilityState={{ busy: isRefreshing }}
                 onPress={() => loadSnapshot(true)}>
-                <HerouiButton.Label>Refresh</HerouiButton.Label>
-              </HerouiButton>
-              <HerouiButton
+                <PillButton.Label>Refresh</PillButton.Label>
+              </PillButton>
+              <PillButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isSharing}
@@ -430,11 +430,11 @@ export const SettingsStorageScreen = () => {
                 accessibilityLabel="Share Full Dump"
                 accessibilityState={{ disabled: isSharing, busy: isSharing }}
                 onPress={handleShareDump}>
-                <HerouiButton.Label>
+                <PillButton.Label>
                   {isSharing ? 'Exporting...' : 'Share Full Dump'}
-                </HerouiButton.Label>
-              </HerouiButton>
-              <HerouiButton
+                </PillButton.Label>
+              </PillButton>
+              <PillButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isCopyingLogs}
@@ -442,10 +442,10 @@ export const SettingsStorageScreen = () => {
                 accessibilityLabel="Copy Debug Logs"
                 accessibilityState={{ disabled: isCopyingLogs, busy: isCopyingLogs }}
                 onPress={handleCopyDebugLogs}>
-                <HerouiButton.Label>
+                <PillButton.Label>
                   {isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}
-                </HerouiButton.Label>
-              </HerouiButton>
+                </PillButton.Label>
+              </PillButton>
               <Button
                 variant="secondary"
                 size="compact"
@@ -477,14 +477,14 @@ export const SettingsStorageScreen = () => {
             </View>
             <Text size={12} className="text-foreground/70">
               Mirror logs to a file on the device so they survive offline, when the dev-server
-              console is unreachable. Export the file and evaluate it later with log-doctor.
+              console is unreachable. Export the file to share diagnostics when troubleshooting.
             </Text>
             <Text size={11} className="text-foreground/50">
               {fileLoggingEnabled ? 'Saving logs to file.' : 'Not saving.'}
               {logFileInfo.exists ? ` Stored: ${formatBytes(logFileInfo.bytes)}.` : ' No file yet.'}
             </Text>
             <View className="flex-row gap-2">
-              <HerouiButton
+              <PillButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isExportingLogs || !logFileInfo.exists}
@@ -495,10 +495,10 @@ export const SettingsStorageScreen = () => {
                   busy: isExportingLogs,
                 }}
                 onPress={handleExportLogFile}>
-                <HerouiButton.Label>
+                <PillButton.Label>
                   {isExportingLogs ? 'Exporting...' : 'Export Log File'}
-                </HerouiButton.Label>
-              </HerouiButton>
+                </PillButton.Label>
+              </PillButton>
               <Button
                 variant="secondary"
                 size="compact"

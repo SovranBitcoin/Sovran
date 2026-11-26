@@ -32,15 +32,10 @@ jest.mock('expo-router/drawer', () => ({
   useDrawerProgress: () => ({ get: () => mockProgress }),
 }));
 
-const MOCK_SURFACE = 'theme-surface';
 const MOCK_BORDER = 'theme-separator-secondary';
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
-  useThemeColor: () => [MOCK_SURFACE, MOCK_BORDER],
-}));
-
-jest.mock('@/shared/lib/color', () => ({
-  withAlpha: (color: string, value: number) => `${color}@${value}`,
+  useThemeColor: () => MOCK_BORDER,
 }));
 
 jest.mock('@/shared/lib/screenCornerRadius', () => ({
@@ -74,6 +69,7 @@ describe('drawer corner curve', () => {
     expect(overlay.props.pointerEvents).toBe('none');
     const flat = StyleSheet.flatten(overlay.props.style);
     expect(flat).toMatchObject({
+      backgroundColor: 'rgba(0,0,0,0.66)',
       borderTopLeftRadius: 55,
       borderBottomLeftRadius: 55,
       borderCurve: 'continuous',

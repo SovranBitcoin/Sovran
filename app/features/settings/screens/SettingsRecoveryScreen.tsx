@@ -50,9 +50,14 @@ import {
 } from '@/features/transactions/components/detail/timeline/timelineTheme';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { discoverMints } from '@/shared/lib/apiClient';
-import { fetchDiscoveredMintUrls } from '@/features/settings/lib/recoveryDiscovery';
-import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import {
+  discoverRecoveryMintUrls,
+  relayEventsReader,
+} from '@/features/settings/lib/recoveryDiscovery';
+import { hasFeature } from '@/shared/config/features';
+import { CocoManager } from '@/shared/lib/cashu/manager';
+import { useNostrClient } from '@/runtime/nostrClient';
+import { useRoutstrRecoveryCard } from '@/features/settings/lib/useRoutstrRecoveryCard';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -105,23 +110,16 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const { client: nostrClient } = useNostrClient();
 
-  // Legacy Routstr AI balance & pending-change reclaim (only shown when
-  // unclaimed credentials or pending payments still exist on this profile).
-  const hasAiLeftovers = useRoutstrStore(
-    (s) =>
-      Object.keys(s.pendingPayments).length > 0 ||
-      Object.values(s.legacyAccounts).some((a) => a.reclaimedAt == null && Boolean(a.apiKey))
+  // Routstr AI money still outside the wallet: the store's unfinished payments
+  // and archived credentials, and the records the removed SDK left behind.
+  const { card: aiCard, collect: collectAiLeftovers } = useRoutstrRecoveryCard(
+    !gateMode && !preview
   );
-  const [reclaimingAi, setReclaimingAi] = useState(false);
-  const [aiReclaimNote, setAiReclaimNote] = useState<string | null>(null);
-
   const handleReclaimAiLeftovers = async () => {
-    if (preview || locked || reclaimingAi) return;
-    setReclaimingAi(true);
-    setAiReclaimNote(null);
-    setAiReclaimNote(await collectAiLeftovers());
-    setReclaimingAi(false);
+    if (locked) return;
+    await collectAiLeftovers();
   };
 
   useEffect(() => {
@@ -134,12 +132,22 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     // enable "Search all mints", swipe immediately, and get an empty probe
     // list with no indication anything was still loading.
     setIsDiscovering(true);
-    void fetchDiscoveredMintUrls(
-      mints.map((m) => m.mintUrl),
-      discoverMints,
-      controller.signal
-    ).then((urls) => {
+    void discoverRecoveryMintUrls({
+      knownUrls: mints.map((m) => m.mintUrl),
+      fetchMints: discoverMints,
+      // The mint list this seed backed up to Nostr (NUT-27, as cashu.me
+      // writes it), read only and ahead of the directory's audited mints.
+      backup:
+        hasFeature('nostr') && nostrClient
+          ? {
+              readSeed: () => CocoManager.copyWalletSeed(),
+              fetchEvents: relayEventsReader(nostrClient),
+            }
+          : undefined,
+      signal: controller.signal,
+    }).then((urls) => {
       if (controller.signal.aborted) return;
+      cashuLog.info('recovery.discovery.complete', { candidates: urls.length });
       setDiscoveredMintUrls(urls);
       setIsDiscovering(false);
     });
@@ -147,7 +155,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       controller.abort();
       setIsDiscovering(false);
     };
-  }, [deepProbe, mints, preview]);
+  }, [deepProbe, mints, preview, nostrClient]);
 
   // Lock navigation when recovery is in progress.
   // Skipped in gateMode — the screen isn't mounted as a route at all, so
@@ -323,25 +331,32 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             iconColor={surfaceSecondary}
           />
         )}
-        {!gateMode && !preview && (hasAiLeftovers || aiReclaimNote) && (
+        {aiCard.kind === 'settled' && (
+          <Text testID="recovery-reclaim-ai-done" size={12} className="text-muted w-full px-4">
+            {aiCard.message}
+          </Text>
+        )}
+        {aiCard.kind !== 'hidden' && aiCard.kind !== 'settled' && (
           <VStack className="bg-surface-secondary w-full gap-2 rounded-2xl px-4 py-3">
             <VStack className="gap-0.5">
               <Text size={14} bold className="text-foreground">
                 Collect AI leftovers
               </Text>
-              <Text size={12} className="text-muted">
-                {aiReclaimNote ?? 'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
+              <Text testID="recovery-reclaim-ai-note" size={12} className="text-muted">
+                {aiCard.kind === 'unresolved'
+                  ? aiCard.message
+                  : aiCard.kind === 'loading'
+                    ? 'Checking this account for leftover AI ecash…'
+                    : 'Reclaim any unspent ecash left on previous Routstr AI nodes.'}
               </Text>
             </VStack>
-            {hasAiLeftovers && (
-              <Button
-                testID="recovery-reclaim-ai"
-                variant="secondary"
-                text={reclaimingAi ? 'Checking AI nodes…' : 'Collect AI leftovers'}
-                disabled={reclaimingAi || locked}
-                onPress={handleReclaimAiLeftovers}
-              />
-            )}
+            <Button
+              testID="recovery-reclaim-ai"
+              variant="secondary"
+              text={aiCard.kind === 'collecting' ? 'Checking AI nodes…' : 'Collect AI leftovers'}
+              disabled={aiCard.kind === 'collecting' || locked}
+              onPress={handleReclaimAiLeftovers}
+            />
           </VStack>
         )}
 
@@ -729,30 +744,3 @@ const MintRecoveryRow: React.FC<{
     </HStack>
   );
 };
-
-/** Sweep legacy Routstr balances and pending AI change into the wallet, and
- *  describe the outcome for the recovery card. Never rejects. */
-async function collectAiLeftovers(): Promise<string> {
-  try {
-    const [legacy, pendingRecovered] = await Promise.all([
-      reclaimRoutstrBalances(),
-      recoverPendingPayments(),
-    ]);
-    const collected = legacy.reclaimed + pendingRecovered;
-    const stillPendingPayments = Object.keys(useRoutstrStore.getState().pendingPayments).length;
-    const hasDeferred = legacy.deferred > 0 || stillPendingPayments > 0;
-    if (collected > 0) {
-      return hasDeferred
-        ? 'Collected available ecash. Some nodes did not answer — try again later.'
-        : 'Collected leftover AI ecash into your wallet.';
-    }
-    if (hasDeferred) return 'AI node did not answer. Your credentials are kept — try again later.';
-    return 'No leftover AI balance found.';
-  } catch (error) {
-    // Shown in the card instead of escaping the press handler unhandled.
-    cashuLog.warn('recovery.ai_reclaim.failed', {
-      error: error instanceof Error ? error.name : 'unknown',
-    });
-    return "Couldn't check AI nodes. Your credentials are kept — try again later.";
-  }
-}

@@ -58,9 +58,9 @@ const LEG_MOVES: Record<SwapLegLocalStatus, readonly SwapLegLocalStatus[]> = {
   // A melt whose inputs fell short is prepared again for a smaller invoice,
   // and paid from here: a leg left here with a melt settles from that melt.
   invoiceReady: ['melting', 'verifying', 'paymentPending', 'settling', 'failed'],
-  melting: ['invoiceReady', 'verifying', 'paymentPending', 'settling', 'failed'],
+  melting: ['invoiceReady', 'verifying', 'paymentPending', 'settling', 'done', 'failed'],
   verifying: ['settling', 'done', 'failed'],
-  paymentPending: ['settling', 'failed'],
+  paymentPending: ['settling', 'done', 'failed'],
   settling: ['done', 'failed'],
   done: [],
   failed: ['creatingInvoice'],
@@ -78,6 +78,8 @@ export interface SwapLeg {
   amount: number;
 
   // Correlation / recovery ids
+  /** Coco's parent mintSwap operation id (Coco nightly+). */
+  mintSwapOperationId?: string;
   mintQuoteId?: string;
   /** Coco's operation for this leg's mint quote; a settling leg is reconciled from it. */
   mintOperationId?: string;
@@ -174,6 +176,7 @@ interface SwapTransactionsActions {
     leg: Omit<SwapLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
   ) => string;
 
+  tagMintSwap: (groupId: string, legId: string, mintSwapOperationId: string) => void;
   tagMintQuote: (
     groupId: string,
     legId: string,
@@ -220,6 +223,7 @@ const PersistedLeg = z.looseObject({
   fromMintUrl: z.string().max(2048),
   toMintUrl: z.string().max(2048),
   amount: z.number().int().nonnegative(),
+  mintSwapOperationId: z.string().max(256).optional(),
   mintQuoteId: z.string().max(256).optional(),
   mintOperationId: z.string().max(256).optional(),
   meltQuoteId: z.string().max(256).optional(),
@@ -346,6 +350,17 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
             },
           };
         });
+      },
+
+      tagMintSwap: (groupId, legId, mintSwapOperationId) => {
+        if (!mintSwapOperationId) return;
+        storeLog.debug('store.swap_tx.tag_mint_swap', { groupId, legId, mintSwapOperationId });
+        set((state) =>
+          patchLeg(state, groupId, legId, (leg) => ({
+            ...leg,
+            mintSwapOperationId,
+          }))
+        );
       },
 
       tagMelt: (groupId, legId, { quoteId, operationId }) => {

@@ -53,12 +53,7 @@ jest.mock('@/shared/blocks/PaymentInfo', () => ({ PaymentInfo: () => null }));
 jest.mock('@/features/receive/components/ReceiveRailPlaceholder', () => ({
   ReceiveRailPlaceholder: () => null,
 }));
-jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
-jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
-jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
-jest.mock('@/shared/ui/composed/Section', () => ({ Section: 'Section' }));
-jest.mock('@/shared/ui/composed/CapsuleButton', () => ({ CapsuleButton: 'CapsuleButton' }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/composed/ListGroup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const host =
     (name: string) =>
@@ -73,14 +68,28 @@ jest.mock('heroui-native', () => {
       ItemTitle: host('Title'),
       ItemDescription: host('Description'),
     }),
+    Separator: () => null,
+  };
+});
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host =
+    (name: string) =>
+    ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) =>
+      ReactActual.createElement(name, props, children);
+  return {
     PressableFeedback: Object.assign(host('Pressable'), {
       Scale: host('Scale'),
       Ripple: () => null,
+      Highlight: () => null,
     }),
-    Separator: () => null,
-    Switch: host('Switch'),
   };
 });
+jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
+jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
+jest.mock('@/shared/ui/composed/Section', () => ({ Section: 'Section' }));
+jest.mock('@/shared/ui/composed/CapsuleButton', () => ({ CapsuleButton: 'CapsuleButton' }));
 
 const allAvailable = { onchain: true, bolt12: true, creq: true };
 function props(available = allAvailable): React.ComponentProps<typeof ReceiveUnifiedTab> {

@@ -2,7 +2,6 @@ import { ingestProfiles, ingestSearchHits } from "../src/facade/cache/ingest";
 import { describe, it, expect, vi } from "vitest";
 import { createNormalizingStore } from "../src/facade/cache/store";
 import { createNostrEntityCache } from "../src/facade/cache/entity-cache";
-import type { NaggFeedEvent } from "../src/map/feed";
 
 type Row = { a?: string; b?: string; n?: number };
 
@@ -159,77 +158,17 @@ describe("NostrEntityCache source ranking (nagg > primal > relay)", () => {
     // Freshness dominates: a newer profile edit is the truth regardless of tier.
     expect(cache.getProfile("pk")?.name).toBe("relay-new");
   });
-
-  it("a lower-ranked source never erases higher-ranked metrics", () => {
-    const cache = createNostrEntityCache();
-    cache.ingestNoteStats(
-      { n1: { likes: 9, reposts: 2, replies: 4, zaps: 1, satsZapped: 100 } },
-      "nagg",
-    );
-    // Relay reports a partial/poorer view — it must not erase nagg's counts.
-    cache.ingestNoteStats(
-      { n1: { likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 } },
-      "relay",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(9);
-    expect(cache.getNoteStats("n1")?.satsZapped).toBe(100);
-    // A nagg refresh (equal rank) is last-write-wins.
-    cache.ingestNoteStats(
-      { n1: { likes: 11, reposts: 2, replies: 4, zaps: 1, satsZapped: 100 } },
-      "nagg",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(11);
-  });
 });
 
-describe("NostrEntityCache notes + stats + clear", () => {
-  const note: NaggFeedEvent = {
-    id: "n1",
-    kind: 1,
-    pubkey: "pk",
-    content: "hello",
-    tags: [],
-    created_at: 50,
-  };
-
-  it("notes are immutable once cached", () => {
+describe("NostrEntityCache stats + clear", () => {
+  it("clears all stores on profile switch", () => {
     const cache = createNostrEntityCache();
-    cache.ingestNotes([note]);
-    cache.ingestNotes([{ ...note, content: "tampered" }]);
-    expect(cache.getNote("n1")?.content).toBe("hello");
-  });
-
-  it("note existence is never tier-gated: a fresh relay note is kept", () => {
-    const cache = createNostrEntityCache();
-    // A nagg-dominated cache already holds n1.
-    cache.ingestNotes([note]);
-    cache.ingestNoteStats(
-      { n1: { likes: 5, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 } },
-      "nagg",
-    );
-    // A brand-new reply arrives via relay (a NEW id nagg hasn't indexed).
-    const relayReply: NaggFeedEvent = {
-      ...note,
-      id: "r2",
-      content: "fresh relay reply",
-      created_at: 99,
-    };
-    cache.ingestNotes([relayReply]);
-    expect(cache.getNote("r2")?.content).toBe("fresh relay reply"); // never dropped
-  });
-
-  it("caches note stats and clears all stores on profile switch", () => {
-    const cache = createNostrEntityCache();
-    cache.ingestNotes([note]);
-    cache.ingestNoteStats(
-      { n1: { likes: 3, reposts: 1, replies: 2, zaps: 0, satsZapped: 0 } },
-      "nagg",
-    );
-    expect(cache.getNoteStats("n1")?.likes).toBe(3);
+    cache.ingestProfileMetadata({ pk: { name: "someone" } }, 100, "relay");
+    cache.ingestProfileStats({ pubkey: "pk", followers: 3 } as never);
+    expect(cache.getProfile("pk")?.name).toBe("someone");
     cache.clear();
-    expect(cache.getNote("n1")).toBeUndefined();
-    expect(cache.getNoteStats("n1")).toBeUndefined();
     expect(cache.getProfile("pk")).toBeUndefined();
+    expect(cache.getProfileStats("pk")).toBeUndefined();
   });
 });
 

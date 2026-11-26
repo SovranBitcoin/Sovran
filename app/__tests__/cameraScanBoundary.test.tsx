@@ -83,10 +83,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' 
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: { pubkey: 'ab'.repeat(32) } }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContextWithOverride: () => mockWallet,
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({

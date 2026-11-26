@@ -2,7 +2,7 @@
  * Blossom BUD-11 delete: signs a fresh `t=delete` auth per blob and sends
  * `DELETE /<sha256>` with `Authorization` + `X-SHA-256`. A 403/404 (not owner /
  * already gone) is surfaced non-fatally; an aborted signal short-circuits before
- * any request. Auth, NDK event, logger, and `fetch` are mocked.
+ * any request. Auth, logger, and `fetch` are mocked; the client's signer is a fake.
  */
 /* eslint-disable import/first */
 
@@ -22,26 +22,12 @@ jest.mock('@/shared/lib/nostr/media/blossomAuth', () => {
   };
 });
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  NDKEvent: class {
-    kind = 0;
-    content = '';
-    created_at = 0;
-    tags: string[][] = [];
-    async sign(): Promise<void> {}
-    rawEvent(): object {
-      return {};
-    }
-  },
-}));
-
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   nostrLog: { info: jest.fn(), warn: jest.fn() },
 }));
 
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { fakeClient, fakeSigner } from './helpers/fakeNostrClient';
 
 import { deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
 
@@ -51,7 +37,7 @@ const { buildBlossomAuthEvent } = (
   }
 ).__mocks;
 
-const ndkStub: NDK = Object.create(null);
+const clientStub = fakeClient({ signer: fakeSigner('a'.repeat(64)) });
 const SHA = 'a'.repeat(64);
 const mockFetch = jest.fn();
 
@@ -62,7 +48,7 @@ beforeEach(() => {
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 
-const baseOpts = () => ({ ndk: ndkStub, server: 'https://blossom.example', sha256: SHA });
+const baseOpts = () => ({ client: clientStub, server: 'https://blossom.example', sha256: SHA });
 
 describe('deleteFromBlossom', () => {
   it('signs a delete auth and DELETEs /<sha256> with the right headers', async () => {

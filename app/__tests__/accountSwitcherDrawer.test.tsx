@@ -97,7 +97,7 @@ jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
     isMissing: !mockCachedMetadata[pubkey],
   }),
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/lib/identity', () => ({

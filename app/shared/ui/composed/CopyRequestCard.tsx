@@ -7,7 +7,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { npubEncode } from 'nostr-tools/nip19';
-import { Button as HerouiButton } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -26,16 +26,16 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
             Choose a profile to view its existing keys. This does not switch your wallet or accept
             the documents.
           </Text>
-          <HerouiButton
+          <PillButton
             variant="secondary"
             isDisabled={!profile}
             testID="profile-recovery-select-root"
             accessibilityState={{ selected: !profile, disabled: !profile }}
             onPress={() => setProfile(null)}>
-            <HerouiButton.Label>Root recovery phrase</HerouiButton.Label>
-          </HerouiButton>
+            <PillButton.Label>Root recovery phrase</PillButton.Label>
+          </PillButton>
           {profiles.map((entry) => (
-            <HerouiButton
+            <PillButton
               key={entry.pubkey}
               variant="secondary"
               isDisabled={profile?.pubkey === entry.pubkey}
@@ -45,10 +45,10 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
                 disabled: profile?.pubkey === entry.pubkey,
               }}
               onPress={() => setProfile(entry)}>
-              <HerouiButton.Label>
+              <PillButton.Label>
                 {entry.cachedDisplayName || `Profile ${entry.accountIndex}`}
-              </HerouiButton.Label>
-            </HerouiButton>
+              </PillButton.Label>
+            </PillButton>
           ))}
           <Text className="text-muted">
             Keys alone may not recover all ecash. Keep this installation, mint information and

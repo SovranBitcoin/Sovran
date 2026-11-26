@@ -6,7 +6,7 @@ import {
   type NaggProfilesEnvelope,
 } from '../envelope';
 import type { RequestControls } from '../timeout';
-import type { ReadProvenance, TierOutcome } from '../tiers';
+import type { ReadProvenance } from '../tiers';
 import { parseProfileMetadata, type ProfileMetadata } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -57,11 +57,6 @@ export type SearchRequest = RequestControls & {
 export type ProfileSearchBundle = { hits: ProfileSearchHit[]; vertexFresh?: boolean | null };
 
 export type ResolvedProfileSearch = ProfileSearchBundle & { tier: NostrTier; provenance?: ReadProvenance };
-
-export interface SearchTier {
-  readonly tier: NostrTier;
-  searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;
-}
 
 /**
  * Build the ranked hits from a v2 `/nostr/search` envelope. The `pubkeys` list

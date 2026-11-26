@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MeshGradientView } from 'expo-mesh-gradient';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
+import { getBackgroundValues } from '@/shared/lib/theme/backgroundBlur';
 import { ReactNode, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, {
@@ -25,7 +25,7 @@ import {
 } from '@/shared/lib/theme/themeTransition';
 import { retainWallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
-import { useTheme } from '@/shared/providers/ThemeProvider';
+import { useTheme } from '@/runtime/theme';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from 'expo-blur';
@@ -263,17 +263,8 @@ interface AnimatedBackgroundViewProps {
 
 /**
  * An animated background component for use at the layout level.
- * Uses BackgroundContext shared values to animate blur transitions
- * when switching between tabs.
- *
- * Must be used within a BackgroundProvider.
- *
- * @example
- * <BackgroundProvider>
- *   <AnimatedBackgroundView>
- *     <NativeTabs>...</NativeTabs>
- *   </AnimatedBackgroundView>
- * </BackgroundProvider>
+ * Reads the shared background values (`useBackgroundConfig`) to animate
+ * blur transitions when switching between tabs.
  */
 export function AnimatedBackgroundView({
   children,
@@ -294,7 +285,7 @@ export function AnimatedBackgroundView({
     blurTint,
   });
 
-  const { fullBlurOpacity, backgroundOpacity, backgroundColor } = useBackgroundContext();
+  const { fullBlurOpacity, backgroundOpacity, backgroundColor } = getBackgroundValues();
 
   // Check if blur is supported on this device
   const blurSupported = supportsBlur();

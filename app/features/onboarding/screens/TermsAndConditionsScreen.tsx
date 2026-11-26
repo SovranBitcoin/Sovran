@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BackHandler, View } from 'react-native';
-import { Button as HerouiButton, ControlField, Label } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { ControlField, Label } from '@/shared/ui/primitives/Field';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -56,13 +57,13 @@ export function TermsAndConditionsScreen({
   if (showRecovery) return <SettingsProfileRecoveryScreen onBack={() => setShowRecovery(false)} />;
 
   const recovery = (
-    <HerouiButton
+    <PillButton
       variant="ghost"
       testID="legal-view-recovery"
       accessibilityLabel="View existing recovery information"
       onPress={onViewRecovery ?? (() => setShowRecovery(true))}>
-      <HerouiButton.Label>View existing recovery information</HerouiButton.Label>
-    </HerouiButton>
+      <PillButton.Label>View existing recovery information</PillButton.Label>
+    </PillButton>
   );
   if (settingsError) {
     return (

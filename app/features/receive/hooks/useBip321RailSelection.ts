@@ -2,7 +2,7 @@ import { accountMintUrls } from 'wallet';
 
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import { deriveBip321RailSelection } from '@/features/receive/lib/bip321RailSelection';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 
 export function useBip321RailSelection(unit: string) {
   const onchain = useReceiveMethodMint('onchain', unit);

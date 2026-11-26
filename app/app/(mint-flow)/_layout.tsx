@@ -12,7 +12,7 @@
  */
 
 import { Stack } from 'expo-router';
-import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
+import { FlowStack } from '../../config/flowLayoutOptions';
 
 const ADD_OPTIONS = { title: 'Add mints' };
 const INFO_OPTIONS = { title: 'Mint details' };
@@ -24,13 +24,13 @@ const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
 // visibility flip on mount remounts the screen in a loop inside modals
 export default function MintFlowLayout() {
   return (
-    <AndroidSheetFlowStack flow="(mint-flow)">
+    <FlowStack>
       <Stack.Screen name="add" options={ADD_OPTIONS} />
       <Stack.Screen name="info" options={INFO_OPTIONS} />
       <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
       <Stack.Screen name="history" options={HISTORY_OPTIONS} />
       <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
       <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
-    </AndroidSheetFlowStack>
+    </FlowStack>
   );
 }

@@ -9,19 +9,19 @@ import {
   type KeyboardEvent,
   type ScrollViewProps,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
   type TextInputSelectionChangeEventData,
 } from 'react-native';
-import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { BottomSheet } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from 'assets/icons';
 import { Button } from '@/shared/ui/primitives/Button';
+import { MenuTitle } from './sheetMenuRow';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
@@ -70,9 +70,8 @@ function isMentionSearchResult(result: SearchResultData): result is MentionSearc
 const mentionKeyExtractor = (item: MentionSearchResult) => item.pubkey;
 
 function renderMentionScrollComponent(props: ScrollViewProps) {
-  // This list is nested inside a fixed-height panel. Avoid BottomSheetScrollView
-  // here because its content-size setter can shrink the whole dynamic sheet
-  // when the search returns only one or two rows.
+  // This list is nested inside a fixed-height panel and scrolls on its own;
+  // the sheet around it fits its content.
   return <GestureScrollView {...props} nestedScrollEnabled />;
 }
 
@@ -107,7 +106,7 @@ export function getSendMemoMentionPanelHeight({
 
 export function SendMemoContent({ payload, close }: SendMemoContentProps): React.ReactElement {
   const initialMemo = payload.memo ?? '';
-  const inputRef = useRef<React.ElementRef<typeof BottomSheetTextInput> | undefined>(undefined);
+  const inputRef = useRef<TextInput>(null);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [memo, setMemo] = useState(initialMemo);
@@ -233,11 +232,9 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
   return (
     <View>
       <View onLayout={handleChromeLayout}>
-        <BottomSheet.Title className="text-foreground -mt-2 mb-1 ml-3 text-lg font-bold">
-          Add memo
-        </BottomSheet.Title>
+        <MenuTitle className="mb-1">Add memo</MenuTitle>
         <View style={styles.inputWrap}>
-          <BottomSheetTextInput
+          <TextInput
             ref={inputRef}
             value={memo}
             selection={selectionOverride}

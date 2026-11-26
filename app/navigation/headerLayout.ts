@@ -18,7 +18,7 @@ export const HEADER_TITLE_MIN_WIDTH = headerButtonSize * 2;
 /**
  * Widest a custom header title can be and still sit on the screen's centre line.
  *
- * UINavigationBar, AndroidX Toolbar and FlowSheetHeader all centre a title in the
+ * UINavigationBar and AndroidX Toolbar both centre a title in the
  * bar only while it clears the items on BOTH sides. react-native-screens sizes the
  * title view in a `space-between` row, so it may grow to the bar minus whatever
  * each side happens to hold; the native bar then slides a title that no longer

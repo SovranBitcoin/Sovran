@@ -4,12 +4,13 @@
  * The QR placeholder's junk frames: same length ⇒ same module density as the
  * real payload (that is the whole point of the length hint), every frame
  * distinct so the cycle visibly animates, path geometry identical to the
- * live react-native-qrcode-svg stroke.
+ * live QrMatrix stroke.
  */
 
 import { create as createQrCode } from 'qrcode';
 
 import {
+  encodeQrPath,
   qrJunkPayload,
   qrMatrixPath,
   qrPlaceholderFrames,
@@ -63,12 +64,32 @@ describe('qrPlaceholderFrames', () => {
 });
 
 describe('qrMatrixPath', () => {
-  it('draws one horizontal stroke per run of dark modules, like react-native-qrcode-svg', () => {
+  it('draws one horizontal stroke per run of dark modules, like the live QR', () => {
     // 3×3: row 0 = ■■□, row 1 = □□□, row 2 = ■□■
     const data = [1, 1, 0, 0, 0, 0, 1, 0, 1];
     const { d, cellSize } = qrMatrixPath(data, 3, 30);
     expect(cellSize).toBe(10);
     expect(d).toBe('M0 5 L20 5 M0 25 L10 25 M20 25 L30 25 ');
+  });
+});
+
+describe('encodeQrPath', () => {
+  it('encodes the live value at ECL M with no quiet zone, the same strokes as the placeholder', () => {
+    const { modules } = createQrCode(SAMPLE_UNIFIED_URI, { errorCorrectionLevel: 'M' });
+    const frame = encodeQrPath(SAMPLE_UNIFIED_URI, 240);
+    expect(frame.modules).toBe(modules.size);
+    expect(frame.cellSize).toBe(240 / modules.size);
+    expect(frame).toEqual({
+      modules: modules.size,
+      ...qrMatrixPath(modules.data, modules.size, 240),
+    });
+    // The first stroke starts at the matrix edge: no quiet-zone offset.
+    expect(frame.d.startsWith(`M0 ${frame.cellSize / 2} `)).toBe(true);
+  });
+
+  it('throws on input qrcode cannot encode, so the caller can render nothing', () => {
+    expect(() => encodeQrPath('', 100)).toThrow();
+    expect(() => encodeQrPath('a'.repeat(5000), 100)).toThrow();
   });
 });
 

@@ -1,5 +1,4 @@
 import { verifyNip05 } from 'wallet';
-import { EventEmitter } from 'node:events';
 import { nostrLog } from '@/shared/lib/logger';
 import type { PublishResult, PublishError } from '@/shared/lib/nostr/publish/types';
 import { errAsync, okAsync, ResultAsync, ok, type Result } from 'neverthrow';
@@ -18,7 +17,8 @@ import {
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import NDK from '@nostr-dev-kit/ndk-mobile';
+import type { RelaySubscriptionHandlers, UnsignedNostrEvent } from 'nostr/client';
+import { fakeClient, fakeSigned, fakeSigner, type FakeClient } from './helpers/fakeNostrClient';
 
 jest.mock('wallet', () => ({ ...jest.requireActual('wallet'), verifyNip05: jest.fn() }));
 
@@ -60,30 +60,14 @@ const mockDelete = jest.fn();
 jest.mock('@/shared/lib/nostr/publish/publishEvent', () => ({ publishEvent: jest.fn() }));
 /** The account's write relays this session's relay-list sync found, or null before it has. */
 let mockKnown: string[] | null;
-/** One relay object per url, as NDK's pool keeps them. */
-const mockRelayObjects = new Map<string, { url: string }>();
-const mockRelay = (url: string) => {
-  if (!mockRelayObjects.has(url)) mockRelayObjects.set(url, { url });
-  return mockRelayObjects.get(url)!;
-};
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
   getOwnWriteRelays: () => [],
   getKnownOwnWriteRelays: () => mockKnown,
 }));
 const mockSign = jest.fn(async (..._args: unknown[]) => {});
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  default: jest.fn(),
-  normalizeRelayUrl: (url: string) => url,
-  NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
-  NDKRelaySet: {
-    fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map(mockRelay)) }),
-  },
-  NDKEvent: class {
-    id = 'e'.repeat(64);
-    sign = (...args: unknown[]) => mockSign(...args);
-  },
-}));
+jest.mock('nostr-tools/pure', () =>
+  jest.requireActual('./helpers/fakeNostrClient').pureTrustingFakeEvents()
+);
 
 const pubkey = 'a'.repeat(64);
 const RELAY = 'wss://relay.example/';
@@ -94,8 +78,7 @@ const kind0 = (id: string, created_at: number, content: unknown) => ({
   id,
   created_at,
   content: typeof content === 'string' ? content : JSON.stringify(content),
-  getEventHash: () => id,
-  verifySignature: () => true,
+  sig: 'sig',
 });
 const accepted = {
   eventId: 'e'.repeat(64),
@@ -104,52 +87,58 @@ const accepted = {
   failed: [],
   relayResults: [],
 };
-/** One read of one relay (or, for the editor's pool read, of `RELAY`), as NDK hands it out. */
-type FakeSubscription = EventEmitter & {
+/** One read of one relay. */
+type FakeSubscription = {
   url: string;
-  relayFilters: Map<string, unknown[]>;
-  eosesSeen: Set<{ url: string }>;
   stop: jest.Mock;
-  start: jest.Mock;
+  /** The relay sends an event, or a bare EOSE. */
+  emit: (type: 'event' | 'eose', event?: unknown) => void;
   /** The relay has sent everything it holds. */
   eose: () => void;
 };
+/** The account's signer; each event it signs is told to `mockSign` first. */
+const ownSigner = () => {
+  const signer = fakeSigner(pubkey);
+  signer.sign.mockImplementation((template: UnsignedNostrEvent) => {
+    void mockSign(template);
+    return fakeSigned(template, pubkey);
+  });
+  return signer;
+};
 /**
- * An NDK whose every subscription is its own, so each relay answers, or stays
- * silent, on its own. What a relay does when a read of it starts is
- * `onStart`; by default it answers holding nothing.
+ * A client whose pool is `RELAY` and whose every read is its own, so each
+ * relay answers, or stays silent, on its own. What a relay does when a read of
+ * it starts is `onStart`; by default it answers holding nothing. A start that
+ * rejects is a socket that dropped.
  */
-const makeNdk = () => {
+const makeClient = (signer: unknown = ownSigner()) => {
   const subscriptions: FakeSubscription[] = [];
   const onStart = jest.fn(async (subscription: FakeSubscription) => subscription.eose());
-  const subscribe = jest.fn(
-    (_filter: unknown, _options: unknown, relaySet?: { relays: Set<{ url: string }> }) => {
-      const relays = relaySet ? [...relaySet.relays] : [mockRelay(RELAY)];
-      const subscription: FakeSubscription = Object.assign(new EventEmitter(), {
-        url: relays[0].url,
-        relayFilters: new Map(relays.map((relay) => [relay.url, []])),
-        eosesSeen: new Set<{ url: string }>(),
+  const subscribeRelay = jest.fn(
+    (url: string, _filters: unknown, handlers: RelaySubscriptionHandlers) => {
+      const subscription: FakeSubscription = {
+        url,
         stop: jest.fn(),
-        start: jest.fn(() => onStart(subscription)),
-        eose: () => {
-          for (const relay of relays) subscription.eosesSeen.add(relay);
-          subscription.emit('eose');
-        },
-      });
+        emit: (type, event) =>
+          type === 'event' ? handlers.onEvent(event as never) : handlers.onEose(),
+        eose: () => handlers.onEose(),
+      };
       subscriptions.push(subscription);
-      return subscription;
+      void Promise.resolve()
+        .then(() => onStart(subscription))
+        .catch((error: Error) => handlers.onError?.(error));
+      return { stop: subscription.stop };
     }
   );
-  return Object.assign(new NDK(), {
-    signer: { user: async () => ({ pubkey }) },
-    subscribe,
-    subscriptions,
-    onStart,
-  });
+  const client: FakeClient = fakeClient({ signer, relays: [RELAY], subscribeRelay });
+  return Object.assign(client, { subscribeRelay, subscriptions, onStart });
 };
-const publish = (ndk: NDK = makeNdk(), initialLoad: OwnProfileLoadResult = { status: 'absent' }) =>
+const publish = (
+  client: FakeClient = makeClient(),
+  initialLoad: OwnProfileLoadResult = { status: 'absent' }
+) =>
   publishOwnProfileMetadata({
-    ndk,
+    client,
     pubkey,
     accountIndex: 0,
     patch: { name: 'New', picture: null },
@@ -199,8 +188,8 @@ it('all-failed rolls back the overlay without a profile or cache write', async (
   expect(mockDelete).not.toHaveBeenCalled();
 });
 it('no signer returns a typed error without an overlay', async () => {
-  const ndk = new NDK();
-  expect((await publish(ndk))._unsafeUnwrapErr()).toEqual({ type: 'no-signer' });
+  const client = makeClient(null);
+  expect((await publish(client))._unsafeUnwrapErr()).toEqual({ type: 'no-signer' });
   expect(publishEvent).not.toHaveBeenCalled();
   expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
 });
@@ -213,9 +202,9 @@ it('duplicate saves join the same operation and publish only once', async () => 
       })
     )
   );
-  const ndk = makeNdk();
-  const first = publish(ndk);
-  const second = publish(ndk);
+  const client = makeClient();
+  const first = publish(client);
+  const second = publish(client);
   expect(first).toBe(second);
   for (let i = 0; i < 20 && !finish; i++) await Promise.resolve();
   // Allow the bounded base lookup and signing to reach the publish seam.
@@ -240,8 +229,8 @@ it('a same-id relay echo is idempotent and an older echo cannot regress the prof
 });
 it('a profile switch during the base lookup prevents publishing', async () => {
   let finish!: () => void;
-  const ndk = makeNdk();
-  ndk.onStart.mockImplementation(
+  const client = makeClient();
+  client.onStart.mockImplementation(
     (subscription) =>
       new Promise((resolve) => {
         finish = () => {
@@ -250,7 +239,7 @@ it('a profile switch during the base lookup prevents publishing', async () => {
         };
       })
   );
-  const result = publish(ndk);
+  const result = publish(client);
   await new Promise((resolve) => setTimeout(resolve, 0));
   const listener = jest.mocked(useProfileStore.subscribe).mock.calls.at(-1)![0];
   const spy = jest
@@ -264,15 +253,15 @@ it('a profile switch during the base lookup prevents publishing', async () => {
 });
 it('a stalled base fetch settles at three seconds and retains the local snapshot', async () => {
   jest.useFakeTimers();
-  const ndk = makeNdk();
-  ndk.onStart.mockImplementation(() => new Promise(() => {}));
+  const client = makeClient();
+  client.onStart.mockImplementation(() => new Promise(() => {}));
   const latest = { content: { about: 'keep' }, createdAt: 20, eventId: 'b'.repeat(64) };
   useOwnProfileMetadataStore.getState().setLatest(latest);
-  const loading = loadOwnProfileMetadata(ndk, pubkey);
+  const loading = loadOwnProfileMetadata(client, pubkey);
   await jest.advanceTimersByTimeAsync(3000);
   expect(await loading).toEqual({ status: 'found', snapshot: latest });
-  expect(ndk.subscriptions).toHaveLength(1);
-  expect(ndk.subscriptions[0].stop).toHaveBeenCalledTimes(1);
+  expect(client.subscriptions).toHaveLength(1);
+  expect(client.subscriptions[0].stop).toHaveBeenCalledTimes(1);
   jest.useRealTimers();
 });
 
@@ -280,8 +269,8 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
   useOwnProfileMetadataStore
     .getState()
     .setLatest({ content: { about: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) });
-  const ndk = makeNdk();
-  ndk.onStart.mockImplementation(async (subscription) => {
+  const client = makeClient();
+  client.onStart.mockImplementation(async (subscription) => {
     subscription.emit(
       'event',
       kind0('c'.repeat(64), 20, {
@@ -293,7 +282,7 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
     );
     subscription.eose();
   });
-  await publish(ndk);
+  await publish(client);
   const event = jest.mocked(publishEvent).mock.calls[0][0].event;
   expect(JSON.parse(event.content)).toEqual({
     name: 'handle',
@@ -304,15 +293,11 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
   expect(event.created_at).toBeGreaterThan(20);
 });
 it('signer rejection does not publish or leave an overlay', async () => {
-  const ndk = new NDK();
-  Object.assign(ndk, {
-    signer: {
-      user: async () => {
-        throw new Error('denied');
-      },
-    },
+  const signer = fakeSigner(pubkey);
+  signer.sign.mockImplementation(() => {
+    throw new Error('denied');
   });
-  expect((await publish(ndk))._unsafeUnwrapErr().type).toBe('sign-failed');
+  expect((await publish(makeClient(signer)))._unsafeUnwrapErr().type).toBe('sign-failed');
   expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
   expect(publishEvent).not.toHaveBeenCalled();
 });
@@ -352,9 +337,9 @@ it('refuses a timed-out base lookup when a cached name proves a profile exists',
       cachedDisplayName: 'Existing',
     }),
   });
-  const ndk = makeNdk();
-  ndk.onStart.mockImplementation(() => new Promise(() => {}));
-  const pending = publish(ndk);
+  const client = makeClient();
+  client.onStart.mockImplementation(() => new Promise(() => {}));
+  const pending = publish(client);
   // The only relay is read again until it counts as silent, and once more.
   await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
   const result = await pending;
@@ -366,25 +351,23 @@ it('refuses a timed-out base lookup when a cached name proves a profile exists',
 });
 
 it('publishes an empty base only after mount and save both receive empty relay EOSE', async () => {
-  const ndk = makeNdk();
-  const initialLoad = await loadOwnProfileMetadata(ndk, pubkey);
+  const client = makeClient();
+  const initialLoad = await loadOwnProfileMetadata(client, pubkey);
   expect(initialLoad).toEqual({ status: 'absent' });
-  expect((await publish(ndk, initialLoad)).isOk()).toBe(true);
-  expect(ndk.subscribe).toHaveBeenCalledTimes(2);
+  expect((await publish(client, initialLoad)).isOk()).toBe(true);
+  expect(client.subscribeRelay).toHaveBeenCalledTimes(2);
   // The editor's fields come from the pool; the save reads each write relay.
-  expect(ndk.subscribe).toHaveBeenNthCalledWith(
+  expect(client.subscribeRelay).toHaveBeenNthCalledWith(
     1,
-    { kinds: [0], authors: [pubkey] },
-    { cacheUsage: 'ONLY_RELAY', closeOnEose: false },
-    undefined,
-    false
+    RELAY,
+    [{ kinds: [0], authors: [pubkey] }],
+    expect.anything()
   );
-  expect(ndk.subscribe).toHaveBeenNthCalledWith(
+  expect(client.subscribeRelay).toHaveBeenNthCalledWith(
     2,
-    { kinds: [0], authors: [pubkey] },
-    { cacheUsage: 'ONLY_RELAY', closeOnEose: false },
-    { relays: new Set([mockRelay(RELAY)]) },
-    false
+    RELAY,
+    [{ kinds: [0], authors: [pubkey] }],
+    expect.anything()
   );
   expect(JSON.parse(jest.mocked(publishEvent).mock.calls[0][0].event.content)).toEqual({
     name: 'New',
@@ -392,7 +375,7 @@ it('publishes an empty base only after mount and save both receive empty relay E
   });
 });
 it('refuses an empty save lookup after an unavailable mount lookup', async () => {
-  expect((await publish(makeNdk(), { status: 'unavailable' }))._unsafeUnwrapErr().type).toBe(
+  expect((await publish(makeClient(), { status: 'unavailable' }))._unsafeUnwrapErr().type).toBe(
     'base-unavailable'
   );
   expect(publishEvent).not.toHaveBeenCalled();
@@ -410,35 +393,32 @@ it.each(['cachedDisplayName', 'cachedPicture'] as const)(
     expect(publishEvent).not.toHaveBeenCalled();
   }
 );
-it.each(['timeout', 'error', 'invalid', 'synthetic-eose'])(
-  'does not classify %s as no kind-0',
-  async (failure) => {
-    jest.useFakeTimers();
-    const ndk = makeNdk();
-    ndk.onStart.mockImplementation(async (subscription) => {
-      if (failure === 'error') throw new Error('offline');
-      if (failure === 'invalid') {
-        subscription.emit('event', kind0('c'.repeat(64), 20, 'not json'));
-        subscription.eose();
-      }
-      if (failure === 'synthetic-eose') subscription.emit('eose');
-    });
-    const pending = publish(ndk);
-    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
-    const result = await pending;
-    jest.useRealTimers();
-    expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
-    expect(ndk.subscriptions.length).toBeGreaterThan(0);
-    for (const subscription of ndk.subscriptions) expect(subscription.stop).toHaveBeenCalled();
-    expect(publishEvent).not.toHaveBeenCalled();
-  }
-);
+// Each read is of one relay, so an EOSE always is that relay's own.
+it.each(['timeout', 'error', 'invalid'])('does not classify %s as no kind-0', async (failure) => {
+  jest.useFakeTimers();
+  const client = makeClient();
+  client.onStart.mockImplementation(async (subscription) => {
+    if (failure === 'error') throw new Error('offline');
+    if (failure === 'invalid') {
+      subscription.emit('event', kind0('c'.repeat(64), 20, 'not json'));
+      subscription.eose();
+    }
+  });
+  const pending = publish(client);
+  await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
+  const result = await pending;
+  jest.useRealTimers();
+  expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
+  expect(client.subscriptions.length).toBeGreaterThan(0);
+  for (const subscription of client.subscriptions) expect(subscription.stop).toHaveBeenCalled();
+  expect(publishEvent).not.toHaveBeenCalled();
+});
 
 it('waits for the relay list before reading or saving', async () => {
   mockKnown = null;
-  const ndk = makeNdk();
-  expect((await publish(ndk))._unsafeUnwrapErr().type).toBe('base-unavailable');
-  expect(ndk.subscribe).not.toHaveBeenCalled();
+  const client = makeClient();
+  expect((await publish(client))._unsafeUnwrapErr().type).toBe('base-unavailable');
+  expect(client.subscribeRelay).not.toHaveBeenCalled();
   expect(publishEvent).not.toHaveBeenCalled();
 });
 it('clamps a future base and logs only its delta once per publish', async () => {
@@ -468,8 +448,8 @@ it('clamps a future base and logs only its delta once per publish', async () => 
 
 it('of two profiles from the same second, takes the one with the lower id, remote or saved', async () => {
   const emitting = (...events: { id: string; about: string }[]) => {
-    const ndk = makeNdk();
-    ndk.onStart.mockImplementation(async (subscription) => {
+    const client = makeClient();
+    client.onStart.mockImplementation(async (subscription) => {
       for (const { id, about } of events)
         subscription.emit('event', {
           pubkey,
@@ -480,7 +460,7 @@ it('of two profiles from the same second, takes the one with the lower id, remot
         });
       subscription.eose();
     });
-    return ndk;
+    return client;
   };
   const low = 'c'.repeat(64);
   const high = 'd'.repeat(64);
@@ -508,7 +488,7 @@ it('refuses a changed identity before publishing when the domain does not match'
     .mocked(verifyNip05)
     .mockResolvedValue({ status: 'mismatch', identifier: 'alice@example.com' });
   const result = await publishOwnProfileMetadata({
-    ndk: makeNdk(),
+    client: makeClient(),
     pubkey,
     accountIndex: 0,
     patch: { nip05: 'alice@example.com' },
@@ -524,7 +504,7 @@ it('publishes only a freshly verified identity for the signing key', async () =>
     .mocked(verifyNip05)
     .mockResolvedValue({ status: 'verified', identifier: 'alice@example.com' });
   const result = await publishOwnProfileMetadata({
-    ndk: makeNdk(),
+    client: makeClient(),
     pubkey,
     accountIndex: 0,
     patch: { nip05: 'Alice@Example.com' },
@@ -537,7 +517,7 @@ it('publishes only a freshly verified identity for the signing key', async () =>
 
 it('allows removing an identity without network verification', async () => {
   const result = await publishOwnProfileMetadata({
-    ndk: makeNdk(),
+    client: makeClient(),
     pubkey,
     accountIndex: 0,
     patch: { nip05: null },
@@ -553,14 +533,14 @@ describe('the profile a save builds on, and where it is sent', () => {
     jest.useFakeTimers();
     const TWO = 'wss://two.example/';
     mockKnown = [RELAY, TWO];
-    const ndk = makeNdk();
-    ndk.onStart.mockImplementation(async (subscription) => {
+    const client = makeClient();
+    client.onStart.mockImplementation(async (subscription) => {
       // Relay two holds the newer profile and never answers.
       if (subscription.url !== RELAY) return;
       subscription.emit('event', kind0('c'.repeat(64), 20, { name: 'Old' }));
       subscription.eose();
     });
-    const pending = publish(ndk);
+    const pending = publish(client);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
     expect(publishEvent).not.toHaveBeenCalled();
 
@@ -578,12 +558,12 @@ describe('the profile a save builds on, and where it is sent', () => {
 
   it('builds on the profile the editor opened on when it is newer than what the relays read hold', async () => {
     const opened = { content: { about: 'opened' }, createdAt: 30, eventId: 'd'.repeat(64) };
-    const ndk = makeNdk();
-    ndk.onStart.mockImplementation(async (subscription) => {
+    const client = makeClient();
+    client.onStart.mockImplementation(async (subscription) => {
       subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'older' }));
       subscription.eose();
     });
-    await publish(ndk, { status: 'found', snapshot: opened });
+    await publish(client, { status: 'found', snapshot: opened });
     const { event } = jest.mocked(publishEvent).mock.calls[0][0];
     expect(JSON.parse(event.content)).toMatchObject({ about: 'opened' });
     expect(event.created_at).toBeGreaterThan(30);
@@ -593,16 +573,16 @@ describe('the profile a save builds on, and where it is sent', () => {
 describe('silence accounting at a fixed clock', () => {
   it('does not exclude a relay after overlapping same-clock failures', async () => {
     jest.useFakeTimers();
-    const ndk = makeNdk();
-    ndk.onStart.mockRejectedValue(new Error('offline'));
+    const client = makeClient();
+    client.onStart.mockRejectedValue(new Error('offline'));
     const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
     await Promise.all(
-      Array.from({ length: 3 }, () => readNewestOwnEvent(ndk, pubkey, 0, { relays: [RELAY] }))
+      Array.from({ length: 3 }, () => readNewestOwnEvent(client, pubkey, 0, { relays: [RELAY] }))
     );
-    ndk.onStart.mockImplementation(async (subscription) => {
+    client.onStart.mockImplementation(async (subscription) => {
       if (subscription.url !== RELAY) subscription.eose();
     });
-    const reading = readNewestOwnEvent(ndk, pubkey, 0, {
+    const reading = readNewestOwnEvent(client, pubkey, 0, {
       relays: [RELAY, 'wss://healthy.example/'],
       leaveOutSilent: true,
     });
@@ -615,19 +595,19 @@ describe('silence accounting at a fixed clock', () => {
 
 it('excludes after sequential same-clock failures and restores on a late answer', async () => {
   jest.useFakeTimers();
-  const ndk = makeNdk();
-  ndk.onStart.mockRejectedValue(new Error('offline'));
+  const client = makeClient();
+  client.onStart.mockRejectedValue(new Error('offline'));
   const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
-  for (let i = 0; i < 3; i++) await readNewestOwnEvent(ndk, pubkey, 0, { relays: [RELAY] });
-  ndk.onStart.mockImplementation(async (subscription) => {
+  for (let i = 0; i < 3; i++) await readNewestOwnEvent(client, pubkey, 0, { relays: [RELAY] });
+  client.onStart.mockImplementation(async (subscription) => {
     if (subscription.url !== RELAY) subscription.eose();
   });
   const relays = [RELAY, 'wss://healthy.example/'];
-  const read = await readNewestOwnEvent(ndk, pubkey, 0, { relays, leaveOutSilent: true });
+  const read = await readNewestOwnEvent(client, pubkey, 0, { relays, leaveOutSilent: true });
   expect(read).toMatchObject({ outcome: 'complete', relays: ['wss://healthy.example/'] });
   // The excluded probe answers after the read returned. Next read must wait for it.
-  ndk.subscriptions.at(-2)!.eose();
-  const next = readNewestOwnEvent(ndk, pubkey, 0, { relays, leaveOutSilent: true });
+  client.subscriptions.at(-2)!.eose();
+  const next = readNewestOwnEvent(client, pubkey, 0, { relays, leaveOutSilent: true });
   await jest.advanceTimersByTimeAsync(12_000);
   expect((await next).outcome).toBe('timed-out');
   clock.mockRestore();
@@ -637,22 +617,22 @@ it('excludes after sequential same-clock failures and restores on a late answer'
 it('returns waiting after bounded alternating relay timeouts without publishing a partial base', async () => {
   jest.useFakeTimers();
   mockKnown = [RELAY, 'wss://alternating.example/'];
-  const ndk = makeNdk();
+  const client = makeClient();
   let attempt = 0;
-  ndk.onStart.mockImplementation(async (subscription) => {
+  client.onStart.mockImplementation(async (subscription) => {
     if (subscription.url === RELAY) attempt++;
     if ((attempt % 2 === 0) === (subscription.url === RELAY)) subscription.eose();
     else subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'partial' }));
   });
   let settled = false;
-  const pending = publish(ndk);
+  const pending = publish(client);
   void pending.then(() => {
     settled = true;
   });
   await jest.advanceTimersByTimeAsync(48_001);
   const bounded = settled;
   // Always drain the pre-fix worker too, so a red assertion leaves no flight behind.
-  ndk.onStart.mockImplementation(async (subscription) => subscription.eose());
+  client.onStart.mockImplementation(async (subscription) => subscription.eose());
   await jest.advanceTimersByTimeAsync(12_001);
   const result = await pending;
   jest.useRealTimers();
@@ -667,7 +647,7 @@ it.each(['identity verification', 'signing'])(
     const before = { content: { about: 'Old' }, createdAt: 20, eventId: 'c'.repeat(64) };
     const newer = { content: { about: 'Newest' }, createdAt: 21, eventId: 'b'.repeat(64) };
     useOwnProfileMetadataStore.getState().setLatest(before);
-    const ndk = makeNdk();
+    const client = makeClient();
     const update = () => useOwnProfileMetadataStore.getState().setLatest(newer);
     jest.mocked(verifyNip05).mockImplementation(async () => {
       if (phase === 'identity verification') update();
@@ -678,7 +658,7 @@ it.each(['identity verification', 'signing'])(
     });
     const save = () =>
       publishOwnProfileMetadata({
-        ndk,
+        client,
         pubkey,
         accountIndex: 0,
         patch: { name: 'New', nip05: 'alice@example.com' },
@@ -699,12 +679,12 @@ it.each(['identity verification', 'signing'])(
 );
 
 it('does not commit profile success after its signer was replaced during publish', async () => {
-  const ndk = makeNdk();
+  const client = makeClient();
   jest.mocked(publishEvent).mockImplementation(() => {
-    Object.assign(ndk, { signer: { user: async () => ({ pubkey }) } });
+    client.signer = ownSigner();
     return okAsync(accepted);
   });
-  expect((await publish(ndk))._unsafeUnwrapErr().type).toBe('profile-changed');
+  expect((await publish(client))._unsafeUnwrapErr().type).toBe('profile-changed');
   expect(mockUpdate).not.toHaveBeenCalled();
   expect(useOwnProfileMetadataStore.getState().latest).toBeNull();
 });

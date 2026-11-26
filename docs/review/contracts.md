@@ -50,7 +50,7 @@ empty defaults. Relevant schemas/migrations may be outside the supplied window: 
 
 Retry publication of the same signed event with its original event id; re-signing or changing the
 payload creates another event. Signing a genuinely new user action is allowed.
-`app/shared/lib/nostr/publish/publishEvent.ts` owns retries.
+`nostr/src/client/relayPool.ts` and `app/shared/lib/nostr/publishGiftWrappedDM.ts` own relay publication.
 
 The first relay OK may mark local optimistic publication successful while background fanout
 continues. It is not recipient receipt or guaranteed global delivery. This is intentional in
@@ -76,11 +76,11 @@ chat strips, and `icon` and `action` cover a custom glyph and a trailing recover
 hand-built equivalent drifts: it is how `#f59e0b` and a private 8% danger tint reached the app.
 
 Distinct shapes with their own owners are not notices and must not be folded into one: full-screen
-error and empty states (`EmptyState`), the screen-wide offline banner in `OfflineProvider`,
+error and empty states (`EmptyState`), the screen-wide offline banner in `OfflineShell`,
 interactive call-to-action cards, badges and pills carrying no status sentence, per-field
 validation text under an input, and bare tinted copy with no surface of its own.
 
 A small named component whose body is a `Notice` fixed at one surface's geometry is the intended
-way to share that geometry across call sites — `TransferErrorBanner` and `ChatStatusStrip` are the
-examples. Notice's own implementation and the design-system catalogue screens under
+way to share that geometry across call sites — `TransferErrorBanner` is the
+example. Notice's own implementation and the design-system catalogue screens under
 `app/features/settings` are excluded by definition.

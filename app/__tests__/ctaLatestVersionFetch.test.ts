@@ -20,7 +20,7 @@ jest.mock('expo-application', () => ({
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({
   useBootMorphCompleted: () => mockBootDone,
 }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockIsOffline }),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ getLatestVersion: jest.fn() }));

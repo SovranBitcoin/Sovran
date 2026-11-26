@@ -1,54 +1,44 @@
 /**
- * @fileoverview Live relay connection health from the NDK pool.
+ * @fileoverview Live relay connection health from the account's Nostr client.
  *
- * Maps each pool relay's `connectivity.status` (an `NDKRelayStatus`) to a small
- * UI-facing state. Polled on a short interval (NDK mutates status outside React)
- * so the relay-management screen's status dots stay current. NIP-66 monitor
- * events are out of scope; this reflects the app's own live connections.
+ * Maps each pool relay's status to a small UI-facing state, updated on every
+ * `relay:status` change so the relay-management screen's status dots stay
+ * current. NIP-66 monitor events are out of scope; this reflects the app's
+ * own live connections.
  */
 import { useEffect, useState } from 'react';
+import type { NostrClient, RelayHealth as ClientRelayHealth } from 'nostr/client';
 
-import { NDKRelayStatus, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNostrClient } from '@/runtime/nostrClient';
 
 export type RelayHealth = 'connected' | 'connecting' | 'disconnected' | 'failed';
 
-const POLL_MS = 2_000;
+const fromClient: Record<ClientRelayHealth, RelayHealth> = {
+  connected: 'connected',
+  connecting: 'connecting',
+  flapping: 'failed',
+  disconnected: 'disconnected',
+};
 
-function mapStatus(status: NDKRelayStatus | undefined): RelayHealth {
-  switch (status) {
-    case NDKRelayStatus.CONNECTED:
-    case NDKRelayStatus.AUTHENTICATED:
-      return 'connected';
-    case NDKRelayStatus.CONNECTING:
-    case NDKRelayStatus.RECONNECTING:
-    case NDKRelayStatus.AUTH_REQUESTED:
-    case NDKRelayStatus.AUTHENTICATING:
-      return 'connecting';
-    case NDKRelayStatus.FLAPPING:
-      return 'failed';
-    default:
-      return 'disconnected';
+function readHealth(client: NostrClient): Record<string, RelayHealth> {
+  const next: Record<string, RelayHealth> = {};
+  for (const [url, status] of Object.entries(client.getRelayHealth())) {
+    next[url] = fromClient[status];
   }
+  return next;
 }
 
-/** Returns a `url → health` map for the current NDK pool relays. */
+/** Returns a `url → health` map for the current pool relays. */
 export function useRelayHealth(): Record<string, RelayHealth> {
-  const { ndk } = useNDK();
+  const { client } = useNostrClient();
   const [health, setHealth] = useState<Record<string, RelayHealth>>({});
 
   useEffect(() => {
-    if (!ndk?.pool) return;
-    const read = () => {
-      const next: Record<string, RelayHealth> = {};
-      for (const [url, relay] of ndk.pool.relays) {
-        next[url] = mapStatus(relay.connectivity?.status);
-      }
-      setHealth(next);
-    };
+    if (!client) return;
+    const read = () => setHealth(readHealth(client));
     read();
-    const interval = setInterval(read, POLL_MS);
-    return () => clearInterval(interval);
-  }, [ndk]);
+    return client.on('relay:status', read);
+  }, [client]);
 
   return health;
 }

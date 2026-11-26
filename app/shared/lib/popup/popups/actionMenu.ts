@@ -1,7 +1,6 @@
 /**
  * Imperative action-menu popup — the canonical "pick one of N" surface across
- * the app. Dispatches a payload that `<ActionMenuHost />` renders as a
- * heroui-native Menu in bottom-sheet mode.
+ * the app. Dispatches a payload that `<ActionMenuHost />` renders in its sheet.
  *
  * Usage (plain):
  *

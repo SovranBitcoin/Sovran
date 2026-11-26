@@ -121,63 +121,20 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-04** — legacy encrypted DMs with decrypt cache (`unrecommended` upstream; kept for backwards compatibility)
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
-  - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread, notification, and DM-envelope queries served for fast app views. The default deployment is Nagg (self-hostable); the app queries it through the [`@sovranbitcoin/nagg-ts`](https://github.com/SovranBitcoin/nagg-ts) GraphQL client, with optimized REST app-view endpoints used where available (e.g. DM envelopes). Nagg forwards encrypted DM envelopes without decrypting their content; routing and connection metadata remain observable.
+  - [x] **Direct Nostr client (`nostr/client`)** — WebSocket relay pool, signing, NIP-44 encryption, and NIP-17 payment inbox directly over `nostr-tools` (no NDK)
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities
 - [x] **Profile switcher in drawer** — header avatar opens the drawer; drawer hosts the profile chrome
-- [x] **Feed** (`kind 1` text notes per NIP-01)
-  - [x] **Home timeline** with follow graph (`kind 3` contact lists)
-  - [x] **Threads** with measured exit-shimmer skeletons while replies stream in
-  - [x] **Image overlay** — tap an image in a note to open the fullscreen lightbox with zoom/pan
-  - [x] **Video player** — inline Nostr video posts with autoplay and unmute on overlay
-  - [x] **Reactions (NIP-25, `kind 7`)** — `+` likes and emoji reactions
-  - [x] **Reposts (NIP-18, `kind 6`)** — share a `kind 1` text note to your own followers
-  - [x] **Link parsing** — hyperlinks rendered with preview affordances
-  - [x] **Image grid layout** — multi-image posts with adaptive grid
-  - [x] **Ignore post / person** — mute a note or author from the thread view; the feed reactively hides ignored content
-- [x] **Notifications & follows**
-  - [x] **Notifications tab** — likes, reposts, replies, mentions, and zaps with All / Mentions / App filters and a policy menu
-  - [x] **Follows & followers** — browse a profile's follow graph and open any entry
-- [x] **Unified cross-surface search** — one search box on Wallet, Contacts, and Feed with scope tabs (All / Contacts / Feed / Posts), aggregated results, and recents on an empty query
-
-### AI
-
-<!-- code: features/ai/screens/AiChatScreen.tsx; features/ai/hooks/useAiSend.ts; features/ai/components/AiHeaderTitle.tsx; features/ai/components/ModelChip.tsx; features/ai/lib/format.ts; shared/lib/routstr/api.ts; shared/stores/profile/routstrStore.ts -->
-
-- [x] **Routstr integration** — [Routstr](https://routstr.com) is a decentralized reverse proxy that fronts OpenAI-compatible LLM providers and bills per request in Cashu; Sovran uses your wallet as the funding source so there's no separate billing account
-- [x] **Cashu-token top-up** — `colada` mints a Cashu token from your wallet and deposits it as Routstr balance; subsequent calls are paid out of that balance
-- [x] **Model picker** — switch between models in chat
-- [x] **Streaming responses** — token-by-token rendering
-- [x] **AI chat as a tab** — first-class tab, not a settings page
-- [x] **Pull-to-AI refresh** — pull-down gesture from the wallet surface to jump into AI (currently shipping)
-- [x] **AI wallpaper backdrop** — tiled pattern wallpaper behind the chat surface
 
 ### BitChat (local BLE mesh)
 
-<!-- code: modules/bitchat-module/src/BitChatModule.ts; modules/bitchat-module/ios/BitChatBLEBridge.swift; modules/bitchat-module/ios/BitChatNostrBridge.swift; modules/bitchat-module/ios/ProfileScopedBitchatKeychain.swift; features/bitchat/hooks/useBitChat.ts; features/bitchat/hooks/useBLEPeers.ts; features/bitchat/screens/GeohashChatScreen.tsx; features/user/screens/UserMessagesScreen.tsx; features/bitchat/stores/bitchatDmMessages.ts -->
+<!-- code: modules/bitchat-module/src/BitChatModule.ts; modules/bitchat-module/ios/BitChatBLEBridge.swift; modules/bitchat-module/ios/BitChatNostrBridge.swift; modules/bitchat-module/ios/ProfileScopedBitchatKeychain.swift; features/bitchat/hooks/useBitChat.ts; features/bitchat/hooks/useBLEPeers.ts -->
 
 - [x] **Native BitChat module** — local iOS `bitchat-module` bridging BLE mesh transport; Android exports degrade gracefully while the native bridge remains iOS-focused
-- [x] **Private DMs over BLE** — peer-to-peer encrypted DMs with no relay, no internet
-- [x] **Group chats over BLE** — multi-peer chats on the mesh
-- [x] **Geohash chat rooms** — public location-bound chat rooms keyed by geohash precision
-- [x] **Split-bill over BLE** — settle splits across nearby peers without any server in the path
-- [x] **Nut Drop (ecash over BLE)** — pay a nearby BitChat peer in Cashu ecash from a honeycomb peer picker. The token is broadcast as a single **public** mesh message so any unmodified nearby receiver can reassemble the full token; the amount screen warns that anyone nearby can claim it. A private mesh-DM path is gated on longer mesh-DM payloads.
+- [x] **Nut Drop (ecash over BLE)** — pay a nearby BitChat peer in Cashu ecash from a peer picker
 - [x] **BLE peer discovery in contacts** — nearby mesh peers appear in the contact list with mesh identity
-- [x] **Delivery acks** — delivered / failed delivery state on DMs
 - [x] **Profile-scoped BLE identity** — BLE peer identity is scoped to the active Sovran profile
-
-### Whitenoise
-
-<!-- code: features/whitenoise/WhitenoiseProvider.tsx; features/whitenoise/client/index.ts; features/whitenoise/client/network.ts; features/whitenoise/client/signer.ts; features/whitenoise/hooks/useWhitenoiseDM.ts; features/whitenoise/hooks/useWhitenoiseInbox.ts; features/whitenoise/hooks/useWhitenoiseRequests.ts; features/whitenoise/screens/WhitenoiseDMScreen.tsx; features/whitenoise/screens/WhitenoiseSetupScreen.tsx; features/whitenoise/components/WhitenoiseSetupBanner.tsx; shared/stores/global/settingsStore.ts; features/settings/screens/SettingsScreen.tsx; vendor/marmot-ts -->
-
-- [x] **Whitenoise protocol** — MLS-based end-to-end encrypted Nostr group chat, powered by the vendored [`@internet-privacy/marmot-ts`](https://github.com/internet-privacy/marmot-ts)
-  - [x] **MLS group chats** — forward-secret, post-compromise-secure ratcheting via the Marmot MLS implementation
-  - [x] **Key packages** — publish your Whitenoise key package as a Nostr event so others can invite you
-  - [x] **Invite-driven join** — accept or decline incoming group invites
-  - [x] **Profile-scoped identity** — each Sovran profile has its own Whitenoise identity, isolated from the others
-  - [x] **Dev-gated** — feature is hidden behind the developer toggle while it stabilizes
 
 ### NFC
 
@@ -240,9 +197,9 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Theme & visual
 
-<!-- code: shared/lib/themeEngine.ts; shared/lib/colorExtraction.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/providers/BackgroundProvider.tsx; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
+<!-- code: shared/lib/themeEngine.ts; shared/lib/wallpaperStorage.ts; shared/lib/wallpaperSync.ts; shared/lib/theme/backgroundBlur.ts; shared/ui/capability/detect.ts; shared/ui/capability/defineVariants.tsx; shared/lib/version.ts; modules/liquid-glass-text/src/LiquidGlassText.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; shared/lib/brandColors.ts -->
 
-- [x] **Wallpaper-driven theming** — theme tints are derived from the user's chosen wallpaper via `react-native-image-colors`
+- [x] **Wallpaper-driven theming** — theme tints come from the static palette stored with the user's chosen wallpaper
 - [x] **Nostr wallpaper sharing** — wallpapers are published and discovered through Nostr; download-then-apply so themes never flip before the asset is ready
 - [x] **Hardened wallpaper pipeline** — remote thumbnail validation, per-URI palette fallback, and catalog/sprite/theme diagnostics with render-count + image-decode perf logs; the wallpaper background is memoized and skips the motion sensor on solid-colour themes
 - [x] **Light & dark theme** — full light theme parity across chrome and content
@@ -286,16 +243,6 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Lightning melt** — pay an invoice from any mint that can cover it
 - [x] **Multi-rail fallback** — BIP-321 rails dim on failure; remaining rails are offered inline
 
-### Split bill
-
-<!-- code: features/splitBill/hooks/useSplitBillOrchestrator.ts; features/splitBill/hooks/useSplitBillParticipantPicker.ts; features/splitBill/components/ParticipantCard.tsx; features/splitBill/components/ParticipantCardDeck.tsx; features/splitBill/components/ParticipantRow.tsx; features/splitBill/lib/candidateToIdentity.ts; features/splitBill/lib/reconcileSplitBillHistoryUpdate.ts; shared/stores/profile/splitBillTransactionsStore.ts; app/(split-bill-flow)/participants.tsx; app/(split-bill-flow)/detail.tsx; app/(split-bill-flow)/summary.tsx -->
-
-- [x] **Participant picker** — pick from contacts, BLE mesh peers, or Nostr directory
-- [x] **Per-person amount adjust** — split evenly or set custom amounts
-- [x] **BLE-mesh settlement** — settle over BitChat with no relay
-- [x] **NPC / Nostr settlement** — fall back to Lightning address or Nostr DM payment
-- [x] **Settlement tracking** — per-participant paid/owed status
-
 ### Search
 
 <!-- code: features/search/screens/SearchScreen.tsx; features/search/hooks/useAllSearchResults.ts; features/search/lib/navigateToProfile.ts; features/payments/hooks/useContactSearch.ts; shared/ui/composed/ContactRow.tsx; features/bitchat/hooks/useBLEPeers.ts; shared/stores/runtime/mockDataStore.ts -->
@@ -307,7 +254,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Recovery & backup
 
-<!-- code: features/settings/screens/SettingsRecoveryScreen.tsx; features/settings/screens/SettingsProfileScreen.tsx; features/settings/screens/DeleteScreen.tsx; shared/lib/nostr/secureStorage.ts; shared/lib/nostr/keyDerivation.ts; shared/providers/NostrKeysProvider.tsx; shared/lib/cashu/manager.ts; shared/providers/CocoProvider.tsx; shared/stores/global/walletLifecycleStore.ts; ../cashu-recovery; ../sovran-recover -->
+<!-- code: features/settings/screens/SettingsRecoveryScreen.tsx; features/settings/screens/SettingsProfileScreen.tsx; features/settings/screens/DeleteScreen.tsx; shared/lib/nostr/secureStorage.ts; shared/lib/nostr/keyDerivation.ts; shared/providers/NostrKeysProvider.tsx; shared/lib/cashu/manager.ts; runtime/WalletCore.tsx; shared/stores/global/walletLifecycleStore.ts; ../cashu-recovery; ../sovran-recover -->
 
 - [x] **BIP-39 mnemonic** — single seed root for every profile's Nostr key (NIP-06) and wallet derivation
 - [x] **Seed display & confirmation** — onboarding seed reveal + verification step
@@ -348,10 +295,10 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 <!-- code: app/_layout.tsx; app/(drawer)/_layout.tsx; app/(drawer)/(tabs)/_layout.tsx; navigation/nativeTabs.tsx; shared/blocks/SovranTabBar.tsx; shared/ui/composed/Screen.tsx; shared/ui/composed/BottomButtons.tsx; shared/ui/primitives/Button.tsx; shared/ui/primitives/Pressable.tsx; shared/ui/primitives/SelectableCheck/index.tsx; shared/ui/composed/BackgroundView.tsx; shared/styles/tokens.ts; assets/icons/index.tsx; scripts/regenerate-icons.js; shared/lib/date.ts; shared/ui/composed/chat/ChatScreen.tsx -->
 
 - [x] **Expo Router** — file-based routing under `app/`
-- [x] **Modal flow stacks** — `(send-flow)`, `(receive-flow)`, `(mint-flow)`, `(split-bill-flow)`, `(settings-flow)`, `(theme-flow)`, etc.
+- [x] **Flow stacks** — `(send-flow)`, `(receive-flow)`, `(mint-flow)`, `(settings-flow)`; every other page is a root route (ADR 0041)
 - [x] **Drawer + bottom tabs** — drawer for profiles/settings, tabs for top-level surfaces
-- [x] **`@gorhom/bottom-sheet`** — native bottom sheets for pickers and confirmations
-- [x] **`heroui-native`** — in-card buttons, dialogs, segmented chips
+- [x] **House `Sheet` and `ToastHost`** — bottom sheets for pickers and confirmations, top toasts
+- [x] **House primitives** — `ListGroup`, `Card`, `PillButton`, `Field`, `Slider`, `Switch`, `PressableFeedback`
 - [x] **Project `Button` primitive** — hero CTAs in `BottomButtons` footers
 - [x] **`SelectableCheck` primitive** — canonical selection checkmark
 - [x] **Underline tabs** — replaced capsule tabs across the app
@@ -382,11 +329,11 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Bun** as package manager and CI runtime
 - [x] **TypeScript** with `noImplicitOverride`, type-aware ESLint rules, `eslint-plugin-react-perf`; React Compiler coverage is gated in CI by `react-compiler-healthcheck`
 - [x] **Reanimated v4** (legacy `Animated` banned by lint)
-- [x] **React Native Gesture Handler**, **Nitro Modules**, **Worklets**
+- [x] **React Native Gesture Handler**, **Worklets**
 - [x] **Zustand** with Zod-validated persistence
 - [x] **Zod v4** schema validation; `@sovranbitcoin/schemas` for shared payloads
 - [x] **`neverthrow`** for `Result` / `ResultAsync` return types
-- [x] **`react-native-quick-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
+- [x] **`expo-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`
 - [x] **Uniwind + Tailwind variants** for styling
 - [x] **`expo-sqlite`** for Coco wallet storage
 - [x] **`expo-secure-store`** for seeds and nsec

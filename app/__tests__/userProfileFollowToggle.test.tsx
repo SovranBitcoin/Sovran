@@ -33,10 +33,9 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 // The screen's unrelated imports (navigation, wallet, UI), as in
 // userProfileIdentityRow.test.tsx.
 jest.mock('expo-router', () => ({}));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({}));
 jest.mock('wallet/react', () => ({}), { virtual: true });
-jest.mock('heroui-native', () => ({}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({}));
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({}));
 jest.mock('@/shared/lib/nav/useRouteParams', () => ({}));
 jest.mock('@/shared/ui/composed/TierBadge', () => ({}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({}));
@@ -52,7 +51,7 @@ jest.mock('@/shared/ui/composed/CapsuleButton', () => ({}));
 jest.mock('@/shared/ui/composed/SkeletonExitShimmer', () => ({}));
 jest.mock('@/shared/lib/cashu/npc', () => ({}));
 jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({}));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({}));
+jest.mock('@/runtime/WalletProjection', () => ({}));
 jest.mock('@/shared/hooks/useModerationActions', () => ({}));
 jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({}));
 jest.mock('@/navigation/headerItems', () => ({}));
@@ -64,7 +63,6 @@ jest.mock('@/shared/lib/nav/profileRoutes', () => ({}));
 jest.mock('@/shared/lib/nav/mintInfoRoutes', () => ({}));
 jest.mock('@/shared/blocks/OperatorRunsSection', () => ({ OperatorRunsSection: () => null }));
 jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({}));
-jest.mock('@/shared/lib/colorExtraction', () => ({}));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({}));
 jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({}));

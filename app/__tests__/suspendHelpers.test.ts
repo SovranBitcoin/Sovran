@@ -23,7 +23,7 @@ describe('hasPresentedRoutes', () => {
     const root = {
       type: 'stack',
       index: 1,
-      routes: [{ name: '(drawer)', state: drawer(tabs) }, { name: '(prompt-flow)' }],
+      routes: [{ name: '(drawer)', state: drawer(tabs) }, { name: 'cta' }],
     };
     expect(hasPresentedRoutes(root)).toBe(true);
   });

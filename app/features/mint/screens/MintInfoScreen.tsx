@@ -26,7 +26,8 @@ import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useScreenActions } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import {

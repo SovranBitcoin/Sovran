@@ -16,7 +16,8 @@
 
 import React, { memo, useCallback, useEffect, useState } from 'react';
 
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { setStringAsync } from 'expo-clipboard';
 

@@ -1,24 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Animated,
-  StyleProp,
-  StyleSheet,
-  Text as RNText,
-  TextStyle,
-  ViewStyle,
-} from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleProp, StyleSheet, Text as RNText, TextStyle, ViewStyle } from 'react-native';
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatDisplayAmount } from '@/shared/lib/amountDisplay';
-import { type AmountValue } from 'wallet/amount';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/classNames';
 import { useCapabilities } from '@/shared/ui/capability';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { RollingAmountText } from '@/shared/ui/composed/RollingAmountText';
 import { View } from '@/shared/ui/primitives/View/View';
 
 type FontWeight = 'light' | 'regular' | 'medium' | 'bold' | 'heavy';
@@ -62,7 +62,15 @@ interface AmountFormatterProps {
   style?: StyleProp<ViewStyle>;
   centered?: boolean;
   className?: string;
+  /**
+   * Roll the digits that change into place (up on an increase, down on a
+   * decrease) instead of swapping the text. Snaps on mount, on a BTC/sats or
+   * unit switch, and under reduced motion. Liquid Glass keeps its glyph
+   * cutouts and rolls natively on iOS 26+.
+   */
   animated?: boolean;
+  /** Shrink strings over 6 characters by 5% per extra character. */
+  scaleToFit?: boolean;
   /**
    * Opt in to Liquid Glass on iOS 26+. Silently falls through to the plain
    * MonaSans text path on older iOS and on Android.
@@ -100,6 +108,7 @@ export function AmountFormatter({
   centered = false,
   className,
   animated = false,
+  scaleToFit = false,
   liquid = false,
   glassVariant = 'regular',
   sign,
@@ -110,6 +119,10 @@ export function AmountFormatter({
 
   const decorated = formatDisplayAmount(amount, unit, displayBtc);
   const text = sign ? `${sign} ${decorated}` : decorated;
+  // What the roll compares to choose a direction, and what makes a change a
+  // re-reading (snap) rather than a new value (roll).
+  const numericValue = (sign === '-' ? -1 : 1) * amountToNumber(amount);
+  const formatKey = `${unit}:${displayBtc}`;
 
   const resolvedColor = resolveColor({ color, foreground });
 
@@ -121,7 +134,7 @@ export function AmountFormatter({
   return (
     <Log name="AmountFormatter">
       <View className={cn(containerClass, className)} style={style}>
-        <ScaleWrapper animated={animated} text={text}>
+        <ScaleWrapper enabled={scaleToFit} text={text}>
           {useGlass ? (
             // Overlay pattern: a transparent RNText drives the Yoga
             // measurement so adjacent inline glass nodes lay out correctly;
@@ -132,6 +145,11 @@ export function AmountFormatter({
             <View>
               <RNText
                 allowFontScaling={false}
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                // The native roll lays digits out at tabular widths.
+                className={animated ? 'tabular-nums' : undefined}
                 style={[
                   plainTextStyle(size, lineHeight, weight, null, centered),
                   { color: 'transparent' },
@@ -140,6 +158,9 @@ export function AmountFormatter({
               </RNText>
               <LiquidGlassText
                 text={text}
+                animated={animated}
+                numericValue={numericValue}
+                formatKey={formatKey}
                 fontName={AMOUNT_FONT_FAMILY[weight]}
                 fontSize={size}
                 fontWeight={weight}
@@ -152,6 +173,13 @@ export function AmountFormatter({
                 ]}
               />
             </View>
+          ) : animated ? (
+            <RollingAmountText
+              text={text}
+              numericValue={numericValue}
+              formatKey={formatKey}
+              style={plainTextStyle(size, lineHeight, weight, resolvedColor, centered)}
+            />
           ) : (
             <RNText
               allowFontScaling={false}
@@ -199,35 +227,29 @@ function resolveColor({
   return foreground;
 }
 
-// Shrinks long amounts to fit. Mirrors the pre-existing behaviour: strings
-// over 6 chars scale down by 5% per extra char. The scale target is derived
-// from the formatted text length so it updates as the balance grows.
+// Shrinks long amounts to fit: strings over 6 chars scale down by 5% per
+// extra char. The scale target is derived from the formatted text length so it
+// updates as the balance grows.
 function ScaleWrapper({
-  animated,
+  enabled,
   text,
   children,
 }: {
-  animated: boolean;
+  enabled: boolean;
   text: string;
   children: React.ReactNode;
 }) {
-  // `useState` with a lazy initializer, not `useRef(new Animated.Value(1)).current`:
-  // the ref form both reads a ref during render (which made the React Compiler
-  // skip this component) and constructs a throwaway `Animated.Value` on every
-  // render, since `useRef` ignores its argument after the first.
-  const [scaleAnim] = useState(() => new Animated.Value(1));
+  const scale = useSharedValue(1);
+  const target = text.length > 6 ? 1 - (text.length - 6) * 0.05 : 1;
 
   useEffect(() => {
-    if (!animated) return;
-    const target = text.length > 6 ? 1 - (text.length - 6) * 0.05 : 1;
-    paymentLog.debug('amount_formatter.scale', {
-      textLength: text.length,
-      target,
-      animated,
-    });
-    Animated.timing(scaleAnim, { toValue: target, duration: 300, useNativeDriver: true }).start();
-  }, [animated, text, scaleAnim]);
+    if (!enabled) return;
+    paymentLog.debug('amount_formatter.scale', { textLength: text.length, target });
+    scale.set(withTiming(target, { duration: 300, reduceMotion: ReduceMotion.System }));
+  }, [enabled, text.length, target, scale]);
 
-  if (!animated) return <>{children}</>;
-  return <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>{children}</Animated.View>;
+  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+
+  if (!enabled) return <>{children}</>;
+  return <Animated.View style={scaleStyle}>{children}</Animated.View>;
 }

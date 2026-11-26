@@ -250,6 +250,11 @@ describe("installed coco NUT-08 persistence and recovery contract", () => {
       const change = signChangeOutput(prepared, 8);
       expect(change.dleq).toBeUndefined();
       expect(prepared.changeOutputData.keep).toHaveLength(3);
+      await harness.repos.proofRepository.setProofState(
+        MINT_URL,
+        ["input-deferred-paid"],
+        "inflight",
+      );
       await harness.repos.meltOperationRepository.update({
         ...prepared,
         state: "pending",

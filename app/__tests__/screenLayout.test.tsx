@@ -22,10 +22,7 @@ jest.mock('expo-router/react-navigation', () => ({
 }));
 jest.mock('@/shared/ui/composed/AndroidSheetRoot', () => ({
   SheetHeaderHeightContext: require('react').createContext(null),
-}));
-jest.mock('@/shared/ui/composed/FlowSheetHeader', () => ({
-  FLOW_SHEET_SCRIM_OVERHANG: 32,
-  FlowSheetHeader: () => null,
+  SHEET_SCRIM_OVERHANG: 32,
 }));
 jest.mock('@/shared/ui/composed/ScrollEdgeFade', () => ({ ScrollEdgeFade: () => null }));
 jest.mock('@/shared/hooks/useDeferredMount', () => ({ useDeferredMount: () => true }));
@@ -250,7 +247,7 @@ it.each(['ios', 'android'] as const)(
   }
 );
 
-it('uses the same solid band and clearance in Android sheets, restoring the fade on change', () => {
+it('clears an Android sheet bar, and its fade only when the header fades', () => {
   Platform.OS = 'android';
   const { SheetHeaderHeightContext } = jest.requireMock('@/shared/ui/composed/AndroidSheetRoot');
   const content = (appearance: 'opaque' | 'gradient') => (
@@ -262,9 +259,8 @@ it('uses the same solid band and clearance in Android sheets, restoring the fade
   );
   mockSetOptions.mockClear();
   const tree = render(content('opaque'));
-  const headerOptions = mockSetOptions.mock.calls.find(([options]) => options.header);
-  expect(headerOptions?.[0].header({}).props.appearance).toBe('opaque');
-  expect(mockSetOptions.mock.calls.some(([options]) => 'headerBackground' in options)).toBe(false);
+  // The sheet's chrome is its own (FormSheetChrome): the page sets no header.
+  expect(mockSetOptions).not.toHaveBeenCalled();
   const topPadding = () =>
     tree.root
       .findAllByType(View)
@@ -272,7 +268,6 @@ it('uses the same solid band and clearance in Android sheets, restoring the fade
       .filter((padding) => padding !== undefined);
   expect(topPadding()).toEqual([74]);
   act(() => tree.update(content('gradient')));
-  expect(mockSetOptions.mock.calls.at(-1)?.[0].header({}).props.appearance).toBe('gradient');
   expect(topPadding()).toEqual([106]);
 });
 
@@ -370,7 +365,6 @@ it('owns one combined fade across an Android sheet bar and currency strip', () =
   );
   expect(tree.root.findAllByType(ScrollEdgeFade)).toHaveLength(1);
   expect(tree.root.findByType(ScrollEdgeFade).props.height).toBe(130);
-  expect(mockSetOptions.mock.calls.at(-1)?.[0].header({}).props.appearance).toBe('gradient-tabs');
   expect(tree.root.findByType(ScrollView).props.children[0].props.style.height).toBe(130);
 });
 

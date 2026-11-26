@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { cashuLog } from '@/shared/lib/logger';
 
 /**

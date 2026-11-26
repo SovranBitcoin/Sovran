@@ -22,6 +22,7 @@ import {
   mintDetailItem,
   entryDetailItems,
 } from '@/features/transactions';
+import { hasFeature } from '@/shared/config/features';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
 import {
@@ -188,7 +189,7 @@ export function OnchainReceiveScreen({
                 });
                 return actions.copy.execute();
               },
-              condition: actions.copy.available,
+              condition: hasFeature('onchain') && actions.copy.available,
             },
             {
               text: 'Share',
@@ -204,7 +205,7 @@ export function OnchainReceiveScreen({
                 });
                 return actions.share.execute();
               },
-              condition: actions.share.available,
+              condition: hasFeature('onchain') && actions.share.available,
             },
           ]}
         />

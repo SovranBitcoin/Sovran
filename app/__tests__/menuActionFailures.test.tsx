@@ -45,7 +45,8 @@ jest.mock('@/shared/lib/logger', () => ({
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>
-    Array.isArray(tokens) ? tokens.map(() => 'black') : 'black',
+    // eslint-disable-next-line no-restricted-syntax -- menu rows tint with withAlpha, which needs hex
+    Array.isArray(tokens) ? tokens.map(() => '#000000') : '#000000',
 }));
 
 jest.mock('@/shared/ui/primitives/Button', () => ({
@@ -73,12 +74,16 @@ jest.mock('@/shared/ui/primitives/View/HStack', () => ({
   },
 }));
 
-jest.mock('@/shared/blocks/popup/MenuScrim', () => ({
-  MenuScrim: () => {
+// The iOS popover draws in the house overlay window; a host element stands in
+// so the test can see whether an inline popover is mounted.
+jest.mock('@/shared/ui/composed/Sheet', () => ({
+  OverlayWindow: ({ children }: { children?: React.ReactNode }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('MenuScrim');
+    return ReactActual.createElement('OverlayWindow', null, children);
   },
 }));
+
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
 
 jest.mock('assets/icons', () => ({
   __esModule: true,
@@ -87,29 +92,6 @@ jest.mock('assets/icons', () => ({
     return ReactActual.createElement('Icon', { testID: `icon-${name}`, ...props });
   },
 }));
-
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const Menu = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu', props, children);
-
-  Menu.Trigger = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Trigger', props, children);
-  Menu.Portal = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Portal', props, children);
-  Menu.Content = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Content', props, children);
-  Menu.Label = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Label', props, children);
-  Menu.Item = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.Item', props, children);
-  Menu.ItemTitle = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.ItemTitle', props, children);
-  Menu.ItemDescription = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu.ItemDescription', props, children);
-
-  return { Menu };
-});
 
 function findByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string) {
   return renderer.root.find((node) => node.props.testID === testID);
@@ -166,7 +148,7 @@ describe('menu action failure containment', () => {
     // The "More" overflow dispatches the FullWindowOverlay-backed
     // actionMenuSheet() lane — NOT actionMenuPopup(), whose host disables FWO
     // and paints UNDER native route modals on iOS. ButtonHandler footers live
-    // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), so
+    // inside route modals (e.g. SendTokenScreen opened from history), so
     // the popup lane renders the menu invisibly behind the modal.
     act(() => {
       findByTestID(renderer!, 'more-button').props.onPress();
@@ -246,15 +228,37 @@ describe('menu action failure containment', () => {
             { id: 'text', label: 'as Text', onPress: jest.fn() },
             { id: 'emoji', label: 'as Emoji', onPress: failingVariant },
           ]}
-        />
+        />,
+        // The popover measures its 1x1 anchor in the window when the chevron
+        // opens it (react-native-web reads the host node's bounding rect).
+        {
+          createNodeMock: () => ({
+            nodeType: 1,
+            getBoundingClientRect: () => ({ left: 300, top: 700, width: 1, height: 1 }),
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }),
+        }
       );
     });
+
+    // The popover is mounted only once the chevron opens it.
+    expect(renderer!.root.findAllByProps({ testID: 'copy-token-menu-emoji' })).toHaveLength(0);
+    await act(async () => {
+      findByTestID(renderer!, 'copy-token-menu').props.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(findAllByType(renderer!, 'OverlayWindow')).toHaveLength(1);
 
     const variantItem = findByTestID(renderer!, 'copy-token-menu-emoji');
     act(() => {
       variantItem.props.onPress();
     });
     await flushMicrotasks();
+
+    // A pick closes the popover before the variant runs.
+    expect(findAllByType(renderer!, 'OverlayWindow')).toHaveLength(0);
+    expect(mockActionMenuPopup).not.toHaveBeenCalled();
 
     expect(failingVariant).toHaveBeenCalledTimes(1);
     expect(mockLogError).toHaveBeenCalledWith('ui.action_menu.menu_action_failed', {
@@ -292,14 +296,15 @@ describe('menu action failure containment', () => {
       });
 
       // No inline popover is mounted on Android — the racy surface is gone.
-      expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
-      expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
+      expect(findAllByType(renderer!, 'OverlayWindow')).toHaveLength(0);
+      expect(renderer!.root.findAllByProps({ testID: 'copy-token-menu-emoji' })).toHaveLength(0);
 
       // Pressing the chevron dispatches the global action-menu host instead.
       act(() => {
         findByTestID(renderer!, 'copy-token-menu').props.onPress();
       });
       expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
+      expect(findAllByType(renderer!, 'OverlayWindow')).toHaveLength(0);
       const payload = mockActionMenuPopup.mock.calls[0][0] as {
         title: string;
         buttons: { testID?: string; onPress: () => void }[];

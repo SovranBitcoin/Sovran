@@ -8,7 +8,7 @@
  * read-side app-view, never a write/bootstrap relay, so it is deliberately
  * absent here.
  */
-import { normalizeRelayUrl } from '@nostr-dev-kit/ndk-mobile';
+import { tryNormalizeRelayUrl } from 'nostr/client';
 
 /** Opinionated, write-capable bootstrap relays. Order is not significant. */
 export const DEFAULT_RELAYS: readonly string[] = [
@@ -23,16 +23,10 @@ export const DEFAULT_RELAYS: readonly string[] = [
 export const MAX_WRITE_RELAYS = 8;
 
 /**
- * Normalizes a relay url via NDK (lowercases host, applies canonical trailing
+ * Normalizes a ws(s) relay url (lowercases host, applies canonical trailing
  * slash). Returns null for unparseable input so callers can drop it.
  */
-export function safeNormalizeRelay(url: string): string | null {
-  try {
-    return normalizeRelayUrl(url);
-  } catch {
-    return null;
-  }
-}
+export const safeNormalizeRelay = tryNormalizeRelayUrl;
 
 /** Normalizes + dedupes a list of relay urls, dropping unparseable entries. */
 export function normalizeRelayList(urls: readonly string[]): string[] {

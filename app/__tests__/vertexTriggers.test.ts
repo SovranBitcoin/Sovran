@@ -1,4 +1,4 @@
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { fakeClient } from './helpers/fakeNostrClient';
 import { ok } from 'neverthrow';
 import {
   refreshVertex,
@@ -45,8 +45,20 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: jest.fn(),
 }));
 
-const ndk = { signer: { user: async () => ({ pubkey: mockOwner }) } } as unknown as NDK;
-const query = () => ({ kind: 'search' as const, query: 'alice', stale: true, ndk, send: mockSend });
+const client = fakeClient({
+  signer: {
+    get pubkey() {
+      return mockOwner;
+    },
+  },
+});
+const query = () => ({
+  kind: 'search' as const,
+  query: 'alice',
+  stale: true,
+  client,
+  send: mockSend,
+});
 let counter = 0;
 
 beforeEach(async () => {
@@ -98,7 +110,7 @@ it.each(['fresh', 'toggle', 'mock', 'budget', 'no-signer', 'cancelled'] as const
     await refreshVertex({
       ...query(),
       stale: gate !== 'fresh',
-      ndk: gate === 'no-signer' ? undefined : ndk,
+      client: gate === 'no-signer' ? undefined : client,
       signal: controller.signal,
     });
     expect(mockSign).not.toHaveBeenCalled();
@@ -113,7 +125,7 @@ it('blocks all later triggers after insufficient credits and logs exhaustion onc
     kind: 'profile',
     target: 'f'.repeat(64),
     stale: true,
-    ndk,
+    client,
     send: mockSend,
   });
   expect(mockSend).toHaveBeenCalledTimes(1);
@@ -146,14 +158,14 @@ it('profile age uses seven days in seconds, and a stale profile signs once', asy
     kind: 'profile',
     target: 'f'.repeat(64),
     stale: true,
-    ndk,
+    client,
     send: mockSend,
   });
   await refreshVertex({
     kind: 'profile',
     target: 'f'.repeat(64),
     stale: true,
-    ndk,
+    client,
     send: mockSend,
   });
   expect(mockSign).toHaveBeenCalledTimes(1);

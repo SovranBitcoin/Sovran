@@ -55,13 +55,11 @@ type PopupStore = {
   isOpen: boolean;
   /**
    * Monotonic presentation nonce, bumped on every open(). PopupHost presents
-   * on nonce changes rather than on `isOpen` edges alone: a native teardown
-   * that bypasses close() (route navigation ripping the FullWindowOverlay,
-   * heroui's measure/snap race) leaves `isOpen` stuck true, and an
-   * edge-triggered host would render every subsequent open() a silent no-op.
+   * on nonce changes rather than on `isOpen` edges alone, so a follow-on
+   * open() while a sheet is still open mounts a fresh instance.
    */
   openSeq: number;
-  /** When true, PopupHost must fully unmount the BottomSheet tree to tear down native overlays. */
+  /** When true, PopupHost unmounts its sheet (and its overlay window). */
   destroyed: boolean;
   open: (payload: SheetPayload) => void;
   /**

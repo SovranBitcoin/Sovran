@@ -2,7 +2,8 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 
 import { DESIGN_SYSTEM_CATALOG } from '@/features/settings/design-system/catalog';
 import type { DesignSystemFamily } from '@/features/settings/design-system/types';
@@ -10,7 +11,7 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, description }) => {
@@ -114,7 +115,7 @@ function useFlowLinks(): FlowLink[] {
       id: 'transactions',
       title: 'Transactions',
       description: 'The full list, filters, and a transaction detail from any row',
-      open: () => router.navigate('/(transactions-flow)/transactions'),
+      open: () => router.navigate('/transactions'),
     },
     {
       id: 'add-mint',
@@ -126,13 +127,13 @@ function useFlowLinks(): FlowLink[] {
       id: 'wallpapers',
       title: 'Wallpapers',
       description: 'Albums and per-account wallpaper, to check a style over an image',
-      open: () => router.navigate('/(theme-flow)/preview'),
+      open: () => router.navigate('/preview'),
     },
     {
       id: 'map',
       title: 'Bitcoin near me',
       description: 'The map and a place detail',
-      open: () => router.navigate('/(map-flow)'),
+      open: () => router.navigate('/map'),
     },
   ];
 }

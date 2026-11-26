@@ -9,10 +9,9 @@ The app combines:
 
 - **Coco wallet state** — `@cashu/coco-core` + `@cashu/coco-expo-sqlite` for proof
   storage, swaps, and reactive balance.
-- **Nostr identity** — NIP-06 multi-account keys, NIP-17 private DMs, a feed, and
-  an app-view served through the in-repo `nostr` package.
+- **Nostr identity & payment DMs** — NIP-06 multi-account keys, NIP-17 encrypted
+  payment messages, and contact/profile lookup through the in-repo `nostr` package.
 - **NFC tag handoffs** and the **BitChat BLE mesh** for offline payments.
-- **Whitenoise** MLS group chat and **Routstr** AI payments billed in Cashu.
 
 On-chain Bitcoin inputs are recognized by the parser and BIP-321 ranking, but
 on-chain send and receive are **not shipped yet**.
@@ -25,7 +24,7 @@ The repository is a single Bun workspace with four packages:
 |------------|------------|
 | `app/`     | The Expo / React Native application. |
 | `wallet/`  | Payment UX logic on top of Coco — parsing, classification, routing, the send/receive state machine, offline suggestions. UI- and navigation-agnostic. |
-| `nostr/`   | Typed client helpers for the Nagg app-view and the tiered Nostr data layer. |
+| `nostr/`   | Direct Nostr client (`nostr-tools`), relay pool, NIP-17 transport, and tiered data layer. |
 | `docs/`    | This site. |
 
 `app` depends on `wallet` and `nostr` via `workspace:*`; both ship raw TypeScript

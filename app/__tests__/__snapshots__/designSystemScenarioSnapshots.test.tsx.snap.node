@@ -54,6 +54,13 @@ exports[`Design System exact structural snapshots locks every UI kit scenario to
   "Notice:offline",
   "Notice:worst-case",
   "Notice:large-text",
+  "StateSwitch:loading",
+  "StateSwitch:empty",
+  "StateSwitch:error",
+  "StateSwitch:populated",
+  "StateSwitch:default",
+  "StateSwitch:offline",
+  "AmountFormatter:populated",
 ]
 `;
 
@@ -36492,6 +36499,664 @@ exports[`Design System exact structural snapshots renders ui-kit/amount-populate
 }
 `;
 
+exports[`Design System exact structural snapshots renders ui-kit/amount-rolling: amount-rolling 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    "₿",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "MonaSans-Black",
+                      "fontSize": "44px",
+                      "marginBottom": "0px",
+                      "marginLeft": "0px",
+                      "marginRight": "0px",
+                      "marginTop": "0px",
+                      "textAlign": "center",
+                    },
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    " ",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "MonaSans-Black",
+                      "fontSize": "44px",
+                      "marginBottom": "0px",
+                      "marginLeft": "0px",
+                      "marginRight": "0px",
+                      "marginTop": "0px",
+                      "textAlign": "center",
+                    },
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-int-0-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-int-0",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    ".",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "MonaSans-Black",
+                      "fontSize": "44px",
+                      "marginBottom": "0px",
+                      "marginLeft": "0px",
+                      "marginRight": "0px",
+                      "marginTop": "0px",
+                      "textAlign": "center",
+                    },
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-0-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-0",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-1-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-1",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-2-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-2",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "2",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "2",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-3-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-3",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "1",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "1",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-4-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-4",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-5-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-5",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-6-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-6",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "MonaSans-Black",
+                          "fontSize": "44px",
+                          "marginBottom": "0px",
+                          "marginLeft": "0px",
+                          "marginRight": "0px",
+                          "marginTop": "0px",
+                          "textAlign": "center",
+                        },
+                      },
+                      "type": "div",
+                    },
+                    {
+                      "children": [
+                        "0",
+                      ],
+                      "props": {
+                        "allowFontScaling": false,
+                        "className": "absolute left-0 right-0 top-0 tabular-nums",
+                        "style": [
+                          [
+                            {
+                              "color": "rgb(16, 16, 16)",
+                              "fontFamily": "MonaSans-Black",
+                              "fontSize": 44,
+                              "margin": 0,
+                              "textAlign": "center",
+                            },
+                            {
+                              "textAlign": "center",
+                            },
+                          ],
+                          {
+                            "transform": [
+                              {
+                                "translateY": 0,
+                              },
+                            ],
+                          },
+                        ],
+                        "testID": "amount-slot-frac-7-in",
+                      },
+                      "type": "AnimatedText",
+                    },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "data-testid": "amount-slot-frac-7",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "aria-label": "₿ 0.00021000",
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
 exports[`Design System exact structural snapshots renders ui-kit/amount-worst-case: amount-worst-case 1`] = `
 {
   "children": [
@@ -41654,20 +42319,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-default: r
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 2,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "#bfbfbf",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": false,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -42067,20 +42768,57 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-disabled: 
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 2,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "#bfbfbf",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": true,
-                                "isSelected": false,
+                              ],
+                              "props": {
+                                "aria-disabled": true,
+                                "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 0.5,
+                                },
+                                "tabIndex": -1,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -42499,20 +43237,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-large-text
                                 {
                                   "children": [
                                     {
-                                      "children": null,
-                                      "props": {
-                                        "animation": {
-                                          "backgroundColor": {
-                                            "value": [
-                                              "#bfbfbf",
-                                              "rgb(32, 128, 72)",
+                                      "children": [
+                                        {
+                                          "children": [
+                                            {
+                                              "children": null,
+                                              "props": {
+                                                "className": "shadow-field",
+                                                "style": [
+                                                  {
+                                                    "backgroundColor": "white",
+                                                    "borderRadius": 999,
+                                                    "height": 20,
+                                                    "position": "absolute",
+                                                    "width": 28,
+                                                  },
+                                                  {
+                                                    "left": 2,
+                                                  },
+                                                ],
+                                              },
+                                              "type": "View",
+                                            },
+                                          ],
+                                          "props": {
+                                            "style": [
+                                              {
+                                                "borderRadius": 999,
+                                                "height": 24,
+                                                "justifyContent": "center",
+                                                "overflow": "hidden",
+                                                "width": 48,
+                                              },
+                                              {
+                                                "backgroundColor": "#bfbfbf",
+                                              },
                                             ],
                                           },
+                                          "type": "View",
                                         },
-                                        "isDisabled": false,
-                                        "isSelected": false,
+                                      ],
+                                      "props": {
+                                        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                        "dir": null,
+                                        "role": "switch",
+                                        "style": {
+                                          "opacity": 1,
+                                        },
+                                        "tabIndex": 0,
                                       },
-                                      "type": "Switch",
+                                      "type": "div",
                                     },
                                   ],
                                   "props": {
@@ -42925,20 +43699,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-selected: 
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 18,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "rgb(32, 128, 72)",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": true,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -43336,20 +44146,56 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-worst-case
                         {
                           "children": [
                             {
-                              "children": null,
-                              "props": {
-                                "animation": {
-                                  "backgroundColor": {
-                                    "value": [
-                                      "#bfbfbf",
-                                      "rgb(32, 128, 72)",
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "children": null,
+                                      "props": {
+                                        "className": "shadow-field",
+                                        "style": [
+                                          {
+                                            "backgroundColor": "white",
+                                            "borderRadius": 999,
+                                            "height": 20,
+                                            "position": "absolute",
+                                            "width": 28,
+                                          },
+                                          {
+                                            "left": 18,
+                                          },
+                                        ],
+                                      },
+                                      "type": "View",
+                                    },
+                                  ],
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "borderRadius": 999,
+                                        "height": 24,
+                                        "justifyContent": "center",
+                                        "overflow": "hidden",
+                                        "width": 48,
+                                      },
+                                      {
+                                        "backgroundColor": "rgb(32, 128, 72)",
+                                      },
                                     ],
                                   },
+                                  "type": "View",
                                 },
-                                "isDisabled": false,
-                                "isSelected": true,
+                              ],
+                              "props": {
+                                "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+                                "dir": null,
+                                "role": "switch",
+                                "style": {
+                                  "opacity": 1,
+                                },
+                                "tabIndex": 0,
                               },
-                              "type": "Switch",
+                              "type": "div",
                             },
                           ],
                           "props": {
@@ -43758,20 +44604,56 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-defau
       "type": "div",
     },
     {
-      "children": null,
-      "props": {
-        "animation": {
-          "backgroundColor": {
-            "value": [
-              "#bfbfbf",
-              "rgb(32, 128, 72)",
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "shadow-field",
+                "style": [
+                  {
+                    "backgroundColor": "white",
+                    "borderRadius": 999,
+                    "height": 20,
+                    "position": "absolute",
+                    "width": 28,
+                  },
+                  {
+                    "left": 2,
+                  },
+                ],
+              },
+              "type": "View",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "borderRadius": 999,
+                "height": 24,
+                "justifyContent": "center",
+                "overflow": "hidden",
+                "width": 48,
+              },
+              {
+                "backgroundColor": "#bfbfbf",
+              },
             ],
           },
+          "type": "View",
         },
-        "isDisabled": false,
-        "isSelected": false,
+      ],
+      "props": {
+        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "dir": null,
+        "role": "switch",
+        "style": {
+          "opacity": 1,
+        },
+        "tabIndex": 0,
       },
-      "type": "Switch",
+      "type": "div",
     },
   ],
   "props": {
@@ -43942,20 +44824,57 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-disab
           "type": "div",
         },
         {
-          "children": null,
-          "props": {
-            "animation": {
-              "backgroundColor": {
-                "value": [
-                  "#bfbfbf",
-                  "rgb(32, 128, 72)",
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "className": "shadow-field",
+                    "style": [
+                      {
+                        "backgroundColor": "white",
+                        "borderRadius": 999,
+                        "height": 20,
+                        "position": "absolute",
+                        "width": 28,
+                      },
+                      {
+                        "left": 18,
+                      },
+                    ],
+                  },
+                  "type": "View",
+                },
+              ],
+              "props": {
+                "style": [
+                  {
+                    "borderRadius": 999,
+                    "height": 24,
+                    "justifyContent": "center",
+                    "overflow": "hidden",
+                    "width": 48,
+                  },
+                  {
+                    "backgroundColor": "rgb(32, 128, 72)",
+                  },
                 ],
               },
+              "type": "View",
             },
-            "isDisabled": true,
-            "isSelected": true,
+          ],
+          "props": {
+            "aria-disabled": true,
+            "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "dir": null,
+            "role": "switch",
+            "style": {
+              "opacity": 0.5,
+            },
+            "tabIndex": -1,
           },
-          "type": "Switch",
+          "type": "div",
         },
       ],
       "props": {
@@ -44131,20 +45050,56 @@ exports[`Design System exact structural snapshots renders ui-kit/selection-selec
       "type": "div",
     },
     {
-      "children": null,
-      "props": {
-        "animation": {
-          "backgroundColor": {
-            "value": [
-              "#bfbfbf",
-              "rgb(32, 128, 72)",
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "shadow-field",
+                "style": [
+                  {
+                    "backgroundColor": "white",
+                    "borderRadius": 999,
+                    "height": 20,
+                    "position": "absolute",
+                    "width": 28,
+                  },
+                  {
+                    "left": 18,
+                  },
+                ],
+              },
+              "type": "View",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "borderRadius": 999,
+                "height": 24,
+                "justifyContent": "center",
+                "overflow": "hidden",
+                "width": 48,
+              },
+              {
+                "backgroundColor": "rgb(32, 128, 72)",
+              },
             ],
           },
+          "type": "View",
         },
-        "isDisabled": false,
-        "isSelected": true,
+      ],
+      "props": {
+        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "dir": null,
+        "role": "switch",
+        "style": {
+          "opacity": 1,
+        },
+        "tabIndex": 0,
       },
-      "type": "Switch",
+      "type": "div",
     },
   ],
   "props": {
@@ -46328,6 +47283,580 @@ exports[`Design System exact structural snapshots renders ui-kit/stats-grid-wors
           "props": {
             "className": "css-view-g5y9jx",
             "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-empty: view-state-empty 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        "No mints yet",
+      ],
+      "props": {
+        "className": "css-text-146c3p1",
+        "dir": "auto",
+        "style": {
+          "color": "rgba(96,96,96,1.00)",
+          "fontFamily": "OxygenRegular",
+          "fontSize": "15px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-error: view-state-error 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "#FFFFFF",
+                "height": 16,
+                "width": 16,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-7v2h2v-2zm0-8v6h2V7z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Couldn’t load your mints",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(255,255,255,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "13px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Couldn’t load your mints",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-loading: view-state-loading 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(16,16,16,0.07)",
+                  "borderBottomLeftRadius": "4px",
+                  "borderBottomRightRadius": "4px",
+                  "borderTopLeftRadius": "4px",
+                  "borderTopRightRadius": "4px",
+                  "bottom": "5%",
+                  "left": "0px",
+                  "position": "absolute",
+                  "right": "0px",
+                  "top": "5%",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Mint name",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                  "opacity": 0,
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-pointerEvents-633pao",
+            "dir": null,
+            "style": {
+              "alignSelf": "flex-start",
+              "overflowX": "hidden",
+              "overflowY": "hidden",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(16,16,16,0.07)",
+                  "borderBottomLeftRadius": "4px",
+                  "borderBottomRightRadius": "4px",
+                  "borderTopLeftRadius": "4px",
+                  "borderTopRightRadius": "4px",
+                  "bottom": "5%",
+                  "left": "0px",
+                  "position": "absolute",
+                  "right": "0px",
+                  "top": "5%",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Mint name",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                  "opacity": 0,
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-pointerEvents-633pao",
+            "dir": null,
+            "style": {
+              "alignSelf": "flex-start",
+              "overflowX": "hidden",
+              "overflowY": "hidden",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "backgroundColor": "rgba(16,16,16,0.07)",
+                  "borderBottomLeftRadius": "4px",
+                  "borderBottomRightRadius": "4px",
+                  "borderTopLeftRadius": "4px",
+                  "borderTopRightRadius": "4px",
+                  "bottom": "5%",
+                  "left": "0px",
+                  "position": "absolute",
+                  "right": "0px",
+                  "top": "5%",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Mint name",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                  "opacity": 0,
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-pointerEvents-633pao",
+            "dir": null,
+            "style": {
+              "alignSelf": "flex-start",
+              "overflowX": "hidden",
+              "overflowY": "hidden",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-ready: view-state-ready 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                "Peanut Mint",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Minibits",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Stablenut",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-refreshing: view-state-refreshing 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                "Peanut Mint",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Minibits",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Stablenut",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            "Updating…",
+          ],
+          "props": {
+            "className": "css-text-146c3p1",
+            "dir": "auto",
+            "style": {
+              "color": "rgba(96,96,96,1.00)",
+              "fontFamily": "OxygenRegular",
+              "fontSize": "12px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders ui-kit/view-state-stale: view-state-stale 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                "Peanut Mint",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Minibits",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Stablenut",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "color": "#000000",
+                    "height": 16,
+                    "width": 16,
+                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="m12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0M11 16v2h2v-2zm0-7v5h2V9z"/></svg>",
+                  },
+                  "type": "SvgXml",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    "Last updated while offline",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(0,0,0,1.00)",
+                      "fontFamily": "OxygenBold",
+                      "fontSize": "13px",
+                    },
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "aria-label": "Last updated while offline",
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "role": "alert",
           },
           "type": "div",
         },

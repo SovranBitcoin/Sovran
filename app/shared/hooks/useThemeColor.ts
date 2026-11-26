@@ -1,4 +1,3 @@
-import type { ThemeColor } from 'heroui-native/hooks';
 import { useCSSVariable } from 'uniwind';
 
 import { themeLog } from '@/shared/lib/logger';
@@ -7,24 +6,19 @@ import type { StaticColorToken, WallpaperToken } from '@/shared/lib/themeEngine'
 /**
  * Extended useThemeColor — resolves ANY color token from CSS variables.
  *
- * Supports HeroUI semantic tokens (dynamic per theme) AND static color scales.
+ * Supports semantic tokens (dynamic per theme) AND static color scales.
  * This is the single hook for all runtime color access. For className usage,
  * use Tailwind classes directly: bg-background, text-danger, bg-shade-300, etc.
  *
- * **Where the tokens come from.** Three registries feed this hook, only two of
- * which this repo owns:
- *   - `shared/lib/themeEngine.ts` — the static ramps and the HeroUI semantic
- *     vars, injected at runtime by `Uniwind.updateCSSVariables`.
- *   - `app/global.css` `@theme` — the Tailwind token schema.
- *   - `heroui-native/lib/module/styles/theme.css` — a **vendored** `@theme
- *     inline static` block that derives ~22 of the semantic tokens below with
- *     `color-mix()` (every `*-soft`, `*-hover`, `separator-secondary`,
- *     `border-secondary`, `background-secondary`, …). Those are not ours; a
- *     heroui upgrade can remove one.
+ * **Where the tokens come from.** Two registries feed this hook:
+ *   - `shared/lib/themeEngine.ts` — the static ramps and the semantic vars,
+ *     injected at runtime by `Uniwind.updateCSSVariables`.
+ *   - `app/global.css` `@theme` — the Tailwind token schema, including the
+ *     `color-mix()` steps derived from the semantic vars (every `*-soft`,
+ *     `*-hover`, `separator-secondary`, `border-secondary`, …).
  *
  * `__tests__/themeTokens.test.ts` asserts every token here is declared by one
- * of the three, and that no app-owned token is unreachable from this hook.
- * Run it after `bun update heroui-native`.
+ * of the two, and that no app-owned token is unreachable from this hook.
  *
  * @example
  * const danger = useThemeColor('danger');
@@ -32,22 +26,7 @@ import type { StaticColorToken, WallpaperToken } from '@/shared/lib/themeEngine'
  * const brandGrad = useThemeColor(['shade-200', 'shade-300', 'shade-400']);
  */
 
-/**
- * Tokens this repo owns on top of HeroUI's set. `skeleton` is declared by
- * `themeEngine` and `global.css`, not by heroui.
- */
-const APP_SEMANTIC_TOKENS = ['skeleton'] as const;
-
-/**
- * HeroUI's semantic tokens, mirrored so the parity test has the names at
- * runtime — heroui declares them but does not export the array, only the
- * `ThemeColor` union built from it.
- *
- * The two assertions below make this a mirror rather than a copy: `satisfies`
- * rejects a name heroui does not have, and `Exhaustive` fails to compile if
- * heroui gains one this list is missing, naming the token. A `bun update
- * heroui-native` that changes the token set is a type error, not a surprise.
- */
+/** Every semantic token, by the name `--color-<token>` declares it under. */
 export const SEMANTIC_TOKENS = [
   'background',
   'foreground',
@@ -113,20 +92,12 @@ export const SEMANTIC_TOKENS = [
   'separator-tertiary',
   'border-secondary',
   'border-tertiary',
-  ...APP_SEMANTIC_TOKENS,
-] as const satisfies readonly (ThemeColor | AppSemanticToken)[];
+  'skeleton',
+] as const;
 
-type AppSemanticToken = (typeof APP_SEMANTIC_TOKENS)[number];
 type SemanticToken = (typeof SEMANTIC_TOKENS)[number];
 
-/** Resolves to `never` only while every heroui token is mirrored above. */
-type Exhaustive<T extends never> = T;
-type AllHerouiTokensMirrored = Exhaustive<Exclude<ThemeColor, SemanticToken>>;
-
-// `AllHerouiTokensMirrored` is `never`, so it adds nothing to this union — it is
-// here so the check above is *used*, and so a heroui upgrade that adds a token
-// fails type-check here, naming it, instead of silently falling back at runtime.
-type ColorToken = SemanticToken | StaticColorToken | WallpaperToken | AllHerouiTokensMirrored;
+type ColorToken = SemanticToken | StaticColorToken | WallpaperToken;
 
 type StringTuple<N extends number, A extends string[] = []> = A['length'] extends N
   ? A

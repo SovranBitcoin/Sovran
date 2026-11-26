@@ -13,6 +13,7 @@
   ],
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
+    "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
     "zod": "4.4.3",
     "neverthrow": "8.2.0",
     "nostr-tools": "2.24.2"
@@ -27,11 +28,11 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "dev": "cd app && bun run dev",
-    "dev:tunnel": "cd app && bun run dev:tunnel",
     "start": "cd app && bun run start",
     "ios": "cd app && bun run ios",
     "android": "cd app && bun run android",
     "prebuild": "cd app && bun run prebuild",
+    "check": "bun run type-check && bun run lint && bun run knip && bun run copy:lint && bun run followups check && bun run rebuild:metrics && bun run test",
     "type-check": "bun run --filter '*' type-check",
     "lint": "cd app && bun run lint",
     "test": "bun run --filter '*' test",
@@ -64,7 +65,8 @@
     "site:assets:prune": "node site/scripts/prune-obsolete-assets.mjs",
     "site:scenes": "bun run --cwd site dev --open /scenes",
     "assets:wallpapers": "node scripts/fetch-wallpapers.mjs",
-    "persistence": "bun app/scripts/persistence.ts"
+    "persistence": "bun app/scripts/persistence.ts",
+    "rebuild:metrics": "node scripts/rebuild-metrics.mjs --check"
   },
   "devDependencies": {
     "opentype.js": "2.0.0",
@@ -75,8 +77,6 @@
   },
   "patchedDependencies": {
     "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
-    "heroui-native@1.0.9": "app/patches/heroui-native+1.0.9.patch",
-    "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
-    "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch"
+    "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch"
   }
 }

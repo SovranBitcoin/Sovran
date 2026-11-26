@@ -3,7 +3,7 @@
  * provider that listens to it: how a BLE start and stop are checked and
  * queued, how a public-mesh lease restarts the mesh, how native events reach
  * JS listeners (and which are dropped), what changes when another account
- * starts, and what `BitchatBLEProvider` mounts and removes.
+ * starts, and what `useBitchatAccountServices` mounts and removes.
  *
  * The real facade runs; only the native module behind `requireNativeModule`
  * is a recording fake. The BLE DM store is the real one over an in-memory
@@ -72,8 +72,13 @@ const {
   startBLE,
   stopBLE,
 } = require('bitchat-module') as typeof import('bitchat-module');
-const { BitchatBLEProvider } =
-  require('@/shared/providers/BitchatBLEProvider') as typeof import('@/shared/providers/BitchatBLEProvider');
+const { useBitchatAccountServices } =
+  require('@/features/bitchat/hooks/useBitchatAccountServices') as typeof import('@/features/bitchat/hooks/useBitchatAccountServices');
+/** The account scope's BitChat services, around its children. */
+function BitchatBLEProvider({ children }: { children?: import('react').ReactNode }) {
+  useBitchatAccountServices();
+  return children;
+}
 /* eslint-enable @typescript-eslint/no-require-imports */
 Object.defineProperty(Platform, 'OS', { value: JEST_PLATFORM, configurable: true });
 

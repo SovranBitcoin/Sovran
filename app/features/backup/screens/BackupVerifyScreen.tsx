@@ -4,7 +4,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
-import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -96,7 +97,7 @@ export function BackupVerifyScreen() {
       setProgress(result.state);
       setAccepted(false);
       locked.current = false;
-      if (result.outcome === 'complete') router.replace('/(prompt-flow)/backup-done');
+      if (result.outcome === 'complete') router.replace('/backup-done');
     }, 250);
   };
   return (

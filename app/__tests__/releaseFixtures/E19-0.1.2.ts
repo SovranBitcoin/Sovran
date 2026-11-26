@@ -923,7 +923,7 @@ export const fixture: ReleaseFixture = {
       `cashu_seed_${IMP_INDEX}`,
     ]),
   },
-  // L/cashu/manager.ts (`coco.db` / `coco-<index>.db`), app/shared/providers/NostrNDKProvider.tsx
+  // L/cashu/manager.ts (`coco.db` / `coco-<index>.db`), app/shared/lib/profile/profileRemovalStorage.ts
   // (`nostr` / `nostr-<index>`): pinned in `__tests__/fixtures/persisted-surface-v0.1.3.json`.
   sqliteDatabases: [
     'coco.db',

@@ -132,7 +132,7 @@ export function E2EActionMenuTargetMarker({
   useEffect(() => {
     if (!enabled || presentedOpenSeq !== openSeq) return;
     // The first frame commits the presented state; the second samples the row
-    // after gorhom has applied its final native transform.
+    // after the sheet has applied its final transform.
     let secondFrame = 0;
     const firstFrame = requestAnimationFrame(() => {
       secondFrame = requestAnimationFrame(measure);
@@ -164,7 +164,7 @@ export function E2EActionMenuTargetMarker({
   );
 }
 
-/** Called by PopupHost only after gorhom reports an opened native snap point.
+/** Called by PopupHost only after the sheet's enter animation lands.
  * React content mounts while the sheet is still closed, so render alone is not
  * sufficient evidence that a coordinate press will hit a visible menu row. */
 export function markE2EActionMenuPresented(openSeq: number): void {
@@ -189,10 +189,9 @@ export function E2EActionMenuRenderMarker({
   return null;
 }
 
-// ── heroui ActionMenuHost mirror ─────────────────────────────────────────────
-// `actionMenuPopup()` renders through the heroui-native Menu in ActionMenuHost
-// (a gorhom sheet inside a FullWindowOverlay), NOT through the popupStore
-// sheets the probe above watches. Its content is equally AX-invisible, so the
+// ── ActionMenuHost mirror ────────────────────────────────────────────────────
+// `actionMenuPopup()` renders through ActionMenuHost's own sheet, NOT through
+// the popupStore sheets the probe above watches. Its content is equally AX-invisible, so the
 // host publishes its open payload title here and a root-tree mirror exposes
 // it. Only the non-secret payload title crosses this DEV-only seam.
 
@@ -208,7 +207,7 @@ export function markE2EHerouiMenu(title: string | null): void {
   useE2EHerouiMenuStore.setState({ title });
 }
 
-/** Dev-only 1×1 mirror of the heroui action-menu open state; mount on screens
+/** Dev-only 1×1 mirror of the action-menu open state; mount on screens
  * whose scenarios must observe an `actionMenuPopup` (e.g. the wallet home's
  * camera-permission menu). `accessibilityValue` carries the menu title. */
 export function E2EHerouiMenuProbe(): React.ReactElement | null {

@@ -1,4 +1,6 @@
-import NDK from '@nostr-dev-kit/ndk-mobile';
+import { createPrivateKeySigner } from 'nostr/client';
+import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { fakeClient } from './helpers/fakeNostrClient';
 import { verifyNip05 } from 'wallet';
 import { safeFetch } from 'wallet/safeFetch';
 import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';
@@ -12,24 +14,10 @@ jest.mock('@/shared/lib/cashu/npc', () => ({
   NPC_BASE_URL: 'https://npub.cash',
   NPC_DOMAIN: 'npub.cash',
 }));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  __esModule: true,
-  default: class {},
-  NDKEvent: class {
-    pubkey: string;
-    raw: Record<string, unknown>;
-    constructor(_ndk: unknown, template: { pubkey: string }) {
-      this.pubkey = template.pubkey;
-      this.raw = template;
-    }
-    async sign() {}
-    rawEvent() {
-      return { ...this.raw, id: 'b'.repeat(64), sig: 'c'.repeat(128) };
-    }
-  },
-}));
-const pubkey = 'a'.repeat(64);
-const makeNdk = () => Object.assign(new NDK(), { signer: { user: async () => ({ pubkey }) } });
+const secretKey = generateSecretKey();
+const pubkey = getPublicKey(secretKey);
+/** The account's client, signing NIP-98 with a real key. */
+const makeClient = () => fakeClient({ signer: createPrivateKeySigner(secretKey) });
 const response = (user: Record<string, unknown>) => ({
   ok: true,
   json: async () => ({ error: false, data: { user } }),
@@ -40,7 +28,7 @@ beforeEach(() => {
 
 it('does not invent a NIP-05 identity from an account with no custom username', async () => {
   jest.mocked(safeFetch).mockResolvedValue(response({ pubkey }) as Response);
-  expect(await loadNpcIdentity(makeNdk(), pubkey, new AbortController().signal)).toEqual({
+  expect(await loadNpcIdentity(makeClient(), pubkey, new AbortController().signal)).toEqual({
     status: 'no-username',
   });
   expect(verifyNip05).not.toHaveBeenCalled();
@@ -51,13 +39,13 @@ it('requires the purchased name to independently map to the selected key', async
   jest
     .mocked(verifyNip05)
     .mockResolvedValueOnce({ status: 'mismatch', identifier: 'alice@npub.cash' });
-  expect(await loadNpcIdentity(makeNdk(), pubkey, new AbortController().signal)).toEqual({
+  expect(await loadNpcIdentity(makeClient(), pubkey, new AbortController().signal)).toEqual({
     status: 'unverified',
   });
   jest
     .mocked(verifyNip05)
     .mockResolvedValueOnce({ status: 'verified', identifier: 'alice@npub.cash' });
-  expect(await loadNpcIdentity(makeNdk(), pubkey, new AbortController().signal)).toEqual({
+  expect(await loadNpcIdentity(makeClient(), pubkey, new AbortController().signal)).toEqual({
     status: 'verified',
     identifier: 'alice@npub.cash',
   });
@@ -72,7 +60,7 @@ it('rejects account data for a different key and does not use its username', asy
   jest
     .mocked(safeFetch)
     .mockResolvedValue(response({ pubkey: 'b'.repeat(64), name: 'alice' }) as Response);
-  expect(await loadNpcIdentity(makeNdk(), pubkey, new AbortController().signal)).toEqual({
+  expect(await loadNpcIdentity(makeClient(), pubkey, new AbortController().signal)).toEqual({
     status: 'unavailable',
   });
   expect(verifyNip05).not.toHaveBeenCalled();

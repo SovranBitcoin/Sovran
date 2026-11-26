@@ -1,3 +1,4 @@
+import { useNostrClient } from '@/runtime/nostrClient';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * @fileoverview Network configuration — the three tiers of the resilient Nostr
@@ -12,9 +13,8 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
  */
 import React from 'react';
 import { RefreshControl } from 'react-native';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { ListGroup, Separator } from 'heroui-native';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -49,7 +49,7 @@ const spokenTierStatus = (status: TierStatus) =>
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
-  const { ndk } = useNDK();
+  const { client } = useNostrClient();
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
   const vertexCreditsEnabled = useSettingsStore((s) => s.vertexCreditsEnabled);
   const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
@@ -177,7 +177,7 @@ export function SettingsNetworkScreen() {
           </ListGroup>
         </Section>
 
-        <RelayListSettings key={ownPubkey} ndk={ndk} pubkey={ownPubkey} health={health} />
+        <RelayListSettings key={ownPubkey} client={client} pubkey={ownPubkey} health={health} />
       </ScreenScrollView>
     </ScreenWrapper>
   );

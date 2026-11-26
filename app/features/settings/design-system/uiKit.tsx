@@ -16,6 +16,7 @@ import React, { type ComponentProps } from 'react';
 import type { SharedValue } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import type { ViewState } from '@/shared/lib/viewState';
 import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import type { GridStat } from '@/shared/ui/composed/StatsGrid';
@@ -41,10 +42,13 @@ const SOURCES = {
   notice: 'shared/ui/composed/Notice.tsx',
   presenceDot: 'shared/ui/primitives/PresenceDot.tsx',
   pressScale: 'shared/ui/primitives/PressScale.tsx',
+  rollingAmountText: 'shared/ui/composed/RollingAmountText.tsx',
   selectableCheck: 'shared/ui/primitives/SelectableCheck/index.tsx',
   selectableCheckCircle: 'shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx',
   selectableCheckSquare: 'shared/ui/primitives/SelectableCheck/SelectableCheck.square.tsx',
   settingsRows: 'shared/ui/composed/SettingsRows.tsx',
+  skeletonContentCrossfade: 'shared/ui/composed/SkeletonContentCrossfade.tsx',
+  stateSwitch: 'shared/ui/composed/StateSwitch.tsx',
   statsGrid: 'shared/ui/composed/StatsGrid.tsx',
   switch: 'shared/ui/primitives/Switch.tsx',
   text: 'shared/ui/primitives/Text.tsx',
@@ -54,19 +58,20 @@ const noop = () => undefined;
 
 /**
  * The parts the fixtures draw, loaded on first render rather than when the
- * catalog is imported: several reach `heroui-native` or platform modules, and
+ * catalog is imported: several reach native or platform modules, and
  * the catalog's metadata is read where neither can load.
  */
 function ui() {
   return {
     Icon: (require('@/assets/icons') as typeof import('@/assets/icons')).default,
-    ListGroup: (require('heroui-native') as typeof import('heroui-native')).ListGroup,
+    ...(require('@/shared/ui/composed/ListGroup') as typeof import('@/shared/ui/composed/ListGroup')),
     ...(require('@/features/mint/components/MintHeader') as typeof import('@/features/mint/components/MintHeader')),
     ...(require('@/shared/ui/composed/AmountFormatter') as typeof import('@/shared/ui/composed/AmountFormatter')),
     ...(require('@/shared/ui/composed/ListRow') as typeof import('@/shared/ui/composed/ListRow')),
     ...(require('@/shared/ui/composed/MintIcon') as typeof import('@/shared/ui/composed/MintIcon')),
     ...(require('@/shared/ui/composed/Notice') as typeof import('@/shared/ui/composed/Notice')),
     ...(require('@/shared/ui/composed/SettingsRows') as typeof import('@/shared/ui/composed/SettingsRows')),
+    ...(require('@/shared/ui/composed/StateSwitch') as typeof import('@/shared/ui/composed/StateSwitch')),
     ...(require('@/shared/ui/composed/StatsGrid') as typeof import('@/shared/ui/composed/StatsGrid')),
     ...(require('@/shared/ui/primitives/Badge') as typeof import('@/shared/ui/primitives/Badge')),
     ...(require('@/shared/ui/primitives/Button') as typeof import('@/shared/ui/primitives/Button')),
@@ -434,6 +439,87 @@ function BalanceHeroFixture({
       ) : (
         <AmountFormatter amount={amount} unit="sat" displayPreference={0} size={size} centered />
       )}
+    </View>
+  );
+}
+
+// ── StateSwitch (ViewState<T>) ──────────────────────────────────
+
+const VIEW_STATE_MINTS = ['Peanut Mint', 'Minibits', 'Stablenut'] as const;
+
+/** Every state a `ViewState<T>` can hold, on one shared row chrome. */
+const VIEW_STATES = {
+  loading: { status: 'loading' },
+  empty: { status: 'empty' },
+  error: { status: 'error', error: new Error('Timed out') },
+  ready: { status: 'ready', data: VIEW_STATE_MINTS },
+  refreshing: { status: 'refreshing', data: VIEW_STATE_MINTS },
+  stale: { status: 'stale', data: VIEW_STATE_MINTS },
+} satisfies Record<ViewState<unknown>['status'], ViewState<readonly string[]>>;
+
+function ViewStateRows({
+  names,
+  loading = false,
+}: {
+  names: readonly string[];
+  loading?: boolean;
+}) {
+  return (
+    <View className="gap-2">
+      {names.map((name) => (
+        <Text key={name} loading={loading} placeholder="Mint name" bold size={15} visualDisabled>
+          {name}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function StateSwitchFixture({ state }: { state: ViewState<readonly string[]> }) {
+  const { StateSwitch, Notice } = ui();
+  const muted = useThemeColor('muted');
+  return (
+    <StateSwitch
+      state={state}
+      wave="none"
+      visualDisabled
+      renderLoading={() => <ViewStateRows names={VIEW_STATE_MINTS} loading />}
+      renderEmpty={() => (
+        <Text size={15} color={muted}>
+          No mints yet
+        </Text>
+      )}
+      renderError={() => <Notice status="danger" size="compact" title="Couldn’t load your mints" />}
+      renderData={(names, info) => (
+        <View className="gap-3">
+          <ViewStateRows names={names} />
+          {info.status === 'refreshing' ? (
+            <Text size={12} color={muted}>
+              Updating…
+            </Text>
+          ) : null}
+          {info.status === 'stale' ? (
+            <Notice status="warning" size="compact" title="Last updated while offline" />
+          ) : null}
+        </View>
+      )}
+    />
+  );
+}
+
+/** The balance hero rolling between two fixed values (here, settled on the second). */
+function RollingBalanceFixture() {
+  const { AmountFormatter } = ui();
+  return (
+    <View className="items-center">
+      <AmountFormatter
+        amount={21_000}
+        unit="sat"
+        displayPreference={0}
+        size={44}
+        centered
+        animated
+      />
     </View>
   );
 }
@@ -994,6 +1080,70 @@ export const UI_KIT_SCENARIOS = [
         <NoticeFixture status="warning" tone="soft" {...OFFLINE_NOTICE} />
       </LargeTextFrame>
     ),
+  },
+
+  // StateSwitch over ViewState<T>: all six states.
+  {
+    id: 'view-state-loading',
+    title: 'View state · Loading',
+    component: 'StateSwitch',
+    state: 'loading',
+    covers: [SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+    render: () => <StateSwitchFixture state={VIEW_STATES.loading} />,
+  },
+  {
+    id: 'view-state-empty',
+    title: 'View state · Empty',
+    component: 'StateSwitch',
+    state: 'empty',
+    covers: [SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+    render: () => <StateSwitchFixture state={VIEW_STATES.empty} />,
+  },
+  {
+    id: 'view-state-error',
+    title: 'View state · Error',
+    component: 'StateSwitch',
+    state: 'error',
+    covers: [
+      ...[SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+      SOURCES.notice,
+    ],
+    render: () => <StateSwitchFixture state={VIEW_STATES.error} />,
+  },
+  {
+    id: 'view-state-ready',
+    title: 'View state · Ready',
+    component: 'StateSwitch',
+    state: 'populated',
+    covers: [SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+    render: () => <StateSwitchFixture state={VIEW_STATES.ready} />,
+  },
+  {
+    id: 'view-state-refreshing',
+    title: 'View state · Refreshing (same rows, still mounted)',
+    component: 'StateSwitch',
+    state: 'default',
+    covers: [SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+    render: () => <StateSwitchFixture state={VIEW_STATES.refreshing} />,
+  },
+  {
+    id: 'view-state-stale',
+    title: 'View state · Stale',
+    component: 'StateSwitch',
+    state: 'offline',
+    covers: [
+      ...[SOURCES.stateSwitch, SOURCES.skeletonContentCrossfade, SOURCES.text],
+      SOURCES.notice,
+    ],
+    render: () => <StateSwitchFixture state={VIEW_STATES.stale} />,
+  },
+  {
+    id: 'amount-rolling',
+    title: 'Balance · Rolling digits',
+    component: 'AmountFormatter',
+    state: 'populated',
+    covers: [SOURCES.amountFormatter, SOURCES.rollingAmountText],
+    render: () => <RollingBalanceFixture />,
   },
 ] satisfies readonly (DesignSystemScenario & {
   component: string;

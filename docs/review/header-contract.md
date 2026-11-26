@@ -24,7 +24,7 @@ mint selection in its existing bottom action slot, with its payment constraints 
 A plain title remains appropriate when no identity is known or the page does not scroll.
 
 Receive's pinned selectors use opaque chrome, continuous with their solid tab band.
-Receive and custom fixed-filter lists (Feed, Contacts, Notifications) declare
+Receive and custom fixed-filter lists (Contacts) declare
 `headerAppearance="opaque"`. Other scrolling pages retain the bounded gradient.
 This is a supported variant, not an exception implemented with native header colors.
 
@@ -36,15 +36,13 @@ fade. A fixed `safeArea` frame is reserved for pinned-filter/non-scrolling layou
 placing an ordinary page scroller inside it leaves the header looking permanently
 solid. Safe-area and navigation insets are applied once.
 Full-bleed profile banners reveal the gradient after the identity leaves the page.
-Camera, stories and other deliberately immersive media may omit the gradient/header.
+Camera and other deliberately immersive media may omit the gradient/header.
 
 Examples: Settings → Design system → Headers. Native scenario: `settings.headers`.
 Verify top, threshold, reverse scroll, long names, missing images, reduced motion,
 and large text on iOS and Android. Static gates do not establish native appearance.
 
-The deterministic glass-header gate owns forbidden opaque header options. The
-`ui-header-*` [checks](README.md) ask about behavior across layout and scroll ownership, not the
-presence of an API.
+The deterministic glass-header gate owns forbidden opaque header options.
 
 
 Horizontal currency/month strips use `headerAppearance="gradient-tabs"`: one

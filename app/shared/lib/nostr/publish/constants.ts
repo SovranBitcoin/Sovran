@@ -7,7 +7,7 @@
  */
 import type { RetryPolicy } from '@/shared/lib/nostr/publish/types';
 
-/** Per-relay OK timeout. `relay.publish(event, ms)` rejects after this. */
+/** Per-relay OK timeout. `client.publishToRelay(url, event, ms)` rejects after this. */
 export const PUBLISH_TIMEOUT_MS = 10_000;
 
 /** Default retry: re-hit only the relays that failed, with exponential backoff. */

@@ -25,18 +25,15 @@ import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 import { parseP2PKSecretInput } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
-import QRCode from 'react-native-qrcode-svg';
+import { QrMatrix } from '@/shared/ui/primitives/QrMatrix';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { withAlpha } from '@/shared/lib/color';
-import {
-  Button,
-  ListGroup,
-  PressableFeedback,
-  Separator,
-  Switch as HeroSwitch,
-} from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
+import { Switch } from '@/shared/ui/primitives/Switch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { spacing } from '@/shared/styles/tokens';
@@ -110,7 +107,7 @@ const CurrentKeyItem: React.FC<{
           }}>
           {/* QR pinned to dark-on-white regardless of theme — scanners are
               strict and an inverted (light-on-dark) render is unreliable. */}
-          <QRCode
+          <QrMatrix
             value={activeData}
             size={120}
             color={INVARIANT_BLACK}
@@ -142,22 +139,22 @@ const CurrentKeyItem: React.FC<{
       </View>
 
       <HStack gap={10} className="mt-3.5">
-        <Button
+        <PillButton
           variant="secondary"
           className="flex-1"
           testID="keyring-active-copy"
           onPress={handleCopy}>
           <Icon name="lets-icons:copy" size={16} color={muted} />
-          <Button.Label style={{ color: muted }}>Copy</Button.Label>
-        </Button>
-        <Button
+          <PillButton.Label style={{ color: muted }}>Copy</PillButton.Label>
+        </PillButton>
+        <PillButton
           variant="secondary"
           className="flex-1"
           testID="keyring-active-show-qr"
           onPress={handleShowQR}>
           <Icon name="stash:qr-code" size={16} color={muted} />
-          <Button.Label style={{ color: muted }}>Show QR</Button.Label>
-        </Button>
+          <PillButton.Label style={{ color: muted }}>Show QR</PillButton.Label>
+        </PillButton>
       </HStack>
     </View>
   );
@@ -215,7 +212,7 @@ const KeyItem: React.FC<{
           </Text>
         </ListGroup.ItemContent>
         <HStack gap={4}>
-          <Button
+          <PillButton
             variant="ghost"
             size="sm"
             isIconOnly
@@ -223,8 +220,8 @@ const KeyItem: React.FC<{
             testID={`keyring-key-copy-${keypair.publicKeyHex}`}
             onPress={() => onCopy(keypair.publicKeyHex)}>
             <Icon name="lets-icons:copy" size={16} />
-          </Button>
-          <Button
+          </PillButton>
+          <PillButton
             variant="ghost"
             size="sm"
             isIconOnly
@@ -232,7 +229,7 @@ const KeyItem: React.FC<{
             testID={`keyring-key-qr-${keypair.publicKeyHex}`}
             onPress={handleShowQR}>
             <Icon name="stash:qr-code" size={16} />
-          </Button>
+          </PillButton>
         </HStack>
       </View>
     </PressableFeedback>
@@ -575,7 +572,7 @@ export const SettingsKeyringScreen: React.FC = () => {
               </ListGroup.ItemDescription>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>
-              <HeroSwitch
+              <Switch
                 testID="keyring-regenerate-on-receive"
                 accessibilityLabel="Regenerate key on receive"
                 isSelected={regenerateP2PKOnReceive ?? true}
@@ -592,7 +589,7 @@ export const SettingsKeyringScreen: React.FC = () => {
               </ListGroup.ItemDescription>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>
-              <Button
+              <PillButton
                 variant="secondary"
                 size="sm"
                 isDisabled={!canImportCurrentNsec || isImportingCurrentNsec}
@@ -608,8 +605,8 @@ export const SettingsKeyringScreen: React.FC = () => {
                 ) : (
                   <Icon name="mdi:key-chain" size={16} color={foreground} />
                 )}
-                <Button.Label>Add</Button.Label>
-              </Button>
+                <PillButton.Label>Add</PillButton.Label>
+              </PillButton>
             </ListGroup.ItemSuffix>
           </ListGroup.Item>
         </ListGroup>

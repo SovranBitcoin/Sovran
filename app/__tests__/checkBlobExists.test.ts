@@ -4,9 +4,6 @@
  */
 /* eslint-disable import/first */
 
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ __esModule: true, NDKEvent: class {} }), {
-  virtual: true,
-});
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   nostrLog: { info: jest.fn(), warn: jest.fn() },

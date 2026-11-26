@@ -80,29 +80,6 @@ jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('@/shared/hooks/useDeferredMount', () => ({ useDeferredMount: () => false }));
-jest.mock('heroui-native', () => {
-  const React = jest.requireActual('react');
-  const host = (name: string) =>
-    function MockHost(props: object) {
-      return React.createElement(name, props);
-    };
-  return {
-    ListGroup: Object.assign(host('ListGroup'), {
-      Item: host('Item'),
-      ItemPrefix: host('Prefix'),
-      ItemContent: host('Content'),
-      ItemTitle: host('Title'),
-      ItemDescription: host('Description'),
-      ItemSuffix: host('Suffix'),
-    }),
-    PressableFeedback: Object.assign(host('Pressable'), {
-      Scale: host('Scale'),
-      Ripple: () => null,
-    }),
-    Separator: () => null,
-    Switch: host('Switch'),
-  };
-});
 
 let tree: TestRenderer.ReactTestRenderer;
 function render() {

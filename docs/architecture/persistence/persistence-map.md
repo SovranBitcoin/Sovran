@@ -174,7 +174,8 @@ candidate's Coco. `cocoVersionsDocumented.test.ts` fails when a database is adde
 | `@cashu/coco-expo-sqlite` 1.0.0-rc.5 | 1.0.0-rc.5 | 0.0.63 (builds from 2026-04-28, inferred) |
 | `@cashu/coco-expo-sqlite` 1.0.0 | 1.0.0 | 0.1.0 |
 | `@cashu/coco-expo-sqlite` 1.0.1 | 1.0.1 | 0.1.1 |
-| `@cashu/coco-expo-sqlite` 2.0.0 | 2.0.0 | 0.1.2, 0.1.3, 0.1.4 (unreleased) |
+| `@cashu/coco-expo-sqlite` 2.0.0 | 2.0.0 | 0.1.2, 0.1.3 |
+| `@cashu/coco-expo-sqlite` 0.0.0-nightly-20261120132306-58abfae | 0.0.0-nightly-20261120132306-58abfae | 0.1.4 (unreleased) |
 
 **Manifest/lock discrepancy:** the early 0.0.51 manifest and committed lock disagree. The table reports the lock resolution, not proof of the library bundled in a released binary.
 

@@ -22,7 +22,7 @@ import {
 
 import { useMints } from '@cashu/coco-react';
 
-import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
+import { useWalletContextWithOverride } from '@/runtime/WalletProjection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -33,7 +33,7 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';

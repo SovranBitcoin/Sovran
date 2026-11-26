@@ -51,7 +51,7 @@ import {
   notifyNutDropNeedsBitcoinAccount,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
@@ -64,7 +64,7 @@ import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useWalletContext } from '@/runtime/WalletProjection';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -2159,8 +2159,8 @@ export function NearPayScreen() {
         // display, so the bar carries nothing beside the back button.
         headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
         // The send flow's shared-element avatar lands inside the header band,
-        // and Android's sheet header (FlowSheetHeader) composites its scrim
-        // gradient ABOVE screen content — the avatar ended up underneath it.
+        // and Android composites the header's scrim gradient ABOVE screen
+        // content — the avatar ended up underneath it.
         // A null headerBackground is the sanctioned per-screen scrim opt-out;
         // the radar's faint dot field doesn't need the legibility fade.
         ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),

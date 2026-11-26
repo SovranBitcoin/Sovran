@@ -19,7 +19,12 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   getPrivateKey: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({ useNostrKeysContext: jest.fn() }));
-jest.mock('@/shared/providers/InitializationProvider', () => ({
+// No relay sockets: the client under test opens none.
+jest.mock('@/shared/ndk', () => ({ relays: [] }));
+jest.mock('@/shared/lib/nostr/outbox/useOwnRelayListSync', () => ({
+  useOwnRelayListSync: jest.fn(),
+}));
+jest.mock('@/runtime/initializationStages', () => ({
   useInitializationStage: jest.fn(),
 }));
 jest.mock('expo-image-manipulator', () => ({
@@ -377,41 +382,57 @@ it('reports leak locations without logging payloads', async () => {
   expect(JSON.stringify(log.warn.mock.calls)).not.toContain(previous);
 });
 
-it('NDK provider unmount stops subscriptions, disconnects relays and drops the signer', async () => {
-  await setup();
+/** Renders the account's Nostr client provider, ready, with a real key; returns what it exposes. */
+function renderNostrClient() {
   const React = require('react');
-  const renderer = require('react-test-renderer');
-  const mobile = require('@nostr-dev-kit/ndk-mobile');
-  const keys = require('@/shared/providers/NostrKeysProvider');
-  const initialization = require('@/shared/providers/InitializationProvider');
-  const logger = require('@/shared/lib/logger');
-  logger.useInitMount = jest.fn();
-  initialization.useInitializationStage.mockReturnValue({ canStart: false });
-  keys.useNostrKeysContext.mockReturnValue({ keys: null });
-  const stop = jest.fn();
-  const disconnect = jest.fn();
-  const ndk = {
-    signer: { account: 'A' },
-    removeAllListeners: jest.fn(),
-    pool: { relays: new Map([['relay', { disconnect }]]) },
-    subManager: { subscriptions: new Map([['subscription', { stop }]]) },
-  };
-  const spy = jest.spyOn(mobile, 'useNDK').mockReturnValue({ ndk, init: jest.fn() });
-  const { NostrNDKProvider } = require('@/shared/providers/NostrNDKProvider');
-  let tree: ReturnType<typeof renderer.create>;
-  try {
-    await renderer.act(async () => {
-      tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
-    });
-    await renderer.act(async () => {
-      tree.unmount();
-    });
-    expect(stop).toHaveBeenCalled();
-    expect(disconnect).toHaveBeenCalled();
-    expect(ndk.signer).toBeUndefined();
-  } finally {
-    spy.mockRestore();
+  const { generateSecretKey, getPublicKey } = require('nostr-tools/pure');
+  require('@/shared/lib/logger').useInitMount = jest.fn();
+  require('@/runtime/initializationStages').useInitializationStage.mockReturnValue({
+    canStart: true,
+    log: jest.fn(),
+    complete: jest.fn(),
+    error: jest.fn(),
+  });
+  const privateKey = generateSecretKey();
+  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
+    keys: { privateKey, pubkey: getPublicKey(privateKey) },
+  });
+  const { useNostrClient, useNostrClientLifecycle } = require('@/runtime/nostrClient');
+  function NostrClientProvider({
+    accountIndex,
+    children,
+  }: {
+    accountIndex: number;
+    children: React.ReactNode;
+  }) {
+    useNostrClientLifecycle(accountIndex);
+    return children;
   }
+  const seen: { client?: import('nostr/client').NostrClient } = {};
+  function Probe() {
+    seen.client = useNostrClient().client ?? seen.client;
+    return null;
+  }
+  const element = () =>
+    React.createElement(NostrClientProvider, { accountIndex: 0 }, React.createElement(Probe));
+  return { seen, element };
+}
+
+it('Nostr client provider unmount closes the client and zeroes its signer', async () => {
+  await setup();
+  const renderer = require('react-test-renderer');
+  const { seen, element } = renderNostrClient();
+  let tree: ReturnType<typeof renderer.create>;
+  await renderer.act(async () => {
+    tree = renderer.create(element());
+  });
+  const client = seen.client!;
+  expect(client.signer).toBeDefined();
+  await renderer.act(async () => {
+    tree.unmount();
+  });
+  expect(client.disposed).toBe(true);
+  expect(client.signer).toBeUndefined();
 });
 
 it('does not merge a late account-A hydration into an empty account B', async () => {
@@ -452,13 +473,8 @@ it('does not merge a late account-A hydration into an empty account B', async ()
 it('strict Coco cleanup rejects swallowed teardown failures while default cleanup stays best-effort', async () => {
   await setup();
   const { CocoManager } = jest.requireActual('@/shared/lib/cashu/manager');
-  const dispose = jest.fn().mockResolvedValue(undefined);
+  const dispose = jest.fn().mockRejectedValue(new Error('dispose failed'));
   const instance = {
-    disableProofStateWatcher: jest.fn().mockRejectedValue(new Error('watcher teardown failed')),
-    disableMintOperationProcessor: jest.fn().mockResolvedValue(undefined),
-    disableMintOperationWatcher: jest.fn().mockResolvedValue(undefined),
-    disableMeltSettlementProcessor: jest.fn().mockResolvedValue(undefined),
-    disableMeltQuoteWatcher: jest.fn().mockResolvedValue(undefined),
     dispose,
   };
   // Synthetic manager only: no native database, proofs, wallet or network.
@@ -541,91 +557,41 @@ it('persists a final teardown write under A before raising the reset barrier', a
   expect(await env.storage.getItem(`theme-store:profile:${'b'.repeat(64)}`)).toBeNull();
 });
 
-it('replaces the old NDK/cache through public init before exposing B', async () => {
+it('stops the old Nostr client through its switch service and account holder before exposing B', async () => {
   const env = await setup();
-  const React = require('react');
   const renderer = require('react-test-renderer');
-  const mobile = require('@nostr-dev-kit/ndk-mobile');
-  require('@/shared/lib/logger').useInitMount = jest.fn();
-  require('@/shared/providers/InitializationProvider').useInitializationStage.mockReturnValue({
-    canStart: false,
-  });
-  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
-    keys: null,
-  });
-  const old = {
-    cacheAdapter: { database: 'A' },
-    signer: {},
-    removeAllListeners: jest.fn(),
-    subManager: { subscriptions: new Map() },
-    pool: { relays: new Map() },
-    outboxPool: { relays: new Map([['outbox', { disconnect: jest.fn() }]]) },
-  };
-  let current = old;
-  const init = jest.fn((params) => {
-    current = { ...params };
-  });
-  const logout = jest.fn();
-  const spy = jest
-    .spyOn(mobile, 'useNDK')
-    .mockImplementation(() => ({ ndk: current, init, logout }));
-  const { NostrNDKProvider } = require('@/shared/providers/NostrNDKProvider');
+  const { seen, element } = renderNostrClient();
   let tree: ReturnType<typeof renderer.create>;
   try {
     await renderer.act(async () => {
-      tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
+      tree = renderer.create(element());
     });
-    await env.protocol.profileSwitchServices().get('nostr.ndk')();
-    const holder = env.accountHolders.find((entry) => entry.name === 'nostr.ndk:0');
+    const client = seen.client!;
+    await env.protocol.profileSwitchServices().get('nostr.client')!();
+    expect(client.disposed).toBe(true);
+    expect(client.signer).toBeUndefined();
+    const holder = env.accountHolders.find((entry) => entry.name === 'nostr.client:0');
+    expect(holder?.inspect?.()).toBe(true);
     await renderer.act(async () => {
       tree.unmount();
     });
     await holder?.dispose();
-    expect(mobile.useNDK().ndk).not.toBe(old);
-    expect(mobile.useNDK().ndk.cacheAdapter).not.toBe(old.cacheAdapter);
-    expect(init).toHaveBeenCalledWith(expect.objectContaining({ explicitRelayUrls: [] }));
-    expect(logout).toHaveBeenCalledTimes(1);
-    expect(old.outboxPool.relays.get('outbox')?.disconnect).toHaveBeenCalled();
+    expect(env.accountHolders.find((entry) => entry.name === 'nostr.client:0')).toBeUndefined();
   } finally {
     await renderer.act(async () => {
       tree?.unmount();
     });
-    spy.mockRestore();
   }
 });
 
-it('disposes an NDK initialized after quiescence has taken the service snapshot', async () => {
+it('disposes a Nostr client started after quiescence has taken the service snapshot', async () => {
   const env = await setup();
-  const React = require('react');
   const renderer = require('react-test-renderer');
-  const mobile = require('@nostr-dev-kit/ndk-mobile');
-  require('@/shared/lib/logger').useInitMount = jest.fn();
-  require('@/shared/providers/InitializationProvider').useInitializationStage.mockReturnValue({
-    canStart: false,
-  });
-  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
-    keys: null,
-  });
-  const old = {
-    cacheAdapter: { database: 'A' },
-    signer: {},
-    removeAllListeners: jest.fn(),
-    subManager: { subscriptions: new Map() },
-    pool: { relays: new Map() },
-    outboxPool: { relays: new Map([['relay', { disconnect: jest.fn() }]]) },
-  };
-  let current = old;
-  const init = jest.fn((params) => {
-    current = { ...params };
-  });
-  const spy = jest
-    .spyOn(mobile, 'useNDK')
-    .mockImplementation(() => ({ ndk: current, init, logout: jest.fn() }));
-  const { NostrNDKProvider } = require('@/shared/providers/NostrNDKProvider');
+  const { seen, element } = renderNostrClient();
   let tree: ReturnType<typeof renderer.create>;
   env.protocol.registerProfileSwitchService('deferred-provider', async () => {
     await renderer.act(async () => {
-      tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
+      tree = renderer.create(element());
     });
   });
   env.suspend.mockImplementation(async () => {
@@ -633,13 +599,8 @@ it('disposes an NDK initialized after quiescence has taken the service snapshot'
       tree.unmount();
     });
   });
-  try {
-    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
-    expect(env.restartApp).not.toHaveBeenCalled();
-    expect(current).not.toBe(old);
-    expect(old.cacheAdapter).toBeUndefined();
-    expect(old.outboxPool.relays.get('relay')?.disconnect).toHaveBeenCalled();
-  } finally {
-    spy.mockRestore();
-  }
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(seen.client?.disposed).toBe(true);
+  expect(seen.client?.signer).toBeUndefined();
 });

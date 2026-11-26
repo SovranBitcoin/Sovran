@@ -32,15 +32,14 @@ jest.mock('react-native-web/dist/exports/View', () => ({
   default: mockHost('RNView'),
 }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: mockHost('RNView') }));
-jest.mock('heroui-native', () => {
-  const PressableFeedback = Object.assign(mockHost('Pressable'), { Ripple: () => null });
-  return { PressableFeedback };
-});
 jest.mock('@expo/ui/swift-ui', () => ({ Host: mockHost('Host'), Button: mockHost('SwiftButton') }));
 jest.mock('@expo/ui/swift-ui/modifiers', () => ({
   environment: () => ({}),
   frame: (f: unknown) => ({ frame: f }),
   glassEffect: () => ({}),
+}));
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => ({
+  PressableFeedback: Object.assign(mockHost('Pressable'), { Ripple: () => null }),
 }));
 jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => 'dark' }));
 jest.mock('@/shared/styles/appStyle', () => ({ useControlChrome: () => ({}) }));

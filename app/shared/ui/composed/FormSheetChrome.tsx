@@ -7,14 +7,13 @@
  * the native header would have provided. On iOS it renders children
  * untouched (the blurred native header is already there).
  *
- * Layout mirrors FlowSheetHeader: the chrome is an absolute OVERLAY with the
- * eased HeaderGradient behind it (solid through the title row, fade tail
- * below the bar), and children fill the sheet from the very top.
- * AndroidSheetRoot publishes FLOW_SHEET_HEADER_HEIGHT through
- * SheetHeaderHeightContext, so composed Screen/ModalLayoutWrapper children
- * auto-inset below the bar and their content scrolls UNDER the fade — same
- * treatment as the flow sheets. Screens not using the composed Screen must
- * inset themselves by FLOW_SHEET_HEADER_HEIGHT.
+ * The chrome is an absolute OVERLAY with the eased HeaderGradient behind it
+ * (solid through the title row, fade tail below the bar), and children fill
+ * the sheet from the very top. AndroidSheetRoot publishes SHEET_HEADER_HEIGHT
+ * through SheetHeaderHeightContext, so composed Screen/ModalLayoutWrapper
+ * children auto-inset below the bar and their content scrolls UNDER the fade.
+ * Screens not using the composed Screen must inset themselves by
+ * SHEET_HEADER_HEIGHT.
  *
  * Apply in the standalone ROUTE files only (app/sendToken.tsx etc.), not in
  * screen components — the same screens are pushed inside flow stacks where
@@ -29,10 +28,14 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
-import { AndroidSheetRoot, SheetPageLayer } from '@/shared/ui/composed/AndroidSheetRoot';
+import {
+  AndroidSheetRoot,
+  SHEET_HEADER_HEIGHT,
+  SHEET_SCRIM_HEIGHT,
+  SheetPageLayer,
+} from '@/shared/ui/composed/AndroidSheetRoot';
 import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 import { androidFlowPresentation } from '@/config/androidFlowPresentation';
-import { FLOW_SHEET_HEADER_HEIGHT, SCRIM_TOTAL_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 interface FormSheetChromeProps {
   /** The standalone route's file name, e.g. `lightningSend`. */
@@ -54,15 +57,15 @@ function AndroidFormSheetChrome({
     // AndroidSheetRoot pins the sheet to exact full height — RNS single-detent
     // sheets otherwise size to content (variable top gap) — and publishes the
     // chrome height so composed Screens inset + scroll under the fade.
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+    <AndroidSheetRoot headerHeight={SHEET_HEADER_HEIGHT}>
       <View style={styles.container}>
         <SheetPageLayer>{children}</SheetPageLayer>
         <View style={styles.chrome} pointerEvents="box-none">
           <View style={styles.scrimLayer} pointerEvents="none">
             <HeaderGradient
               backgroundColor={scrimColor ?? background}
-              height={SCRIM_TOTAL_HEIGHT}
-              anchor={FLOW_SHEET_HEADER_HEIGHT / SCRIM_TOTAL_HEIGHT - 0.1}
+              height={SHEET_SCRIM_HEIGHT}
+              anchor={SHEET_HEADER_HEIGHT / SHEET_SCRIM_HEIGHT - 0.1}
             />
           </View>
           <SheetGrabber />
@@ -110,7 +113,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: FLOW_SHEET_HEADER_HEIGHT,
+    height: SHEET_HEADER_HEIGHT,
   },
   // Taller than the chrome (fade tail below the bar) — overflow stays
   // default-visible; pointerEvents none so the tail can't eat touches.
@@ -119,7 +122,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCRIM_TOTAL_HEIGHT,
+    height: SHEET_SCRIM_HEIGHT,
   },
   titleRow: {
     paddingHorizontal: spacing.sm,

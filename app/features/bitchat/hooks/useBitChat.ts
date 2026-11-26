@@ -242,7 +242,7 @@ function wiringFor(
 
     //  Upstream keeps the BLE mesh running as one process; DM threads are
     //  just a filtered view over `onBLEPrivateMessage`, which
-    //  `BitchatBLEProvider` pushes into `useBitchatDmMessagesStore` so inbound
+    //  `useBitchatAccountServices` pushes into `useBitchatDmMessagesStore` so inbound
     //  DMs aren't dropped while this screen is closed. The store also tracks
     //  delivery status, so this transport listens to nothing here.
     case 'ble-dm': {
@@ -436,7 +436,7 @@ export function useBitChat({
           if (!dmPeerID) return;
           // Noise-encrypted DM. Add an optimistic message to the GLOBAL
           // store (not local state) so the app-wide delivery-status
-          // listener in BitchatBLEProvider can update its
+          // listener in useBitchatAccountServices can update its
           // status as the native side reports
           // `sending → sent → delivered`. Empty senderId matches the ble
           // public path so `useMessageGrouping` doesn't conflate own +
@@ -565,7 +565,7 @@ export function useBitChat({
   );
 
   // For `ble-dm` the source of truth is the global store (populated by
-  // BitchatBLEProvider's listener + this hook's send path). All other
+  // useBitchatAccountServices's listener + this hook's send path). All other
   // transports use the local `messages` buffer.
   const source: readonly BleDmMessage[] | undefined =
     transport === 'ble-dm' ? bleDmMessages : messages;

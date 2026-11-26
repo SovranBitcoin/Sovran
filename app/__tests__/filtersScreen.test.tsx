@@ -118,11 +118,13 @@ jest.mock('@/shared/ui/composed/CapsuleButton', () => ({
   CapsuleButton: jest.requireActual('@/shared/ui/composed/CapsuleButton/CapsuleButton.flat')
     .CapsuleButtonFlat,
 }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
   const React = jest.requireActual('react');
   return {
     PressableFeedback: Object.assign((props: object) => React.createElement('Pressable', props), {
       Ripple: () => null,
+      Highlight: () => null,
+      Scale: ({ children }: { children?: React.ReactNode }) => children,
     }),
   };
 });

@@ -11,7 +11,7 @@
  * (`relayListRelays`). Sending it to all of those reaches the old write
  * relays and the new ones alike, so both sides learn of the change.
  */
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import type { NostrClient } from 'nostr/client';
 import { err, ok, type Result } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -105,7 +105,7 @@ const sameBase = (a: CompleteRead, b: CompleteRead) =>
 
 // Read newly learned destinations too, before offering a base for review.
 async function readRelayBase(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   proposed: readonly RelayListEntry[] = [],
   previous: readonly string[] = []
@@ -118,7 +118,7 @@ async function readRelayBase(
     ...proposed.filter((e) => e.write).map((e) => e.url),
   ]);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const read = await readForEdit(ndk, pubkey, RELAY_LIST_KIND, relays);
+    const read = await readForEdit(client, pubkey, RELAY_LIST_KIND, relays);
     if (read.status === 'waiting') return read;
     const learned = entriesFrom(read)
       .filter((e) => e.write)
@@ -130,15 +130,15 @@ async function readRelayBase(
   return { status: 'waiting', reason: 'relay-list-unknown' } satisfies ReadForEdit;
 }
 
-const publishing = new WeakMap<NDK, Set<string>>();
+const publishing = new WeakMap<NostrClient, Set<string>>();
 async function exclusively(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   run: () => Promise<PublishResult>
 ): Promise<PublishResult> {
-  const active = publishing.get(ndk) ?? new Set<string>();
+  const active = publishing.get(client) ?? new Set<string>();
   if (active.has(pubkey)) return err({ type: 'waiting' });
-  publishing.set(ndk, active);
+  publishing.set(client, active);
   active.add(pubkey);
   try {
     return await run();
@@ -149,7 +149,7 @@ async function exclusively(
 
 /** A complete read starts an ephemeral edit. No toggle writes the saved store. */
 export async function beginRelayListEdit(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string
 ): Promise<Result<RelayListEditor, RelayListPublishError>> {
   const scope = captureActiveProfile(pubkey);
@@ -167,15 +167,15 @@ export async function beginRelayListEdit(
     useRelayListStore.getState().entries === held &&
     useRelayListStore.getState().updatedAt === updatedAt;
   try {
-    const signer = await matchingSigner(ndk, pubkey);
+    const signer = await matchingSigner(client, pubkey);
     scope.check();
     if (!destinations || !wanted()) {
       dispose();
       return err({ type: 'waiting' });
     }
-    const base = await readRelayBase(ndk, pubkey, [], destinations);
+    const base = await readRelayBase(client, pubkey, [], destinations);
     scope.check();
-    if (base.status === 'waiting' || !wanted() || ndk.signer !== signer) {
+    if (base.status === 'waiting' || !wanted() || client.signer !== signer) {
       dispose();
       return err({ type: 'waiting' });
     }
@@ -197,16 +197,16 @@ export async function beginRelayListEdit(
           base: snapshot(entriesFrom(reviewed)),
           entries: proposal,
           publish: () =>
-            exclusively(ndk, pubkey, async () => {
+            exclusively(client, pubkey, async () => {
               if (consumed) return err({ type: 'waiting' });
               consumed = true;
               const valid = () =>
-                wanted() && approvedRevision === revision && ndk.signer === signer;
+                wanted() && approvedRevision === revision && client.signer === signer;
               try {
                 scope.check();
                 if (!valid()) return err({ type: 'waiting' });
                 if (!proposal.some((e) => e.write)) return err({ type: 'no-write-relay' });
-                const fresh = await readRelayBase(ndk, pubkey, proposal, reviewed.asked);
+                const fresh = await readRelayBase(client, pubkey, proposal, reviewed.asked);
                 scope.check();
                 if (fresh.status === 'waiting' || !valid()) return err({ type: 'waiting' });
                 // New proposed destinations must also have answered before signing;
@@ -219,7 +219,7 @@ export async function beginRelayListEdit(
                   current = fresh;
                   return err({ type: 'changed' });
                 }
-                const event = await signReplacement(ndk, signer, scope, {
+                const event = await signReplacement(client, signer, scope, {
                   kind: RELAY_LIST_KIND,
                   pubkey,
                   replaces: Math.max(updatedAt, fresh.newest?.created_at ?? 0),
@@ -228,20 +228,20 @@ export async function beginRelayListEdit(
                 });
                 scope.check();
                 if (!valid()) return err({ type: 'waiting' });
-                const afterSign = await readRelayBase(ndk, pubkey, proposal, fresh.asked);
+                const afterSign = await readRelayBase(client, pubkey, proposal, fresh.asked);
                 scope.check();
                 if (afterSign.status === 'waiting' || !valid()) return err({ type: 'waiting' });
                 if (!sameBase(fresh, afterSign)) {
                   current = afterSign;
                   return err({ type: 'changed' });
                 }
-                const published = await publishToRelaysRead(ndk, event, afterSign.relays);
+                const published = await publishToRelaysRead(client, event, afterSign.relays);
                 scope.check();
                 if (!valid()) return err({ type: 'failed' });
                 if (published.isErr()) return err({ type: 'failed', cause: published.error });
                 useRelayListStore.getState().markPublished(event.created_at, [...proposal]);
                 scope.check();
-                if (ndk.signer !== signer) return err({ type: 'failed' });
+                if (client.signer !== signer) return err({ type: 'failed' });
                 useRelayListStore.getState().markDiscovered(pubkey);
                 return ok({ accepted: published.value.accepted.length });
               } catch (cause) {
@@ -260,12 +260,12 @@ export async function beginRelayListEdit(
 
 /** First run can only publish defaults, after discovery proved no list exists. */
 export async function publishDefaultRelayList(
-  ndk: NDK,
+  client: NostrClient,
   pubkey: string,
   read: CompleteRead,
   stillWanted: () => boolean
 ): Promise<PublishResult> {
-  return exclusively(ndk, pubkey, async () => {
+  return exclusively(client, pubkey, async () => {
     const scope = captureActiveProfile(pubkey);
     const held = useRelayListStore.getState().entries;
     const wanted = () => {
@@ -276,34 +276,34 @@ export async function publishDefaultRelayList(
     };
     try {
       if (read.newest || !wanted()) return err({ type: 'waiting' });
-      const signer = await matchingSigner(ndk, pubkey);
+      const signer = await matchingSigner(client, pubkey);
       scope.check();
       if (!wanted()) return err({ type: 'waiting' });
-      const fresh = await readRelayBase(ndk, pubkey, [], read.asked);
+      const fresh = await readRelayBase(client, pubkey, [], read.asked);
       scope.check();
-      if (fresh.status === 'waiting' || fresh.newest || !wanted() || ndk.signer !== signer)
+      if (fresh.status === 'waiting' || fresh.newest || !wanted() || client.signer !== signer)
         return err({ type: 'waiting' });
       const entries = defaultEntries();
-      const event = await signReplacement(ndk, signer, scope, {
+      const event = await signReplacement(client, signer, scope, {
         kind: RELAY_LIST_KIND,
         pubkey,
         tags: serializeRelayList(entries),
         content: '',
       });
       scope.check();
-      if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
-      const afterSign = await readRelayBase(ndk, pubkey, [], fresh.asked);
+      if (!wanted() || client.signer !== signer) return err({ type: 'waiting' });
+      const afterSign = await readRelayBase(client, pubkey, [], fresh.asked);
       scope.check();
       if (
         afterSign.status === 'waiting' ||
         !sameBase(fresh, afterSign) ||
         !wanted() ||
-        ndk.signer !== signer
+        client.signer !== signer
       )
         return err({ type: 'waiting' });
-      const published = await publishToRelaysRead(ndk, event, afterSign.relays);
+      const published = await publishToRelaysRead(client, event, afterSign.relays);
       scope.check();
-      if (ndk.signer !== signer || !wanted()) return err({ type: 'failed' });
+      if (client.signer !== signer || !wanted()) return err({ type: 'failed' });
       if (published.isErr()) return err({ type: 'failed', cause: published.error });
       useRelayListStore.getState().markPublished(event.created_at, entries);
       return ok({ accepted: published.value.accepted.length });

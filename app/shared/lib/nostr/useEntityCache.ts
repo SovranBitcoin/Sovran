@@ -4,10 +4,9 @@ import { facade } from 'nostr';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
-import type { NoteMetrics, ProfileInfo } from '@/shared/lib/nostr/nostrEventTypes';
+import type { ProfileInfo } from '@/shared/lib/nostr/nostrEventTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { backfillProfile } from '@/shared/lib/nostr/fetchProfiles';
-import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
 import { peekNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
@@ -205,27 +204,6 @@ export function useProfileFetchSettlements(pubkeys: readonly string[]): Readonly
   );
   const settledKey = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return useMemo(() => new Set(settledKey ? settledKey.split(',') : []), [settledKey]);
-}
-
-/**
- * Engagement counts for one note, read reactively from the single owner, plus
- * whether a backfill that may fill them is in flight. `cached` → real counts;
- * `loading` → show a placeholder (never a zero); `absent` → no source has
- * counted this note.
- */
-export function useNoteStats(eventId: string | undefined): {
-  metrics: NoteMetrics | undefined;
-  status: 'cached' | 'loading' | 'absent';
-} {
-  const cache = buildNostrDataLayer()?.cache;
-  const record = useCachedRecord(cache?.noteStats, eventId);
-  const pending = usePendingProfile(cache?.pendingNoteStats, eventId);
-  return useMemo(() => {
-    if (record) {
-      return { metrics: noteMetricsFromStats(record), status: 'cached' as const };
-    }
-    return { metrics: undefined, status: pending ? ('loading' as const) : ('absent' as const) };
-  }, [record, pending]);
 }
 
 /** Non-reactive read of one full profile record (for getState-style callers). */

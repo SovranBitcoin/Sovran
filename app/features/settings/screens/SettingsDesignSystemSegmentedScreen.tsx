@@ -1,7 +1,8 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useRef, useState } from 'react';
 
-import { Button as HerouiButton, Card } from 'heroui-native';
+import { PillButton } from '@/shared/ui/primitives/PillButton';
+import { Card } from '@/shared/ui/composed/ListGroup';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { SEGMENT_COUNT_OPTIONS } from '@/features/settings/design-system/segmentedProgress';
@@ -122,22 +123,22 @@ export function SettingsDesignSystemSegmentedScreen() {
             <HStack gap={8} wrap="wrap">
               {SEGMENT_COUNT_OPTIONS.map((count) => (
                 <View key={count} style={{ width: 58 }}>
-                  <HerouiButton
+                  <PillButton
                     variant={segmentCount === count ? 'primary' : 'secondary'}
                     size="sm"
                     testID={`design-system-segmented-count-${count}`}
                     accessibilityLabel={`${count} segments`}
                     accessibilityState={{ selected: segmentCount === count }}
                     onPress={() => onSelectSegmentCount(count)}>
-                    <HerouiButton.Label>{count}</HerouiButton.Label>
-                  </HerouiButton>
+                    <PillButton.Label>{count}</PillButton.Label>
+                  </PillButton>
                 </View>
               ))}
             </HStack>
 
             <HStack gap={8}>
               <View className="flex-1">
-                <HerouiButton
+                <PillButton
                   variant={segmentsAuto ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-segmented-auto"
@@ -145,8 +146,8 @@ export function SettingsDesignSystemSegmentedScreen() {
                   accessibilityLabel="Auto-play"
                   accessibilityState={{ checked: segmentsAuto }}
                   onPress={() => setSegmentsAuto((value) => !value)}>
-                  <HerouiButton.Label>{segmentsAuto ? 'Pause' : 'Play'}</HerouiButton.Label>
-                </HerouiButton>
+                  <PillButton.Label>{segmentsAuto ? 'Pause' : 'Play'}</PillButton.Label>
+                </PillButton>
               </View>
               <View className="flex-1">
                 <Button

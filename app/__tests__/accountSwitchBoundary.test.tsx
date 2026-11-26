@@ -32,6 +32,20 @@ function mockRecorder(name: string) {
   };
 }
 
+/** A hook the account scope calls, recording its mount like a provider. */
+function mockHookRecorder(name: string, argName?: string) {
+  const ReactActual = jest.requireActual('react') as typeof import('react');
+  return function useRecorder(arg?: unknown) {
+    const label = argName ? `${name}${JSON.stringify({ [argName]: arg })}` : name;
+    ReactActual.useEffect(() => {
+      mockEvents.push(`mount ${label}`);
+      return () => {
+        mockEvents.push(`unmount ${label}`);
+      };
+    }, [label]);
+  };
+}
+
 const mockNavigation = {
   isReady: jest.fn(() => true),
   getRootState: jest.fn((): unknown => ({ type: 'stack', routes: [{}] })),
@@ -43,21 +57,25 @@ jest.mock('@/shared/config/features', () => ({ hasFeature: (f: string) => mockFe
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   NostrKeysProvider: mockRecorder('NostrKeys'),
 }));
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  NostrNDKProvider: mockRecorder('NostrNDK'),
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClientLifecycle: mockHookRecorder('NostrClient', 'accountIndex'),
 }));
-jest.mock('@/shared/providers/CocoProvider', () => ({ CocoProvider: mockRecorder('Coco') }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
-  WalletContextProvider: mockRecorder('WalletContext'),
+jest.mock('@/runtime/WalletCore', () => ({ WalletCore: mockRecorder('Coco') }));
+jest.mock('@/runtime/WalletProjection', () => ({
+  WalletProjection: mockRecorder('WalletContext'),
+}));
+jest.mock('@/runtime/AppRuntime', () => ({
+  appRuntime: {
+    start: (accountIndex: number) =>
+      mockEvents.push(`mount AccountRuntime{"accountIndex":${accountIndex}}`),
+    stop: () => mockEvents.push('unmount AccountRuntime'),
+  },
 }));
 jest.mock('@/features/send/providers/Colada', () => ({
   SovranColadaProvider: mockRecorder('Colada'),
 }));
-jest.mock('@/shared/providers/PricelistProvider', () => ({
-  PricelistProvider: mockRecorder('Pricelist'),
-}));
-jest.mock('@/shared/providers/BitchatBLEProvider', () => ({
-  BitchatBLEProvider: mockRecorder('BitchatBLE'),
+jest.mock('@/features/bitchat/hooks/useBitchatAccountServices', () => ({
+  useBitchatAccountServices: mockHookRecorder('BitchatBLE'),
 }));
 jest.mock('@/features/payments/hooks/useDmEcashAutoRedeem', () => ({
   DmEcashAutoRedeemProvider: mockRecorder('DmEcashAutoRedeem'),
@@ -66,19 +84,33 @@ jest.mock('@/shared/blocks/AppGate', () => ({
   __esModule: true,
   default: mockRecorder('AppGate'),
 }));
+jest.mock('@/features/backup/BackupFlowProvider', () => ({
+  BackupFlowProvider: mockRecorder('BackupFlow'),
+}));
+jest.mock('@/shared/blocks/popup/PopupHost', () => ({ __esModule: true, default: () => null }));
+jest.mock('@/shared/blocks/popup/ActionMenuHost', () => ({ ActionMenuHost: () => null }));
+jest.mock('@/shared/lib/popup/E2EToastProbe', () => ({ E2EToastProbe: () => null }));
 jest.mock('@/shared/hooks/useRegisterKeyDerivation', () => ({
   useRegisterKeyDerivation: jest.fn(),
 }));
-jest.mock('@/shared/lib/persist/storageUsage', () => ({ reportAsyncStorageUsage: jest.fn() }));
-jest.mock('@/shared/lib/profile/profileTransition', () => ({
-  clearTransitionGuardOnStartup: jest.fn(),
-  registerTransitionControls: jest.fn(),
+jest.mock('@/shared/hooks/usePaymentStatusListener', () => ({
+  usePaymentStatusListener: jest.fn(),
+}));
+jest.mock('@/shared/hooks/useSwapLegReconciler', () => ({ useSwapLegReconciler: jest.fn() }));
+jest.mock('@/shared/hooks/useSwapStatusListener', () => ({ useSwapStatusListener: jest.fn() }));
+jest.mock('@/features/wallet', () => ({ useProfileBalanceSync: jest.fn() }));
+jest.mock('@/shared/lib/nostr/ownsync/useOwnEventsSync', () => ({ useOwnEventsSync: jest.fn() }));
+jest.mock('@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed', () => ({
+  useOwnSocialGraphSeed: jest.fn(),
 }));
 
 import React, { useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react-native';
 
-import { AccountScopedProviders, AccountSwitchBoundary } from '@/shared/providers/AccountProviders';
+import {
+  AccountScope as AccountScopedProviders,
+  AccountSwitchBoundary,
+} from '@/runtime/AccountScope';
 import { profileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 
 function Account({ name }: { name: string }) {
@@ -256,7 +288,7 @@ describe('AccountSwitchBoundary', () => {
   });
 });
 
-describe('AccountScopedProviders', () => {
+describe('AccountScope', () => {
   function nesting(): string[] {
     const chain: string[] = [];
     let node = screen.toJSON() as { type: string; children?: unknown[] } | null;
@@ -275,23 +307,26 @@ describe('AccountScopedProviders', () => {
     );
   }
 
-  it('nests the account providers in order with AppGate innermost, above the routes', () => {
+  it('nests the account providers in order with the backup session innermost, above the routes', () => {
     mockFeatures.add('nutDrop');
     mockFeatures.add('ecashMessages');
     render(tree(0));
 
     expect(nesting()).toEqual([
       'NostrKeys',
-      'NostrNDK',
       'Coco',
       'WalletContext',
       'Colada',
-      'Pricelist',
-      'BitchatBLE',
       'DmEcashAutoRedeem',
       'AppGate',
+      'BackupFlow',
       'account',
     ]);
+    // The Nostr client sits beside the wallet core, under the keys; BitChat
+    // beside the gate, inside the payment machine. Neither wraps the routes.
+    expect(mockEvents).toEqual(
+      expect.arrayContaining(['mount NostrClient{"accountIndex":0}', 'mount BitchatBLE'])
+    );
   });
 
   it('leaves out BitChat and DM auto-redeem when the build has neither feature', () => {
@@ -299,14 +334,14 @@ describe('AccountScopedProviders', () => {
 
     expect(nesting()).toEqual([
       'NostrKeys',
-      'NostrNDK',
       'Coco',
       'WalletContext',
       'Colada',
-      'Pricelist',
       'AppGate',
+      'BackupFlow',
       'account',
     ]);
+    expect(mockEvents).not.toContain('mount BitchatBLE');
   });
 
   it('tears down every provider and mounts a fresh set when the account key changes', () => {
@@ -320,24 +355,27 @@ describe('AccountScopedProviders', () => {
     expect(unmounts).toEqual(
       expect.arrayContaining([
         'unmount NostrKeys{"defaultAccountIndex":0}',
-        'unmount NostrNDK{"accountIndex":0}',
+        'unmount NostrClient{"accountIndex":0}',
         'unmount Coco',
         'unmount WalletContext',
         'unmount Colada',
-        'unmount Pricelist',
+        'unmount AccountRuntime',
         'unmount AppGate',
+        'unmount BackupFlow',
         'unmount routes',
       ])
     );
-    expect(unmounts).toHaveLength(8);
+    // The backup session goes with the account it belongs to.
+    expect(unmounts).toHaveLength(9);
     expect(mounts).toEqual(
       expect.arrayContaining([
         'mount NostrKeys{"defaultAccountIndex":1}',
-        'mount NostrNDK{"accountIndex":1}',
+        'mount NostrClient{"accountIndex":1}',
+        'mount AccountRuntime{"accountIndex":1}',
         'mount routes',
       ])
     );
-    expect(mounts).toHaveLength(8);
+    expect(mounts).toHaveLength(9);
     // Every old provider is gone before the first new one mounts.
     expect(mockEvents.findIndex((e) => e.startsWith('mount'))).toBe(unmounts.length);
   });

@@ -36,17 +36,6 @@ jest.mock('@cashu/coco-react', () => ({
   useBalanceContext: () => ({ balances: { totalByUnit: { sat: { total: 1, unit: 'sat' } } } }),
 }));
 jest.mock('@/shared/ui/composed/SheetGrabber', () => ({ SheetGrabber: 'Grabber' }));
-jest.mock('heroui-native', () => {
-  const React = require('react');
-  const host = (name: string) =>
-    function MockHost(props: Record<string, unknown>) {
-      return React.createElement(name, props);
-    };
-  return {
-    ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
-    Label: Object.assign(host('Label'), { Text: 'LabelText' }),
-  };
-});
 jest.mock('@/assets/icons', () => 'Icon');
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
@@ -176,7 +165,7 @@ it('Back up now pushes the backup intro inside the prompt flow without snoozing'
   await press('cta-primary');
   act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed).toEqual({});
-  expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');
+  expect(mockPush).toHaveBeenCalledWith('/backup-intro');
   expect(mockBack).not.toHaveBeenCalled();
   expect(useCtaStore.getState().backupStartedAt).not.toBeNull();
 });

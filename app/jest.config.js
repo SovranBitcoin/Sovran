@@ -18,6 +18,7 @@ module.exports = {
     '^nostr$': '<rootDir>/../nostr/src/index.ts',
     '^nostr/map$': '<rootDir>/../nostr/src/map/index.ts',
     '^nostr/recipes$': '<rootDir>/../nostr/src/recipes/index.ts',
+    '^nostr/client$': '<rootDir>/../nostr/src/client/index.ts',
     '^nostr/schemas$': '<rootDir>/../nostr/src/schemas.ts',
     '^wallet$': '<rootDir>/../wallet/src/index.ts',
     '^wallet/react$': '<rootDir>/../wallet/src/react/index.ts',
@@ -62,8 +63,6 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-react/dist/index.js',
     ],
-    // ESM-only `exports` map with a React Native build; see the stub's header.
-    '^@nostr-dev-kit/ndk-mobile$': '<rootDir>/__mocks__/ndkMobile.ts',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',

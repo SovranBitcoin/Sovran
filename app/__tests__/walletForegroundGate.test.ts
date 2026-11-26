@@ -480,8 +480,7 @@ describe('createWalletForegroundGate', () => {
     createWalletForegroundGate({
       appState: app.appState,
       manager: {
-        pauseSubscriptions: record('coco.pause'),
-        resumeSubscriptions: record('coco.resume'),
+        ensureSubscriptions: record('coco.ensure'),
         requeuePaidMintQuotes: async () => {
           calls.push('coco.requeue');
           return { requeued: [] };
@@ -493,11 +492,11 @@ describe('createWalletForegroundGate', () => {
 
     app.set('background');
     await settle();
-    expect(calls).toEqual(['npc.stop', 'coco.pause']);
+    expect(calls).toEqual(['npc.stop']);
 
     calls.length = 0;
     app.set('active');
     await settle();
-    expect(calls).toEqual(['coco.resume', 'npc.start', 'npc.sync', 'coco.requeue']);
+    expect(calls).toEqual(['coco.ensure', 'npc.start', 'npc.sync', 'coco.requeue']);
   });
 });

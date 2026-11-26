@@ -5,12 +5,14 @@ import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { isTokenSpent } from '@/shared/lib/cashu/spentProbe';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
+import { createSdkStorageDriver } from '@/shared/lib/routstr/sdk/driver';
 import type { RequestControls } from 'wallet/safeFetch';
 
 type WalletManager = NonNullable<ReturnType<typeof CocoManager.peekInstance>>;
-const pendingPaymentSweeps = new WeakMap<WalletManager, Promise<number>>();
+const pendingPaymentSweeps = new WeakMap<WalletManager, Promise<PendingRecoveryOutcome>>();
 const legacyBalanceSweeps = new WeakMap<WalletManager, Promise<ReclaimOutcome>>();
+const sdkRecordSweeps = new WeakMap<WalletManager, Promise<SdkSweepOutcome>>();
 
 /**
  * Sweep every Routstr credential this profile has held back into the wallet.
@@ -33,6 +35,25 @@ const RefundSpine = z.looseObject({
   sats: z.string().max(32).optional(),
   msats: z.string().max(32).optional(),
 });
+
+function normalizeIssuerBase(base: string): string {
+  const trimmed = base.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+  // Only scheme and authority are case-insensitive; preserve path/query casing
+  // so distinct deployments on one host (e.g. /TeamA vs /teama) never collide.
+  const match = /^([a-z][a-z0-9+.-]*:\/\/[^/?#]*)(.*)$/i.exec(trimmed);
+  return match ? match[1]!.toLowerCase() + match[2] : trimmed;
+}
+
+function redactNodeUrl(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.origin + parsed.pathname;
+  } catch {
+    return '[invalid-url]';
+  }
+}
 
 function refundUrl(base: string): string {
   const trimmed = base.trim().replace(/\/+$/, '').replace(/\/v1$/, '');
@@ -95,8 +116,27 @@ async function askNode(
  *   410 — the refund was swept. Nothing to collect; stop asking.
  */
 export async function recoverPendingPayments(controls: RequestControls = {}): Promise<number> {
+  return (await recoverPendingPaymentsDetailed(controls)).recovered;
+}
+
+interface PendingRecoveryOutcome {
+  /** Rows whose change (or unspent token) is back in the wallet. */
+  recovered: number;
+  /** Rows left for the next pass: offline, pending, a failed receive. */
+  retryable: number;
+  /** Rows whose recorded node is not an address the wallet may ask. */
+  unknownIssuer: number;
+  /** Rows whose replayed refund the mint reports spent; kept, not dropped. */
+  spentReplay: number;
+}
+
+/** {@link recoverPendingPayments}, with what became of the rows it kept. */
+export async function recoverPendingPaymentsDetailed(
+  controls: RequestControls = {}
+): Promise<PendingRecoveryOutcome> {
   const manager = CocoManager.peekInstance();
-  if (!manager || controls.signal?.aborted) return 0;
+  if (!manager || controls.signal?.aborted)
+    return { recovered: 0, retryable: 0, unknownIssuer: 0, spentReplay: 0 };
   const active = pendingPaymentSweeps.get(manager);
   if (active) return active;
   const sweep = recoverPendingPaymentsOnce(manager, controls);
@@ -111,7 +151,7 @@ export async function recoverPendingPayments(controls: RequestControls = {}): Pr
 async function recoverPendingPaymentsOnce(
   manager: WalletManager,
   controls: RequestControls
-): Promise<number> {
+): Promise<PendingRecoveryOutcome> {
   const owner = useProfileStore.getState().activeAccountIndex;
   const ownsScope = () =>
     !controls.signal?.aborted &&
@@ -120,11 +160,20 @@ async function recoverPendingPaymentsOnce(
 
   const store = useRoutstrStore.getState();
   const pending = Object.entries(store.pendingPayments);
-  if (pending.length === 0) return 0;
+  const outcome: PendingRecoveryOutcome = {
+    recovered: 0,
+    retryable: 0,
+    unknownIssuer: 0,
+    spentReplay: 0,
+  };
+  if (pending.length === 0) return outcome;
 
-  let recovered = 0;
   for (const [id, payment] of pending) {
     if (!ownsScope()) break;
+    if (!z.httpUrl().safeParse(payment.nodeBaseUrl).success) {
+      outcome.unknownIssuer += 1;
+      continue;
+    }
     let response: Response;
     try {
       // An arbitrary node base, and the reply is a bearer token rather than a
@@ -137,7 +186,8 @@ async function recoverPendingPaymentsOnce(
         signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
       });
     } catch {
-      continue; // offline; the row survives for the next sweep
+      outcome.retryable += 1; // offline; the row survives for the next sweep
+      continue;
     }
     if (!ownsScope()) break;
 
@@ -148,8 +198,10 @@ async function recoverPendingPaymentsOnce(
         await manager.ops.send.reclaim(payment.operationId);
         if (!ownsScope()) break;
         useRoutstrStore.getState().settlePayment(id);
+        outcome.recovered += 1;
         apiLog.info('routstr.payment.recovered_unspent', { operationId: payment.operationId });
       } catch (error) {
+        outcome.retryable += 1;
         apiLog.warn('routstr.payment.recover_reclaim_failed', {
           error: error instanceof Error ? error.message : String(error),
         });
@@ -161,14 +213,24 @@ async function recoverPendingPaymentsOnce(
       useRoutstrStore.getState().settlePayment(id);
       continue;
     }
-    if (!response.ok) continue; // 425 and anything else: try again later
+    if (!response.ok) {
+      outcome.retryable += 1; // 425 and anything else: try again later
+      continue;
+    }
 
     const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
     if (!ownsScope()) break;
-    if (!parsed.success || !parsed.data.token) continue;
+    if (!parsed.success || !parsed.data.token) {
+      outcome.retryable += 1;
+      continue;
+    }
     // The endpoint replays a refund it has already paid. One the mint has
-    // spent is one this wallet banked on an earlier pass, or never will.
-    if (await isTokenSpent(manager, parsed.data.token)) continue;
+    // spent is one this wallet banked on an earlier pass, or never will:
+    // nothing local proves which, so the row stays and is reported.
+    if (await isTokenSpent(manager, parsed.data.token)) {
+      outcome.spentReplay += 1;
+      continue;
+    }
     if (!ownsScope()) break;
     try {
       const prepared = await manager.ops.receive.prepare({ token: parsed.data.token });
@@ -176,9 +238,10 @@ async function recoverPendingPaymentsOnce(
       await manager.ops.receive.execute(prepared);
       if (!ownsScope()) break;
       useRoutstrStore.getState().settlePayment(id);
-      recovered += 1;
+      outcome.recovered += 1;
       apiLog.info('routstr.payment.change_recovered', { startedAt: payment.startedAt });
     } catch (error) {
+      outcome.retryable += 1;
       // Leave the row: the refund is idempotent, so the next sweep re-asks.
       apiLog.error('routstr.payment.change_receive_failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -186,8 +249,8 @@ async function recoverPendingPaymentsOnce(
     }
   }
 
-  if (recovered > 0) apiLog.info('routstr.payment.recovery_swept', { recovered });
-  return recovered;
+  if (outcome.recovered > 0) apiLog.info('routstr.payment.recovery_swept', { ...outcome });
+  return outcome;
 }
 
 interface ReclaimOutcome {
@@ -197,7 +260,19 @@ interface ReclaimOutcome {
   reclaimed: number;
   /** Credentials whose answer was not final; the next pass tries again. */
   deferred: number;
+  /** Of `deferred`: credentials with no node address the wallet may ask. */
+  unknownIssuer: number;
+  /** Of `deferred`: replayed refunds the mint reports spent. */
+  spentReplay: number;
 }
+
+const EMPTY_RECLAIM: ReclaimOutcome = {
+  attempted: 0,
+  reclaimed: 0,
+  deferred: 0,
+  unknownIssuer: 0,
+  spentReplay: 0,
+};
 
 /**
  * Run one sweep. Safe to call repeatedly — a reclaimed row is skipped, and the
@@ -211,7 +286,7 @@ export async function reclaimRoutstrBalances(
   controls: RequestControls = {}
 ): Promise<ReclaimOutcome> {
   const manager = CocoManager.peekInstance();
-  if (!manager || controls.signal?.aborted) return { attempted: 0, reclaimed: 0, deferred: 0 };
+  if (!manager || controls.signal?.aborted) return { ...EMPTY_RECLAIM };
   // Startup and the manual Reclaim action share one pass over this wallet's
   // credentials. A second snapshot could redeem the same replayed refund.
   const active = legacyBalanceSweeps.get(manager);
@@ -239,15 +314,16 @@ async function reclaimRoutstrBalancesOnce(
   const pending = Object.entries(state.legacyAccounts).filter(
     ([, account]) => account.reclaimedAt == null && account.apiKey
   );
-  if (pending.length === 0) return { attempted: 0, reclaimed: 0, deferred: 0 };
+  if (pending.length === 0) return { ...EMPTY_RECLAIM };
 
-  const outcome: ReclaimOutcome = { attempted: pending.length, reclaimed: 0, deferred: 0 };
+  const outcome: ReclaimOutcome = { ...EMPTY_RECLAIM, attempted: pending.length };
 
   for (const [nodeKey, account] of pending) {
     if (!ownsScope()) break;
     const node = account.nodeBaseUrl ?? nodeKey;
     if (!z.httpUrl().safeParse(node).success) {
       outcome.deferred += 1;
+      outcome.unknownIssuer += 1;
       continue;
     }
 
@@ -266,6 +342,7 @@ async function reclaimRoutstrBalancesOnce(
     // wallet already banked. Left deferred, as any other unfinished answer.
     if (await isTokenSpent(manager, result)) {
       outcome.deferred += 1;
+      outcome.spentReplay += 1;
       continue;
     }
     if (!ownsScope()) break;
@@ -276,7 +353,7 @@ async function reclaimRoutstrBalancesOnce(
       if (!ownsScope()) break;
       useRoutstrStore.getState().markAccountReclaimed(nodeKey);
       outcome.reclaimed += 1;
-      apiLog.info('routstr.reclaim.collected', { node });
+      apiLog.info('routstr.reclaim.collected', { node: redactNodeUrl(node) });
     } catch {
       // The provider can replay the refund on the next pass.
       apiLog.error('routstr.reclaim.receive_failed');
@@ -286,4 +363,311 @@ async function reclaimRoutstrBalancesOnce(
 
   apiLog.info('routstr.reclaim.swept', { ...outcome });
   return outcome;
+}
+
+// ---------------------------------------------------------------------------
+// Records the removed Routstr SDK left behind (0.1.4, E20)
+//
+// `@routstr/sdk` kept four kinds of money-bearing record in this profile's
+// vaults (sdk/driver.ts). Nothing reads them since the AI tab went, so each is
+// swept here under the same rule as the store's own rows: a record is only
+// ever sent to the node that issued it, and a row is only removed once its
+// money is in the wallet or its node gave a final answer.
+// ---------------------------------------------------------------------------
+
+/** Shapes as @routstr/sdk 0.4.6 persists them (`SdkStorageState`). Unknown
+ *  fields are kept: a row is filtered out of the original array, never rebuilt. */
+const SdkApiKeys = z.array(z.looseObject({ baseUrl: z.string(), key: z.string() }));
+const SdkChildKeys = z.array(z.looseObject({ parentBaseUrl: z.string(), childKey: z.string() }));
+const SdkXcashuTokens = z.record(
+  z.string(),
+  z.array(z.looseObject({ baseUrl: z.string().optional(), token: z.string() }))
+);
+const SdkCachedReceiveTokens = z.array(z.looseObject({ token: z.string() }));
+
+interface SdkRecoveryRecords {
+  apiKeys: z.infer<typeof SdkApiKeys>;
+  childKeys: z.infer<typeof SdkChildKeys>;
+  xcashuTokens: z.infer<typeof SdkXcashuTokens>;
+  cachedReceiveTokens: z.infer<typeof SdkCachedReceiveTokens>;
+  /** Records that could not be read; kept untouched and counted as retryable. */
+  unreadable: number;
+}
+
+type SdkDriver = ReturnType<typeof createSdkStorageDriver>;
+
+async function readSdkRecord<T>(
+  driver: SdkDriver,
+  key: string,
+  schema: z.ZodType<T>,
+  empty: T
+): Promise<T | null> {
+  try {
+    const raw = await driver.getItem<unknown>(key, empty);
+    if (raw == null) return empty;
+    const parsed = schema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read every SDK recovery record the account holds. Never throws. */
+export async function readSdkRecoveryRecords(owner: string): Promise<SdkRecoveryRecords> {
+  const driver = createSdkStorageDriver(owner);
+  let unreadable = 0;
+  const read = async <T>(key: string, schema: z.ZodType<T>, empty: T): Promise<T> => {
+    const value = await readSdkRecord(driver, key, schema, empty);
+    if (value === null) unreadable += 1;
+    return value ?? empty;
+  };
+  const apiKeys = await read('api_keys', SdkApiKeys, []);
+  const childKeys = await read('child_keys', SdkChildKeys, []);
+  const xcashuTokens = await read('xcashu_tokens', SdkXcashuTokens, {});
+  const cachedReceiveTokens = await read('cached_receive_tokens', SdkCachedReceiveTokens, []);
+  return { apiKeys, childKeys, xcashuTokens, cachedReceiveTokens, unreadable };
+}
+
+const isHttpUrl = (url: string | undefined): url is string =>
+  !!url && z.httpUrl().safeParse(url).success;
+const sameNode = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
+
+/** Child keys spend their parent's balance: the parent is the one to sweep. */
+function childKeyHasParent(records: SdkRecoveryRecords, parentBaseUrl: string): boolean {
+  return records.apiKeys.some((k) => sameNode(k.baseUrl, parentBaseUrl));
+}
+
+/** How many unresolved SDK rows there are, and how many of those have no
+ *  issuing node this wallet may ask. */
+export function countSdkRecords(records: SdkRecoveryRecords): {
+  total: number;
+  unknownIssuer: number;
+} {
+  const xcashu = Object.entries(records.xcashuTokens).flatMap(([node, rows]) =>
+    rows.map((row) => row.baseUrl ?? node)
+  );
+  const unknownIssuer =
+    records.apiKeys.filter((k) => !isHttpUrl(k.baseUrl)).length +
+    xcashu.filter((node) => !isHttpUrl(node)).length +
+    records.childKeys.filter((c) => !childKeyHasParent(records, c.parentBaseUrl)).length;
+  return {
+    total:
+      records.apiKeys.length +
+      records.childKeys.length +
+      xcashu.length +
+      records.cachedReceiveTokens.length +
+      records.unreadable,
+    unknownIssuer,
+  };
+}
+
+interface SdkSweepOutcome {
+  /** Rows whose money is now in the wallet. */
+  collected: number;
+  /** Rows whose answer was not final (offline, pending, a failed receive). */
+  retryable: number;
+  /** Rows with no issuing node to ask; kept. */
+  unknownIssuer: number;
+  /** Rows whose token the mint reports spent with no local proof that this
+   *  wallet banked it; kept so they stay visible. */
+  spentReplay: number;
+}
+
+const EMPTY_SDK_SWEEP: SdkSweepOutcome = {
+  collected: 0,
+  retryable: 0,
+  unknownIssuer: 0,
+  spentReplay: 0,
+};
+
+/** Sweep the SDK's recovery records into the wallet. Shares one pass per
+ *  wallet, like the other sweeps, and stops when `controls.signal` aborts, the
+ *  account changes or the wallet is replaced. */
+export async function recoverSdkRecords(controls: RequestControls = {}): Promise<SdkSweepOutcome> {
+  const manager = CocoManager.peekInstance();
+  const owner = activePubkey();
+  if (!manager || !owner || controls.signal?.aborted) return { ...EMPTY_SDK_SWEEP };
+  const active = sdkRecordSweeps.get(manager);
+  if (active) return active;
+  const sweep = recoverSdkRecordsOnce(manager, owner, controls);
+  sdkRecordSweeps.set(manager, sweep);
+  try {
+    return await sweep;
+  } finally {
+    sdkRecordSweeps.delete(manager);
+  }
+}
+
+async function recoverSdkRecordsOnce(
+  manager: WalletManager,
+  owner: string,
+  controls: RequestControls
+): Promise<SdkSweepOutcome> {
+  const ownsScope = () =>
+    !controls.signal?.aborted && activePubkey() === owner && CocoManager.peekInstance() === manager;
+  const outcome: SdkSweepOutcome = { ...EMPTY_SDK_SWEEP };
+  const records = await readSdkRecoveryRecords(owner);
+  outcome.retryable += records.unreadable;
+  if (!ownsScope()) return outcome;
+  const driver = createSdkStorageDriver(owner);
+  const save = async (key: string, value: unknown) => {
+    await driver.setItem(key, value);
+    await driver.flush();
+  };
+
+  /** Bank one token. `'spent'` when the mint already redeemed it. */
+  const bank = async (token: string): Promise<'banked' | 'spent' | 'failed' | 'aborted'> => {
+    if (await isTokenSpent(manager, token)) return 'spent';
+    if (!ownsScope()) return 'aborted';
+    try {
+      const prepared = await manager.ops.receive.prepare({ token });
+      if (!ownsScope()) return 'aborted';
+      await manager.ops.receive.execute(prepared);
+      return 'banked';
+    } catch {
+      apiLog.error('routstr.sdk_recovery.receive_failed');
+      return 'failed';
+    }
+  };
+  const tally = (result: 'banked' | 'spent' | 'failed' | 'aborted'): boolean => {
+    if (result === 'banked') outcome.collected += 1;
+    else if (result === 'spent') outcome.spentReplay += 1;
+    else outcome.retryable += 1;
+    return result === 'banked';
+  };
+
+  try {
+    // Change the SDK received but never managed to bank.
+    let cached = records.cachedReceiveTokens;
+    for (const row of records.cachedReceiveTokens) {
+      if (!ownsScope()) return outcome;
+      if (!tally(await bank(row.token))) continue;
+      cached = cached.filter((r) => r !== row);
+      await save('cached_receive_tokens', cached);
+    }
+
+    // Request tokens a node holds: ask that node for the change, as
+    // recoverPendingPayments does for the store's own rows.
+    let xcashu = records.xcashuTokens;
+    for (const [nodeKey, rows] of Object.entries(records.xcashuTokens)) {
+      for (const row of rows) {
+        if (!ownsScope()) return outcome;
+        const node = row.baseUrl ?? nodeKey;
+        if (!isHttpUrl(node)) {
+          outcome.unknownIssuer += 1;
+          continue;
+        }
+        const answer = await askForChange(node, row.token, controls);
+        if (!ownsScope()) return outcome;
+        let settled = false;
+        if (answer.kind === 'swept') settled = true;
+        else if (answer.kind === 'retry') outcome.retryable += 1;
+        // 404: the node never redeemed it, so the original token is still ours.
+        else settled = tally(await bank(answer.kind === 'unseen' ? row.token : answer.token));
+        if (!settled) continue;
+        xcashu = {
+          ...xcashu,
+          [nodeKey]: (xcashu[nodeKey] ?? []).filter((r) => r !== row),
+        };
+        if (xcashu[nodeKey].length === 0) {
+          const { [nodeKey]: _gone, ...rest } = xcashu;
+          xcashu = rest;
+        }
+        await save('xcashu_tokens', xcashu);
+      }
+    }
+
+    // Hosted balances. A key the store's legacy sweep already banked on the
+    // SAME issuing node is settled by that evidence; one it still holds is left
+    // to that sweep. Matching both bearer key and normalized issuing URL ensures
+    // identical keys on distinct nodes never suppress or erase each other.
+    const legacyEntries = Object.entries(useRoutstrStore.getState().legacyAccounts);
+    const hadParent = (c: { parentBaseUrl: string }) => childKeyHasParent(records, c.parentBaseUrl);
+    let apiKeys = records.apiKeys;
+    let childKeys = records.childKeys;
+    for (const row of records.apiKeys) {
+      if (!ownsScope()) return outcome;
+      const rowBase = isHttpUrl(row.baseUrl) ? normalizeIssuerBase(row.baseUrl) : null;
+      const twinEntry = rowBase
+        ? legacyEntries.find(([nodeKey, account]) => {
+            if (account.apiKey !== row.key) return false;
+            const legacyBase = account.nodeBaseUrl ?? nodeKey;
+            return isHttpUrl(legacyBase) && normalizeIssuerBase(legacyBase) === rowBase;
+          })
+        : undefined;
+      const twin = twinEntry?.[1];
+      let settled = false;
+      if (twin?.reclaimedAt != null) settled = true;
+      else if (twin) outcome.retryable += 1;
+      else if (!rowBase) outcome.unknownIssuer += 1;
+      else {
+        const result = await askNode(row.baseUrl, row.key, controls);
+        if (!ownsScope()) return outcome;
+        if (result === null) settled = true;
+        else if (result === 'retry') outcome.retryable += 1;
+        else settled = tally(await bank(result));
+      }
+      if (!settled) continue;
+      const nextApiKeys = apiKeys.filter((r) => r !== row);
+      // Persist dependent child-key cleanup BEFORE removing the settled parent
+      // so an interruption between the two writes never orphans child keys as
+      // unknown-issuer records on the next launch.
+      const nextChildKeys = childKeys.filter(
+        (c) =>
+          !hadParent(c) || childKeyHasParent({ ...records, apiKeys: nextApiKeys }, c.parentBaseUrl)
+      );
+      if (nextChildKeys.length !== childKeys.length) {
+        if (!ownsScope()) return outcome;
+        await save('child_keys', nextChildKeys);
+        childKeys = nextChildKeys;
+      }
+      if (!ownsScope()) return outcome;
+      await save('api_keys', nextApiKeys);
+      apiKeys = nextApiKeys;
+    }
+
+    // Child keys hold no balance of their own; ones without any recorded parent
+    // have no node to ask and stay visible as unknown-issuer.
+    outcome.unknownIssuer += records.childKeys.filter((c) => !hadParent(c)).length;
+  } catch (error) {
+    // A row whose removal could not be saved is re-read next pass; the spent
+    // probe then keeps it from being banked twice.
+    apiLog.warn('routstr.sdk_recovery.save_failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    outcome.retryable += 1;
+  }
+
+  apiLog.info('routstr.sdk_recovery.swept', { ...outcome });
+  return outcome;
+}
+
+type ChangeAnswer =
+  { kind: 'token'; token: string } | { kind: 'unseen' } | { kind: 'swept' } | { kind: 'retry' };
+
+/** Ask a node for the change on a token it was paid, by the token itself. */
+async function askForChange(
+  base: string,
+  encoded: string,
+  controls: RequestControls
+): Promise<ChangeAnswer> {
+  let response: Response;
+  try {
+    // eslint-disable-next-line no-restricted-globals -- an arbitrary node base; see askNode
+    response = await fetch(refundUrl(base), {
+      method: 'POST',
+      headers: { 'X-Cashu': encoded, 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
+    });
+  } catch {
+    return { kind: 'retry' };
+  }
+  if (response.status === 404) return { kind: 'unseen' };
+  if (response.status === 410) return { kind: 'swept' };
+  if (!response.ok) return { kind: 'retry' };
+  const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
+  return parsed.success && parsed.data.token
+    ? { kind: 'token', token: parsed.data.token }
+    : { kind: 'retry' };
 }

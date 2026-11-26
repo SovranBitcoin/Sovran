@@ -45,7 +45,7 @@ jest.mock('@/shared/ui/composed/CapsuleButton', () => ({
     onPress: () => void;
   }) => require('react').createElement('capsule', { testID, label, onPress }),
 }));
-const mockNdk = {};
+const mockClient = {};
 jest.mock('@/shared/stores/global/profileStore', () => {
   const useProfileStore = Object.assign(
     (selector: (state: typeof mockState) => unknown) => selector(mockState),
@@ -60,11 +60,8 @@ jest.mock('@/shared/stores/global/profileStore', () => {
       .activeAccountReaders(() => useProfileStore.getState()),
   };
 });
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }), {
-  virtual: true,
-});
-jest.mock('@/shared/providers/NostrNDKProvider', () => ({
-  useNostrNDKContext: () => ({ isInitialized: true }),
+jest.mock('@/runtime/nostrClient', () => ({
+  useNostrClient: () => ({ client: mockClient, isInitialized: true }),
 }));
 jest.mock('@/shared/lib/nostr/profile/publishOwnProfileMetadata', () => ({
   loadOwnProfileMetadata: jest.fn(),
@@ -85,6 +82,12 @@ jest.mock('@/shared/lib/nostr/media/mediaUpload', () => ({ uploadMedia: jest.fn(
 jest.mock('@/shared/lib/nostr/media/mediaServerStore', () => ({ getMediaServer: jest.fn() }));
 jest.mock('@/shared/lib/nostr/media/ownedBlobs', () => ({
   extractOwnedBlobsFromDescriptors: jest.fn(),
+}));
+jest.mock('@/shared/ui/primitives/Field', () => ({
+  TextField: ({ children }: React.PropsWithChildren) => children,
+  Label: ({ children }: React.PropsWithChildren) => children,
+  Description: ({ children }: React.PropsWithChildren) => children,
+  Input: () => null,
 }));
 jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('react-native-svg', () => ({
@@ -110,12 +113,6 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children }: React.PropsWithChildren) => children,
-}));
-jest.mock('heroui-native', () => ({
-  TextField: ({ children }: React.PropsWithChildren) => children,
-  Label: ({ children }: React.PropsWithChildren) => children,
-  Description: ({ children }: React.PropsWithChildren) => children,
-  Input: () => null,
 }));
 
 let renderer: TestRenderer.ReactTestRenderer;

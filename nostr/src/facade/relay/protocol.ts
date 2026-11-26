@@ -1,3 +1,4 @@
+import { verifyEvent } from 'nostr-tools/pure';
 import type { WebSocketLike } from '../websocket';
 import { createRelaySocketPool, type RelaySocketPool } from './socket-pool';
 import { ok, err, type Result } from 'neverthrow';
@@ -49,11 +50,20 @@ export type RawRelayEvent = {
   created_at?: number;
 };
 
-/** An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`. */
+const GIFT_WRAP_KIND = 1059;
+const LIVE_RECONNECT_INITIAL_MS = 1_000;
+const LIVE_RECONNECT_MAX_MS = 30_000;
+
+/** An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`.
+ *  Gift-wrapped payment envelopes (`kind: 1059`) are cryptographically verified before dedup so a
+ *  forged outer frame with a spoofed `id` can never poison the seen-set or unwrap cache. */
 function readRelayEvent(payload: unknown): (RawRelayEvent & { id: string }) | null {
   if (!payload || typeof payload !== 'object') return null;
   const { id, kind }: { id?: unknown; kind?: unknown } = payload;
   if (typeof id !== 'string' || typeof kind !== 'number') return null;
+  if (kind === GIFT_WRAP_KIND && !verifyEvent(payload as Parameters<typeof verifyEvent>[0])) {
+    return null;
+  }
   return { ...payload, id, kind };
 }
 
@@ -219,32 +229,62 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       const relays = config.relays.filter((r) => r.length > 0);
       if (!pool || relays.length === 0) return () => {};
 
-      const subId = `sov-live-${++counter}`;
       const seen = new Set<string>();
-      const ends: (() => void)[] = [];
+      const activeEnds = new Map<string, () => void>();
+      const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+      const reconnectDelays = new Map<string, number>();
       let closed = false;
       nostrLog.debug('nostr.relay.listen', { relays: relays.length, filters: filters.length });
 
-      for (const url of relays) {
+      const attach = (url: string) => {
+        if (closed) return;
+        const subId = `sov-live-${++counter}`;
         const end = pool.subscribe(url, subId, filters, {
           onFrame(message) {
+            if (closed) return;
+            // Healthy traffic resets the reconnect backoff for this relay.
+            reconnectDelays.delete(url);
             // Stay open past EOSE — a live listener only cares about EVENTs.
-            if (closed || message[0] !== 'EVENT') return;
+            if (message[0] !== 'EVENT') return;
             const candidate = readRelayEvent(message[2]);
             if (!candidate || seen.has(candidate.id)) return;
             seen.add(candidate.id);
             onEvent(candidate);
           },
-          // A dropped relay simply stops feeding the listener.
-          onClosed: () => {},
+          onClosed: () => {
+            activeEnds.delete(url);
+            if (closed || reconnectTimers.has(url)) return;
+            const delay = reconnectDelays.get(url) ?? LIVE_RECONNECT_INITIAL_MS;
+            reconnectDelays.set(url, Math.min(delay * 2, LIVE_RECONNECT_MAX_MS));
+            const timer = setTimeout(() => {
+              reconnectTimers.delete(url);
+              attach(url);
+            }, delay);
+            reconnectTimers.set(url, timer);
+          },
         });
-        if (end) ends.push(end);
-      }
+        if (end) {
+          activeEnds.set(url, end);
+        } else if (!closed && !reconnectTimers.has(url)) {
+          const delay = reconnectDelays.get(url) ?? LIVE_RECONNECT_INITIAL_MS;
+          reconnectDelays.set(url, Math.min(delay * 2, LIVE_RECONNECT_MAX_MS));
+          const timer = setTimeout(() => {
+            reconnectTimers.delete(url);
+            attach(url);
+          }, delay);
+          reconnectTimers.set(url, timer);
+        }
+      };
+
+      for (const url of relays) attach(url);
 
       return () => {
         if (closed) return;
         closed = true;
-        for (const end of ends) end();
+        for (const timer of reconnectTimers.values()) clearTimeout(timer);
+        reconnectTimers.clear();
+        for (const end of activeEnds.values()) end();
+        activeEnds.clear();
       };
     },
   };

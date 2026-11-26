@@ -67,7 +67,7 @@ jest.mock('@/shared/ui/composed/Nip05Identity', () => ({ Nip05Identity: () => nu
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { push: jest.fn(), navigate: jest.fn() },
 }));
-jest.mock('@/shared/providers/WalletContextProvider', () => ({
+jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContextWithOverride: () => ({ proofAmounts: mockProofAmounts }),
 }));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
@@ -99,7 +99,7 @@ jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
   }),
 }));
 jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: [] }) }));
-jest.mock('@/shared/providers/OfflineProvider', () => ({
+jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({

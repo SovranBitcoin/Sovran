@@ -5,8 +5,8 @@
  * own dimensions/alt into the descriptor the composer serializes into kind:1
  * content + an `imeta` tag.
  */
+import type { NostrClient } from 'nostr/client';
 import * as FileSystem from 'expo-file-system/legacy';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -23,7 +23,7 @@ import {
 import type { MediaDescriptor, PickedAsset } from '@/shared/lib/nostr/media/types';
 
 interface UploadMediaOptions {
-  ndk: NDK;
+  client: NostrClient;
   asset: PickedAsset;
   alt?: string;
   sensitive?: boolean;
@@ -75,7 +75,7 @@ export function uploadMedia(
     .andThen(() => normalizeImageAsset(opts.asset, opts.forceImageReencode))
     .andThen((asset) =>
       uploadToBlossom({
-        ndk: opts.ndk,
+        client: opts.client,
         server: opts.server ?? getMediaServer(),
         fileUri: asset.uri,
         mimeType: asset.mimeType,

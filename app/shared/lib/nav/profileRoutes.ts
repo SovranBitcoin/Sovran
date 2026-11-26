@@ -1,47 +1,50 @@
-import { useSegments } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
-export const USER_PROFILE_FLOW = '(user-flow)';
-export const MODAL_PROFILE_FLOW = '(profile-flow)';
+/**
+ * How a profile page was opened. A `page` is pushed (Search, the drawer, the
+ * gallery). A `sheet` rises over a screen that is itself a sheet (a payment,
+ * a mint review, the scanner): on iPhone react-native-screens pushes a page
+ * that follows a sheet beneath that sheet, so the profile must be a sheet too.
+ * Android pushes both. The root stack reads the `entry` param to choose
+ * (config/modalScreens.ts `sheet`), and a profile opened as a sheet opens the
+ * next profile as one.
+ */
+type ProfileEntry = 'page' | 'sheet';
 
-type ProfileFlowGroup = typeof USER_PROFILE_FLOW | typeof MODAL_PROFILE_FLOW;
-
-type ProfileRouteName = 'profile' | 'share' | 'bitchatDM' | 'bitchatNetwork';
+type ProfileRouteName = 'profile' | 'share';
 
 type ProfileRouteParamValue = string | number | (string | number)[] | null | undefined;
 type ProfileRouteParams = Record<string, ProfileRouteParamValue>;
 
-type ProfileHref<Route extends ProfileRouteName = ProfileRouteName> = {
-  pathname: `/${ProfileFlowGroup}/${Route}`;
-  params?: ProfileRouteParams;
-};
-
-export function resolveProfileFlowGroup(
-  segments: readonly string[] | null | undefined
-): ProfileFlowGroup {
-  return segments?.includes(MODAL_PROFILE_FLOW) ? MODAL_PROFILE_FLOW : USER_PROFILE_FLOW;
+/** Whether a route's params ask for the sheet presentation. */
+export function isSheetEntry(params: unknown): boolean {
+  return (
+    typeof params === 'object' &&
+    params !== null &&
+    (params as Record<string, unknown>).entry === 'sheet'
+  );
 }
 
-export function useActiveProfileFlowGroup(): ProfileFlowGroup {
-  return resolveProfileFlowGroup(useSegments());
+export function useProfileEntry(): ProfileEntry {
+  return isSheetEntry(useLocalSearchParams()) ? 'sheet' : 'page';
 }
 
 export function buildProfileHref<Route extends ProfileRouteName>(
   route: Route,
   params?: ProfileRouteParams,
-  flowGroup: ProfileFlowGroup = USER_PROFILE_FLOW
-): ProfileHref<Route> {
+  entry: ProfileEntry = 'page'
+): { pathname: `/${Route}`; params?: ProfileRouteParams } {
+  const withEntry = entry === 'sheet' ? { ...params, entry: 'sheet' } : params;
   return {
-    pathname: `/${flowGroup}/${route}`,
-    ...(params ? { params } : {}),
+    pathname: `/${route}`,
+    ...(withEntry ? { params: withEntry } : {}),
   };
 }
 
+/** A profile opened from a sheet: the scanner, a payment, a mint review. */
 export function buildModalProfileHref(params: ProfileRouteParams): {
-  pathname: '/(profile-flow)/profile';
-  params: ProfileRouteParams;
+  pathname: '/profile';
+  params?: ProfileRouteParams;
 } {
-  return {
-    pathname: '/(profile-flow)/profile',
-    params,
-  };
+  return buildProfileHref('profile', params, 'sheet');
 }

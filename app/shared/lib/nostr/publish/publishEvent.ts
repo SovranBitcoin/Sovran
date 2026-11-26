@@ -3,24 +3,22 @@ import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
  * @fileoverview `publishEvent` — the single seam every Nostr write routes
  * through.
  *
- * Replaces scattered `await ndkEvent.publish()` calls. Publishes to each target
- * relay individually (so failures are per-relay, not all-or-nothing), retries
- * only the relays that failed with exponential backoff, dedupes concurrent
- * publishes of the same signed event, and reports a structured
- * {@link PublishResult}.
+ * Publishes to each target relay individually (so failures are per-relay, not
+ * all-or-nothing), retries only the relays that failed with exponential
+ * backoff, dedupes concurrent publishes of the same signed event, and reports a
+ * structured {@link PublishResult}.
  *
- * Per-relay semantics follow the NIP-46 transport's verified NDK facts:
- * `relay.publish(event, timeoutMs)` resolves on the relay's OK frame and
- * rejects on error/timeout. Unlike `NDKRelaySet.publish`, this gives genuine
- * per-relay outcomes and resolve-on-first-accept.
+ * `client.publishToRelay(url, event, timeoutMs)` resolves on the relay's
+ * `["OK", id, true]` frame and rejects on rejection, error or timeout, which
+ * gives genuine per-relay outcomes and resolve-on-first-accept.
  *
  * Three resolve modes, one engine: `first-ok` and `all-settled` resolve only
  * once the fan-out is done; `optimistic` resolves the instant the first relay
  * accepts and finishes the fan-out (plus recipient/outbox relays) in the
  * background — see {@link runOptimistic}.
  */
-import NDK, { NDKEvent, NDKRelaySet, normalizeRelayUrl } from '@nostr-dev-kit/ndk-mobile';
-import type { NDKRelay } from '@nostr-dev-kit/ndk-mobile';
+import { tryNormalizeRelayUrl, type NostrClient } from 'nostr/client';
+import type { VerifiedEvent } from 'nostr-tools/pure';
 import { ResultAsync, err, ok, type Result } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -57,40 +55,37 @@ function buildPublishResult(eventId: string, relayResults: PublishRelayResult[])
 }
 
 /**
- * Resolves the target {@link NDKRelay} objects. With an explicit url set, builds
- * a relay set (connecting as needed); otherwise uses the pool's current relays
- * — the same reach `NDKEvent.publish()` has today.
+ * Resolves the target relay urls. With an explicit url set, normalizes and
+ * dedupes it; otherwise uses the client's current relays.
  */
-function targetRelays(ndk: NDK, relays?: readonly string[]): NDKRelay[] {
+function targetRelays(client: NostrClient, relays?: readonly string[]): string[] {
   if (relays && relays.length > 0) {
     const normalized = new Set<string>();
     for (const url of relays) {
-      try {
-        normalized.add(normalizeRelayUrl(url));
-      } catch {
-        nostrLog.warn('nostr.publish.relay_url_invalid', { urlLength: url.length });
-      }
+      const relay = tryNormalizeRelayUrl(url);
+      if (relay) normalized.add(relay);
+      else nostrLog.warn('nostr.publish.relay_url_invalid', { urlLength: url.length });
     }
-    if (normalized.size === 0) return [];
-    return [...NDKRelaySet.fromRelayUrls([...normalized], ndk).relays];
+    return [...normalized];
   }
-  return [...ndk.pool.relays.values()];
+  return client.relayUrls();
 }
 
 /** Publishes to one relay once, mapping accept/timeout/error to a result. */
 async function publishOne(
-  relay: NDKRelay,
-  event: NDKEvent,
+  client: NostrClient,
+  url: string,
+  event: VerifiedEvent,
   timeoutMs: number
 ): Promise<PublishRelayResult> {
   const start = Date.now();
   try {
-    await relay.publish(event, timeoutMs);
-    return { url: relay.url, ok: true, durationMs: Date.now() - start };
+    await client.publishToRelay(url, event, timeoutMs);
+    return { url, ok: true, durationMs: Date.now() - start };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const reason: 'timeout' | 'error' = /timeout|timed out/i.test(message) ? 'timeout' : 'error';
-    return { url: relay.url, ok: false, reason, message, durationMs: Date.now() - start };
+    return { url, ok: false, reason, message, durationMs: Date.now() - start };
   }
 }
 
@@ -100,14 +95,15 @@ async function publishOne(
  * to resolve on the genuine first accept rather than the slowest relay.
  */
 async function publishRound(
-  relays: NDKRelay[],
-  event: NDKEvent,
+  client: NostrClient,
+  relays: string[],
+  event: VerifiedEvent,
   timeoutMs: number,
   onAccept?: (result: AcceptResult) => void
-): Promise<{ results: PublishRelayResult[]; failed: NDKRelay[] }> {
+): Promise<{ results: PublishRelayResult[]; failed: string[] }> {
   const settled = await Promise.all(
     relays.map(async (relay) => {
-      const result = await publishOne(relay, event, timeoutMs);
+      const result = await publishOne(client, relay, event, timeoutMs);
       if (result.ok) onAccept?.(result);
       return { result, relay };
     })
@@ -136,8 +132,9 @@ interface FanOutHooks {
  * behind all resolve modes.
  */
 async function fanOut(
-  relays: NDKRelay[],
-  event: NDKEvent,
+  client: NostrClient,
+  relays: string[],
+  event: VerifiedEvent,
   timeoutMs: number,
   policy: RetryPolicy,
   finalByUrl: Map<string, PublishRelayResult>,
@@ -147,7 +144,13 @@ async function fanOut(
   for (let attempt = 0; attempt <= policy.attempts; attempt += 1) {
     if (pending.length === 0) break;
 
-    const { results, failed } = await publishRound(pending, event, timeoutMs, hooks.onAccept);
+    const { results, failed } = await publishRound(
+      client,
+      pending,
+      event,
+      timeoutMs,
+      hooks.onAccept
+    );
     const isLast = attempt === policy.attempts;
     for (const result of results) {
       finalByUrl.set(result.url, result);
@@ -179,8 +182,8 @@ interface PublishRun {
  * composer open with the draft intact).
  */
 function runOptimistic(
-  ndk: NDK,
-  event: NDKEvent,
+  client: NostrClient,
+  event: VerifiedEvent,
   eventId: string,
   timeoutMs: number,
   policy: RetryPolicy,
@@ -206,14 +209,14 @@ function runOptimistic(
 
   const done = (async (): Promise<void> => {
     try {
-      const base = targetRelays(ndk, opts.relays);
+      const base = targetRelays(client, opts.relays);
       if (base.length === 0) {
         nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
         resolveAssured(err({ type: 'no-relays' }));
         return;
       }
 
-      await fanOut(base, event, timeoutMs, policy, finalByUrl, {
+      await fanOut(client, base, event, timeoutMs, policy, finalByUrl, {
         resolveOn: 'all-settled',
         onAccept,
         onRelayResult: opts.onRelayResult,
@@ -245,9 +248,9 @@ function runOptimistic(
           });
           return [] as readonly string[];
         });
-        const extra = targetRelays(ndk, extraUrls).filter((relay) => !finalByUrl.has(relay.url));
+        const extra = targetRelays(client, extraUrls).filter((url) => !finalByUrl.has(url));
         if (extra.length > 0) {
-          await fanOut(extra, event, timeoutMs, policy, finalByUrl, {
+          await fanOut(client, extra, event, timeoutMs, policy, finalByUrl, {
             resolveOn: 'all-settled',
             onRelayResult: opts.onRelayResult,
           });
@@ -277,21 +280,21 @@ function runOptimistic(
 
 /** Runs `first-ok` / `all-settled`: a single fan-out, resolved once it's done. */
 async function runBlocking(
-  ndk: NDK,
-  event: NDKEvent,
+  client: NostrClient,
+  event: VerifiedEvent,
   eventId: string,
   timeoutMs: number,
   policy: RetryPolicy,
   opts: PublishOptions
 ): Promise<Result<PublishResult, PublishError>> {
-  const relays = targetRelays(ndk, opts.relays);
+  const relays = targetRelays(client, opts.relays);
   if (relays.length === 0) {
     nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
     return err({ type: 'no-relays' });
   }
 
   const finalByUrl = new Map<string, PublishRelayResult>();
-  await fanOut(relays, event, timeoutMs, policy, finalByUrl, {
+  await fanOut(client, relays, event, timeoutMs, policy, finalByUrl, {
     resolveOn: opts.resolveOn === 'first-ok' ? 'first-ok' : 'all-settled',
     onRelayResult: opts.onRelayResult,
   });
@@ -313,20 +316,28 @@ async function runBlocking(
   return ok(result);
 }
 
+function isSigned(event: PublishOptions['event']): event is VerifiedEvent {
+  const e = event as Partial<VerifiedEvent>;
+  return typeof e.sig === 'string' && typeof e.id === 'string' && typeof e.pubkey === 'string';
+}
+
 async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, PublishError>> {
-  const { ndk, event } = opts;
+  const { client } = opts;
   const timeoutMs = opts.timeoutMs ?? PUBLISH_TIMEOUT_MS;
   const policy: RetryPolicy = { ...DEFAULT_RETRY_POLICY, ...opts.retry };
   const resolveOn = opts.resolveOn ?? 'all-settled';
 
   // Sign if needed — the event id is only known after signing.
-  if (!event.sig) {
-    if (!ndk.signer) return err({ type: 'no-signer' });
+  let event: VerifiedEvent;
+  if (isSigned(opts.event)) {
+    event = opts.event;
+  } else {
+    if (!client.signer) return err({ type: 'no-signer' });
     try {
-      await event.sign();
+      event = client.signEvent(opts.event);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      nostrLog.error('nostr.publish.sign_failed', { kind: event.kind });
+      nostrLog.error('nostr.publish.sign_failed', { kind: opts.event.kind });
       return err({ type: 'sign-failed', message });
     }
   }
@@ -341,13 +352,13 @@ async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, P
     // `assured` resolves on first accept; the dedup entry is held until the
     // background fan-out finishes. `done` settles its own errors internally
     // (see runOptimistic), so it never rejects — just clean up when it's done.
-    const { assured, done } = runOptimistic(ndk, event, eventId, timeoutMs, policy, opts);
+    const { assured, done } = runOptimistic(client, event, eventId, timeoutMs, policy, opts);
     inFlight.set(eventId, assured);
     void done.finally(() => inFlight.delete(eventId));
     return assured;
   }
 
-  const run = runBlocking(ndk, event, eventId, timeoutMs, policy, opts);
+  const run = runBlocking(client, event, eventId, timeoutMs, policy, opts);
   inFlight.set(eventId, run);
   try {
     return await run;
@@ -360,7 +371,7 @@ async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, P
  * Publishes a Nostr event through the central seam. See {@link PublishOptions}.
  *
  * @example
- * const result = await publishEvent({ ndk, event, resolveOn: 'first-ok' });
+ * const result = await publishEvent({ client, event, resolveOn: 'first-ok' });
  * if (result.isErr()) rollbackOptimisticState();
  */
 export function publishEvent(opts: PublishOptions): ResultAsync<PublishResult, PublishError> {

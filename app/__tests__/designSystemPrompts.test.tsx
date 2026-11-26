@@ -167,17 +167,41 @@ jest.mock('react-native-reanimated', () => {
 
 jest.mock('react-native-worklets', () => ({ scheduleOnRN: jest.fn() }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
-jest.mock('heroui-native', () => {
+jest.mock('@/shared/ui/primitives/PillButton', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host = (name: string) =>
+    function MockHost(props: Record<string, unknown>) {
+      return ReactActual.createElement(name, props);
+    };
+  return { PillButton: Object.assign(host('PillButton'), { Label: 'Label' }) };
+});
+jest.mock('@/shared/ui/primitives/Field', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const host = (name: string) =>
     function MockHost(props: Record<string, unknown>) {
       return ReactActual.createElement(name, props);
     };
   return {
-    Button: Object.assign(host('HeroButton'), { Label: 'Label' }),
     ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
     Label: Object.assign(host('Label'), { Text: 'LabelText' }),
-    PressableFeedback: Object.assign(host('PressableFeedback'), { Highlight: 'Highlight' }),
+    TextField: host('TextField'),
+    Input: host('Input'),
+    Description: host('Description'),
+    RadioGroup: Object.assign(host('RadioGroup'), { Item: host('RadioGroup.Item') }),
+  };
+});
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const host = (name: string) =>
+    function MockHost(props: Record<string, unknown>) {
+      return ReactActual.createElement(name, props);
+    };
+  return {
+    PressableFeedback: Object.assign(host('PressableFeedback'), {
+      Highlight: 'Highlight',
+      Ripple: 'Ripple',
+      Scale: 'Scale',
+    }),
   };
 });
 jest.mock('assets/icons', () => 'Icon');
@@ -477,10 +501,7 @@ describe('the Prompts page', () => {
         expect(getActionMenuSnapshot().payload).not.toBeNull();
       } else {
         expect(mockNavigate).toHaveBeenCalledWith({
-          pathname:
-            entry.kind === 'cta'
-              ? '/(prompt-flow)/cta-sample'
-              : '/(settings-flow)/design-system-prompt',
+          pathname: entry.kind === 'cta' ? '/cta-sample' : '/(settings-flow)/design-system-prompt',
           params: { id: entry.id },
         });
         expect(getActionMenuSnapshot().payload).toBeNull();

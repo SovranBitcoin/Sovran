@@ -1,8 +1,10 @@
+import type { NostrClient } from 'nostr/client';
 import { Children, useCallback, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { Input, ListGroup, PressableFeedback, Separator, TextField } from 'heroui-native';
+import { Input, TextField } from '@/shared/ui/primitives/Field';
+import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
+import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import { relayEditCopy as copy } from 'copy/prompts';
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -39,11 +41,11 @@ type State =
     };
 
 export function RelayListSettings({
-  ndk,
+  client,
   pubkey,
   health,
 }: {
-  ndk: NDK | undefined;
+  client: NostrClient | undefined;
   pubkey: string | undefined;
   health?: Record<string, RelayHealth>;
 }) {
@@ -66,17 +68,17 @@ export function RelayListSettings({
   }, []);
   useFocusEffect(
     useCallback(() => {
-      if (!ndk || !pubkey) return;
+      if (!client || !pubkey) return;
       return reset;
-    }, [reset, ndk, pubkey])
+    }, [reset, client, pubkey])
   );
 
   const start = async (proposal?: readonly RelayListEntry[]) => {
-    if (!ndk || !pubkey || busy.current) return;
+    if (!client || !pubkey || busy.current) return;
     busy.current = true;
     const started = ++generation.current;
     setState({ kind: 'loading' });
-    const result = await beginRelayListEdit(ndk, pubkey);
+    const result = await beginRelayListEdit(client, pubkey);
     if (started !== generation.current) {
       if (result.isOk()) result.value.dispose();
       return;
@@ -316,7 +318,7 @@ export function RelayListSettings({
             id="relay-edit"
             label={copy.edit}
             onPress={() => start()}
-            disabled={!ndk || !pubkey}
+            disabled={!client || !pubkey}
           />
         ) : null}
         {state.kind === 'waiting' || state.kind === 'loading' ? (

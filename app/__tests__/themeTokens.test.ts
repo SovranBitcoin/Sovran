@@ -4,17 +4,15 @@
  * Parity gate for the colour-token system.
  *
  * `useThemeColor`'s token list is hand-maintained, but the variables it resolves
- * come from three separate registries — two owned by this repo, one vendored:
+ * come from two registries:
  *
  *   1. `shared/lib/themeEngine.ts`      — injected at runtime by Uniwind
- *   2. `app/global.css` `@theme`        — the Tailwind token schema
- *   3. `heroui-native/.../theme.css`    — VENDORED `@theme inline static`, which
- *                                         derives ~22 tokens via `color-mix()`
+ *   2. `app/global.css` `@theme`        — the Tailwind token schema, including
+ *                                         ~22 tokens derived via `color-mix()`
  *
  * Nothing else compares them. An unresolved token does not throw — it falls back
- * to a neutral grey — so a heroui upgrade that renames `--color-separator-secondary`
- * would quietly repaint ten separators with no error anywhere. This test is that
- * error. Run it after `bun update heroui-native`.
+ * to a neutral grey — so renaming `--color-separator-secondary` would quietly
+ * repaint ten separators with no error anywhere. This test is that error.
  */
 
 import fs from 'node:fs';
@@ -35,24 +33,10 @@ jest.mock('uniwind', () => ({ useCSSVariable: () => [] }));
 const NON_COLOUR_VAR = /-shadow$/;
 
 /**
- * heroui exposes `--field-background` under the shorter token name `field`
+ * global.css exposes `--field-background` under the shorter token name `field`
  * (`--color-field: var(--field-background, var(--default))`).
  */
 const VAR_TO_TOKEN_ALIAS: Record<string, string> = { 'field-background': 'field' };
-
-function resolveHerouiThemeCss(): string {
-  const candidates = [
-    path.resolve(__dirname, '../node_modules/heroui-native/lib/module/styles/theme.css'),
-    path.resolve(__dirname, '../../node_modules/heroui-native/lib/module/styles/theme.css'),
-  ];
-  const found = candidates.find((file) => fs.existsSync(file));
-
-  if (!found) {
-    throw new Error(`heroui-native theme.css not found. Looked in:\n  ${candidates.join('\n  ')}`);
-  }
-
-  return found;
-}
 
 /** Every `--color-*` custom property declared in a CSS file. */
 function declaredColorVars(file: string): string[] {
@@ -67,7 +51,6 @@ describe('colour tokens', () => {
   const declared = new Set<string>([
     ...Object.keys(getThemeVariables('dark')),
     ...declaredColorVars(path.resolve(__dirname, '../global.css')),
-    ...declaredColorVars(resolveHerouiThemeCss()),
   ]);
 
   it('has no duplicate token names', () => {
@@ -94,7 +77,7 @@ describe('colour tokens', () => {
 
   it('gives every theme a concrete value for every variable it declares', () => {
     // themeEngine sets the base `--x` form; `--color-x` is the Tailwind alias
-    // that global.css / heroui map onto it, so check the base names here.
+    // that global.css maps onto it, so check the base names here.
     const empty: string[] = [];
 
     for (const [themeName, vars] of Object.entries(themeVariables)) {

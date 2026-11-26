@@ -1,49 +1,103 @@
 /**
- * Shared row body for `Menu.Item`s hosted inside our custom `<BottomSheet>`
- * lane (a bare `<Menu>` outside any `Menu.Content` host): leading icon,
- * collapse-proof title, optional description, optional trailing accessory.
- * Used by the action-menu / payment-options / proof-selector / model-picker
- * sheets, the `ActionMenuHost` menu lane, and `ActionMenuButton`'s popover so
- * the row body and the heroui title defence live in one place.
+ * Menu rows for every action menu: the sheets (`ActionMenuHost`,
+ * `actionMenuSheet`) and `ActionMenuButton`'s popover. `MenuItem` is the
+ * pressable row (tinted and shrunk while held); `SheetMenuRowContent` its
+ * body: leading icon, title, optional description, optional trailing
+ * accessory.
  */
 
-import type { ReactNode } from 'react';
-import { View } from 'react-native';
-import { Menu } from 'heroui-native';
+import { type ReactNode } from 'react';
+import { Text as RNText, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { withAlpha } from '@/shared/lib/color';
+import { cn } from '@/shared/lib/classNames';
+import { injectParts } from '@/shared/lib/injectParts';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 
-/**
- * `flex: 0` + `numberOfLines={1}` neutralise heroui's baked-in `flex-1` on
- * `Menu.ItemTitle`, which collapses to zero height outside a `Menu.Content`
- * host (the surrounding column has no fixed height for `flex-grow` to claim):
- *   1. `style.flex: 0` — RN's `style` wins over className in the merge, so
- *      the tailwind `flex-1` is neutralised.
- *   2. `numberOfLines={1}` — forces RN to allocate at least one line of
- *      layout height regardless of flex math.
- * The rest of heroui's typography (`text-base font-medium text-foreground`)
- * is preserved.
- */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+type MenuItemProps = {
+  testID?: string;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityState?: { disabled?: boolean; busy?: boolean; selected?: boolean };
+  isDisabled?: boolean;
+  isSelected?: boolean;
+  variant?: 'default' | 'danger';
+  onPress: () => void;
+  children: ReactNode;
+};
+
+export function MenuItem({
+  isDisabled = false,
+  isSelected = false,
+  variant = 'default',
+  accessibilityState,
+  onPress,
+  children,
+  ...rest
+}: MenuItemProps) {
+  const [fill, danger] = useThemeColor(['default', 'danger'] as const);
+  const pressedFill = variant === 'danger' ? withAlpha(danger, 0.1) : fill;
+  const restFill = withAlpha(fill, 0);
+  const pressed = useSharedValue(false);
+  const feedback = useAnimatedStyle(() => ({
+    backgroundColor: withTiming(pressed.get() ? pressedFill : restFill, {
+      duration: 150,
+    }),
+    transform: [{ scale: withTiming(pressed.get() ? 0.98 : 1, { duration: 150 }) }],
+  }));
+  return (
+    <AnimatedPressable
+      accessibilityRole="menuitem"
+      accessibilityState={{ disabled: isDisabled, selected: isSelected, ...accessibilityState }}
+      disabled={isDisabled}
+      activeOpacity={1}
+      onPressIn={() => pressed.set(true)}
+      onPressOut={() => pressed.set(false)}
+      onPress={onPress}
+      className={cn(
+        'flex-row items-center gap-2.5 rounded-2xl px-2.5 py-2',
+        isDisabled && 'opacity-disabled'
+      )}
+      style={[{ borderCurve: 'continuous' }, feedback]}
+      {...rest}>
+      {injectParts(children, [SheetMenuRowContent], { variant })}
+    </AnimatedPressable>
+  );
+}
+
+/** The bold sheet title above a menu's rows. */
+export function MenuTitle({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <RNText
+      className={cn('text-foreground -mt-2 mb-2 ml-3 text-left text-lg font-bold', className)}>
+      {children}
+    </RNText>
+  );
+}
+
 function SheetItemTitle({
   children,
   singleLine = true,
+  variant,
 }: {
   children: ReactNode;
-  /**
-   * The `numberOfLines={1}` half of the defence above is only needed where the
-   * title would otherwise collapse to zero height — a bare `<Menu>` with no
-   * `Menu.Content` host. Inside a real host it just truncates titles that used
-   * to wrap, so those callers opt out.
-   */
   singleLine?: boolean;
+  variant: 'default' | 'danger';
 }) {
   return (
-    <Menu.ItemTitle
-      className="flex-none"
-      numberOfLines={singleLine ? 1 : undefined}
-      style={{ flex: 0 }}>
+    <RNText
+      className={cn(
+        'text-left text-base font-medium',
+        variant === 'danger' ? 'text-danger' : 'text-foreground'
+      )}
+      numberOfLines={singleLine ? 1 : undefined}>
       {children}
-    </Menu.ItemTitle>
+    </RNText>
   );
 }
 
@@ -51,12 +105,14 @@ interface SheetMenuRowContentProps {
   /** Leading icon node (already sized); `null` renders nothing. */
   icon: ReactNode;
   title: ReactNode;
-  /** Rendered in a `Menu.ItemDescription` when non-null. */
+  /** A muted second line when non-null. */
   description?: ReactNode;
   /** Trailing accessory (amount, check, capability glyphs …). */
   trailing?: ReactNode;
-  /** See `SheetItemTitle.singleLine`. Hosts inside `Menu.Content` pass false. */
+  /** One line, truncated (pickers); `false` lets the title wrap. */
   singleLineTitle?: boolean;
+  /** Handed down by `MenuItem`: danger rows title in the danger colour. */
+  variant?: 'default' | 'danger';
 }
 
 export function SheetMenuRowContent({
@@ -65,13 +121,18 @@ export function SheetMenuRowContent({
   description,
   trailing,
   singleLineTitle = true,
+  variant = 'default',
 }: SheetMenuRowContentProps) {
   return (
     <HStack align="center" gap={10} style={{ flex: 1 }}>
       {icon}
       <View style={{ flex: 1 }}>
-        <SheetItemTitle singleLine={singleLineTitle}>{title}</SheetItemTitle>
-        {description != null ? <Menu.ItemDescription>{description}</Menu.ItemDescription> : null}
+        <SheetItemTitle singleLine={singleLineTitle} variant={variant}>
+          {title}
+        </SheetItemTitle>
+        {description != null ? (
+          <RNText className="text-muted text-left text-sm leading-[1.375]">{description}</RNText>
+        ) : null}
       </View>
       {trailing}
     </HStack>
@@ -79,7 +140,7 @@ export function SheetMenuRowContent({
 }
 
 /**
- * Row tint for a menu item's state. heroui's `variant="danger"` only colours
+ * Row tint for a menu item's state. `variant="danger"` only colours
  * text, so a failed row (red) or a caution row (yellow) gets its whole
  * background tinted to read at a glance. The description still carries the
  * meaning for screen readers; colour alone is not an accessibility signal.

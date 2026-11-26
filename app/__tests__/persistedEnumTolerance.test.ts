@@ -32,9 +32,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
-  virtual: true,
-});
 
 import '@/features/bitchat/stores/bitchatDmMessages';
 import '@/shared/stores/profile/ignoreStore';

@@ -24,32 +24,6 @@ jest.mock('assets/icons', () => ({
   },
 }));
 
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-
-  const ListGroup = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup', props, children);
-  ListGroup.Item = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup.Item', props, children);
-  ListGroup.ItemPrefix = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup.ItemPrefix', props, children);
-  ListGroup.ItemContent = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup.ItemContent', props, children);
-  ListGroup.ItemTitle = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup.ItemTitle', props, children);
-  ListGroup.ItemSuffix = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('ListGroup.ItemSuffix', props, children);
-
-  const PressableFeedback = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('PressableFeedback', props, children);
-  PressableFeedback.Scale = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('PressableFeedback.Scale', props, children);
-  PressableFeedback.Ripple = (props: Record<string, unknown>) =>
-    ReactActual.createElement('PressableFeedback.Ripple', props);
-
-  return { ListGroup, PressableFeedback };
-});
-
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: () =>
     jest.requireActual<typeof import('@/shared/lib/brandColors')>('@/shared/lib/brandColors')
@@ -83,6 +57,42 @@ jest.mock('@/shared/ui/composed/Section', () => ({
     return ReactActual.createElement('Section', { title }, children);
   },
 }));
+
+jest.mock('@/shared/ui/composed/ListGroup', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+
+  const ListGroup = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup', props, children);
+  ListGroup.Item = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.Item', props, children);
+  ListGroup.ItemPrefix = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemPrefix', props, children);
+  ListGroup.ItemContent = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemContent', props, children);
+  ListGroup.ItemTitle = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemTitle', props, children);
+  ListGroup.ItemDescription = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemDescription', props, children);
+  ListGroup.ItemSuffix = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('ListGroup.ItemSuffix', props, children);
+
+  return { ListGroup };
+});
+
+jest.mock('@/shared/ui/primitives/PressableFeedback', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+
+  const PressableFeedback = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('PressableFeedback', props, children);
+  PressableFeedback.Scale = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('PressableFeedback.Scale', props, children);
+  PressableFeedback.Ripple = (props: Record<string, unknown>) =>
+    ReactActual.createElement('PressableFeedback.Ripple', props);
+  PressableFeedback.Highlight = (props: Record<string, unknown>) =>
+    ReactActual.createElement('PressableFeedback.Highlight', props);
+
+  return { PressableFeedback };
+});
 
 function render(element: React.ReactElement): TestRenderer.ReactTestRenderer {
   let renderer!: TestRenderer.ReactTestRenderer;

@@ -129,7 +129,7 @@ export function MapScreen() {
   const handleMarkerClick = (marker: { id?: string }) => {
     const placeId = marker.id ? pressMarker(marker.id) : undefined;
     if (placeId) {
-      router.navigate({ pathname: '/(map-flow)/detail', params: { placeId: placeId.toString() } });
+      router.navigate({ pathname: '/detail', params: { placeId: placeId.toString() } });
     }
   };
 

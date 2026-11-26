@@ -13,6 +13,7 @@ import { isMintQuotePaymentObserved } from 'wallet';
 import { useScreenActions } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
+import { hasFeature } from '@/shared/config/features';
 import { MintSelector } from '@/features/wallet';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import {
@@ -115,7 +116,7 @@ export function LightningReceiveScreen({
               variant: 'primary',
               testID: 'lightning-receive-copy',
               onPress: () => actions.copy.execute(),
-              condition: actions.copy.available,
+              condition: hasFeature('lightning') && actions.copy.available,
             },
             {
               text: 'Share',
@@ -123,7 +124,7 @@ export function LightningReceiveScreen({
               variant: 'secondary',
               testID: 'lightning-receive-share',
               onPress: () => actions.share.execute(),
-              condition: actions.share.available,
+              condition: hasFeature('lightning') && actions.share.available,
             },
           ]}
         />

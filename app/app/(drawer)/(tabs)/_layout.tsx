@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
 import { View } from 'react-native';
 import type { SFSymbol } from 'expo-symbols';
 import Icon from 'assets/icons';
@@ -101,57 +100,55 @@ export default function TabLayout() {
   if (isExpo55NativeTabsSupported()) {
     return (
       <TabBarInsetsProvider mode="native">
-        <BackgroundProvider>
-          <View className="flex-1">
-            <Expo55NativeTabs
-              labelStyle={{ default: { color: muted }, selected: { color: foreground } }}
-              iconColor={{ default: muted, selected: foreground }}
-              tintColor={foreground}
-              disableTransparentOnScrollEdge
-              screenListeners={({ route }) => ({
-                focus: () => onTabFocus(route.name),
-                tabPress: () => {
-                  if (route.name !== 'search' || !searchOpen) return;
-                  // The navigator re-selects Search right after this event, so
-                  // leave on the next frame or the re-select would win. Unguarded:
-                  // the double-tap cooldown would swallow a quick open-then-close
-                  // (the tab bar itself is the only caller, once per press).
-                  if (closeFrame.current !== null) cancelAnimationFrame(closeFrame.current);
-                  closeFrame.current = requestAnimationFrame(() => {
-                    closeFrame.current = null;
-                    guardedRouter.raw.navigate(RETURN_TABS[returnTab].href);
-                  });
-                },
-              })}>
-              {TAB_DEFS.map((tab) => {
-                const closes = tab.name === 'search' && searchOpen;
-                return (
-                  <Expo55NativeTabs.Trigger
-                    disableAutomaticContentInsets
-                    key={tab.name}
-                    name={tab.name}
-                    role={tab.role}
-                    // Pressing the open Search tab closes it; it never pops or scrolls.
-                    disablePopToTop={tab.name === 'search'}
-                    disableScrollToTop={tab.name === 'search'}
-                    unstable_nativeProps={{
-                      tabBarItemTestID: tab.testID,
-                      tabBarItemAccessibilityLabel: closes
-                        ? `${SEARCH_CLOSE_LABEL}. ${RETURN_TABS[returnTab].hint}`
-                        : tab.title,
-                    }}>
-                    {/* A `role` item takes the system's own title. */}
-                    {tab.role ? null : (
-                      <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
-                    )}
-                    <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
-                  </Expo55NativeTabs.Trigger>
-                );
-              })}
-            </Expo55NativeTabs>
-            <DrawerSceneOverlay />
-          </View>
-        </BackgroundProvider>
+        <View className="flex-1">
+          <Expo55NativeTabs
+            labelStyle={{ default: { color: muted }, selected: { color: foreground } }}
+            iconColor={{ default: muted, selected: foreground }}
+            tintColor={foreground}
+            disableTransparentOnScrollEdge
+            screenListeners={({ route }) => ({
+              focus: () => onTabFocus(route.name),
+              tabPress: () => {
+                if (route.name !== 'search' || !searchOpen) return;
+                // The navigator re-selects Search right after this event, so
+                // leave on the next frame or the re-select would win. Unguarded:
+                // the double-tap cooldown would swallow a quick open-then-close
+                // (the tab bar itself is the only caller, once per press).
+                if (closeFrame.current !== null) cancelAnimationFrame(closeFrame.current);
+                closeFrame.current = requestAnimationFrame(() => {
+                  closeFrame.current = null;
+                  guardedRouter.raw.navigate(RETURN_TABS[returnTab].href);
+                });
+              },
+            })}>
+            {TAB_DEFS.map((tab) => {
+              const closes = tab.name === 'search' && searchOpen;
+              return (
+                <Expo55NativeTabs.Trigger
+                  disableAutomaticContentInsets
+                  key={tab.name}
+                  name={tab.name}
+                  role={tab.role}
+                  // Pressing the open Search tab closes it; it never pops or scrolls.
+                  disablePopToTop={tab.name === 'search'}
+                  disableScrollToTop={tab.name === 'search'}
+                  unstable_nativeProps={{
+                    tabBarItemTestID: tab.testID,
+                    tabBarItemAccessibilityLabel: closes
+                      ? `${SEARCH_CLOSE_LABEL}. ${RETURN_TABS[returnTab].hint}`
+                      : tab.title,
+                  }}>
+                  {/* A `role` item takes the system's own title. */}
+                  {tab.role ? null : (
+                    <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
+                  )}
+                  <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
+                </Expo55NativeTabs.Trigger>
+              );
+            })}
+          </Expo55NativeTabs>
+          <DrawerSceneOverlay />
+        </View>
       </TabBarInsetsProvider>
     );
   }
@@ -159,46 +156,44 @@ export default function TabLayout() {
   // Everything else (pre-iOS-26 + Android) uses the custom JS tab bar.
   return (
     <TabBarInsetsProvider mode="docked">
-      <BackgroundProvider>
-        <View className="flex-1">
-          <Tabs
-            initialRouteName="index"
-            screenOptions={{ headerShown: false }}
-            screenListeners={({ route }) => ({ focus: () => onTabFocus(route.name) })}
-            tabBar={(props) => (
-              <SovranTabBar
-                {...props}
-                closeableRoute="search"
-                onCloseRoute={() => props.navigation.navigate(returnTab)}
-                closeLabel={SEARCH_CLOSE_LABEL}
-                closeHint={RETURN_TABS[returnTab].hint}
-              />
-            )}>
-            {TAB_DEFS.map((tab) => (
-              <Tabs.Screen
-                key={tab.name}
-                name={tab.name}
-                options={{
-                  title: tab.title,
-                  tabBarAccessibilityLabel: tab.title,
-                  tabBarButtonTestID: tab.testID,
-                  tabBarIcon: ({ focused, color }) =>
-                    tab.name === 'search' ? (
-                      <SearchTabIcon focused={focused} color={color as string} />
-                    ) : (
-                      <Icon
-                        name={focused ? tab.monicon.selected : tab.monicon.default}
-                        color={color as string}
-                        size={24}
-                      />
-                    ),
-                }}
-              />
-            ))}
-          </Tabs>
-          <DrawerSceneOverlay />
-        </View>
-      </BackgroundProvider>
+      <View className="flex-1">
+        <Tabs
+          initialRouteName="index"
+          screenOptions={{ headerShown: false }}
+          screenListeners={({ route }) => ({ focus: () => onTabFocus(route.name) })}
+          tabBar={(props) => (
+            <SovranTabBar
+              {...props}
+              closeableRoute="search"
+              onCloseRoute={() => props.navigation.navigate(returnTab)}
+              closeLabel={SEARCH_CLOSE_LABEL}
+              closeHint={RETURN_TABS[returnTab].hint}
+            />
+          )}>
+          {TAB_DEFS.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              options={{
+                title: tab.title,
+                tabBarAccessibilityLabel: tab.title,
+                tabBarButtonTestID: tab.testID,
+                tabBarIcon: ({ focused, color }) =>
+                  tab.name === 'search' ? (
+                    <SearchTabIcon focused={focused} color={color as string} />
+                  ) : (
+                    <Icon
+                      name={focused ? tab.monicon.selected : tab.monicon.default}
+                      color={color as string}
+                      size={24}
+                    />
+                  ),
+              }}
+            />
+          ))}
+        </Tabs>
+        <DrawerSceneOverlay />
+      </View>
     </TabBarInsetsProvider>
   );
 }

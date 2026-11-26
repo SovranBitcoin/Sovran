@@ -7,7 +7,7 @@
  * recording fakes.
  */
 import { act, renderHook } from '@testing-library/react-native';
-import { Amount, MintOperationError } from '@cashu/coco-core';
+import { Amount } from '@cashu/coco-core';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { cashuLog } from '@/shared/lib/logger';
@@ -66,6 +66,7 @@ const mockTransactions = {
   startGroup: jest.fn(() => 'group-1'),
   addLeg: jest.fn(() => 'leg-1'),
   setLegStatus: jest.fn(),
+  tagMintSwap: jest.fn(),
   tagMintQuote: jest.fn(),
   tagMelt: jest.fn(),
   finalizeGroup: jest.fn(),
@@ -87,20 +88,31 @@ const mockStatus = {
   resume: jest.fn(),
 };
 let destinationBalance = 0;
-let mintState = 'pending';
-const operation = () => ({
-  id: 'mint-op-1',
-  quoteId: 'mint-quote-1',
-  mintUrl: DESTINATION,
-  method: 'bolt11',
-  request: 'lnbc-fixture',
-  amount: Amount.from(100),
-  unit: 'sat',
-  state: mintState,
-  createdAt: 1000,
-  updatedAt: 1000,
-});
+let pendingWaitResolvers: Array<() => void> = [];
 let mockManager: ReturnType<typeof createManager>;
+
+function makeSwapOp(id: string, state: string, extra: Record<string, unknown> = {}) {
+  return {
+    id,
+    revision: 1,
+    sourceMintUrl: SOURCE,
+    destinationMintUrl: DESTINATION,
+    unit: 'sat' as const,
+    destinationAmount: Amount.from(100),
+    sourceQuote: { mintUrl: SOURCE, method: 'bolt11' as const, quoteId: `mq-${id}` },
+    destinationQuote: { mintUrl: DESTINATION, method: 'bolt11' as const, quoteId: `dq-${id}` },
+    sourceOperationId: `melt-${id}`,
+    destinationOperationId: `mint-${id}`,
+    paymentRequestHash: '00'.repeat(32),
+    createdAt: 1000,
+    updatedAt: 1000,
+    stateEnteredAt: 1000,
+    retry: { attemptCount: 0, lastAttemptAt: null, nextAttemptAt: null, lastError: null },
+    state,
+    ...extra,
+  };
+}
+
 function createManager() {
   return {
     wallet: {
@@ -111,41 +123,37 @@ function createManager() {
         })),
       },
     },
-    quotes: {
-      mint: {
-        create: jest.fn(
-          async (_input: { mintUrl: string; amount: { amount: number; unit: string } }) => ({
-            quoteId: 'mint-quote-1',
-            mintUrl: DESTINATION,
-            unit: 'sat',
-            request: 'lnbc-fixture',
-          })
-        ),
-      },
-      melt: { create: jest.fn(async () => ({ quoteId: 'melt-quote-1', mintUrl: SOURCE })) },
-    },
     ops: {
-      mint: {
-        prepare: jest.fn(async (_input: { quote: { quoteId: string }; amount: number }) =>
-          operation()
+      mintSwap: {
+        prepare: jest.fn(
+          async (input: { id: string; sourceMintUrl: string; destinationMintUrl: string }) =>
+            makeSwapOp(input.id, 'prepared', {
+              sourceMintUrl: input.sourceMintUrl,
+              destinationMintUrl: input.destinationMintUrl,
+            })
         ),
-        get: jest.fn(async (_id: string) => operation()),
-      },
-      melt: {
-        prepare: jest.fn(async () => ({
-          id: 'melt-op-1',
-          quoteId: 'melt-quote-1',
-          amount: Amount.from(100),
-          fee_reserve: 0,
-          swap_fee: 0,
-        })),
-        execute: jest.fn(async () => {
-          mintState = 'finalized';
+        execute: jest.fn(async (id: string) => {
           destinationBalance = 100;
-          return { id: 'melt-op-1', state: 'finalized' };
+          return makeSwapOp(id, 'completed');
         }),
-        refresh: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
-        get: jest.fn(async (_id: string) => null as { id: string; state: string } | null),
+        get: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
+        listActive: jest.fn(async () => []),
+        refresh: jest.fn(async (id: string) => makeSwapOp(id, 'completed')),
+        cancel: jest.fn(async (id: string) => makeSwapOp(id, 'cancelled')),
+        waitForOutcome: jest.fn(
+          (id: string) =>
+            new Promise((resolve) => {
+              const timer = setTimeout(
+                () =>
+                  resolve({ status: 'timeout', operation: makeSwapOp(id, 'destination_funded') }),
+                15_000
+              );
+              pendingWaitResolvers.push(() => {
+                clearTimeout(timer);
+                resolve({ status: 'timeout', operation: makeSwapOp(id, 'destination_funded') });
+              });
+            })
+        ),
       },
     },
     mint: { addMint: jest.fn().mockResolvedValue(undefined) },
@@ -183,13 +191,14 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockStatus.active = null;
   destinationBalance = 0;
-  mintState = 'pending';
+  pendingWaitResolvers = [];
   mockLocalCandidates = [];
   mockManager = createManager();
 });
 afterEach(() => {
   // A run still going holds its group for the process; end it with the test.
   for (const result of mounted) act(() => result.current.handleCancelRun());
+  for (const resolve of pendingWaitResolvers.splice(0)) resolve();
   mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
@@ -198,18 +207,15 @@ afterEach(() => {
 const step = plan.steps[0];
 
 function failNextMelt() {
-  mockManager.ops.melt.execute.mockImplementationOnce(async () => ({
-    id: 'melt-op-1',
-    state: 'pending',
-  }));
-  mockManager.ops.melt.refresh.mockResolvedValueOnce({ id: 'melt-op-1', state: 'rolled_back' });
+  mockManager.ops.mintSwap.execute.mockImplementationOnce(async (id: string) =>
+    makeSwapOp(id, 'failed', { failure: { code: 'source_payment_rejected' } })
+  );
 }
 
 function keepRecipientPending() {
-  mockManager.ops.melt.execute.mockImplementation(async () => ({
-    id: 'melt-op-1',
-    state: 'finalized',
-  }));
+  mockManager.ops.mintSwap.execute.mockImplementation(async (id: string) =>
+    makeSwapOp(id, 'destination_funded')
+  );
 }
 
 async function finishRun() {
@@ -282,7 +288,7 @@ test('pressing start twice in a row runs one swap', async () => {
 
   expect(mockTransactions.startGroup).toHaveBeenCalledTimes(1);
   expect(mockStatus.start).toHaveBeenCalledTimes(1);
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
 });
 
 test('start is refused while another screen’s swap owns a run, whatever the toast shows', async () => {
@@ -301,7 +307,7 @@ test('start is refused while another screen’s swap owns a run, whatever the to
   expect(result.current.runPlan).toBeNull();
   expect(mockTransactions.startGroup).not.toHaveBeenCalled();
   expect(mockStatus.start).not.toHaveBeenCalled();
-  expect(mockManager.ops.melt.execute).not.toHaveBeenCalled();
+  expect(mockManager.ops.mintSwap.execute).not.toHaveBeenCalled();
   expect(cashuLog.info).toHaveBeenCalledWith('mint.rebalance.start_blocked_by_active_swap');
 });
 
@@ -311,7 +317,7 @@ test('a toast left running with no run behind it does not block a new start', as
   await act(async () => result.current.handleStart());
   await finishRun();
 
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
   expect(result.current.runStatus).toBe('finished');
 });
 
@@ -321,7 +327,7 @@ test('a finished swap left on the toast does not block a new start', async () =>
   await act(async () => result.current.handleStart());
   await finishRun();
 
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
   expect(result.current.runStatus).toBe('finished');
 });
 
@@ -353,7 +359,7 @@ test('retrying a step after cancelling runs it again and ends the run as finishe
 
   // The retry reopens the cancelled group and its toast, and ends both as it ends.
   expect(result.current.runStatus).toBe('finished');
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(2);
   expect(result.current.stepStates['step-1'].status).toBe('done');
   expect(mockStatus.setLegDone).toHaveBeenCalledWith('step-1');
   expect(mockTransactions.reopenGroup).toHaveBeenCalledWith('group-1');
@@ -413,7 +419,7 @@ test('retry-failed runs a failed step again', async () => {
     await retry;
   });
 
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(2);
   expect(result.current.stepStates['step-1'].status).toBe('done');
   expect(result.current.runStatus).toBe('finished');
 });
@@ -425,12 +431,11 @@ test('retry-failed never pays again for a step that is done or still settling', 
   await act(async () => {
     await done.result.current.handleRetryFailed();
   });
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
   done.unmount();
 
   mockManager = createManager();
   mockStatus.active = null;
-  mintState = 'pending';
   destinationBalance = 0;
   keepRecipientPending();
   const settling = mount();
@@ -442,7 +447,7 @@ test('retry-failed never pays again for a step that is done or still settling', 
   await act(async () => {
     await settling.result.current.handleRetryFailed();
   });
-  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
 });
 
 test('retry-failed before any run does nothing', async () => {
@@ -452,7 +457,7 @@ test('retry-failed before any run does nothing', async () => {
   });
 
   expect(result.current.runStatus).toBe('idle');
-  expect(mockManager.ops.melt.execute).not.toHaveBeenCalled();
+  expect(mockManager.ops.mintSwap.execute).not.toHaveBeenCalled();
 });
 
 describe('a reroute cancelled while its intermediary is being trusted', () => {
@@ -464,15 +469,15 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
   async function failWithSuggestedRoute() {
     mockLocalCandidates = [via];
     // The mint answers that Lightning found no route.
-    mockManager.ops.melt.execute.mockRejectedValueOnce(new MintOperationError(20004, 'no_route'));
-    mockManager.quotes.mint.create.mockImplementation(async (input) => {
-      if (input.mintUrl === via) throw new Error('middleman offline');
-      return {
-        quoteId: 'mint-quote-1',
-        mintUrl: DESTINATION,
-        unit: 'sat',
-        request: 'lnbc-fixture',
-      };
+    mockManager.ops.mintSwap.execute.mockImplementationOnce(async (id: string) =>
+      makeSwapOp(id, 'failed', { failure: { code: 'source_payment_rejected' } })
+    );
+    mockManager.ops.mintSwap.prepare.mockImplementation(async (input) => {
+      if (input.destinationMintUrl === via) throw new Error('middleman offline');
+      return makeSwapOp(input.id, 'prepared', {
+        sourceMintUrl: input.sourceMintUrl,
+        destinationMintUrl: input.destinationMintUrl,
+      });
     });
     // The row shows the route found before its hop rows are inserted.
     let trustedForAutoRoute!: () => void;
@@ -514,8 +519,8 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
     const b = mount();
     await act(async () => b.result.current.handleStart());
     expect(b.result.current.runStatus).toBe('running');
-    const melts = mockManager.ops.melt.execute.mock.calls.length;
-    const quotes = mockManager.quotes.mint.create.mock.calls.length;
+    const executes = mockManager.ops.mintSwap.execute.mock.calls.length;
+    const prepares = mockManager.ops.mintSwap.prepare.mock.calls.length;
     const reopens = mockTransactions.reopenGroup.mock.calls.length;
 
     // The late trust answer is dropped: A's reroute never runs.
@@ -526,8 +531,8 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
     });
     expect(a.result.current.runStatus).toBe('cancelled');
     expect(rerouteRows(a)).toEqual([]);
-    expect(mockManager.quotes.mint.create).toHaveBeenCalledTimes(quotes);
-    expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(melts);
+    expect(mockManager.ops.mintSwap.prepare).toHaveBeenCalledTimes(prepares);
+    expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(executes);
     expect(mockTransactions.reopenGroup).toHaveBeenCalledTimes(reopens);
     // Its intermediary is given back all the same.
     expect(mockReleaseTrust).toHaveBeenLastCalledWith(mockManager, [via]);
@@ -536,20 +541,20 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
 
   test('runs once the trust arrives when nothing cancelled it', async () => {
     const a = await failWithSuggestedRoute();
-    mockManager.quotes.mint.create.mockImplementation(async (input) => ({
-      quoteId: `quote-${input.mintUrl}`,
-      mintUrl: input.mintUrl,
-      unit: 'sat',
-      request: `invoice-${input.mintUrl}`,
-    }));
+    mockManager.ops.mintSwap.prepare.mockImplementation(async (input) =>
+      makeSwapOp(input.id, 'prepared', {
+        sourceMintUrl: input.sourceMintUrl,
+        destinationMintUrl: input.destinationMintUrl,
+      })
+    );
     await act(async () => {
       void a.result.current.handleRouteThrough(step);
       await jest.advanceTimersByTimeAsync(100);
     });
     expect(a.result.current.runStatus).toBe('running');
     expect(rerouteRows(a)).toHaveLength(2);
-    expect(mockManager.quotes.mint.create).toHaveBeenCalledWith(
-      expect.objectContaining({ mintUrl: via })
+    expect(mockManager.ops.mintSwap.prepare).toHaveBeenCalledWith(
+      expect.objectContaining({ destinationMintUrl: via })
     );
   });
 });

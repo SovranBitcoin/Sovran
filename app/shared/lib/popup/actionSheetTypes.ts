@@ -30,22 +30,12 @@ type NfcTapPayload = Record<string, never>;
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * should stay internal to that sheet.
  *
- * Sheets here render through `PopupHost` on heroui's standalone
- * `<BottomSheet>` (FullWindowOverlay enabled by default — appears above
- * iOS route modals). Pick-one-of-N menus and short input-form menus go
- * through `actionMenuPopup` instead, which uses heroui `<Menu>` (no FWO,
- * for keyboard avoidance) — but heroui Menu in bottom-sheet presentation
- * silently fails to mount under FWO, so any surface that needs
- * above-modal stacking must live here.
+ * Sheets here render through `PopupHost`, sequenced with its other popups.
+ * Pick-one-of-N menus and short input-form menus go through
+ * `actionMenuPopup` instead.
  */
 type BaseActionSheetPayloads = {
-  /**
-   * Generic action-menu chooser routed here (FullWindowOverlay) because
-   * `ActionMenuButton presentation="bottom-sheet"` callers — e.g. the
-   * amount-screen "Next" split button (as Lightning / as Ecash) — live inside
-   * `(send-flow)` route modals, where the menu-lane host renders underneath
-   * and is invisible.
-   */
+  /** Generic action-menu chooser for `ActionMenuButton presentation="bottom-sheet"` (the amount-screen "Next" split button). */
   'action-menu': ActionMenuSheetPayload;
   /**
    * Optional memo before creating an ecash token. This is reached from the

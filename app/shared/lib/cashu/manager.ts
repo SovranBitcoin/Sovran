@@ -115,8 +115,6 @@ const MINT_OPERATION_PROCESSOR_OPTIONS = {
   initialEnqueueDelayMs: 2000,
 };
 
-/** How long a resume waits for the sockets the pause closed to report it. */
-const SOCKET_CLOSE_WAIT_MS = 2_000;
 const FOREGROUND_GATE_ATTEMPTS = 3;
 const FOREGROUND_GATE_RETRY_MS = 2_000;
 /**
@@ -286,14 +284,12 @@ export function trackSocketCloses(create: WebSocketFactory): {
  */
 export function createWalletForegroundGate(options: {
   appState: ForegroundSignal;
-  manager: Pick<Manager, 'pauseSubscriptions' | 'resumeSubscriptions' | 'requeuePaidMintQuotes'>;
+  manager: Pick<Manager, 'ensureSubscriptions' | 'requeuePaidMintQuotes'>;
   npcAccount: () => NPCAccountApi | null;
   socketCloses: ReturnType<typeof trackSocketCloses> | null;
   pauseAfterMs?: number;
 }): { dispose: () => Promise<void> } {
-  const { manager, socketCloses } = options;
-  /** Mint sockets the last pause closed that had not yet reported it. */
-  let closingSockets: WebSocketLike[] = [];
+  const { manager } = options;
 
   return createForegroundGate({
     appState: options.appState,
@@ -302,18 +298,11 @@ export function createWalletForegroundGate(options: {
       cashuLog.info('cashu.manager.background_pause.start');
       const npcAccount = options.npcAccount();
       if (npcAccount) await pauseNpcSync(npcAccount);
-      await manager.pauseSubscriptions();
-      closingSockets = socketCloses?.open() ?? [];
-      cashuLog.info('cashu.manager.background_pause.done', {
-        closingSockets: closingSockets.length,
-      });
+      cashuLog.info('cashu.manager.background_pause.done');
     },
     async resume() {
       const t0 = performance.now();
-      const socketsClosed =
-        (await socketCloses?.closed(closingSockets, SOCKET_CLOSE_WAIT_MS)) ?? true;
-      closingSockets = [];
-      await manager.resumeSubscriptions();
+      await manager.ensureSubscriptions();
       const npcAccount = options.npcAccount();
       if (npcAccount) {
         void resumeNpcSync(npcAccount).catch((error) =>
@@ -326,7 +315,6 @@ export function createWalletForegroundGate(options: {
         cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
       }
       cashuLog.info('cashu.manager.foreground_resume.done', {
-        socketsClosed,
         duration_ms: Math.round((performance.now() - t0) * 100) / 100,
       });
     },
@@ -438,13 +426,21 @@ export class CocoManager {
   }
   private static npcPlugin: NPCPlugin | null = null;
   private static npcAccount: NPCAccountApi | null = null;
-  private static npcPluginRegistered = false;
   /** Pauses coco and NPC polling while the app is backgrounded. Armed only
    *  once enableNpcSyncAndProcessor has run; see armForegroundGate. */
   private static foregroundGate: ReturnType<typeof createForegroundGate> | null = null;
   private static socketCloses: ReturnType<typeof trackSocketCloses> | null = null;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
+
+  /**
+   * A copy of the open wallet's 64-byte Cashu seed, or null before a wallet
+   * opens. The caller owns the copy and must zero it (`fill(0)`) when done;
+   * the memoized seed is untouched.
+   */
+  static async copyWalletSeed(): Promise<Uint8Array | null> {
+    return this.seedGetter ? this.seedGetter() : null;
+  }
 
   /** Zero and drop the current session's memoized Cashu seed, if one exists. */
   static disposeSeed(): void {
@@ -479,7 +475,6 @@ export class CocoManager {
     this.credentials.clearUnchangedSince(since);
     this.npcPlugin = null;
     this.npcAccount = null;
-    this.npcPluginRegistered = false;
     this.seedGetter = null;
   }
 
@@ -882,9 +877,12 @@ export class CocoManager {
       // in-memory for this manager session and scrubs legacy rows.
       const ephemeralKeyringPubkeys = new Set<string>();
       if (p2pkImportSecretKey) {
-        ephemeralKeyringPubkeys.add(
-          cashuP2pkPubkeyFromNostrHex(getPublicKey(new Uint8Array(p2pkImportSecretKey)))
-        );
+        const xOnly = getPublicKey(new Uint8Array(p2pkImportSecretKey));
+        // Coco nightly keys P2PK imports by canonical SEC1 parity (`02` or `03`),
+        // whereas legacy builds always used `02`. Register both so odd-Y signer
+        // keys stay in-memory and never leak into plaintext SQLite.
+        ephemeralKeyringPubkeys.add(cashuP2pkPubkeyFromNostrHex(xOnly));
+        ephemeralKeyringPubkeys.add(`03${xOnly}`);
       }
       cashuLog.info('cashu.manager.repositories.create', {
         dbName,
@@ -960,6 +958,7 @@ export class CocoManager {
       //   - The shared, build-time GIVEAWAY_P2PK_SECRET (module constant
       //     above). This is intentionally global across all profiles so any
       //     install can redeem giveaway ecash; it is not a profile secret.
+      const npcPlugin = this.getOrCreateNpcPlugin();
       const plugins: Plugin[] = [
         createP2PKImportPlugin({
           getSecretKeys: () => {
@@ -976,6 +975,7 @@ export class CocoManager {
         createPaymentRequestNostrTransportPlugin({
           getSignerKey: () => (p2pkImportSecretKey ? new Uint8Array(p2pkImportSecretKey) : null),
         }),
+        npcPlugin,
       ];
       cashuLog.info('cashu.manager.plugins.configured', {
         pluginCount: plugins.length,
@@ -1002,20 +1002,18 @@ export class CocoManager {
           : (url) => new globalThis.WebSocket(url));
       this.socketCloses = createSocket ? trackSocketCloses(createSocket) : null;
 
-      const manager = new Manager(
-        repositories,
-        seedGetter,
-        new CocoCoreLogger('manager'),
-        this.socketCloses?.factory,
-        plugins,
-        // The constructor starts nothing; watchers and processors are
-        // enabled explicitly in the two phases below. The watchers'
-        // defaults match what those calls pass, and the subscription
-        // intervals stay coco's (20s beside a websocket, 5s without one).
-        undefined,
-        { mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS },
-        undefined,
-        outputDataCreator
+      const manager = await initPhase('CocoManager.createManager', () =>
+        Manager.create({
+          repo: repositories,
+          seedGetter,
+          logger: new CocoCoreLogger('manager'),
+          webSocketFactory: this.socketCloses?.factory,
+          plugins,
+          processors: {
+            mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS,
+          },
+          outputDataCreator,
+        })
       );
       if (resetGeneration !== this.resetGeneration) {
         await manager.dispose().catch(() => undefined);
@@ -1036,21 +1034,6 @@ export class CocoManager {
               namespaces: COCO_TIMED_NAMESPACES,
             })
           : manager;
-      // The wallet is handed out only once its plugins have started. One
-      // whose plugins failed is closed here, so the next open starts afresh
-      // instead of being handed it.
-      try {
-        await initPhase('CocoManager.initCorePlugins', () => wallet.initPlugins());
-      } catch (error) {
-        await manager.dispose().catch(() => undefined);
-        throw error;
-      }
-      if (resetGeneration !== this.resetGeneration) {
-        await manager.dispose().catch(() => undefined);
-        acquired.db = null;
-        await this.discardAfterReset(db, dbName);
-        throw new Error('Wallet was reset while it was opening');
-      }
       // The ready wallet owns the database from here.
       acquired.db = null;
       initLog('CocoManager', 'Manager created');
@@ -1125,22 +1108,6 @@ export class CocoManager {
     }
     if (superseded()) return;
 
-    try {
-      await initPhase('CocoManager.enableProofWatcher', () => manager.enableProofStateWatcher());
-    } catch (error) {
-      cashuLog.warn('cashu.manager.proof_watcher_failed', { error });
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        if (superseded()) return;
-        await manager.enableProofStateWatcher();
-        initLog('CocoManager', 'proof state watcher enabled on retry');
-        cashuLog.info('cashu.manager.proof_watcher_retry_done');
-      } catch (retryError) {
-        cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
-        reportCocoApiFailure('enableProofStateWatcher', retryError);
-      }
-    }
-
     const e2eFundedAssets = process.env.EXPO_PUBLIC_E2E_FUNDED_ASSETS;
     if (
       !superseded() &&
@@ -1197,21 +1164,7 @@ export class CocoManager {
 
     let npcAccount: NPCAccountApi | null = null;
     try {
-      initLog('CocoManager', 'initializing plugins...');
-      const npcPlugin = this.getOrCreateNpcPlugin();
-      if (!this.npcPluginRegistered) {
-        manager.use(npcPlugin);
-        this.npcPluginRegistered = true;
-        cashuLog.info('cashu.manager.npc_plugin_registered');
-      } else {
-        cashuLog.debug('cashu.manager.npc_plugin_registration_skipped', {
-          hasPlugin: true,
-          alreadyRegistered: this.npcPluginRegistered,
-        });
-      }
-      await manager.initPlugins();
       npcAccount = await this.getOrCreateNpcAccount(manager);
-      initLog('CocoManager', 'plugins initialized');
       cashuLog.info('cashu.manager.plugins_initialized', {
         hasNpcPlugin: true,
         hasNpcAccount: !!npcAccount,
@@ -1230,57 +1183,6 @@ export class CocoManager {
     } catch (error) {
       cashuLog.warn('cashu.manager.legacy_mint_quote_reconcile_failed', { error });
       reportCocoApiFailure('reconcileLegacyMintQuotes', error);
-    }
-
-    try {
-      initLog('CocoManager', 'enabling mint quote watcher...');
-      await manager.enableMintOperationWatcher({
-        watchExistingPendingOnStart: true,
-        // v2: reusable bolt12/onchain quotes are watched as canonical quote
-        // rows, not operations — rewatch those on start too.
-        watchExistingPendingQuotesOnStart: true,
-      });
-      initLog('CocoManager', 'mint quote watcher enabled');
-      cashuLog.info('cashu.manager.quote_watcher_enabled', {
-        watchExistingPendingOnStart: true,
-        watchExistingPendingQuotesOnStart: true,
-      });
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
-      reportCocoApiFailure('enableMintOperationWatcher', error);
-    }
-
-    try {
-      initLog('CocoManager', 'enabling melt quote watcher...');
-      await manager.enableMeltQuoteWatcher();
-      initLog('CocoManager', 'melt quote watcher enabled');
-      cashuLog.info('cashu.manager.melt_quote_watcher_enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.melt_quote_watcher_failed', { error });
-      reportCocoApiFailure('enableMeltQuoteWatcher', error);
-    }
-
-    try {
-      initLog('CocoManager', 'enabling mint quote processor...');
-      await manager.enableMintOperationProcessor(MINT_OPERATION_PROCESSOR_OPTIONS);
-      initLog('CocoManager', 'mint quote processor enabled');
-      cashuLog.info('cashu.manager.quote_processor_enabled', {
-        processIntervalMs: MINT_OPERATION_PROCESSOR_OPTIONS.processIntervalMs,
-        maxRetries: MINT_OPERATION_PROCESSOR_OPTIONS.maxRetries,
-      });
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_processor_failed', { error });
-      reportCocoApiFailure('enableMintOperationProcessor', error);
-    }
-
-    try {
-      initLog('CocoManager', 'enabling melt settlement processor...');
-      await manager.enableMeltSettlementProcessor();
-      initLog('CocoManager', 'melt settlement processor enabled');
-      cashuLog.info('cashu.manager.melt_settlement_processor_enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.melt_settlement_processor_failed', { error });
-      reportCocoApiFailure('enableMeltSettlementProcessor', error);
     }
 
     try {
@@ -1517,35 +1419,9 @@ export class CocoManager {
     cashuLog.info('cashu.manager.cleanup_start');
     const { instance, db } = wallet;
     let complete = true;
-    // Disable watchers in reverse order to prevent conflicts. Kept as an
-    // explicit sequence (not disableWatchers()) — this path disables the
-    // quote processor before its watcher, the reverse of that method.
     const step = async (okEvent: string, failEvent: string, run: () => Promise<void>) => {
       if (!(await this.teardownStep(okEvent, failEvent, run))) complete = false;
     };
-    await step(
-      'cashu.manager.proof_watcher_disabled',
-      'cashu.manager.proof_watcher_disable_failed',
-      () => instance.disableProofStateWatcher()
-    );
-    await step(
-      'cashu.manager.quote_processor_disabled',
-      'cashu.manager.quote_processor_disable_failed',
-      () => instance.disableMintOperationProcessor()
-    );
-    await step(
-      'cashu.manager.quote_watcher_disabled',
-      'cashu.manager.quote_watcher_disable_failed',
-      () => instance.disableMintOperationWatcher()
-    );
-    await step(
-      'cashu.manager.melt_watchers_disabled',
-      'cashu.manager.melt_watchers_disable_failed',
-      async () => {
-        await instance.disableMeltSettlementProcessor();
-        await instance.disableMeltQuoteWatcher();
-      }
-    );
     await step('cashu.manager.disposed', 'cashu.manager.dispose_failed', () => instance.dispose());
 
     // Close the SQLite connection to prevent "database is locked" on revisit
@@ -1772,33 +1648,6 @@ export class CocoManager {
     }
   }
 
-  /** Safely disable all watchers before tearing down the Manager. */
-  private static async disableWatchers(instance: Manager): Promise<void> {
-    await this.teardownStep(
-      'cashu.manager.proof_watcher_disabled',
-      'cashu.manager.proof_watcher_disable_failed',
-      () => instance.disableProofStateWatcher()
-    );
-    await this.teardownStep(
-      'cashu.manager.quote_watcher_disabled',
-      'cashu.manager.quote_watcher_disable_failed',
-      () => instance.disableMintOperationWatcher()
-    );
-    await this.teardownStep(
-      'cashu.manager.quote_processor_disabled',
-      'cashu.manager.quote_processor_disable_failed',
-      () => instance.disableMintOperationProcessor()
-    );
-    await this.teardownStep(
-      'cashu.manager.melt_watchers_disabled',
-      'cashu.manager.melt_watchers_disable_failed',
-      async () => {
-        await instance.disableMeltSettlementProcessor();
-        await instance.disableMeltQuoteWatcher();
-      }
-    );
-  }
-
   /** Close and remove a database an initialise opened across a reset. */
   private static async discardAfterReset(
     db: { closeAsync(): Promise<void> },
@@ -1871,7 +1720,6 @@ export class CocoManager {
       const wallet =
         life.phase === 'ready' ? life : life.phase === 'closing' ? life.holding.wallet : null;
       if (wallet) {
-        await this.disableWatchers(wallet.instance);
         await this.teardownStep('cashu.manager.disposed', 'cashu.manager.dispose_failed', () =>
           wallet.instance.dispose()
         );

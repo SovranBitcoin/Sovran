@@ -40,6 +40,16 @@ export type LiquidGlassTextProps = {
   colorScheme?: 'light' | 'dark';
   /** Debug override: replace the text glyph shape with a simple custom Path to isolate glass-effect rendering. */
   debugShape?: DebugShape;
+  /**
+   * iOS 26+: roll the digits that change (up on an increase, down on a
+   * decrease) while keeping every glyph a glass cutout. Snaps on mount, on a
+   * `formatKey` change and under Reduce Motion. Ignored with a `debugShape`.
+   */
+  animated?: boolean;
+  /** The value behind `text`; its change picks the roll direction. */
+  numericValue?: number;
+  /** Changes when the same value is shown another way (BTC ↔ sats); snaps. */
+  formatKey?: string;
   onLayout?: (e: { nativeEvent: { width: number; height: number } }) => void;
 } & ViewProps;
 

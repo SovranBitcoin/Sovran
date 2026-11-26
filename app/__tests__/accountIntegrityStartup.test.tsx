@@ -75,7 +75,7 @@ jest.mock('@/shared/lib/nostr/accountIntegrity', () => {
       (mockBackground.finished = actual.verifyOtherAccountsInBackground(...args)),
   };
 });
-jest.mock('@/shared/providers/InitializationProvider', () => {
+jest.mock('@/runtime/initializationStages', () => {
   const stage = { canStart: true, log: jest.fn(), complete: jest.fn(), error: jest.fn() };
   return { useInitializationStage: () => stage };
 });

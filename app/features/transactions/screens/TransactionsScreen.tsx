@@ -36,7 +36,7 @@ import { log, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useOfflineStatus } from '@/runtime/connectivity';
 import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { matchesTransactionFilters } from 'wallet';

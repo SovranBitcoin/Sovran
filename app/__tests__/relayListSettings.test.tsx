@@ -8,15 +8,14 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { RelayListSettings } from '@/features/settings/components/RelayListSettings';
 
-import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { errAsync, okAsync } from 'neverthrow';
 
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { forgetSilentRelays } from '@/shared/lib/nostr/ownReplaceableEvent';
+import { asVerified, fakeClient, fakeSigned, type FakeClient } from './helpers/fakeNostrClient';
 import { relayEditCopy } from 'copy/prompts';
 
 const OWN = 'a0'.repeat(32);
-type Relay = { url: string };
 type RelayEvent = {
   kind: number;
   pubkey: string;
@@ -30,39 +29,13 @@ const mockAfterSign = jest.fn();
 /** Per relay, the kind 10002s it holds, or `fail` for one whose read throws. */
 const mockHeld = new Map<string, RelayEvent[] | 'fail'>();
 const mockAsked: string[] = [];
+/** Relays answer once this settles. */
+let mockReadGate: Promise<void> = Promise.resolve();
 const mockProfile = { activeAccountIndex: 0, profiles: [{ accountIndex: 0, pubkey: OWN }] };
 const mockProfileListeners = new Set<(state: typeof mockProfile) => void>();
-const mockRelayObjects = new Map<string, Relay>();
-const mockRelay = (url: string) => {
-  if (!mockRelayObjects.has(url)) mockRelayObjects.set(url, { url });
-  return mockRelayObjects.get(url)!;
-};
-
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
-  ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
-  NDKRelaySet: {
-    fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map(mockRelay)) }),
-  },
-  NDKEvent: class NDKEvent {
-    kind = 0;
-    pubkey = '';
-    created_at = 0;
-    tags: string[][] = [];
-    content = '';
-    id = '';
-    getEventHash() {
-      return this.id;
-    }
-    verifySignature() {
-      return true;
-    }
-    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
-      this.pubkey = (await signer.user()).pubkey;
-      this.id = 'e'.repeat(64);
-      mockAfterSign();
-    }
-  },
-}));
+jest.mock('nostr-tools/pure', () =>
+  jest.requireActual('./helpers/fakeNostrClient').pureTrustingFakeEvents()
+);
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
 }));
@@ -93,35 +66,41 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 }));
 
 const NOW_SEC = 1_790_000_000;
-const MINE = 'wss://mine.example';
-const OLD = 'wss://old.example';
+const MINE = 'wss://mine.example/';
+const OLD = 'wss://old.example/';
 const store = () => useRelayListStore.getState();
 
-function relayFake() {
+/** The account's signer: each event it signs is told to `mockAfterSign`. */
+function ownSigner() {
   return {
-    signer: { user: async () => ({ pubkey: OWN }) },
-    subscribe: (_filter: unknown, _options: unknown, relaySet: { relays: Set<Relay> }) => {
-      const [relay] = [...relaySet.relays];
-      mockAsked.push(relay.url);
-      const listeners: Record<string, (...args: unknown[]) => void> = {};
-      const subscription = {
-        eosesSeen: new Set<Relay>(),
-        stop: () => undefined,
-        on: (type: string, listener: (...args: unknown[]) => void) => {
-          listeners[type] = listener;
-        },
-        start: async () => {
-          const held = mockHeld.get(relay.url) ?? [];
-          if (held === 'fail') throw new Error('relay failed');
-          const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
-          for (const event of held) listeners.event(Object.assign(new NDKEvent(), event));
-          subscription.eosesSeen.add(relay);
-          listeners.eose();
-        },
-      };
-      return subscription;
+    pubkey: OWN,
+    sign: (template: Parameters<typeof fakeSigned>[0]) => {
+      const event = { ...fakeSigned(template, OWN), id: 'e'.repeat(64) };
+      mockAfterSign();
+      return event;
     },
-  } as unknown as NDK;
+  };
+}
+
+function relayFake(): FakeClient {
+  return fakeClient({
+    signer: ownSigner(),
+    subscribeRelay: (url, _filters, handlers) => {
+      mockAsked.push(url);
+      const held = mockHeld.get(url) ?? [];
+      // A relay whose request cannot be made fails the read at once.
+      if (held === 'fail') {
+        handlers.onError?.(new Error('relay failed'));
+        return { stop: () => undefined };
+      }
+      void mockReadGate.then(() => {
+        for (const event of held)
+          handlers.onEvent(asVerified({ ...event, content: '', sig: 'sig' }));
+        handlers.onEose();
+      });
+      return { stop: () => undefined };
+    },
+  });
 }
 
 const remote = (tags: string[][], id = 'b', created_at = 200): RelayEvent => ({
@@ -136,6 +115,7 @@ const mine = { url: MINE, read: true, write: true };
 const sent = () => mockPublish.mock.calls[0][0];
 
 beforeEach(() => {
+  mockReadGate = Promise.resolve();
   jest.useFakeTimers({ now: NOW_SEC * 1000, doNotFake: ['nextTick', 'setImmediate'] });
   forgetSilentRelays();
   mockProfile.activeAccountIndex = 0;
@@ -248,25 +228,6 @@ const mockMenus: { title?: string; buttons: MenuButton[] }[] = [];
 jest.mock('@/shared/lib/popup', () => ({
   actionMenuPopup: (payload: { title?: string; buttons: MenuButton[] }) => mockMenus.push(payload),
 }));
-jest.mock('heroui-native', () => {
-  const { View, Text, TextInput } = jest.requireMock('react-native');
-  const ListGroup = Object.assign(
-    ({ children }: React.PropsWithChildren) => <View testID="relay-list-group">{children}</View>,
-    {
-      Item: Object.assign(({ children }: React.PropsWithChildren) => <View>{children}</View>, {}),
-      ItemPrefix: View,
-      ItemContent: View,
-      ItemTitle: Text,
-      ItemDescription: Text,
-      ItemSuffix: View,
-    }
-  );
-  const PressableFeedback = Object.assign(
-    ({ children, ...props }: React.PropsWithChildren) => <View {...props}>{children}</View>,
-    { Scale: View, Ripple: () => null }
-  );
-  return { ListGroup, PressableFeedback, Separator: () => null, TextField: View, Input: TextInput };
-});
 
 /** Open a relay's menu while editing and press one of its choices. */
 function choose(url: string, testIDPrefix: 'read-write' | 'read' | 'write' | 'remove') {
@@ -281,14 +242,18 @@ function choose(url: string, testIDPrefix: 'read-write' | 'read' | 'write' | 're
 }
 
 function mount() {
-  return render(<RelayListSettings ndk={relayFake()} pubkey={OWN} />);
+  return render(<RelayListSettings client={relayFake()} pubkey={OWN} />);
 }
 
 it.each([undefined, 'connecting'] as const)(
   'does not label an unchecked or connecting relay offline (%s)',
   (health) => {
     render(
-      <RelayListSettings ndk={relayFake()} pubkey={OWN} health={health ? { [MINE]: health } : {}} />
+      <RelayListSettings
+        client={relayFake()}
+        pubkey={OWN}
+        health={health ? { [MINE]: health } : {}}
+      />
     );
     // The host, what it is used for, and no health word until there is an answer.
     expect(screen.getByText('mine.example')).toBeOnTheScreen();
@@ -310,10 +275,10 @@ it('says "1 relay", not "1 relays"', () => {
 
 it('shows the known connection state for relays with an answer', () => {
   const { rerender } = render(
-    <RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'connected' }} />
+    <RelayListSettings client={relayFake()} pubkey={OWN} health={{ [MINE]: 'connected' }} />
   );
   expect(screen.getByLabelText(`${MINE}, Read and write, Online`)).toBeOnTheScreen();
-  rerender(<RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'failed' }} />);
+  rerender(<RelayListSettings client={relayFake()} pubkey={OWN} health={{ [MINE]: 'failed' }} />);
   expect(screen.getByLabelText(`${MINE}, Read and write, Offline`)).toBeOnTheScreen();
   // Not pressable outside editing: there is nothing to change yet.
   expect(screen.queryByTestId(`settings-network-relay-row-${MINE}`)).not.toBeOnTheScreen();
@@ -338,7 +303,7 @@ it('reads before editing, keeps remote additions and permissions, and publishes 
   expect(store().entries).toEqual([mine]);
   expect(mockPublish).not.toHaveBeenCalled();
   fireEvent.press(screen.getByRole('button', { name: 'Review changes' }));
-  expect(screen.getByText('Add: wss://added.example')).toBeOnTheScreen();
+  expect(screen.getByText('Add: wss://added.example/')).toBeOnTheScreen();
   expect(screen.queryByLabelText('Relay URL')).not.toBeOnTheScreen();
   fireEvent.press(screen.getByRole('button', { name: 'Publish relay list' }));
   expect(await screen.findByText(/^Published to /)).toBeOnTheScreen();
@@ -346,7 +311,7 @@ it('reads before editing, keeps remote additions and permissions, and publishes 
   expect(sent().event.tags).toEqual([
     ['r', MINE, 'read'],
     ['r', OLD],
-    ['r', 'wss://added.example'],
+    ['r', 'wss://added.example/'],
   ]);
 });
 
@@ -449,20 +414,13 @@ it('cancels without saving, then reads the new base on re-entry', async () => {
 });
 
 it('disposes its session on leave and drops a late read after unmount', async () => {
-  const ndk = relayFake();
+  const client = relayFake();
   let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  Object.assign(ndk, {
-    signer: {
-      user: async () => {
-        await gate;
-        return { pubkey: OWN };
-      },
-    },
-  });
-  const view = render(<RelayListSettings ndk={ndk} pubkey={OWN} />);
+  mockReadGate = gate;
+  const view = render(<RelayListSettings client={client} pubkey={OWN} />);
   fireEvent.press(screen.getByRole('button', { name: 'Edit relays' }));
   view.unmount();
   release?.();
