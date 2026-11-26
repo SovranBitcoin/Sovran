@@ -46,11 +46,27 @@ function mockHookRecorder(name: string, argName?: string) {
   };
 }
 
+const navListeners = new Map<string, Set<() => void>>();
 const mockNavigation = {
   isReady: jest.fn(() => true),
   getRootState: jest.fn((): unknown => ({ type: 'stack', routes: [{}] })),
   resetRoot: jest.fn(),
+  addListener: jest.fn((event: string, listener: () => void) => {
+    let set = navListeners.get(event);
+    if (!set) {
+      set = new Set();
+      navListeners.set(event, set);
+    }
+    set.add(listener);
+    return () => {
+      set?.delete(listener);
+    };
+  }),
 };
+
+function emitNav(event: 'ready' | 'state') {
+  for (const listener of [...(navListeners.get(event) ?? [])]) listener();
+}
 
 jest.mock('expo-router', () => ({ useNavigationContainerRef: () => mockNavigation }));
 jest.mock('@/shared/config/features', () => ({ hasFeature: (f: string) => mockFeatures.has(f) }));
@@ -151,6 +167,8 @@ beforeEach(() => {
   mockNavigation.isReady.mockReturnValue(true);
   mockNavigation.getRootState.mockReturnValue({ type: 'stack', routes: [{}] });
   mockNavigation.resetRoot.mockClear();
+  mockNavigation.addListener.mockClear();
+  navListeners.clear();
 });
 
 afterEach(() => {
@@ -255,7 +273,36 @@ describe('AccountSwitchBoundary', () => {
     });
   });
 
-  it('rejects resume when navigation is not ready, after the tree is back', async () => {
+  it('waits for navigation readiness on resume and resets once ready', async () => {
+    mount();
+    const boundary = profileSwitchBoundary()!;
+    void boundary.suspend();
+    await flush();
+    mockEvents.length = 0;
+    mockNavigation.isReady.mockReturnValue(false);
+
+    const resumedPromise = boundary.resume();
+    const resumed = tracked(resumedPromise);
+    await flush();
+
+    expect(mockEvents).toEqual(['mount account tree']);
+    expect(resumed.settled).toBe(false);
+    expect(mockNavigation.resetRoot).not.toHaveBeenCalled();
+
+    mockNavigation.isReady.mockReturnValue(true);
+    emitNav('ready');
+    await flush();
+    await resumedPromise;
+
+    expect(resumed.settled).toBe(true);
+    expect(mockNavigation.resetRoot).toHaveBeenCalledTimes(1);
+    expect(mockNavigation.resetRoot).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: '(drawer)' }],
+    });
+  });
+
+  it('rejects a pending resume wait when suspended before navigation becomes ready', async () => {
     mount();
     const boundary = profileSwitchBoundary()!;
     void boundary.suspend();
@@ -268,10 +315,13 @@ describe('AccountSwitchBoundary', () => {
       error = caught;
     });
     await flush();
+    expect(mockEvents).toEqual(['mount account tree']);
+
+    void boundary.suspend();
+    await flush();
     await resumed;
 
-    expect(error).toEqual(new Error('Profile navigation is not ready'));
-    expect(mockEvents).toEqual(['mount account tree']);
+    expect(error).toEqual(new Error('Profile navigation reset cancelled'));
   });
 
   it('never settles a resume that has nothing to resume', async () => {

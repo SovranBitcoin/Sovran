@@ -277,7 +277,7 @@ test('routes through a middleman mint on source_payment_rejected and releases te
   });
 
   expect(mockManager.mint.addMint).toHaveBeenCalledWith(VIA, { trusted: true });
-  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [VIA]);
+  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [VIA], expect.any(AbortSignal));
   expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(3);
   expect(result.current.runStatus).toBe('finished');
 });

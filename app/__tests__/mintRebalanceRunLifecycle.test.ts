@@ -535,7 +535,7 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
     expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(executes);
     expect(mockTransactions.reopenGroup).toHaveBeenCalledTimes(reopens);
     // Its intermediary is given back all the same.
-    expect(mockReleaseTrust).toHaveBeenLastCalledWith(mockManager, [via]);
+    expect(mockReleaseTrust).toHaveBeenLastCalledWith(mockManager, [via], expect.any(AbortSignal));
     expect(b.result.current.runStatus).toBe('running');
   });
 
