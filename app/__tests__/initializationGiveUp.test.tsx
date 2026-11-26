@@ -1,12 +1,9 @@
 /**
  * @jest-environment node
  *
- * Characterization of the initialization stages around a profile flow that
- * raises the splash and then gives up (F175). The real InitializationProvider,
- * the real CocoProvider (manager replaced) and the real `createAndSwitchProfile`
- * run together; the splash controls are the provider's own, registered the way
- * the layout registers them. Pins what the person sees afterwards: whether the
- * wallet below CocoProvider is still on screen and whether the splash is up.
+ * Exercise the real initialization stages, WalletCore (fake manager) and
+ * create-profile flow. Holding the splash while deriving keys must leave
+ * the outgoing wallet mounted so a failed derivation can return to it.
  */
 
 /* eslint-disable import/first */
@@ -45,6 +42,8 @@ jest.mock('@/shared/lib/cashu/manager', () => {
       cleanup: async () => {
         mockCalls.push('cleanup');
       },
+      isReadyForCleanup: () => true,
+      getCleanupReadiness: () => ({ ready: true }),
       peekInstance: () => manager,
     },
   };
@@ -180,7 +179,7 @@ afterEach(() => {
 });
 
 describe('a profile flow that gives up after raising the splash', () => {
-  it('closes the wallet and leaves a blank app with the splash down', async () => {
+  it('keeps the wallet open after a failed derivation', async () => {
     await boot();
 
     let result: boolean | undefined;
@@ -190,11 +189,8 @@ describe('a profile flow that gives up after raising the splash', () => {
     await settle();
 
     expect(result).toBe(false);
-    // QUIRK (F175): the reset emptied the stage map, the mounted providers never register
-    // again, so CocoProvider tears the wallet down and renders nothing; the give-up only
-    // lowers the splash. account-lifecycle.md says the app carries on as the old account.
-    expect(mockCalls).toEqual(['cleanup']);
-    expect(walletShown()).toBe(false);
+    expect(mockCalls).toEqual([]);
+    expect(walletShown()).toBe(true);
     expect(mockSplashUp).toBe(false);
   });
 
@@ -212,7 +208,8 @@ describe('a profile flow that gives up after raising the splash', () => {
     await settle();
 
     expect(mockSplashUp).toBe(true);
-    expect(walletShown()).toBe(false);
+    expect(walletShown()).toBe(true);
+    expect(mockCalls).toEqual([]);
 
     await act(async () => {
       finishDerivation(null);
@@ -220,7 +217,7 @@ describe('a profile flow that gives up after raising the splash', () => {
     });
     await settle();
     expect(mockSplashUp).toBe(false);
-    expect(walletShown()).toBe(false);
+    expect(walletShown()).toBe(true);
   });
 });
 

@@ -1,15 +1,15 @@
-import { createAmountEntryMethodContext } from '../../mint-capabilities';
-import { selectMint } from '../../mint-selection';
-import type { WalletContext } from '../../types';
+import { createAmountEntryMethodContext } from "../../mint-capabilities";
+import { selectMint } from "../../mint-selection";
+import type { WalletContext } from "../../types";
 import type {
   FlowContext,
   FlowStep,
   RecipientProfile,
   SendEntrySource,
   StepDataMap,
-} from '../types';
-import { logger, mintUrlFields } from '../../logger';
-import { normalizeP2pkLock, type P2pkLockSpec } from '../../p2pk';
+} from "../types";
+import { logger, mintUrlFields } from "../../logger";
+import { normalizeP2pkLock, type P2pkLockSpec } from "../../p2pk";
 
 interface SendFlowTransitionResult<S extends FlowStep = FlowStep> {
   step: S;
@@ -20,6 +20,7 @@ interface SendFlowTransitionResult<S extends FlowStep = FlowStep> {
 interface StartSendEcashOptions {
   offline?: boolean;
   meltTarget?: string;
+  meltTargetIsNpcFallback?: boolean;
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
   /** See `FlowContext.p2pkLockPubkey` — a bare key, kept for the Nut Drop callers. */
@@ -44,10 +45,12 @@ interface StartSendEcashOptions {
  * drives the rest of the flow through the existing entries (`startSendEcash`,
  * `execute`/`scan`, the Nut Drop route, etc.).
  */
-export function startSendFlow(unit: string): SendFlowTransitionResult<'selectDestination'> {
-  logger.info('flow.send.chooseDestination', { unit });
+export function startSendFlow(
+  unit: string,
+): SendFlowTransitionResult<"selectDestination"> {
+  logger.info("flow.send.chooseDestination", { unit });
   return {
-    step: 'selectDestination',
+    step: "selectDestination",
     context: { unit },
     data: { unit },
   };
@@ -62,7 +65,7 @@ export function startSendEcashFlow(
   // callers still pass.
   const requestedLock = opts.p2pkLock ?? opts.p2pkLockPubkey;
   const lock = normalizeP2pkLock(requestedLock);
-  logger.info('flow.sendEcash.start', {
+  logger.info("flow.sendEcash.start", {
     unit,
     offline: opts.offline === true,
     hasMeltTarget: !!opts.meltTarget,
@@ -79,9 +82,12 @@ export function startSendEcashFlow(
   });
   const context: FlowContext = {
     unit,
-    destination: 'sendEcash',
+    destination: "sendEcash",
     offline: opts.offline,
     ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+    ...(opts.meltTarget && opts.meltTargetIsNpcFallback
+      ? { meltTargetIsNpcFallback: true }
+      : {}),
     ...(opts.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
     ...(opts.recipientProfile
       ? { recipientProfile: opts.recipientProfile }
@@ -99,16 +105,17 @@ export function startSendEcashFlow(
   // A malformed lock must abort the flow — silently dropping it would
   // downgrade the send to a bearer token on whatever surface requested a lock.
   if (requestedLock && !lock) {
-    logger.warn('flow.sendEcash.invalidP2pkLock', {
-      hasLocktime: typeof requestedLock !== 'string' && !!requestedLock.locktimeSec,
+    logger.warn("flow.sendEcash.invalidP2pkLock", {
+      hasLocktime:
+        typeof requestedLock !== "string" && !!requestedLock.locktimeSec,
       allowedMintCount: opts.allowedMints?.length ?? 0,
     });
     return {
-      step: 'error',
+      step: "error",
       context,
       data: {
-        code: 'INVALID_P2PK_LOCK',
-        message: 'Invalid P2PK lock key for this send.',
+        code: "INVALID_P2PK_LOCK",
+        message: "Invalid P2PK lock key for this send.",
       },
     };
   }
@@ -120,9 +127,9 @@ export function startSendEcashFlow(
   );
 
   switch (selection.type) {
-    case 'selected':
+    case "selected":
       context.mintUrl = selection.mintUrl;
-      logger.info('flow.sendEcash.selectedMint', {
+      logger.info("flow.sendEcash.selectedMint", {
         unit,
         ...mintUrlFields(selection.mintUrl),
         offline: opts.offline === true,
@@ -130,15 +137,18 @@ export function startSendEcashFlow(
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {
-        step: 'enterAmount',
+        step: "enterAmount",
         context,
         data: {
           unit,
           preselectedMintUrl: selection.mintUrl,
           constraints: {
-            destination: 'sendEcash',
+            destination: "sendEcash",
             methodContext: createAmountEntryMethodContext(walletCtx),
             ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+            ...(opts.meltTarget && opts.meltTargetIsNpcFallback
+              ? { meltTargetIsNpcFallback: true }
+              : {}),
             ...(opts.recipientPubkey
               ? { recipientPubkey: opts.recipientPubkey }
               : {}),
@@ -155,8 +165,8 @@ export function startSendEcashFlow(
           },
         },
       };
-    case 'selectionNeeded':
-      logger.info('flow.sendEcash.selectionNeeded', {
+    case "selectionNeeded":
+      logger.info("flow.sendEcash.selectionNeeded", {
         unit,
         candidateCount: selection.validMints.length,
         offline: opts.offline === true,
@@ -164,7 +174,7 @@ export function startSendEcashFlow(
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {
-        step: 'selectMint',
+        step: "selectMint",
         context,
         data: {
           candidates: selection.validMints,
@@ -172,7 +182,7 @@ export function startSendEcashFlow(
             ? { supportedMintUrls: context.supportedMintUrls }
             : {}),
           unit,
-          destination: 'sendEcash',
+          destination: "sendEcash",
           ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
           ...(opts.recipientPubkey
             ? { recipientPubkey: opts.recipientPubkey }
@@ -182,8 +192,8 @@ export function startSendEcashFlow(
             : {}),
         },
       };
-    case 'noValidMint':
-      logger.warn('flow.sendEcash.noValidMint', {
+    case "noValidMint":
+      logger.warn("flow.sendEcash.noValidMint", {
         unit,
         reasonCode: selection.reason.code,
         reasonMessage: selection.reason.message,
@@ -192,9 +202,9 @@ export function startSendEcashFlow(
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {
-        step: 'error',
+        step: "error",
         context,
-        data: { code: 'NO_BALANCE', message: selection.reason.message },
+        data: { code: "NO_BALANCE", message: selection.reason.message },
       };
   }
 }

@@ -16,7 +16,10 @@ interface OperationSnapshot {
 
 interface SwapLegOperations {
   ops: {
-    mintSwap?: { get(operationId: string): Promise<OperationSnapshot | null> };
+    mintSwap?: {
+      get(operationId: string): Promise<OperationSnapshot | null>;
+      cancel(operationId: string): Promise<unknown>;
+    };
     mint: { get(operationId: string): Promise<OperationSnapshot | null> };
     melt: {
       get(operationId: string): Promise<OperationSnapshot | null>;
@@ -118,6 +121,13 @@ export async function reconcileSwapLegs(
           if (swap.state === 'completed') {
             move({ localStatus: 'done' });
           } else if (swap.state === 'failed' || swap.state === 'cancelled') {
+            move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
+          } else if (status === 'paymentPending' && swap.state === 'prepared') {
+            if (!stillRead()) continue;
+            // An execute that threw before starting the source melt leaves the
+            // parent in `prepared` with source proofs still reserved. Coco's
+            // cancel takes the source lock so it cannot race an active payment.
+            await manager.ops.mintSwap.cancel(leg.mintSwapOperationId);
             move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
           } else if (
             (swap.state === 'destination_funded' || swap.state === 'destination_pending') &&

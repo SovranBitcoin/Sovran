@@ -5,6 +5,7 @@ import { act, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as nip19 from 'nostr-tools/nip19';
 import { getPublicKey } from 'nostr-tools/pure';
+import { InteractionManager } from 'react-native';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import {
@@ -304,6 +305,24 @@ describe('a sound key with a wrong wallet phrase cached beside it', () => {
 });
 
 describe('a healthy install written by 0.1.3', () => {
+  it('stages the wallet keys while interaction callbacks are still queued', async () => {
+    install013(0);
+    const interactions = jest.spyOn(InteractionManager, 'runAfterInteractions').mockReturnValue({
+      then: () => new Promise(() => {}),
+      done: jest.fn(),
+      cancel: jest.fn(),
+    });
+    try {
+      const screen = await start(0);
+
+      expect(await screen.findByTestId('app')).toBeOnTheScreen();
+      expect(CocoManager.setAccountIndex).toHaveBeenCalledWith(0, false);
+      expect(CocoManager.setCashuMnemonic).toHaveBeenCalled();
+    } finally {
+      interactions.mockRestore();
+    }
+  });
+
   it.each([
     ['its first derived account', 0],
     ['its second derived account', 1],

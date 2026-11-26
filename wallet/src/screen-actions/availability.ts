@@ -184,7 +184,9 @@ function methodAmountReason(
  */
 function describeMints(availability: MintMethodAmountAvailability | null) {
   if (!availability) return null;
-  const rank = (candidate: MintMethodAmountAvailability["candidates"][number]) =>
+  const rank = (
+    candidate: MintMethodAmountAvailability["candidates"][number],
+  ) =>
     candidate.status !== "disabled"
       ? 0
       : candidate.reason?.code === "MINT_METHOD_UNSUPPORTED"
@@ -519,7 +521,9 @@ function amountEntryAvailability(
     balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
   const isSpendDestination = isSendEcash || isMeltQuote || isPaymentRequest;
   const exceedsBalance =
-    isSpendDestination && effectiveAmount > 0 && effectiveAmount > spendableAmount;
+    isSpendDestination &&
+    effectiveAmount > 0 &&
+    effectiveAmount > spendableAmount;
   const receiveLightningRequirement: MintMethodRequirement = {
     operation: "mint",
     method: "bolt11",
@@ -620,7 +624,8 @@ function amountEntryAvailability(
   } else if (isPaymentRequest) {
     // A payment request is delivered over the network to its requester.
     ecashAvailable = nextCanFire && !deviceOffline;
-    if (deviceOffline) ecashReason = "Needs a connection to reach the requester";
+    if (deviceOffline)
+      ecashReason = "Needs a connection to reach the requester";
     ecashDescription = paymentRequestIsLocked
       ? "Send a Cashu payment request, locked to its key"
       : "Send a Cashu payment request";
@@ -662,8 +667,13 @@ function amountEntryAvailability(
   // fallback — every Nostr pubkey is payable at <npub>@npubx.cash, but the
   // menu must say where the money actually goes instead of a generic
   // "as Lightning" (npub.cash is the marketing name; npubx.cash the host).
-  const meltTargetIsNpc = /@npubx?\.cash$/i.test(meltTarget.trim());
-  const lightningLabel = meltTargetIsNpc ? "as Lightning (npub.cash)" : "as Lightning";
+  // Only a target the app synthesized for a recipient with no published
+  // Lightning address gets the caution. An `@npub.cash` / `@npubx.cash`
+  // address the recipient published themselves is a normal Lightning target.
+  const meltTargetIsNpc = entry.meltTargetIsNpcFallback === true;
+  const lightningLabel = meltTargetIsNpc
+    ? "as Lightning (npub.cash)"
+    : "as Lightning";
   // npub.cash is a custodial service we picked on their behalf because they
   // advertised no Lightning address. It is reachable for every pubkey, which
   // is exactly why it can look like a confirmed destination when it is not —

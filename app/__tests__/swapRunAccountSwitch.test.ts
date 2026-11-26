@@ -1,18 +1,7 @@
 /**
- * A swap run that outlives an account switch. The run started for account A;
- * the switch unmounts the account's tree (`AccountScopedProviders` is keyed by
- * account), so the screen's hook is gone, but its run is a closure that keeps
- * the manager it started with and never sees B's. The swap history store is
- * reset and loaded again for B while that run goes on: its late writes must
- * not land in B's history, and it must not start new work for A from under
- * B: the leg in flight finishes, and before the next one opens the run ends
- * and gives up its hold. A's saved group is left running, and the next time A
- * is open the reconciler settles it from its own operations.
- *
- * The real swap history store runs over the real profile-scoped storage
- * (backed by the AsyncStorage mock) and the real profile store; the real
- * `wallet` rebalance engine runs against a fake Coco manager, as in
- * `mintRebalanceRetryAgreement.test.ts`.
+ * Exercise the real switch protocol, rebalance engine and profile-scoped
+ * history with a fake Coco manager. A funded leg is reconciled after returning
+ * to its account, even when the original observer settles in a later session.
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { act, renderHook } from '@testing-library/react-native';
@@ -21,15 +10,12 @@ import { Amount } from '@cashu/coco-core';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
-import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import {
-  blockProfilePersistWrites,
-  signalMigrationsComplete,
-  unblockProfilePersistWrites,
-} from '@/shared/lib/cashu/profileScopedStorage';
+import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
+import { registerProfileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
+import { runInProcessProfileSwitch } from '@/shared/lib/profile/inProcessProfileSwitch';
 import { reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
-import { anySwapGroupHeld } from '@/shared/lib/cashu/swapGroupPhase';
+import { anySwapGroupHeld, holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -128,7 +114,7 @@ function createManager() {
         ),
         cancel: jest.fn(async (id: string) => makeSwapOp(id, 'cancelled')),
         waitForOutcome: jest.fn(
-          (id: string) =>
+          (id: string, _options?: { signal?: AbortSignal }) =>
             new Promise((resolve) => {
               releaseWait = () =>
                 resolve({
@@ -166,16 +152,23 @@ async function saved(account: string) {
   return raw ? JSON.parse(raw).state : null;
 }
 
-/** The in-process account switch: writes held, stores reset, account flipped, loaded again. */
 async function switchTo(accountIndex: number) {
-  await act(async () => {
-    await blockProfilePersistWrites();
-    useSwapTransactionsStore.setState(useSwapTransactionsStore.getInitialState(), true);
-    useSwapStatusStore.setState(useSwapStatusStore.getInitialState(), true);
-    useProfileStore.setState({ activeAccountIndex: accountIndex });
-    await useSwapTransactionsStore.persist.rehydrate();
-    unblockProfilePersistWrites();
+  const unregister = registerProfileSwitchBoundary({
+    suspend: async () => {},
+    resume: async () => {},
   });
+  try {
+    await act(async () => {
+      await runInProcessProfileSwitch({
+        cleanupCoco: async () => {},
+        flipAccount: () => {
+          useProfileStore.setState({ activeAccountIndex: accountIndex });
+        },
+      });
+    });
+  } finally {
+    unregister();
+  }
 }
 
 beforeEach(async () => {
@@ -201,8 +194,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('a run that outlives an account switch finishes its leg in flight, starts no other, writes nothing into the next account, and its own group settles when that account opens again', async () => {
-  const { result, unmount } = renderHook(() =>
+function mountRebalance() {
+  return renderHook(() =>
     useMintRebalanceOrchestrator({
       unit: 'sat',
       computedPlan: plan,
@@ -218,7 +211,10 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
       minTransferThreshold: 5,
     })
   );
+}
 
+it('lets B swap immediately and reconciles the funded leg when A is reopened', async () => {
+  const { result, unmount } = mountRebalance();
   // Account A: the first melt is paid, the destination has not issued yet.
   await act(async () => result.current.handleStart());
   await flush(100);
@@ -239,42 +235,48 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
     JSON.stringify({ state: { groups: { [groupId]: bGroup }, quoteIdToGroup: {} }, version })
   );
 
-  // The switch unmounts A's tree; the run goes on with A's manager.
   const managerA = mockManager;
+  const settleA = releaseWait!;
   unmount();
   await switchTo(1);
-  expect(useSwapTransactionsStore.getState().groups[groupId]?.title).toBe('B');
-
-  // A's first transfer arrives. The run would move on to the second, but the
-  // open account is no longer A: it pays nothing more and lets the group go,
-  // so a swap can start in B.
-  swapCompleted = true;
-  releaseWait?.();
-  await flush(1000);
-  expect(managerA.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
-  expect(managerA.ops.mintSwap.prepare).toHaveBeenCalledTimes(1);
   expect(anySwapGroupHeld()).toBe(false);
+  expect(managerA.ops.mintSwap.waitForOutcome.mock.calls[0][1]?.signal?.aborted).toBe(true);
 
-  // B's history is untouched, in memory and saved, and no annotation was written for it.
+  mockManager = createManager();
+  const accountB = mountRebalance();
+  await act(async () => accountB.result.current.handleStart());
+  await flush(100);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
+  expect(anySwapGroupHeld()).toBe(true);
   expect(useSwapTransactionsStore.getState().groups[groupId]).toEqual(bGroup);
   expect((await saved(ACCOUNT_B)).groups[groupId]).toEqual(bGroup);
-  expect(setTransactionAnnotation).toHaveBeenCalledTimes(annotationsBeforeSwitch);
+  const annotationsAfterB = jest.mocked(setTransactionAnnotation).mock.calls.length;
+  expect(annotationsAfterB).toBeGreaterThan(annotationsBeforeSwitch);
 
-  // A's saved group is left as the run last wrote it before the switch: one
-  // leg, its source paid, its destination not yet seen.
-  const savedA = (await saved(ACCOUNT_A)).groups[groupId];
-  expect(savedA).toMatchObject({
+  accountB.unmount();
+  await switchTo(0);
+  expect(anySwapGroupHeld()).toBe(false);
+  const releaseCurrentA = holdSwapGroup(groupId);
+  swapCompleted = true;
+  settleA();
+  await flush(1000);
+
+  expect(managerA.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
+  expect(managerA.ops.mintSwap.prepare).toHaveBeenCalledTimes(1);
+  expect(managerA.ops.mintSwap.cancel).not.toHaveBeenCalled();
+  expect(anySwapGroupHeld()).toBe(true);
+  expect(setTransactionAnnotation).toHaveBeenCalledTimes(annotationsAfterB);
+  expect(useSwapTransactionsStore.getState().groups[groupId]).toMatchObject({
     state: 'running',
     legs: [{ localStatus: 'verifying', meltOperationId: 'melt-op-1' }],
   });
-  expect(savedA.legs).toHaveLength(1);
+  releaseCurrentA();
 
-  // A opens again: no run owns the group, so the reconciler settles it.
-  await switchTo(0);
+  // No run owns the group, so the reconciler settles it.
   await act(async () => {
     await reconcileSwapLegs({
       ops: {
-        mintSwap: { get: async () => ({ state: 'completed' }) },
+        mintSwap: { get: async () => ({ state: 'completed' }), cancel: async () => undefined },
         melt: { get: async () => ({ state: 'finalized' }), cancel: async () => {} },
         mint: { get: async () => ({ state: 'finalized' }) },
       },
@@ -284,4 +286,16 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
     state: 'finished',
     legs: [{ localStatus: 'done' }],
   });
+});
+
+it('ignores a stale release after the same group id is held in B', async () => {
+  const releaseA = holdSwapGroup('same-id');
+  await switchTo(1);
+  expect(anySwapGroupHeld()).toBe(false);
+  const releaseB = holdSwapGroup('same-id');
+  releaseA();
+  expect(anySwapGroupHeld()).toBe(true);
+  releaseB();
+  await switchTo(0);
+  expect(anySwapGroupHeld()).toBe(false);
 });

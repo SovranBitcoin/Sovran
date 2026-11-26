@@ -238,6 +238,7 @@ export function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'f
     banner: raw.banner,
     nip05: raw.nip05,
     lud16: raw.lud16,
+    lud06: raw.lud06,
     website: raw.website,
     about: raw.about,
   };

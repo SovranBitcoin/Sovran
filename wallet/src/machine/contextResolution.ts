@@ -83,11 +83,9 @@ function summarizeResultData(
 ): Record<string, unknown> {
   const data = result.data as Record<string, unknown>;
   const suggestions = data.suggestions as
-    | { roundDown?: unknown; roundUp?: unknown }
-    | undefined;
+    { roundDown?: unknown; roundUp?: unknown } | undefined;
   const methodRequirement = data.methodRequirement as
-    | MintMethodRequirement
-    | undefined;
+    MintMethodRequirement | undefined;
   const candidates = Array.isArray(data.candidates)
     ? (data.candidates as MintCandidate[])
     : [];
@@ -777,7 +775,13 @@ export function resolveFromContext(
     if (methodCandidates && availableCandidates.length > 0) {
       return logContextResult(
         "mint_quote_select_mint_for_method",
-        buildSelectMintRedirect(ctx,walletCtx, destination, methodCandidates, amount),
+        buildSelectMintRedirect(
+          ctx,
+          walletCtx,
+          destination,
+          methodCandidates,
+          amount,
+        ),
       );
     }
 
@@ -852,6 +856,7 @@ export function resolveFromContext(
           constraints: {
             destination,
             meltTarget: ctx.meltTarget,
+            meltTargetIsNpcFallback: ctx.meltTargetIsNpcFallback,
             methodContext: createAmountEntryMethodContext(walletCtx),
             recipientPubkey: ctx.recipientPubkey,
             recipientProfile: ctx.recipientProfile,
@@ -889,6 +894,7 @@ export function resolveFromContext(
           destination,
           paymentRequest: ctx.paymentRequest,
           meltTarget: ctx.meltTarget,
+          meltTargetIsNpcFallback: ctx.meltTargetIsNpcFallback,
           methodContext: createAmountEntryMethodContext(walletCtx),
           recipientPubkey: ctx.recipientPubkey,
           recipientProfile: ctx.recipientProfile,

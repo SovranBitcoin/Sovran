@@ -98,7 +98,6 @@ jest.mock('@/shared/ui/composed/ContactRow', () => ({
   ContactRow: mockHost('ContactRow'),
   mintIdentity: () => ({}),
 }));
-jest.mock('@/shared/ui/composed/TierBadge', () => ({ TierBadge: mockHost('TierBadge') }));
 jest.mock('@/shared/ui/composed/GlassSearchBar', () => ({
   GlassSearchBar: mockHost('GlassSearchBar'),
 }));

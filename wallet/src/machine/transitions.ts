@@ -391,7 +391,8 @@ function handleAmountEntered(
           // Rebuild the FULL constraint set (BTC-12): dropping
           // supportedMintUrls / paymentRequest / methodContext here lost a
           // payment-request flow's mint allow-list (and more) on the retry.
-          destination: event.destination ?? currentCtx.destination ?? "sendEcash",
+          destination:
+            event.destination ?? currentCtx.destination ?? "sendEcash",
           ...(currentCtx.supportedMintUrls
             ? { supportedMintUrls: currentCtx.supportedMintUrls }
             : {}),
@@ -399,6 +400,7 @@ function handleAmountEntered(
             ? { paymentRequest: currentCtx.paymentRequest }
             : {}),
           meltTarget: currentCtx.meltTarget,
+          meltTargetIsNpcFallback: currentCtx.meltTargetIsNpcFallback,
           recipientPubkey: currentCtx.recipientPubkey,
           recipientProfile: currentCtx.recipientProfile,
           p2pkLockPubkey: currentCtx.p2pkLockPubkey,
@@ -436,6 +438,8 @@ function handleAmountEntered(
         meltQuoteMethod: event.meltQuoteMethod,
         offline: event.offline,
         meltTarget: event.meltTarget,
+        meltTargetIsNpcFallback:
+          event.meltTarget && event.meltTargetIsNpcFallback ? true : undefined,
         recipientPubkey: event.recipientPubkey,
         recipientProfile: event.recipientProfile,
         amountEntryDisplay: event.amountEntryDisplay,
@@ -455,6 +459,11 @@ function handleAmountEntered(
         meltQuoteMethod: event.meltQuoteMethod ?? currentCtx.meltQuoteMethod,
         offline: event.offline ?? currentCtx.offline,
         meltTarget: event.meltTarget ?? currentCtx.meltTarget,
+        meltTargetIsNpcFallback: event.meltTarget
+          ? event.meltTargetIsNpcFallback
+            ? true
+            : undefined
+          : currentCtx.meltTargetIsNpcFallback,
         recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
         amountEntryDisplay:
@@ -734,6 +743,9 @@ export function transition(
         startSendEcashFlow(walletCtx, unit, {
           offline,
           ...(event.meltTarget ? { meltTarget: event.meltTarget } : {}),
+          ...(event.meltTarget && event.meltTargetIsNpcFallback
+            ? { meltTargetIsNpcFallback: true }
+            : {}),
           ...(event.recipientPubkey
             ? { recipientPubkey: event.recipientPubkey }
             : {}),

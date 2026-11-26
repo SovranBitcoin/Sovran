@@ -1,10 +1,8 @@
 /**
  * @jest-environment node
  *
- * Balance split opened for a unit (`?unit=usd`) starts on that unit's tab on
- * its first frame, not on SAT. A trusted mint whose info has not loaded yet is
- * not assumed to be a sat mint: it is left out until its units are known, so
- * the SAT split is never initialised with a mint that may not issue sats.
+ * Balance split opens on the requested Bitcoin account and rejects fiat
+ * routes. Mints with unknown units are left out until their info loads.
  */
 import TestRenderer, { act } from 'react-test-renderer';
 
@@ -21,7 +19,7 @@ jest.mock('wallet', () => ({
   ACCOUNT_UNITS: ['sat', 'usd', 'eur', 'tsat'],
   accountUnitLabel: (unit: string) => unit.toUpperCase(),
   deriveSupportedUnitsFromInfo: (info: { units: string[] }) => info.units,
-  toAccountUnit: (unit: string) => unit,
+  toAccountUnit: (unit: string, testnut: boolean) => (testnut ? `t${unit}` : unit),
 }));
 jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: mockMints }) }));
 jest.mock('@/shared/lib/nav/useRouteParams', () => ({ useRouteParams: () => mockParams }));
@@ -54,7 +52,7 @@ jest.mock('@/features/mint/hooks/useMintManagement', () => ({
 }));
 jest.mock('@/features/wallet/hooks/useMintKeysetUnits', () => ({ useMintKeysetUnits: () => ({}) }));
 jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
-  useIsTestnutMint: () => () => false,
+  useIsTestnutMint: () => (mintUrl: string) => mintUrl === 'testnut',
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => ['black'] }));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
@@ -91,12 +89,23 @@ beforeEach(() => {
 });
 afterEach(() => act(() => renderer?.unmount()));
 
-it('starts on the route unit from the first frame', () => {
-  mockParams = { unit: 'usd' };
-  mockMints = [{ mintUrl: 'a', mintInfo: { units: ['sat', 'usd'] } }];
+it('starts on the testnut account and only initializes its testnut sat mints', () => {
+  mockParams = { unit: 'tsat' };
+  mockMints = [
+    { mintUrl: 'production', mintInfo: { units: ['sat', 'usd'] } },
+    { mintUrl: 'testnut', mintInfo: { units: ['sat', 'usd'] } },
+  ];
   render();
-  expect(mockTabs[0].selectedCurrency).toBe('USD');
-  expect(mockTabs.every((tabs) => tabs.selectedCurrency === 'USD')).toBe(true);
+  expect(mockTabs[0]).toEqual({ selectedCurrency: 'TSAT', currencies: ['SAT', 'TSAT'] });
+  expect(mockInitialize).toHaveBeenCalledWith('TSAT', ['testnut']);
+});
+
+it.each(['usd', 'eur', 'gbp', 'tusd'])('does not open Balance split for %s', (unit) => {
+  mockParams = { unit };
+  mockMints = [{ mintUrl: 'production', mintInfo: { units: ['sat', unit] } }];
+  render();
+  expect(mockTabs).toHaveLength(0);
+  expect(mockInitialize).not.toHaveBeenCalled();
 });
 
 it('treats btc in the route as the SAT tab and no unit as SAT', () => {

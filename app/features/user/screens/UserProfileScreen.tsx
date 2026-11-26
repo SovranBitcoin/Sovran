@@ -32,7 +32,6 @@ import { Stack, useIsFocused } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -55,10 +54,15 @@ import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { StateSwitch } from '@/shared/ui/composed/StateSwitch';
 import { toViewState } from '@/shared/lib/viewState';
-import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
+import { armContactDelivery } from '@/features/send/lib/startContactSend';
+import {
+  peekCachedLightningTarget,
+  resolveProfileLightningTarget,
+} from '@/shared/lib/nostr/profileLightningTarget';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { extractLightningTarget } from 'wallet';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/runtime/WalletProjection';
 import { useModerationActions } from '@/shared/hooks/useModerationActions';
@@ -86,7 +90,8 @@ import {
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
-import { resolveIdentityName } from '@/shared/lib/identity';
+import { findOperatorMintUrl, resolveIdentityName } from '@/shared/lib/identity';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { ListGroup } from '@/shared/ui/composed/ListGroup';
 import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
@@ -930,22 +935,46 @@ function BannerWithAvatar({
 // Main Component
 // ============================================================================
 
+/** How long Send waits for a still-loading kind-0 before using the npub.cash fallback. */
+const PROFILE_ADDRESS_WAIT_MS = 1500;
+
 // Module-scope because the try/catch around startSendEcash bails the React
 // Compiler for the whole component. Verbatim former
 // handleSendMoney IIFE body; the optional-chaining reads moved to the caller.
-async function startSendMoneyToProfile(ctx: {
+export async function startSendMoneyToProfile(ctx: {
   machine: ReturnType<typeof usePaymentFlowMachine>;
   pubkey: string;
-  meltTarget: string;
+  /** The address the profile published (lud16 / lud06), when already known. */
+  publishedTarget: string | null;
+  /** npub.cash address to use only when the profile published nothing. */
+  npcFallback: string | undefined;
+  /** The kind-0 is still loading: give it a moment before using the fallback. */
+  waitForProfile: boolean;
   displayName: string;
   avatarUrl: string | null;
   nip05: string | null;
+  isCurrent: () => boolean;
 }) {
-  const { machine, pubkey, meltTarget, displayName, avatarUrl, nip05 } = ctx;
+  const { machine, pubkey, npcFallback, waitForProfile, displayName, avatarUrl, nip05, isCurrent } =
+    ctx;
+  // Tapping Send right after the profile opens can beat the kind-0 fetch.
+  // Wait a short, bounded time for it rather than silently missing a
+  // published address.
+  const publishedTarget =
+    ctx.publishedTarget ??
+    (waitForProfile
+      ? await resolveProfileLightningTarget(pubkey, null, PROFILE_ADDRESS_WAIT_MS)
+      : peekCachedLightningTarget(pubkey));
+  if (!isCurrent()) return;
+  const meltTarget = publishedTarget ?? npcFallback;
+  if (!meltTarget) return;
+  // The same encrypted-DM ecash delivery a contact picked in Send gets.
+  armContactDelivery({ pubkey, displayName, picture: avatarUrl, nip05, lud16: publishedTarget });
   try {
     await machine.startSendEcash({
       reset: true,
       meltTarget,
+      ...(publishedTarget ? {} : { meltTargetIsNpcFallback: true }),
       recipientPubkey: pubkey,
       recipientProfile: {
         displayName,
@@ -958,6 +987,7 @@ async function startSendMoneyToProfile(ctx: {
       meltTargetLength: meltTarget.length,
     });
   } catch (error) {
+    clearPaymentContext('user.profile.send_money_failed');
     paymentLog.warn('user.profile.send_money.failed_to_start', {
       recipientPubkeyLength: pubkey.length,
       meltTargetLength: meltTarget.length,
@@ -1042,7 +1072,17 @@ export function UserProfileScreen() {
     isLoading: isProfileApiLoading,
     isCountsLoading: isProfileCountsLoading,
   } = useNostrProfile(pubkey || null, isFocused);
-  const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
+  // No mint link on the route or profile: a mint this pubkey is known to
+  // operate (from the cached mint metadata) stands in.
+  const operatedMintUrl = useMintMetadataStore((s) => findOperatorMintUrl(s.byMintUrl, pubkey));
+  const profileMintUrl =
+    getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam) ?? operatedMintUrl ?? undefined;
+  const profileMint = useMintMetadataStore((s) =>
+    profileMintUrl ? s.getCached(profileMintUrl) : undefined
+  );
+  // Their own Nostr picture and name first; the mint's icon and name only
+  // stand in when kind-0 has none.
+  const profilePicture = cachedProfile?.picture?.trim() || profileMint?.iconUrl || undefined;
   // Clock for the "new account" check, read once on mount (never in render).
   const [openedAtSec] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -1054,7 +1094,11 @@ export function UserProfileScreen() {
   // deterministic word pair after metadata. truncateMiddle(npub, …) is no
   // longer used as a name; the npub still appears as a copy-row in the
   // profile body.
-  const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
+  const displayName = resolveIdentityName({
+    pubkey,
+    nostrProfile: cachedProfile,
+    mintFallbackName: profileMint?.displayName,
+  });
   const headerHeight = useHeaderHeight();
   // Where the page's PICTURE ends, in scroll coordinates. The handoff waits for
   // the picture alone, not for the whole banner header: the name, the nip-05 and
@@ -1063,6 +1107,13 @@ export function UserProfileScreen() {
   const [identityBottom, setIdentityBottom] = useState<number | null>(null);
   const bannerTopRef = useRef(0);
   const avatarBottomRef = useRef<number | null>(null);
+  const sendRequestSeqRef = useRef(0);
+  useEffect(() => {
+    if (!isFocused) sendRequestSeqRef.current += 1;
+    return () => {
+      sendRequestSeqRef.current += 1;
+    };
+  }, [isFocused, pubkey]);
   const commitIdentityBottom = useCallback(() => {
     if (avatarBottomRef.current === null) return;
     const bottom = Math.round(bannerTopRef.current + avatarBottomRef.current);
@@ -1075,9 +1126,7 @@ export function UserProfileScreen() {
   // the left side at one action, which is the width the title must clear.
   const headerActionCount = (profileMintUrl ? 1 : 0) + (isOwnProfile ? 0 : 1);
   const morph = useIdentityHeader({
-    identity: pubkey
-      ? { name: displayName, seed: pubkey, picture: cachedProfile?.picture }
-      : undefined,
+    identity: pubkey ? { name: displayName, seed: pubkey, picture: profilePicture } : undefined,
     collapseAt:
       identityBottom === null
         ? Number.POSITIVE_INFINITY
@@ -1092,15 +1141,15 @@ export function UserProfileScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
   const rawLud16 = cachedProfile?.lud16;
-  const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
-  // No (valid) lud16 in the profile → fall back to the recipient's npub.cash
-  // address: every Nostr pubkey is payable at <npub>@npub.cash, so money can
-  // always be sent. The send flow's Select-option menu labels the Lightning
-  // variant "as Lightning (npub.cash)" for npc targets, so the destination stays explicit.
+  const publishedTarget = cachedProfile ? extractLightningTarget(cachedProfile) : null;
+  // No usable published address (lud16 / lud06) → fall back to the recipient's
+  // npub.cash address: every Nostr pubkey is payable at <npub>@npub.cash, so
+  // money can always be sent. That target is flagged as an app-made fallback so
+  // the Select-option menu labels it "as Lightning (npub.cash)"; an address the
+  // person published themselves, even an @npub.cash one, is not flagged.
   const npcFallback = npub ? getNpcAddress(undefined, npub) : undefined;
-  const meltTarget = lud16 ?? npcFallback;
   const handleSendMoney = () => {
-    if (!meltTarget) {
+    if (!publishedTarget && !npcFallback && !isMetadataLoading && !isMetadataResolving) {
       paymentLog.warn('user.profile.send_money.unavailable', {
         recipientPubkeyLength: pubkey.length,
         hasRawLightningAddress: !!rawLud16,
@@ -1119,19 +1168,23 @@ export function UserProfileScreen() {
     prefetchNutzapProfile(pubkey);
     paymentLog.info('user.profile.send_money.start', {
       recipientPubkeyLength: pubkey.length,
-      meltTargetLength: meltTarget.length,
-      usedNpcFallback: !lud16,
+      hasPublishedTarget: !!publishedTarget,
+      waitingForProfile: !publishedTarget && (isMetadataLoading || isMetadataResolving),
       hasDisplayName: displayName.length > 0,
       hasAvatarUrl: !!cachedProfile?.picture,
       hasNip05: !!cachedProfile?.nip05,
     });
+    const sendSeq = ++sendRequestSeqRef.current;
     void startSendMoneyToProfile({
       machine,
       pubkey,
-      meltTarget,
+      publishedTarget,
+      npcFallback,
+      waitForProfile: isMetadataLoading || isMetadataResolving,
       displayName,
-      avatarUrl: cachedProfile?.picture ?? null,
+      avatarUrl: profilePicture ?? null,
       nip05: cachedProfile?.nip05 ?? null,
+      isCurrent: () => sendRequestSeqRef.current === sendSeq,
     });
   };
 
@@ -1376,7 +1429,7 @@ export function UserProfileScreen() {
           onScroll={morph.onScroll}
           pubkey={pubkey}
           authorName={displayName}
-          authorPicture={cachedProfile?.picture}
+          authorPicture={profilePicture}
           isOwnProfile={isOwnProfile}
           ListHeaderComponent={
             <View>
@@ -1393,7 +1446,7 @@ export function UserProfileScreen() {
                   commitIdentityBottom();
                 }}
                 bannerUrl={cachedProfile?.banner}
-                pictureUrl={cachedProfile?.picture}
+                pictureUrl={profilePicture}
                 pubkey={pubkey}
                 displayName={displayName}
                 nip05={cachedProfile?.nip05}
@@ -1419,13 +1472,7 @@ export function UserProfileScreen() {
 
               <Spacer size={16} />
 
-              {/* Stats Grid (dev tier badge: which source served this profile) */}
               <View style={{ paddingHorizontal: 16 }}>
-                {pubkey ? (
-                  <View style={{ position: 'absolute', right: 20, top: -12, zIndex: 1 }}>
-                    <TierBadge eventId={pubkey} />
-                  </View>
-                ) : null}
                 <ProfileStatsGrid
                   followingCount={followingCount}
                   followerCount={followerCount}

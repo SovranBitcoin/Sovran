@@ -11,6 +11,8 @@
 const mockCalls: string[] = [];
 const mockBgComplete = jest.fn();
 const mockReport = jest.fn();
+let mockSplashCompleted: boolean;
+let mockCompleteSplash: ((completed: boolean) => void) | undefined;
 let mockLiveInstance: unknown = null;
 let mockManager: ReturnType<typeof mockMakeManager>;
 
@@ -23,11 +25,8 @@ function mockStep(name: string) {
 function mockMakeManager() {
   return {
     ops: {
-      send: { recovery: { run: mockStep('sendRecovery') } },
-      melt: { recovery: { run: mockStep('meltRecovery') } },
       receive: { recovery: { run: mockStep('receiveRecovery') } },
     },
-    recoverPendingPaymentRequestReceiveAttempts: mockStep('paymentRequestRecovery'),
   };
 }
 
@@ -40,10 +39,13 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
     },
     cleanup: async () => undefined,
     peekInstance: () => mockLiveInstance,
-    enableSafeWatchers: async () => {
-      mockCalls.push('safeWatchers');
+    warmSeedCache: async () => {
+      mockCalls.push('seedCacheWarm');
     },
-    enableNpcSyncAndProcessor: async () => {
+    startOperationRecovery: async () => {
+      mockCalls.push('operationRecovery');
+    },
+    enableNpcSync: async () => {
       mockCalls.push('npcSync');
     },
   },
@@ -108,8 +110,13 @@ jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   attachMintMetadataToManager: () => () => undefined,
 }));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({
-  getBootMorphCompleted: () => true,
-  subscribeBootMorphCompleted: () => () => undefined,
+  getBootMorphCompleted: () => mockSplashCompleted,
+  subscribeBootMorphCompleted: (onCompleted: (completed: boolean) => void) => {
+    mockCompleteSplash = onCompleted;
+    return () => {
+      mockCompleteSplash = undefined;
+    };
+  },
 }));
 jest.mock('@/shared/lib/cashu/initializeDefaultMints', () => ({
   initializeDefaultMints: jest.fn(async () => {
@@ -124,13 +131,11 @@ import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMint
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
 const FULL_ORDER = [
-  'safeWatchers',
+  'seedCacheWarm',
   'defaultMints',
+  'operationRecovery',
   'npcSync',
-  'sendRecovery',
-  'meltRecovery',
   'receiveRecovery',
-  'paymentRequestRecovery',
   'routstrPaymentRecovery',
   'routstrReclaim',
   'routstrSdkRecords',
@@ -158,6 +163,8 @@ beforeEach(() => {
   mockCalls.length = 0;
   mockBgComplete.mockClear();
   mockReport.mockClear();
+  mockSplashCompleted = true;
+  mockCompleteSplash = undefined;
   mockLiveInstance = null;
   mockManager = mockMakeManager();
   useWalletLifecycleStore.setState({ restoreStatus: 'not-needed' });
@@ -171,9 +178,6 @@ describe('CocoProvider phase 2', () => {
   it('runs the background steps in a fixed order and then completes the stage', async () => {
     const view = await mountProvider();
 
-    // QUIRK: the Routstr change recovery runs after the send, melt, receive and NUT-18
-    // recoveries although its comment says it "runs first" because it has a deadline
-    // (stores-persistence D3). A reorder should change this assertion on purpose.
     expect(mockCalls).toEqual(FULL_ORDER);
     expect(mockBgComplete).toHaveBeenCalledTimes(1);
     expect(jest.mocked(initializeDefaultMints)).toHaveBeenCalledWith(
@@ -183,13 +187,11 @@ describe('CocoProvider phase 2', () => {
     view.unmount();
   });
 
-  it('waits for the wallet restore before NPC sync and every recovery', async () => {
+  it('waits for wallet restore before starting any Coco operation owners or NPC sync', async () => {
     useWalletLifecycleStore.setState({ restoreStatus: 'pending' });
 
     const view = await mountProvider();
-    // QUIRK: the safe watchers and the default mints run while restore is still pending;
-    // only what follows waits. Moving them behind the wait should change this on purpose.
-    expect(mockCalls).toEqual(['safeWatchers', 'defaultMints']);
+    expect(mockCalls).toEqual(['seedCacheWarm', 'defaultMints']);
     expect(mockBgComplete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -211,29 +213,36 @@ describe('CocoProvider phase 2', () => {
     });
     await settle();
 
-    expect(mockCalls).toEqual(['safeWatchers', 'defaultMints']);
+    expect(mockCalls).toEqual(['seedCacheWarm', 'defaultMints']);
     view.unmount();
   });
 
-  it('still runs every later recovery when send recovery throws', async () => {
-    const failure = new Error('Recovery is already in progress');
-    mockManager.ops.send.recovery.run.mockImplementationOnce(async () => {
-      mockCalls.push('sendRecovery');
-      throw failure;
-    });
+  it('waits for the splash to finish even after 500 ms have elapsed', async () => {
+    jest.useFakeTimers();
+    mockSplashCompleted = false;
+    try {
+      const view = render(<WalletCore>{null}</WalletCore>);
+      await act(async () => {});
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
 
-    const view = await mountProvider();
-
-    expect(mockCalls).toEqual(FULL_ORDER);
-    expect(mockReport).toHaveBeenCalledWith('ops.*.recovery.run', failure);
-    expect(mockBgComplete).toHaveBeenCalledTimes(1);
-    view.unmount();
+      expect(mockCalls).toEqual([]);
+      await act(async () => {
+        mockSplashCompleted = true;
+        mockCompleteSplash?.(true);
+      });
+      expect(mockCalls).toEqual(FULL_ORDER);
+      view.unmount();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
-  it('still runs the receive and Routstr recoveries when melt recovery throws', async () => {
-    mockManager.ops.melt.recovery.run.mockImplementationOnce(async () => {
-      mockCalls.push('meltRecovery');
-      throw new Error('melt recovery failed');
+  it('still runs the Routstr recoveries when receive recovery throws', async () => {
+    mockManager.ops.receive.recovery.run.mockImplementationOnce(async () => {
+      mockCalls.push('receiveRecovery');
+      throw new Error('receive recovery failed');
     });
 
     const view = await mountProvider();
@@ -251,7 +260,7 @@ describe('CocoProvider phase 2', () => {
 
     const view = await mountProvider();
 
-    expect(mockCalls).toEqual(['safeWatchers', 'defaultMints']);
+    expect(mockCalls).toEqual(['seedCacheWarm', 'defaultMints']);
     expect(mockBgComplete).not.toHaveBeenCalled();
     view.unmount();
   });
@@ -264,7 +273,7 @@ describe('CocoProvider phase 2', () => {
 
     const view = await mountProvider();
 
-    expect(mockCalls).toEqual(['safeWatchers', 'defaultMints']);
+    expect(mockCalls).toEqual(['seedCacheWarm', 'defaultMints']);
     expect(mockReport).not.toHaveBeenCalled();
     expect(mockBgComplete).toHaveBeenCalledTimes(1);
     view.unmount();

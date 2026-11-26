@@ -17,7 +17,12 @@ import { swapStatusPopup } from '@/shared/lib/popup';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { activePubkey } from '@/shared/stores/global/profileStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
-import { anySwapGroupHeld, holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
+import {
+  anySwapGroupHeld,
+  holdSwapGroup,
+  swapGroupSessionSignal,
+} from '@/shared/lib/cashu/swapGroupPhase';
+import { profileSwitchQuiescing } from '@/shared/lib/account/accountRegistry';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import {
   MIN_FEE_RESERVE,
@@ -49,6 +54,7 @@ interface MintLite {
 interface UseMintRebalanceOrchestratorArgs {
   unit: string;
   computedPlan: RebalancePlan;
+  isInAccount?: (mintUrl: string) => boolean;
   trustedMints: MintLite[];
   mintInfoMap: Record<string, GetInfoResponse | null>;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -155,6 +161,7 @@ function toRunResult(outcome: RebalanceTransferOutcome): RunResult {
 export function useMintRebalanceOrchestrator({
   unit,
   computedPlan,
+  isInAccount,
   trustedMints,
   mintInfoMap,
   middlemanRouting,
@@ -172,6 +179,11 @@ export function useMintRebalanceOrchestrator({
   const [runStatus, setRunStatus] = useState<RebalanceRunStatus>('idle');
   // One lock per screen: transfers from a retry never overlap a running one.
   const [lock] = useState(createRebalanceLock);
+  const [sessionSignal] = useState(swapGroupSessionSignal);
+  const isCurrentSession = useCallback(
+    () => !sessionSignal.aborted && !profileSwitchQuiescing(),
+    [sessionSignal]
+  );
 
   const runRef = useRef<OwnedRun | null>(null);
   const swapGroupRef = useRef<StartedGroup | null>(null);
@@ -179,8 +191,9 @@ export function useMintRebalanceOrchestrator({
   const toastStartRef = useRef<ToastStart | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
   const isRunActive = useCallback(
-    (run: OwnedRun) => runRef.current === run && managerRef.current === manager,
-    [manager]
+    (run: OwnedRun) =>
+      isCurrentSession() && runRef.current === run && managerRef.current === manager,
+    [isCurrentSession, manager]
   );
 
   /**
@@ -194,31 +207,37 @@ export function useMintRebalanceOrchestrator({
    * is reopened for it, with its toast (shown again if it was dismissed), so
    * the retry's end is the one they show.
    */
-  const claimRun = useCallback((prepare?: () => void): OwnedRun | null => {
-    if (runRef.current) return null;
-    if (anySwapGroupHeld()) {
-      cashuLog.info('mint.rebalance.start_blocked_by_active_swap');
-      return null;
-    }
-    prepare?.();
-    const groupId = swapGroupRef.current?.id ?? null;
-    const account = swapGroupRef.current ? swapGroupRef.current.account : activePubkey();
-    if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
-    const toast = toastFor(groupId);
-    if (toast) toast.resume();
-    else if (toastStartRef.current) showToast(toastStartRef.current, stepStatesRef.current);
-    const run = { groupId, account, release: groupId ? holdSwapGroup(groupId) : () => {} };
-    runRef.current = run;
-    return run;
-  }, []);
+  const claimRun = useCallback(
+    (prepare?: () => void): OwnedRun | null => {
+      if (runRef.current || !isCurrentSession()) return null;
+      if (anySwapGroupHeld()) {
+        cashuLog.info('mint.rebalance.start_blocked_by_active_swap');
+        return null;
+      }
+      prepare?.();
+      const groupId = swapGroupRef.current?.id ?? null;
+      const account = swapGroupRef.current ? swapGroupRef.current.account : activePubkey();
+      if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
+      const toast = toastFor(groupId);
+      if (toast) toast.resume();
+      else if (toastStartRef.current) showToast(toastStartRef.current, stepStatesRef.current);
+      const run = { groupId, account, release: groupId ? holdSwapGroup(groupId) : () => {} };
+      runRef.current = run;
+      return run;
+    },
+    [isCurrentSession]
+  );
 
   /** Stop owning `run`; false when it was no longer the current run (Cancel ended it). */
-  const giveUpRun = useCallback((run: OwnedRun) => {
-    run.release();
-    if (runRef.current !== run) return false;
-    runRef.current = null;
-    return true;
-  }, []);
+  const giveUpRun = useCallback(
+    (run: OwnedRun) => {
+      run.release();
+      if (runRef.current !== run) return false;
+      runRef.current = null;
+      return isCurrentSession();
+    },
+    [isCurrentSession]
+  );
 
   /** End the swap group and the screen for a run that did not get through its steps. */
   const closeCancelled = useCallback((groupId: string | null, account: string | undefined) => {
@@ -264,12 +283,14 @@ export function useMintRebalanceOrchestrator({
   const engine = useMemo(() => {
     const trustedMintUrls = trustedMints.map((mint) => mint.mintUrl);
     return createRebalanceEngine({
-      wallet: createRebalanceWalletPort(manager, unit),
+      wallet: createRebalanceWalletPort(manager, unit, sessionSignal),
+      sessionSignal,
       findRoutes: (fromMintUrl, toMintUrl) =>
         findRebalanceRouteCandidates({
           fromMintUrl,
           toMintUrl,
           planSteps: runPlan?.steps ?? null,
+          isInAccount,
           trustedMintUrls,
           mintInfoMap,
           middlemanRouting,
@@ -283,12 +304,14 @@ export function useMintRebalanceOrchestrator({
   }, [
     manager,
     unit,
+    isInAccount,
     runPlan,
     trustedMints,
     mintInfoMap,
     middlemanRouting,
     minTransferThreshold,
     lock,
+    sessionSignal,
   ]);
 
   const sinkFor = useCallback(
@@ -297,10 +320,11 @@ export function useMintRebalanceOrchestrator({
         step,
         group: swapGroupRef.current,
         swapLegIds: swapLegIdByStepIdRef.current,
+        isCurrentSession,
         updateStepState,
         insertChainRows,
       }),
-    [updateStepState, insertChainRows]
+    [isCurrentSession, updateStepState, insertChainRows]
   );
 
   /**
@@ -360,9 +384,12 @@ export function useMintRebalanceOrchestrator({
         },
         sinkFor,
         // Flip the toast pip to "active" before the transfer starts.
-        onTransferStart: (step) => toastFor(currentRun().groupId)?.setActiveLeg(step.id),
-        onTransferSettled: (step, outcome) =>
-          reportSwapLeg(toastFor(currentRun().groupId), step, outcome),
+        onTransferStart: (step) => {
+          if (isCurrentSession()) toastFor(currentRun().groupId)?.setActiveLeg(step.id);
+        },
+        onTransferSettled: (step, outcome) => {
+          if (isCurrentSession()) reportSwapLeg(toastFor(currentRun().groupId), step, outcome);
+        },
       };
       try {
         report(await start(callbacks, report));
@@ -375,7 +402,7 @@ export function useMintRebalanceOrchestrator({
         throw err;
       }
     },
-    [closeCancelled, giveUpRun, isRunActive, sinkFor]
+    [closeCancelled, giveUpRun, isCurrentSession, isRunActive, sinkFor]
   );
 
   const handleStart = useCallback(() => {
@@ -483,6 +510,7 @@ export function useMintRebalanceOrchestrator({
 
       const chainPath = suggestion.path;
       if (chainPath.length < 3) return; // Need at least A → via → B
+      if (isInAccount && !chainPath.every(isInAccount)) return;
 
       // Held while the intermediaries are trusted, so nothing else starts.
       const run = claimRun();
@@ -511,10 +539,11 @@ export function useMintRebalanceOrchestrator({
         () => run
       );
     },
-    [claimRun, isRunActive, runPlan, runSteps, engine, insertChainRows]
+    [claimRun, isRunActive, runPlan, runSteps, engine, insertChainRows, isInAccount]
   );
 
   const handleCancelRun = useCallback(() => {
+    if (!isCurrentSession()) return;
     // Stops scheduling new steps and UI updates; an in-flight melt continues
     // and coco settles it.
     const run = runRef.current;
@@ -524,7 +553,7 @@ export function useMintRebalanceOrchestrator({
     // Flip the SwapStatusToast to its terminal 'cancelled' state; the runner
     // returns early on abort, so its complete()/fail() never fires.
     toastFor(groupId)?.cancel();
-  }, [closeCancelled, giveUpRun]);
+  }, [closeCancelled, giveUpRun, isCurrentSession]);
 
   return {
     plan,

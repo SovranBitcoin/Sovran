@@ -86,6 +86,7 @@ export async function clearTransitionGuardOnStartup(): Promise<void> {
 
 // ── Registered controls (set at runtime by layout components) ────
 type TransitionControls = {
+  holdForProfileSwitch?: () => void;
   resetStages: (options?: { keepStagesThatOutliveAccount?: boolean }) => void;
   cancelResetStages: () => void;
 };
@@ -138,7 +139,7 @@ export function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<voi
   );
 }
 
-/** The opt-in protocol awaits its explicit account-index write, including failures. */
+/** The in-process protocol awaits its explicit account-index write, including failures. */
 export function activateProfileInMemory(accountIndex: number): void {
   const profileOptions = useProfileStore.persist.getOptions();
   useProfileStore.persist.setOptions({
@@ -236,7 +237,11 @@ export function acquireTransition(): TransitionLock | null {
     holdSplash(options) {
       splashHeld = true;
       cancelSplash = registeredControls?.cancelResetStages;
-      registeredControls?.resetStages(options);
+      if (options?.keepStagesThatOutliveAccount && registeredControls?.holdForProfileSwitch) {
+        registeredControls.holdForProfileSwitch();
+      } else {
+        registeredControls?.resetStages(options);
+      }
     },
     release,
   };

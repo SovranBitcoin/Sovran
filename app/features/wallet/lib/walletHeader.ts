@@ -49,9 +49,10 @@ export function getHeaderTitleWidthFromWidth(windowWidth: number): number {
 }
 
 /**
- * A left-aligned title in a header with a left button and none on the right
- * (the Search tab): the side the right button would take is the title's.
+ * A left-aligned title in a header with no left button and one on the right
+ * (the Search tab's close): the title starts at the edge padding and stops a
+ * button's spacing short of the right button.
  */
-export function getHeaderTitleWidthWithoutRight(windowWidth: number): number {
-  return windowWidth - SIDE - HEADER_LAYOUT.HORIZONTAL_PADDING;
+export function getHeaderTitleWidthBesideRightButton(windowWidth: number): number {
+  return windowWidth - HEADER_LAYOUT.HORIZONTAL_PADDING - SIDE;
 }

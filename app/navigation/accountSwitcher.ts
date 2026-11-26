@@ -35,7 +35,3 @@ export function accountNpub(pubkey: string): string | null {
     return null;
   }
 }
-
-export function accountsCountLabel(count: number): string {
-  return count === 1 ? '1 account' : `${count} accounts`;
-}

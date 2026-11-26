@@ -44,9 +44,10 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
    */
   sheet?: boolean;
   /**
-   * The flow is a pushed screen (Android), not a sheet. Leaving a pushed
-   * screen is going back, so its first screen shows the arrow too; an X says
-   * "dismiss this sheet". Selectors and labels are unchanged either way.
+   * The flow is a pushed screen (Android, and Settings everywhere), not a
+   * sheet. Leaving a pushed screen is going back, so its first screen shows
+   * the arrow too; an X says "dismiss this sheet". Selectors and labels are
+   * unchanged either way.
    */
   pushed: boolean;
 }) {
@@ -119,7 +120,7 @@ export const MINT_SELECT_SCREEN_OPTIONS: NativeStackNavigationOptions = {
  * Screen options for a flow stack, for Stack's `screenOptions`: the shared
  * header, with the close button on the first screen and back after it.
  */
-const createFlowLayoutScreenOptions = (colors: FlowColors) => {
+const createFlowLayoutScreenOptions = (colors: FlowColors, pushedEverywhere: boolean) => {
   return ({
     navigation,
     route,
@@ -137,7 +138,7 @@ const createFlowLayoutScreenOptions = (colors: FlowColors) => {
       headerLeft: () => (
         <FlowHeaderButton
           isFirstScreen={isFirstScreen}
-          pushed={Platform.OS === 'android'}
+          pushed={pushedEverywhere || Platform.OS === 'android'}
           sheet={Platform.OS === 'ios' && !isFirstScreen && IOS_SHEET_SCREENS.has(route.name)}
         />
       ),
@@ -148,12 +149,16 @@ const createFlowLayoutScreenOptions = (colors: FlowColors) => {
 /**
  * The stack a flow group's `_layout` renders: themed, with the shared header.
  * Route modules supply only their Stack.Screen declarations.
+ *
+ * `pushed`: the group is a pushed page on every platform (`slideFromRight` in
+ * config/modalScreens.ts — Settings), never an iPhone sheet, so its first
+ * screen goes back with the arrow instead of closing with the X.
  */
-export function FlowStack({ children }: { children: ReactNode }) {
+export function FlowStack({ children, pushed = false }: { children: ReactNode; pushed?: boolean }) {
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
-    [foreground, background]
+    () => createFlowLayoutScreenOptions({ foreground, background }, pushed),
+    [foreground, background, pushed]
   );
   return <Stack screenOptions={screenOptions}>{children}</Stack>;
 }

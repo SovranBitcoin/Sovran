@@ -1,4 +1,8 @@
 import { estimatedTransferFee } from '@/features/mint/components/rebalance/transferFee';
+import {
+  registerAccountScoped,
+  registerProfileSwitchService,
+} from '@/shared/lib/account/accountRegistry';
 import type { SwapGroup, SwapLeg } from '@/shared/stores/profile/swapTransactionsStore';
 
 /**
@@ -19,6 +23,38 @@ type SwapGroupPhase = 'running' | 'interrupted' | 'finished' | 'cancelled';
 
 /** Group id → how many holds this process has on it. */
 const owners = new Map<string, number>();
+let session = new AbortController();
+const pendingTrustChanges = new Set<Promise<unknown>>();
+
+// Abort observers and stop issuing work before Coco closes.
+registerProfileSwitchService('wallet.swap-runs', async () => {
+  session.abort();
+  await Promise.allSettled(pendingTrustChanges);
+});
+registerAccountScoped(
+  'wallet.swap-group-phase',
+  () => {
+    session.abort();
+    owners.clear();
+    session = new AbortController();
+  },
+  () => owners.size === 0
+);
+
+export function swapGroupSessionSignal(): AbortSignal {
+  return session.signal;
+}
+
+// The engine's mint-swap operations are drained by Coco. Trust changes
+// go through the mint API and must be joined here before its database closes.
+export async function trackSwapTrustChange<T>(change: Promise<T>): Promise<T> {
+  pendingTrustChanges.add(change);
+  try {
+    return await change;
+  } finally {
+    pendingTrustChanges.delete(change);
+  }
+}
 
 /**
  * Mark a swap group as owned by a live run until the returned release is
@@ -26,9 +62,10 @@ const owners = new Map<string, number>();
  */
 export function holdSwapGroup(groupId: string): () => void {
   owners.set(groupId, (owners.get(groupId) ?? 0) + 1);
+  const signal = swapGroupSessionSignal();
   let held = true;
   return () => {
-    if (!held) return;
+    if (!held || signal.aborted) return;
     held = false;
     const remaining = (owners.get(groupId) ?? 1) - 1;
     if (remaining > 0) owners.set(groupId, remaining);

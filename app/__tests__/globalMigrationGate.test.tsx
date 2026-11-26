@@ -96,7 +96,7 @@ it('migrates, then opens storage, then mounts the app, and lets the splash go', 
   await act(async () => finish());
 
   expect(mockEvents).toEqual(['migrating', 'storage opened', 'app mounted']);
-  expect(state).toEqual({ isInitializing: false, hasFailedStage: false });
+  expect(state).toEqual({ isInitializing: false, hasFailedStage: false, profileSwitchHeld: false });
   expect(mockMigrate).toHaveBeenCalledTimes(1);
 });
 
@@ -113,7 +113,7 @@ it('on failure opens nothing and shows the storage retry; a retry that succeeds 
   expect(mockMigrate).toHaveBeenCalledTimes(2);
   expect(mockEvents).toEqual(['storage opened', 'app mounted']);
   expect(failed()).toHaveLength(0);
-  expect(state).toEqual({ isInitializing: false, hasFailedStage: false });
+  expect(state).toEqual({ isInitializing: false, hasFailedStage: false, profileSwitchHeld: false });
 });
 
 it('a retry under way clears the failed stage before the run settles', async () => {
@@ -126,7 +126,7 @@ it('a retry under way clears the failed stage before the run settles', async () 
 
   await act(async () => failed()[0]!.props.onRetry());
 
-  expect(state).toEqual({ isInitializing: true, hasFailedStage: false });
+  expect(state).toEqual({ isInitializing: true, hasFailedStage: false, profileSwitchHeld: false });
   expect(renderer.toJSON()).toBeNull();
   await act(async () => finish());
 });

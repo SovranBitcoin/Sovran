@@ -80,6 +80,9 @@ function setup() {
       { accountIndex: 1, pubkey: 'b'.repeat(64), addedAt: 2 },
     ],
   });
+  const { useSettingsStore } =
+    require('@/shared/stores/global/settingsStore') as typeof import('@/shared/stores/global/settingsStore');
+  useSettingsStore.getState().setRestartOnProfileSwitch(true);
   (AsyncStorage.setItem as jest.Mock).mockClear();
   return {
     switchToExistingProfile: orchestrator.switchToExistingProfile,

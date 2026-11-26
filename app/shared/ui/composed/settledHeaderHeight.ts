@@ -70,7 +70,10 @@ export function useSettledHeaderHeight(navigatorHeight: number): number {
   const firstValue = useRef(navigatorHeight);
   const [released, setReleased] = useState(false);
   const reached = navigatorHeight === remembered;
-  const overriding = remembered !== undefined && !reached && !released;
+  // A page that hides its header reports 0 (the design-system prompt preview
+  // in the settings stack): there is no native header to wait for, and the
+  // stack's remembered height would pad it for 3s, then jump.
+  const overriding = remembered !== undefined && navigatorHeight > 0 && !reached && !released;
 
   // Only a change after mount is the native header reporting in; the
   // navigator's first value is its own guess.

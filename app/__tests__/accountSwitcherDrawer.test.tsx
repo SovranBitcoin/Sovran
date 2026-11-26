@@ -6,12 +6,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import {
-  accountHandle,
-  accountsCountLabel,
-  formatCachedBalance,
-  UNKNOWN_BALANCE,
-} from '@/navigation/accountSwitcher';
+import { accountHandle, formatCachedBalance, UNKNOWN_BALANCE } from '@/navigation/accountSwitcher';
 
 import { AccountRow } from '@/navigation/AccountRow';
 import { AccountSwitcherDrawer } from '@/navigation/AccountSwitcherDrawer';
@@ -147,8 +142,8 @@ jest.mock('@/shared/ui/primitives/Text', () => {
 jest.mock('@/shared/ui/primitives/View/View', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
   return {
-    View: ({ children }: { children: import('react').ReactNode }) =>
-      createElement('View', null, children),
+    View: ({ children, ...props }: { children: import('react').ReactNode }) =>
+      createElement('View', props, children),
   };
 });
 jest.mock('@/shared/ui/primitives/Pressable', () => {
@@ -183,17 +178,11 @@ describe('account row wording', () => {
     expect(accountHandle(undefined)).toBeNull();
     expect(accountHandle('')).toBeNull();
   });
-
-  it('counts accounts', () => {
-    expect(accountsCountLabel(1)).toBe('1 account');
-    expect(accountsCountLabel(3)).toBe('3 accounts');
-  });
 });
 
 describe('AccountSwitcherDrawer', () => {
   it('lists every account with its balance and checks only the active one', () => {
     renderDrawer();
-    expect(screen.getByText('3 accounts')).toBeTruthy();
     expect(screen.getByText('2,100 sats')).toBeTruthy();
     expect(screen.getByText(UNKNOWN_BALANCE)).toBeTruthy();
     expect(screen.getByText('0 sats')).toBeTruthy();
@@ -205,6 +194,26 @@ describe('AccountSwitcherDrawer', () => {
     expect(screen.getByTestId('drawer-profile-switch-77').props.accessibilityState).toMatchObject({
       selected: false,
     });
+  });
+
+  it('opens straight on the accounts, with no title or count above them', () => {
+    renderDrawer();
+    expect(screen.queryByText('Accounts')).toBeNull();
+    expect(screen.queryByText(/\d+ accounts?$/)).toBeNull();
+  });
+
+  it('draws Add and Import as tinted rounded buttons, not avatar-like circles', () => {
+    renderDrawer();
+    for (const id of ['drawer-add-account', 'drawer-import-account']) {
+      const surface = screen.getByTestId(`${id}-surface`);
+      expect(surface.props.className).toContain('bg-default');
+      expect(surface.props.className).toContain('rounded-2xl');
+      expect(surface.props.className).not.toContain('rounded-full');
+    }
+    expect(screen.getByText('Add account')).toBeTruthy();
+    expect(screen.getByText('Import account')).toBeTruthy();
+    expect(screen.getByTestId('icon:la:user-plus')).toBeTruthy();
+    expect(screen.getByTestId('icon:mdi:key-variant')).toBeTruthy();
   });
 
   it('only closes the drawer when the active account is tapped', () => {

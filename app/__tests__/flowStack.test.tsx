@@ -34,11 +34,11 @@ jest.mock('@/navigation/headerItems', () => ({
   withGlassHeaderItems: (options: Record<string, unknown>) => options,
 }));
 
-function optionsAt(index: number, name = 'example') {
+function optionsAt(index: number, name = 'example', pushed = false) {
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
-      <FlowStack>
+      <FlowStack pushed={pushed}>
         <Stack.Screen name={name} />
       </FlowStack>
     );
@@ -91,6 +91,20 @@ describe.each(['ios', 'android'] as const)('FlowStack on %s', (os) => {
     expect(next).toMatchObject({
       testID: 'flow-header-back',
       icon: 'material-symbols:arrow-back-rounded',
+    });
+  });
+
+  it('goes back from the first screen of a pushed flow (Settings), keeping its selectors', () => {
+    const first = headerButton(optionsAt(0, 'design-system', true));
+    expect(first).toMatchObject({
+      testID: 'flow-header-close',
+      icon: 'material-symbols:arrow-back-rounded',
+    });
+    const next = headerButton(optionsAt(1, 'design-system-ui-kit', true));
+    expect(next).toMatchObject({
+      testID: 'flow-header-back',
+      icon: 'material-symbols:arrow-back-rounded',
+      accessibilityLabel: 'Go back',
     });
   });
 });

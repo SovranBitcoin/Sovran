@@ -391,8 +391,7 @@ export function previewStep(
   ctx: FlowContext,
   at: { mintUrl: string; amount: number; unit: string },
 ):
-  | StepResult<"navigateToMeltPreview">
-  | StepResult<"navigateToPaymentRequest"> {
+  StepResult<"navigateToMeltPreview"> | StepResult<"navigateToPaymentRequest"> {
   const { mintUrl, amount, unit } = at;
   const recipient = {
     recipientPubkey: ctx.recipientPubkey,
@@ -554,6 +553,7 @@ export function resolveNext(
             recipientPubkey: undefined,
             recipientProfile: undefined,
             meltTarget: undefined,
+            meltTargetIsNpcFallback: undefined,
             meltQuoteMethod: undefined,
             paymentRequest: undefined,
           },
@@ -713,6 +713,7 @@ export function resolveNext(
             supportedMintUrls,
             paymentRequest: ctx.paymentRequest,
             meltTarget: ctx.meltTarget,
+            meltTargetIsNpcFallback: ctx.meltTargetIsNpcFallback,
             methodContext: createAmountEntryMethodContext(walletCtx),
             // Carry recipient identity onto the amount-entry constraints so the
             // scan-LA flow (EXECUTE → resolveNext → enterAmount) reaches the

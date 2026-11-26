@@ -10,7 +10,6 @@ import { parseNostrProfileFor, type NostrProfileFull } from '@/shared/lib/apiCli
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { tryNpubEncode } from '@/shared/lib/nostr/nostrBech32';
-import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import {
   cacheProfileStats,
   fetchFollowingCountViaFacade,
@@ -52,6 +51,7 @@ function profileFullFromStats(
     ...(m?.nip05 ? { nip05: m.nip05 } : {}),
     ...(m?.website ? { website: m.website } : {}),
     ...(m?.lud16 ? { lud16: m.lud16 } : {}),
+    ...(m?.lud06 ? { lud06: m.lud06 } : {}),
   };
 }
 
@@ -282,7 +282,6 @@ export function useNostrProfile(
     if (signal.aborted) return;
     let counting: Promise<void> = Promise.resolve();
     if (stats) {
-      recordDebugTiers([pubkey], stats.tier);
       const data = profileFullFromStats(pubkey, stats);
       settle(data);
       done(stats.tier === 'cache' ? 'cache' : stats.tier, !!stats.provenance?.degraded);

@@ -11,13 +11,13 @@
 // ---------------------------------------------------------------------------
 
 import { getTokenMetadata } from '@cashu/cashu-ts';
-import { operationHistoryId } from '@cashu/coco-core';
+import { operationHistoryId, projectReceiveOperation } from '@cashu/coco-core';
 import type {
+  FinalizedReceiveOperation,
   HistoryEntry,
   LegacyMintHistoryEntry,
   Manager,
   MintHistoryEntry,
-  ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 
 import { amountToNumber, type AmountValue } from '../amount';
@@ -40,8 +40,6 @@ interface ReceiveDeps {
   verifyOfflineReceive: (manager: Manager, prepared: PreparedReceive) => Promise<void>;
   /** What the person is told while a receive waits for the mint. */
   pendingMessage: string;
-  /** An id for a history entry that Coco's history never produced. */
-  newLocalId: (prefix: string) => string;
 }
 
 /** What a prepared mint quote has to carry for its history entry. */
@@ -85,47 +83,19 @@ function isRecoverableReceiveError(err: unknown): boolean {
   return kind === 'network' || kind === 'retryable';
 }
 
-async function findReceiveHistoryEntryForOperation(
-  manager: Manager,
-  operationId: string,
-  mintUrl: string,
-  beforeIds: Set<string>
-): Promise<ReceiveHistoryEntry | null> {
-  const direct = await manager.history.getHistoryEntryById(
-    operationHistoryId('receive', operationId)
-  );
-  if (direct?.type === 'receive') return direct as ReceiveHistoryEntry;
-
-  // This operation's own row wins wherever it sits in the page; a row that is
-  // merely new since the snapshot is the fallback.
-  const after = await manager.history.getPaginatedHistory(0, 100);
-  const fromMint = after.filter(
-    (h): h is ReceiveHistoryEntry => h.type === 'receive' && h.mintUrl === mintUrl
-  );
-  return (
-    fromMint.find((h) => h.operationId === operationId) ??
-    fromMint.find((h) => !beforeIds.has(h.id)) ??
-    null
-  );
-}
-
 async function waitForReceiveHistoryEntry(
   manager: Manager,
   operationId: string,
   mintUrl: string,
-  beforeIds: Set<string>
-): Promise<ReceiveHistoryEntry | null> {
+) {
   const MAX_ATTEMPTS = 50; // ~10s of polling at 200ms intervals
   const DELAY_MS = 200;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      const entry = await findReceiveHistoryEntryForOperation(
-        manager,
-        operationId,
-        mintUrl,
-        beforeIds
+      const entry = await manager.history.getHistoryEntryById(
+        operationHistoryId('receive', operationId)
       );
-      if (entry) {
+      if (entry?.type === 'receive' && entry.operationId === operationId) {
         logger.info('payment.execute_receive.found', {
           ...mintUrlFields(mintUrl),
           realId: entry.id,
@@ -175,41 +145,22 @@ function buildPendingReceiveEntry(
   };
 }
 
-function buildFallbackFinalizedReceiveEntry(
-  tokenString: string,
-  mintUrl: string,
-  amount: number,
-  newLocalId: ReceiveDeps['newLocalId'],
-  operationId?: string
+async function finalizedReceiveResult(
+  manager: Manager,
+  operation: FinalizedReceiveOperation,
+  hadP2PKProofs: boolean
 ) {
-  let tokenAmount = amount;
-  let tokenUnit = 'sat';
-  try {
-    const metadata = getTokenMetadata(tokenString);
-    tokenAmount = amountToNumber(metadata.amount);
-    tokenUnit = metadata.unit ?? 'sat';
-  } catch (error) {
-    logger.warn('payment.execute_receive.fallback_decode_failed', {
-      ...mintUrlFields(mintUrl),
-      operationId: operationId ?? null,
-      tokenLength: tokenString.length,
-      error: error instanceof Error ? error.message : String(error),
+  const entry = await waitForReceiveHistoryEntry(manager, operation.id, operation.mintUrl);
+  if (!entry) {
+    logger.warn('payment.execute_receive.history_unavailable', {
+      ...mintUrlFields(operation.mintUrl),
+      operationId: operation.id,
     });
   }
-  const now = Date.now();
   return {
-    id: newLocalId('redeemed'),
-    type: 'receive' as const,
-    source: 'legacy' as const,
-    legacyHistoryId: newLocalId('redeemed'),
-    createdAt: now,
-    updatedAt: now,
-    mintUrl,
-    unit: tokenUnit,
-    amount: tokenAmount,
-    state: 'finalized',
-    ...(operationId ? { operationId } : {}),
-    metadata: { rawToken: tokenString, ...(operationId ? { operationId } : {}) },
+    status: 'finalized' as const,
+    historyEntry: JSON.stringify(entry ?? projectReceiveOperation(operation)),
+    hadP2PKProofs,
   };
 }
 
@@ -229,7 +180,8 @@ function buildFallbackFinalizedReceiveEntry(
  * The fix is to use Coco receive ops directly. If the operation reaches
  * `executing` and the mint/network is unreachable, we return Colada's
  * pending result so the screen can wait for recovery. If it finalizes
- * immediately, we still poll Coco history and use its real persisted id.
+ * immediately, we look up its exact history row. If the read is unavailable,
+ * Coco projects the same row from the finalized operation.
  */
 export function createExecuteReceive(
   deps: ReceiveDeps
@@ -240,25 +192,6 @@ export function createExecuteReceive(
     if (!manager) {
       logger.error('payment.execute_receive.no_manager');
       throw new Error('Wallet manager is not available');
-    }
-
-    // Snapshot existing receive ids for this mint so we can identify the
-    // newly-persisted entry by set difference after the receive completes.
-    let beforeIds: Set<string>;
-    try {
-      const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
-      beforeIds = new Set(
-        (beforeHistory as readonly Record<string, unknown>[])
-          .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
-          .map((h) => (typeof h.id === 'string' ? h.id : ''))
-          .filter((id) => id.length > 0)
-      );
-    } catch (e) {
-      logger.warn('payment.execute_receive.snapshot_failed', {
-        ...mintUrlFields(mintUrl),
-        error: e instanceof Error ? e.message : String(e),
-      });
-      beforeIds = new Set();
     }
 
     // P2PK detection — preserved from coco's default so the downstream
@@ -279,7 +212,6 @@ export function createExecuteReceive(
 
     logger.info('payment.execute_receive.start', {
       ...mintUrlFields(mintUrl),
-      beforeCount: beforeIds.size,
       tokenLength: tokenString.length,
       hadP2PKProofs,
       expectedNext: 'prepare_receive_operation',
@@ -311,48 +243,11 @@ export function createExecuteReceive(
         state: finalized.state,
         expectedNext: 'history_entry_link',
       });
-      const entry = await waitForReceiveHistoryEntry(
-        manager,
-        finalized.id,
-        finalized.mintUrl,
-        beforeIds
-      );
-      if (entry) {
-        logger.info('payment.execute_receive.finalized', {
-          ...mintUrlFields(entry.mintUrl),
-          operationId: finalized.id,
-          receiveEntryId: entry.id,
-          hadP2PKProofs,
-          expectedNext: 'colada_receive_success',
-        });
-        return {
-          status: 'finalized',
-          historyEntry: JSON.stringify(entry),
-          hadP2PKProofs,
-        };
-      }
-
-      logger.error('payment.execute_receive.timeout_fallback', {
-        ...mintUrlFields(mintUrl),
-        operationId: finalized.id,
-        polledMs: 10_000,
-      });
-      const fallbackEntry = buildFallbackFinalizedReceiveEntry(
-        tokenString,
-        finalized.mintUrl,
-        amountToNumber(finalized.amount),
-        deps.newLocalId,
-        finalized.id
-      );
-      return {
-        status: 'finalized',
-        historyEntry: JSON.stringify(fallbackEntry),
-        hadP2PKProofs,
-      };
+      return finalizedReceiveResult(manager, finalized, hadP2PKProofs);
     } catch (err) {
-      let latest: ReceiveOperationLike | null = null;
+      let latest: Awaited<ReturnType<Manager['ops']['receive']['get']>> = null;
       try {
-        latest = (await manager.ops.receive.get(prepared.id)) as ReceiveOperationLike | null;
+        latest = await manager.ops.receive.get(prepared.id);
       } catch (getErr) {
         logger.warn('payment.execute_receive.get_after_error_failed', {
           operationId: prepared.id,
@@ -361,26 +256,7 @@ export function createExecuteReceive(
       }
 
       if (latest?.state === 'finalized') {
-        const entry = await waitForReceiveHistoryEntry(
-          manager,
-          latest.id,
-          latest.mintUrl,
-          beforeIds
-        );
-        if (entry) {
-          logger.info('payment.execute_receive.finalized_after_error', {
-            ...mintUrlFields(entry.mintUrl),
-            operationId: latest.id,
-            receiveEntryId: entry.id,
-            hadP2PKProofs,
-            expectedNext: 'colada_receive_success',
-          });
-          return {
-            status: 'finalized',
-            historyEntry: JSON.stringify(entry),
-            hadP2PKProofs,
-          };
-        }
+        return finalizedReceiveResult(manager, latest, hadP2PKProofs);
       }
 
       if (latest?.state === 'executing' && isRecoverableReceiveError(err)) {
@@ -397,7 +273,12 @@ export function createExecuteReceive(
           expectedNext: 'coco_recovery_then_success_toast',
           error: err instanceof Error ? err.message : String(err),
         });
-        const pendingEntry = buildPendingReceiveEntry(latest, tokenString, mintUrl, _amount);
+        const pendingEntry = buildPendingReceiveEntry(
+          latest,
+          tokenString,
+          mintUrl,
+          _amount,
+        );
         return {
           status: 'pending',
           operationId: latest.id,

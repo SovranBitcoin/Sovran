@@ -482,7 +482,7 @@ function ActionMenuInstance({
         // Pad by the pinned footer's height, or clear the home indicator.
         <View
           style={{
-            paddingBottom: hasFooter ? contentBottomInset : insets.bottom + 12,
+            paddingBottom: hasFooter ? contentBottomInset : insets.bottom + 20,
           }}>
           {labelNode}
           {headerNode}

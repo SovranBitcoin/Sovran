@@ -72,6 +72,56 @@ const MAX_PLACE_DETAILS_ENTRIES = 200;
 
 const BTCMAP_BASE_URL = 'https://api.btcmap.org/v4';
 
+// BTCMap v4 omits every attribute except `id` unless requested via `?fields=`.
+// Deliberately omit `deleted_at` from the list query so v4 returns active places only,
+// and omit unused `comments`/`boosted_until` to keep the ~30k-row payload lean.
+const BTCMAP_PLACES_FIELDS = ['id', 'lat', 'lon', 'icon', 'updated_at'].join(',');
+
+const BTCMAP_PLACE_DETAILS_FIELDS = [
+  'id',
+  'lat',
+  'lon',
+  'icon',
+  'updated_at',
+  'name',
+  'address',
+  'description',
+  'phone',
+  'website',
+  'twitter',
+  'facebook',
+  'instagram',
+  'email',
+  'opening_hours',
+  'created_at',
+  'verified_at',
+  'osm_id',
+  'osm_url',
+  'required_app_url',
+  'osm:contact:instagram',
+  'osm:contact:twitter',
+  'osm:contact:facebook',
+  'osm:contact:phone',
+  'osm:contact:website',
+  'osm:contact:email',
+  'osm:payment:onchain',
+  'osm:payment:lightning',
+  'osm:payment:lightning_contactless',
+  'osm:payment:bitcoin',
+  'osm:payment:uri',
+  'osm:payment:coinos',
+  'osm:payment:pouch',
+  'osm:amenity',
+  'osm:category',
+  'osm:survey:date',
+  'osm:check_date',
+  'osm:check_date:currency:XBT',
+].join(',');
+
+export const BTCMAP_PLACES_URL = `${BTCMAP_BASE_URL}/places?fields=${BTCMAP_PLACES_FIELDS}`;
+export const btcMapPlaceDetailsUrl = (id: number) =>
+  `${BTCMAP_BASE_URL}/places/${id}?fields=${BTCMAP_PLACE_DETAILS_FIELDS}`;
+
 function isCacheExpired(timestampMs: number, ttlMs: number, nowMs: number): boolean {
   return nowMs - timestampMs > ttlMs;
 }
@@ -178,7 +228,7 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
 
         const run = async (): Promise<BtcMapPlace[]> => {
           const result = await fetchJson(
-            `${BTCMAP_BASE_URL}/places`,
+            BTCMAP_PLACES_URL,
             parsePlaces,
             'app/btcmap/places',
             undefined,
@@ -249,7 +299,7 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
         const startTime = performance.now();
 
         const result = await fetchJson(
-          `${BTCMAP_BASE_URL}/places/${id}`,
+          btcMapPlaceDetailsUrl(id),
           parsePlaceDetails,
           'app/btcmap/places/:id',
           undefined,

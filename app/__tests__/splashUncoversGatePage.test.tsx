@@ -12,7 +12,12 @@ import { act, render, screen } from '@testing-library/react-native';
 import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
 import { initializationStages } from '@/runtime/initializationStages';
 import { log } from '@/shared/lib/logger';
-import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
+import {
+  getBootMorphCompleted,
+  getBootSplashHandoff,
+  setQRButtonAnchor,
+  useShownInsteadOfWallet,
+} from '@/shared/lib/qrButtonAnchor';
 
 jest.mock('expo-splash-screen', () => ({ hideAsync: jest.fn(async () => true) }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
@@ -48,6 +53,7 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
   });
 
   afterEach(() => {
+    setQRButtonAnchor(null);
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
@@ -88,9 +94,28 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
     screen.unmount();
     render(gate('second'));
     expect(overlayMounted()).toBe(true);
+    expect(getBootMorphCompleted()).toBe(false);
+    expect(getBootSplashHandoff()).toBe(false);
     layOutRoot();
     act(() => jest.advanceTimersByTime(1000));
     expect(overlayMounted()).toBe(false);
+  });
+
+  it('morphs once the wallet publishes its QR anchor and signals completion after docking', () => {
+    render(<NativeSplashLayoutGate>{null}</NativeSplashLayoutGate>);
+    layOutRoot();
+    act(() => {
+      setQRButtonAnchor({ x: 120, y: 350, width: 72, height: 72, borderRadius: 16 });
+    });
+    act(() => jest.advanceTimersByTime(600));
+
+    expect(getBootSplashHandoff()).toBe(true);
+    expect(getBootMorphCompleted()).toBe(false);
+    expect(splashGone()).toBe(false);
+
+    act(() => jest.advanceTimersByTime(800));
+    expect(getBootMorphCompleted()).toBe(true);
+    expect(info).toHaveBeenCalledWith('splash.gone', { by: 'morph' });
   });
 
   it('still waits for the wallet home when no such page is shown', () => {
@@ -149,4 +174,31 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
       act(() => initializationStages.cancelResetStages());
     }
   });
+});
+
+it('keeps the splash over the outgoing wallet until the switch releases it', () => {
+  jest.useFakeTimers();
+  const anchor = { x: 120, y: 350, width: 72, height: 72, borderRadius: 16 };
+  try {
+    render(<NativeSplashLayoutGate>{null}</NativeSplashLayoutGate>);
+    layOutRoot();
+    act(() => setQRButtonAnchor(anchor));
+    act(() => jest.advanceTimersByTime(600));
+    act(() => jest.advanceTimersByTime(800));
+    expect(getBootMorphCompleted()).toBe(true);
+
+    act(() => initializationStages.holdForProfileSwitch());
+    act(() => jest.advanceTimersByTime(9000));
+    expect(getBootSplashHandoff()).toBe(false);
+    expect(getBootMorphCompleted()).toBe(false);
+
+    act(() => initializationStages.cancelResetStages());
+    act(() => jest.advanceTimersByTime(600));
+    act(() => jest.advanceTimersByTime(800));
+    expect(getBootMorphCompleted()).toBe(true);
+  } finally {
+    act(() => initializationStages.cancelResetStages());
+    setQRButtonAnchor(null);
+    jest.useRealTimers();
+  }
 });

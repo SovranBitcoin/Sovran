@@ -121,6 +121,7 @@ export function createRebalanceStepSink({
   step,
   group,
   swapLegIds,
+  isCurrentSession,
   updateStepState,
   insertChainRows,
 }: {
@@ -132,6 +133,7 @@ export function createRebalanceStepSink({
   group: StartedGroup | null;
   /** Engine leg id → persisted swap leg id, shared across a run's retries. */
   swapLegIds: Record<string, string>;
+  isCurrentSession: () => boolean;
   updateStepState: (stepId: string, update: Partial<StepState>) => void;
   /** Show hop rows after `afterStepId`, which is marked skipped with `routingDetail`. */
   insertChainRows: (afterStepId: string, hopSteps: TransferStep[], routingDetail: string) => void;
@@ -158,6 +160,7 @@ export function createRebalanceStepSink({
 
   return {
     legOpened(legId, leg) {
+      if (!isCurrentSession()) return;
       chainByLeg[legId] = { chainId: leg.chainId, hopIndex: leg.chainHopIndex };
       const history = swapStore();
       if (!groupId || swapLegIds[legId] || !history) return;
@@ -166,6 +169,7 @@ export function createRebalanceStepSink({
       history.setLegStatus(groupId, swapLegId, { localStatus: 'pending' });
     },
     legUpdated(legId, update) {
+      if (!isCurrentSession()) return;
       updateStepState(legId, legUpdateToStepState(update));
       const swapLegId = swapLegIds[legId];
       const localStatus = update.status ? toSwapLegStatus(update.status) : null;
@@ -179,6 +183,7 @@ export function createRebalanceStepSink({
       );
     },
     swapPrepared(legId, operation) {
+      if (!isCurrentSession()) return;
       updateStepState(legId, { operationId: operation.id });
       const swapLegId = swapLegIds[legId];
       if (!groupId || !swapLegId) return;
@@ -211,15 +216,16 @@ export function createRebalanceStepSink({
         idPrefix: `auto-route-${stepId}-${index}`,
         makeId: mintLocalId,
       });
-      insertChainRows(
-        stepId,
-        hopSteps,
-        formatCandidateRoutingDetail({
-          routeIndex: index,
-          routeCount: count,
-          pathNames: route.pathNames,
-        })
-      );
+      if (isCurrentSession())
+        insertChainRows(
+          stepId,
+          hopSteps,
+          formatCandidateRoutingDetail({
+            routeIndex: index,
+            routeCount: count,
+            pathNames: route.pathNames,
+          })
+        );
       return { chainId, hopLegIds: hopSteps.map((hop) => hop.id) };
     },
   };

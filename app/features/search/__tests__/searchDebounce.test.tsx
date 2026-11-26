@@ -23,15 +23,12 @@ jest.mock('expo-router', () => {
   Stack.Screen = function Screen({ options }: { options: { headerTitle?: () => unknown } }) {
     return options.headerTitle ? options.headerTitle() : null;
   };
-  return { Stack, useNavigation: () => ({ dispatch: jest.fn() }) };
+  return { Stack };
 });
-jest.mock('expo-router/react-navigation', () => ({
-  DrawerActions: { openDrawer: () => ({ type: 'OPEN_DRAWER' }) },
-}));
 jest.mock('@/navigation/nativeTabs', () => ({
   buildExpoRouterHeaderOptions: ({ options }: { options: unknown }) => options,
 }));
-jest.mock('@/shared/blocks/HeaderProfileButton', () => ({ HeaderProfileButton: () => null }));
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { raw: {} } }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: readonly string[]) => tokens.map(() => 'rgb(0, 0, 0)'),
 }));

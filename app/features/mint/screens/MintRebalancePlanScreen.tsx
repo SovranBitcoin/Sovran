@@ -15,7 +15,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { useMints, useBalanceContext } from '@cashu/coco-react';
+import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { amountToNumber } from 'wallet/amount';
@@ -76,6 +76,20 @@ function PlanDoneCard({ title, subtitle }: { title: string; subtitle: string }) 
 
 export function MintRebalancePlanScreen() {
   useLifecycleLogger('MintRebalancePlanScreen');
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.rebalancePlan' });
+  const accountUnit = params?.unit?.toLowerCase() || 'sat';
+  if (toRealUnit(accountUnit) !== 'sat') {
+    return (
+      <Screen name="MintRebalancePlanScreen">
+        <Stack.Screen options={{ title: 'Rebalance plan', headerRight: () => null }} />
+        <Text className="p-4">Rebalancing is available for Bitcoin accounts only.</Text>
+      </Screen>
+    );
+  }
+  return <SatMintRebalancePlan key={accountUnit} accountUnit={accountUnit} />;
+}
+
+function SatMintRebalancePlan({ accountUnit }: { accountUnit: string }) {
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
     'foreground',
     'surface-tertiary',
@@ -86,21 +100,23 @@ export function MintRebalancePlanScreen() {
   const fgMuted = withAlpha(foreground, 0.5);
   const fgDim = withAlpha(foreground, 0.4);
 
-  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.rebalancePlan' });
-  // The route carries the ACCOUNT unit (`tusd` for a testnut split): it keys
-  // the distribution and picks the mint set, while coco moves the real unit.
-  const accountUnit = params?.unit?.toLowerCase() || 'sat';
-  const unit = toRealUnit(accountUnit);
-
+  const unit = 'sat';
+  const manager = useManager();
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();
   const liveBalances = liveBalanceCtx.byMintAndUnit;
   const keysetUnitsByMint = useMintKeysetUnits();
   const isTestnutMint = useIsTestnutMint();
+  const isInAccount = useCallback(
+    (mintUrl: string) => isTestnutMint(mintUrl) === isTestnutUnit(accountUnit),
+    [isTestnutMint, accountUnit]
+  );
   const { getMintInfo } = useMintManagement();
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, GetInfoResponse | null>>({});
+
+  const [destinationSupport, setDestinationSupport] = useState<Record<string, boolean>>({});
 
   // Narrow the selector to the per-unit slice. Returning the whole `distributions`
   // record made any write to any unit re-render this screen even though only the
@@ -116,10 +132,10 @@ export function MintRebalancePlanScreen() {
   const mintsForUnit = useMemo(() => {
     return trustedMints.filter(
       (mint) =>
-        isTestnutMint(mint.mintUrl) === isTestnutUnit(accountUnit) &&
+        isInAccount(mint.mintUrl) &&
         deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]).includes(unit)
     );
-  }, [trustedMints, unit, accountUnit, keysetUnitsByMint, isTestnutMint]);
+  }, [trustedMints, unit, keysetUnitsByMint, isInAccount]);
 
   const mintUrls = useMemo(() => mintsForUnit.map((m) => m.mintUrl), [mintsForUnit]);
 
@@ -130,12 +146,25 @@ export function MintRebalancePlanScreen() {
         trustedMintCount: trustedMints.length,
       });
       const results = await Promise.allSettled(
-        trustedMints.map((mint) =>
-          getMintInfo(mint.mintUrl).then(
-            (info) => [mint.mintUrl, info] as const,
-            () => [mint.mintUrl, mint.mintInfo || null] as const
-          )
-        )
+        trustedMints.map(async (mint) => {
+          const info = await getMintInfo(mint.mintUrl).catch(() => mint.mintInfo ?? null);
+          const capability =
+            info?.nuts?.[9]?.supported && info.nuts[20]?.supported
+              ? await manager.mint
+                  .checkPaymentMethodCapability({
+                    mintUrl: mint.mintUrl,
+                    operation: 'mint',
+                    method: 'bolt11',
+                    unit,
+                  })
+                  .catch(() => null)
+              : null;
+          return [
+            mint.mintUrl,
+            info,
+            capability?.supported === true && !capability.disabled,
+          ] as const;
+        })
       );
       if (cancelled) {
         paymentLog.info('mint.rebalance_plan.mint_info.load_stale', {
@@ -145,9 +174,11 @@ export function MintRebalancePlanScreen() {
         return;
       }
       const infoMap: Record<string, GetInfoResponse | null> = {};
+      const support: Record<string, boolean> = {};
       for (const r of results) {
         if (r.status === 'fulfilled') {
-          const [url, info] = r.value;
+          const [url, info, supported] = r.value;
+          support[url] = supported;
           infoMap[url] = info;
         }
       }
@@ -159,12 +190,13 @@ export function MintRebalancePlanScreen() {
         infoCount: Object.keys(infoMap).length,
       });
       setMintInfoMap(infoMap);
+      setDestinationSupport(support);
     };
     void loadMintInfo();
     return () => {
       cancelled = true;
     };
-  }, [trustedMints, getMintInfo]);
+  }, [trustedMints, getMintInfo, manager]);
 
   const computedPlan = useMemo(() => {
     const mintBalances = mintUrls.map((mintUrl) => ({
@@ -189,11 +221,20 @@ export function MintRebalancePlanScreen() {
   } = useMintRebalanceOrchestrator({
     unit,
     computedPlan,
+    isInAccount,
     trustedMints,
     mintInfoMap,
     middlemanRouting,
     minTransferThreshold,
   });
+
+  const blockedDestinations = computedPlan.steps.filter(
+    (step) => destinationSupport[step.toMintUrl] !== true
+  );
+  const canStart = blockedDestinations.length === 0;
+  const checkingDestinations = blockedDestinations.some(
+    (step) => destinationSupport[step.toMintUrl] === undefined
+  );
 
   const alreadyBalanced = useMemo(() => {
     return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, minTransferThreshold);
@@ -321,7 +362,9 @@ export function MintRebalancePlanScreen() {
                 text: 'Rebalance',
                 variant: 'primary' as const,
                 testID: 'rebalance-start',
+                disabled: !canStart,
                 onPress: async () => {
+                  if (!canStart) return;
                   paymentLog.info('mint.rebalance_plan.start_press', {
                     planStepCount: plan.steps.length,
                     totalAmount: plan.totalAmount,
@@ -361,6 +404,7 @@ export function MintRebalancePlanScreen() {
     );
   }, [
     alreadyBalanced,
+    canStart,
     plan.steps,
     plan.totalAmount,
     stepCounts,
@@ -445,6 +489,14 @@ export function MintRebalancePlanScreen() {
           </Text>
         </VStack>
       </View>
+
+      {runStatus === 'idle' && !canStart && (
+        <Text className="text-muted mx-4 my-2">
+          {checkingDestinations
+            ? 'Checking destination mint support…'
+            : 'A destination mint does not support Lightning minting with NUT-09 and NUT-20.'}
+        </Text>
+      )}
 
       {alreadyBalanced && (
         <PlanDoneCard

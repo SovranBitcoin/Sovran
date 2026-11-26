@@ -16,10 +16,7 @@ import type { Mint } from '@cashu/coco-core';
 
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { accountHolders } from '@/shared/lib/account/accountRegistry';
-import {
-  beginRecoverySuppression,
-  endRecoverySuppression,
-} from '@/shared/lib/cashu/recoverySuppression';
+import { beginRecoverySuppression } from '@/shared/lib/cashu/recoverySuppression';
 
 type Listener = () => void;
 function makeManager(name: string) {
@@ -207,7 +204,7 @@ describe('wallet events and adding or removing a mint', () => {
   it('during recovery, events are held and replayed as one reload when recovery ends', async () => {
     renderHook(() => useMintManagement());
     await flush();
-    beginRecoverySuppression();
+    const end = beginRecoverySuppression();
     try {
       await act(async () => {
         mockManager.emit('mint:added');
@@ -216,7 +213,7 @@ describe('wallet events and adding or removing a mint', () => {
       });
       expect(mockManager.mint.getAllTrustedMints).toHaveBeenCalledTimes(1);
     } finally {
-      await act(async () => endRecoverySuppression());
+      await act(async () => end());
     }
 
     expect(mockManager.mint.getAllTrustedMints).toHaveBeenCalledTimes(2);

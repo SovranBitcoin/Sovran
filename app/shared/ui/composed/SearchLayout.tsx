@@ -1,12 +1,16 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
-import { Stack, useNavigation } from 'expo-router';
-import { DrawerActions } from 'expo-router/react-navigation';
+import { Stack } from 'expo-router';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { getHeaderTitleWidthWithoutRight, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
-import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { runAfterNativeSearchDismiss } from '@/shared/ui/composed/search/nativeSearchDismiss';
+import {
+  getHeaderTitleWidthBesideRightButton,
+  HEADER_LAYOUT,
+} from '@/features/wallet/lib/walletHeader';
 
 // --- Context ---
 
@@ -30,6 +34,47 @@ export const useSearchContext = () => {
   return ctx;
 };
 
+// --- Close ---
+
+type SearchClose = {
+  /** Leaves Search for the tab it was opened from. */
+  close: () => void;
+  /** VoiceOver/TalkBack label naming where closing returns to. */
+  accessibilityLabel: string;
+};
+
+// Without a tab navigator above it (tests, a stray mount), close goes to Wallet.
+const WALLET_CLOSE: SearchClose = {
+  close: () => guardedRouter.raw.navigate('/(drawer)/(tabs)/index'),
+  accessibilityLabel: 'Close search. Returns to Wallet',
+};
+
+const SearchCloseContext = createContext<SearchClose>(WALLET_CLOSE);
+
+/** The tab navigator tells the Search header where its close button returns to. */
+export function SearchCloseProvider({
+  value,
+  children,
+}: {
+  value: SearchClose;
+  children: ReactNode;
+}) {
+  return <SearchCloseContext.Provider value={value}>{children}</SearchCloseContext.Provider>;
+}
+
+function SearchCloseButton() {
+  const { close, accessibilityLabel } = useContext(SearchCloseContext);
+  return (
+    <ScreenHeaderAction
+      icon="material-symbols:close-rounded"
+      accessibilityLabel={accessibilityLabel}
+      testID="search-close"
+      // An active iOS search controller is let go first, or the tab bar breaks.
+      onPress={() => runAfterNativeSearchDismiss(close)}
+    />
+  );
+}
+
 // --- Android header field (iOS uses the native header search bar) ---
 
 // The field emits every keystroke, like iOS's native bar: local results answer
@@ -43,8 +88,8 @@ function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?:
   return (
     <GlassSearchBar
       testID={testID}
-      // The tab has no right header button, so the field runs to the edge.
-      width={getHeaderTitleWidthWithoutRight(width)}
+      // Starts at the edge (no left button) and stops short of the close button.
+      width={getHeaderTitleWidthBesideRightButton(width)}
       height={HEADER_LAYOUT.BUTTON_HEIGHT}
       clearKey={clearKey}
       seedText={seedText}
@@ -74,10 +119,10 @@ type SearchLayoutProps = {
  * The field is always in the header. On iOS the page mounts the native
  * `Stack.SearchBar`, which iOS 26 joins to the tab bar's `role="search"` item;
  * on Android this layout puts the shared glass field in the title slot.
+ * The close button sits on the right, where iOS's Cancel sits while typing.
  */
 export function SearchLayout({ title, placeholder, searchTestID }: SearchLayoutProps) {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
-  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   const [clearKey, setClearKey] = useState(0);
   const [seedText, setSeedText] = useState('');
@@ -87,21 +132,20 @@ export function SearchLayout({ title, placeholder, searchTestID }: SearchLayoutP
     setClearKey((prev) => prev + 1);
   };
 
-  const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
-  const headerLeft = () => <HeaderProfileButton onPress={openDrawer} />;
+  const headerRight = () => <SearchCloseButton />;
 
   const androidField =
     Platform.OS === 'android'
       ? {
           headerTitle: () => <SearchBarTitle placeholder={placeholder} testID={searchTestID} />,
-          // Starts after the profile button and takes the width a right button would.
+          // Starts at the left edge; the close button takes the right.
           headerTitleAlign: 'left' as const,
         }
       : {};
 
   const screenOptions = buildExpoRouterHeaderOptions({
     iconColor: foreground,
-    headerLeft,
+    headerRight,
     options: {
       title,
       headerTitleStyle: { color: foreground },

@@ -26,18 +26,36 @@
 // Historical trigger: repeated TS2341/private-reach-in failures across mint-op
 // cleanup, migration, and reserved-proof paths. Keep future reach-ins here.
 
-import type { CoreProof, Manager } from '@cashu/coco-core';
+import {
+  CocoInitializationError,
+  Manager,
+  type CocoConfig,
+  type CoreProof,
+} from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
-import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
+import { cashuLog, initPhase, mintUrlLogFields } from '@/shared/lib/logger';
+
+import { reportCocoApiFailure } from './cocoFeedback';
+
+interface BackgroundOwner {
+  start(): Promise<void>;
+}
 
 interface ManagerInternals {
+  initPlugins(): Promise<void>;
+  mintOperationWatcher?: BackgroundOwner;
+  proofStateWatcher?: BackgroundOwner;
+  meltQuoteWatcher?: BackgroundOwner;
+  mintOperationProcessor?: BackgroundOwner;
+  meltSettlementProcessor?: BackgroundOwner;
+  mintSwapOperationProcessor?: BackgroundOwner;
   proofRepository: {
     getReservedProofs(): Promise<CoreProof[]>;
     getInflightProofs(mintUrls?: string[]): Promise<CoreProof[]>;
     getProofsBySecrets(mintUrl: string, secrets: string[]): Promise<CoreProof[]>;
   };
   proofService: {
-    getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
+    getReadyProofs(mintUrl: string, filter?: { units: string[] }): Promise<CoreProof[]>;
     setProofState(
       mintUrl: string,
       secrets: string[],
@@ -71,6 +89,64 @@ interface ManagerInternals {
 
 function internals(manager: Manager): ManagerInternals {
   return manager as unknown as ManagerInternals;
+}
+
+/**
+ * Coco 58abfae8 has one factory for local setup and network recovery. Its
+ * owner selection is fixed at construction, and disabling owners still runs
+ * startup recovery. Split the pinned startup sequence here so recovery and
+ * automatic claims can wait for Sovran's restore gate. Keep this adapter in
+ * sync with Manager.create and Manager.initialize when upgrading Coco.
+ */
+export async function openLocalCocoManager(config: CocoConfig): Promise<Manager> {
+  await initPhase('CocoManager.reposInit', () => config.repo.init());
+  const LocalManager = Manager as unknown as new (config: CocoConfig) => Manager;
+  const manager = new LocalManager(config);
+  try {
+    await internals(manager).initPlugins();
+    return manager;
+  } catch (error) {
+    try {
+      await manager.dispose();
+    } catch (cleanupError) {
+      throw new CocoInitializationError(
+        'Coco initialization failed and cleanup could not be confirmed',
+        'unconfirmed',
+        new AggregateError([error, cleanupError])
+      );
+    }
+    throw new CocoInitializationError('Coco initialization failed', 'confirmed', error);
+  }
+}
+
+/** Start Coco's existing owners and run its startup sweeps in upstream order. */
+export async function startCocoOperationRecovery(
+  manager: Manager,
+  isLive: () => boolean
+): Promise<void> {
+  const owners = internals(manager);
+  const run = async (name: string, work: () => Promise<unknown> | undefined) => {
+    if (!isLive()) return;
+    try {
+      await initPhase(`Coco-bg.${name}`, async () => work());
+    } catch (error) {
+      reportCocoApiFailure(name, error);
+    }
+  };
+
+  await run('reconcileLegacyMintQuotes', () => manager.reconcileLegacyMintQuotes());
+  await run('mintOperationWatcher.start', () => owners.mintOperationWatcher?.start());
+  await run('proofStateWatcher.start', () => owners.proofStateWatcher?.start());
+  await run('meltQuoteWatcher.start', () => owners.meltQuoteWatcher?.start());
+  await run('mintOperationProcessor.start', () => owners.mintOperationProcessor?.start());
+  await run('meltSettlementProcessor.start', () => owners.meltSettlementProcessor?.start());
+  await run('ops.send.recovery.run', () => manager.ops.send.recovery.run());
+  await run('ops.melt.recovery.run', () => manager.ops.melt.recovery.run());
+  await run('recoverPendingPaymentRequestReceiveAttempts', () =>
+    manager.recoverPendingPaymentRequestReceiveAttempts()
+  );
+  await run('recoverPendingMintOperations', () => manager.recoverPendingMintOperations());
+  await run('mintSwapOperationProcessor.start', () => owners.mintSwapOperationProcessor?.start());
 }
 
 function errorMessage(error: unknown): string {
@@ -137,12 +213,16 @@ export function getStoredProofsBySecrets(
 }
 
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */
-export async function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
+export async function getReadyProofs(
+  manager: Manager,
+  mintUrl: string,
+  filter?: { units: string[] }
+): Promise<CoreProof[]> {
   cashuLog.debug('cashu.manager_internals.ready_proofs.start', {
     ...mintUrlLogFields(mintUrl),
   });
   try {
-    const proofs = await internals(manager).proofService.getReadyProofs(mintUrl);
+    const proofs = await internals(manager).proofService.getReadyProofs(mintUrl, filter);
     cashuLog.debug('cashu.manager_internals.ready_proofs.done', {
       ...mintUrlLogFields(mintUrl),
       count: proofs.length,

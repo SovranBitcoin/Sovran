@@ -28,6 +28,7 @@ import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
 import type { DiscoverMint, MintInfoRow } from '@/shared/lib/apiClient';
+import { isKnownTestnutHost } from '@/shared/lib/cashu/knownTestnutHosts';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
@@ -126,26 +127,43 @@ export const useMintTestnutStore = create<MintTestnutState>({
 
 /** Synchronous, local-only verdict read for non-React callers. */
 export function isTestnutMint(mintUrl: string): boolean {
-  return (
-    ownEntry(useMintTestnutStore.getState().byMintUrl, normalizeMintUrlKey(mintUrl))?.testnut ===
-    true
-  );
+  const entry = ownEntry(useMintTestnutStore.getState().byMintUrl, normalizeMintUrlKey(mintUrl));
+  if (entry?.probedAt != null) return entry.testnut === true;
+  return entry?.testnut === true || isKnownTestnutHost(mintUrl);
 }
 
 /**
  * Reactive verdict predicate. Its identity changes only when the SET of
- * testnut mints changes, so it is safe as a memo / effect dependency.
+ * testnut/probed verdicts changes, so it is safe as a memo / effect dependency.
  */
 export function useIsTestnutMint(): (mintUrl: string) => boolean {
   const signature = useMintTestnutStore((state) =>
-    Object.keys(state.byMintUrl)
-      .filter((key) => state.byMintUrl[key].testnut)
+    Object.entries(state.byMintUrl)
+      .filter(([, entry]) => entry.testnut || entry.probedAt != null)
+      .map(([key, entry]) => `${key}:${entry.testnut ? 1 : 0}:${entry.probedAt != null ? 1 : 0}`)
       .sort()
       .join('\n')
   );
-  const testnutKeys = useMemo(() => new Set(signature ? signature.split('\n') : []), [signature]);
+  const entries = useMemo(() => {
+    const map = new Map<string, { testnut: boolean; probed: boolean }>();
+    if (!signature) return map;
+    for (const line of signature.split('\n')) {
+      const idx2 = line.lastIndexOf(':');
+      const idx1 = line.lastIndexOf(':', idx2 - 1);
+      const key = line.slice(0, idx1);
+      map.set(key, {
+        testnut: line.slice(idx1 + 1, idx2) === '1',
+        probed: line.slice(idx2 + 1) === '1',
+      });
+    }
+    return map;
+  }, [signature]);
   return useCallback(
-    (mintUrl: string) => testnutKeys.has(normalizeMintUrlKey(mintUrl)),
-    [testnutKeys]
+    (mintUrl: string) => {
+      const entry = entries.get(normalizeMintUrlKey(mintUrl));
+      if (entry?.probed) return entry.testnut;
+      return entry?.testnut === true || isKnownTestnutHost(mintUrl);
+    },
+    [entries]
   );
 }

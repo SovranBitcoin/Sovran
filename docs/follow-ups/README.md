@@ -203,7 +203,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F245](F245.md) | low | decision | Sweep 1: unreachable code, repeated work and leftovers listed for the owner |
 | [F246](F246.md) | high | device | Verify the decided payment and relay flows on iOS and Android |
 | [F247](F247.md) | medium | test | Expand declarative persistence cases beyond baseline field evidence |
-| [F248](F248.md) | medium | decision | Privacy policy points to a Settings media page the app no longer has |
 | [F250](F250.md) | high | device | Run the new tabs, Search tab and account drawer on iPhone and Android |
 | [F251](F251.md) | medium | device | Mint Info stats/header and Mint history states not yet seen on a device or covered by a native scenario |
 | [F252](F252.md) | medium | device | Look at the sectioned Search tab on both platforms and add its native scenario |

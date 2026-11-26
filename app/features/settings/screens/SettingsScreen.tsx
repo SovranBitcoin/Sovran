@@ -118,8 +118,8 @@ export const SettingsScreen = () => {
   const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
   const showTouches = useSettingsStore((state) => state.showTouches);
   const setShowTouches = useSettingsStore((state) => state.setShowTouches);
-  const inProcessProfileSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
-  const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
+  const restartOnProfileSwitch = useSettingsStore((state) => state.restartOnProfileSwitch);
+  const setRestartOnProfileSwitch = useSettingsStore((state) => state.setRestartOnProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const verboseLoggingEnabled = useSettingsStore((state) => state.verboseLoggingEnabled);
@@ -370,10 +370,10 @@ export const SettingsScreen = () => {
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
-                  title="Switch profiles without restart"
-                  testID="settings-in-process-profile-switch-toggle"
-                  isSelected={inProcessProfileSwitch}
-                  onSelectedChange={setInProcessProfileSwitch}
+                  title="Restart app on profile switch"
+                  testID="settings-restart-on-profile-switch-toggle"
+                  isSelected={restartOnProfileSwitch}
+                  onSelectedChange={setRestartOnProfileSwitch}
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem

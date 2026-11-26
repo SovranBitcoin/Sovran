@@ -1,17 +1,24 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { nsecEncode } from 'nostr-tools/nip19';
+import { getPublicKey } from 'nostr-tools/pure';
 import type { persistRegistry as Registry } from '@/shared/lib/persist/persistConfig';
 import type * as AccountRegistry from '@/shared/lib/account/accountRegistry';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
+jest.mock('@/shared/lib/nostr/accountIntegrity', () => ({
+  ...jest.requireActual('@/shared/lib/nostr/accountIntegrity'),
+  storedPhraseDerivesAccount: jest.fn(async () => true),
+}));
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   readSensitiveValue: jest.fn().mockResolvedValue(null),
   writeSensitiveValue: jest.fn().mockResolvedValue(undefined),
   retrieveMnemonic: jest.fn().mockResolvedValue(null),
   storeMnemonic: jest.fn(),
+  storeImportedNsec: jest.fn().mockResolvedValue(true),
   prepareSecureDataReset: jest.fn(),
   getMnemonic: jest.fn().mockResolvedValue(null),
   getNostrKeys: jest.fn().mockResolvedValue(null),
@@ -45,7 +52,11 @@ jest.mock('expo-secure-store', () => ({
 }));
 jest.mock('@/shared/lib/profile/appRestart', () => ({ restartApp: jest.fn(() => true) }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: { cleanup: jest.fn().mockResolvedValue(undefined), isReadyForCleanup: () => true },
+  CocoManager: {
+    cleanup: jest.fn().mockResolvedValue(undefined),
+    isReadyForCleanup: jest.fn(() => true),
+    getCleanupReadiness: jest.fn(() => ({ ready: true })),
+  },
 }));
 jest.mock('@/shared/lib/logger', () => {
   const noop = {
@@ -89,7 +100,11 @@ async function setup() {
   };
   const { liveStores, declaredStores, accountHolders } =
     require('@/shared/lib/account/accountRegistry') as typeof AccountRegistry;
-  const { switchToExistingProfile } = require('@/shared/lib/profile/profileSessionOrchestrator');
+  const {
+    switchToExistingProfile,
+    createAndSwitchProfile,
+    importAndSwitchProfile,
+  } = require('@/shared/lib/profile/profileSessionOrchestrator');
   const { restartApp } = require('@/shared/lib/profile/appRestart');
   const { CocoManager } = require('@/shared/lib/cashu/manager');
   const suspend = jest.fn().mockResolvedValue(undefined);
@@ -106,7 +121,6 @@ async function setup() {
     ],
   });
   scoped.signalMigrationsComplete();
-  useSettingsStore.setState({ inProcessProfileSwitch: true });
   return {
     storage,
     useProfileStore,
@@ -118,6 +132,8 @@ async function setup() {
     declaredStores,
     accountHolders,
     switchToExistingProfile,
+    createAndSwitchProfile,
+    importAndSwitchProfile,
     restartApp,
     CocoManager,
     suspend,
@@ -127,7 +143,7 @@ async function setup() {
 
 afterEach(() => jest.useRealTimers());
 
-it('loads old settings without the opt-in and tolerates an invalid field', async () => {
+it('still parses missing and invalid legacy fields', async () => {
   const { useSettingsStore, storage } = await setup();
   const options = useSettingsStore.persist.getOptions();
   const old = options.partialize(useSettingsStore.getInitialState());
@@ -140,6 +156,75 @@ it('loads old settings without the opt-in and tolerates an invalid field', async
     expect(useSettingsStore.getState().hasSeenOnboarding).toBe(true);
   }
 });
+
+it('switches in process after hydrating an upgrade with the old opt-in off', async () => {
+  const env = await setup();
+  const { asyncStorage } = require('./releaseFixtures/E20-0.1.4.upgraded.json');
+  const savedSettings = asyncStorage['settings-store'];
+  expect(savedSettings.state.inProcessProfileSwitch).toBe(false);
+  expect(savedSettings.state.restartOnProfileSwitch).toBeUndefined();
+  await env.storage.setItem('settings-store', JSON.stringify(savedSettings));
+  await env.useSettingsStore.persist.rehydrate();
+
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.CocoManager.cleanup).toHaveBeenCalledWith({ requireSuccess: true });
+  expect(env.useProfileStore.getState().activeAccountIndex).toBe(1);
+  expect(env.useSettingsStore.getState().restartOnProfileSwitch).toBe(false);
+  expect(env.resume).toHaveBeenCalledTimes(1);
+  expect(env.restartApp).not.toHaveBeenCalled();
+});
+
+it.each([false, true])('creates a profile with teardown failure = %s', async (fails) => {
+  const env = await setup();
+  if (fails) env.CocoManager.cleanup.mockRejectedValueOnce(new Error('close failed'));
+  const controls = { resetStages: jest.fn(), cancelResetStages: jest.fn() };
+  require('@/shared/lib/profile/profileTransition').registerTransitionControls(controls);
+  const pubkey = 'c'.repeat(64);
+
+  expect(await env.createAndSwitchProfile({ getKeysForAccount: async () => ({ pubkey }) })).toBe(
+    true
+  );
+  expect(controls.resetStages).toHaveBeenCalledWith({ keepStagesThatOutliveAccount: true });
+  expect(env.CocoManager.cleanup).toHaveBeenCalledWith({ requireSuccess: true });
+  expect(env.useProfileStore.getState().activeAccountIndex).toBe(fails ? 0 : 2);
+  expect(JSON.parse(await env.storage.getItem('profile-store')).state).toMatchObject({
+    activeAccountIndex: 2,
+    profiles: expect.arrayContaining([expect.objectContaining({ accountIndex: 2, pubkey })]),
+  });
+  expect(env.restartApp).toHaveBeenCalledTimes(fails ? 1 : 0);
+  expect(env.resume).toHaveBeenCalledTimes(fails ? 0 : 1);
+  expect(controls.cancelResetStages).toHaveBeenCalledTimes(fails ? 0 : 1);
+});
+
+it('imports a profile and releases the in-process transition', async () => {
+  const env = await setup();
+  const key = new Uint8Array(32).fill(7);
+  const pubkeyHex = getPublicKey(key);
+  const accountIndex = Number(BigInt(`0x${pubkeyHex}`) % 0x80000000n);
+  const nsec = nsecEncode(key);
+
+  expect(await env.importAndSwitchProfile({ accountIndex, pubkeyHex, nsec })).toBe('switching');
+  expect(env.useProfileStore.getState().activeAccountIndex).toBe(accountIndex);
+  expect(env.CocoManager.cleanup).toHaveBeenCalledWith({ requireSuccess: true });
+  expect(env.resume).toHaveBeenCalledTimes(1);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(await env.switchToExistingProfile({ accountIndex: 0 })).toBe(true);
+  expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+});
+
+it.each(['developer setting', 'stopped account'])(
+  'restarts when requested by the %s',
+  async (reason) => {
+    const env = await setup();
+    const fromStoppedAccount = reason === 'stopped account';
+    if (!fromStoppedAccount) env.useSettingsStore.getState().setRestartOnProfileSwitch(true);
+
+    expect(await env.switchToExistingProfile({ accountIndex: 1, fromStoppedAccount })).toBe(true);
+    expect(env.restartApp).toHaveBeenCalledTimes(1);
+    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(JSON.parse(await env.storage.getItem('profile-store')).state.activeAccountIndex).toBe(1);
+  }
+);
 
 it.each(['disposer', 'coco', 'rehydrate'] as const)(
   '%s failure restarts with no partial B session',
@@ -351,17 +436,29 @@ it('treats a swallowed storage rejection as failed hydration', async () => {
   expect(env.resume).not.toHaveBeenCalled();
 });
 
-it('keeps writes and providers held when the fallback restart is unavailable', async () => {
-  const env = await setup();
-  env.restartApp.mockReturnValue(false);
-  env.protocol.registerProfileSwitchService('unsafe-service', () => {
-    throw new Error('no teardown');
-  });
-  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(false);
-  expect(env.resume).not.toHaveBeenCalled();
-  await env.scoped.createProfileScopedStorage().setItem('held-canary', 'must not write');
-  expect(await env.storage.getItem(`held-canary:profile:${'a'.repeat(64)}`)).toBeNull();
-});
+it.each(['unavailable', 'throws'])(
+  'keeps the switch held when the fallback restart is %s',
+  async (failure) => {
+    const env = await setup();
+    if (failure === 'throws') {
+      env.restartApp.mockImplementation(() => {
+        throw new Error('reload failed');
+      });
+    } else {
+      env.restartApp.mockReturnValue(false);
+    }
+    const controls = { resetStages: jest.fn(), cancelResetStages: jest.fn() };
+    require('@/shared/lib/profile/profileTransition').registerTransitionControls(controls);
+    env.protocol.registerProfileSwitchService('unsafe-service', () => {
+      throw new Error('no teardown');
+    });
+    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+    expect(env.resume).not.toHaveBeenCalled();
+    expect(controls.cancelResetStages).not.toHaveBeenCalled();
+    await env.scoped.createProfileScopedStorage().setItem('held-canary', 'must not write');
+    expect(await env.storage.getItem(`held-canary:profile:${'a'.repeat(64)}`)).toBeNull();
+  }
+);
 
 it('reports leak locations without logging payloads', async () => {
   const env = await setup();
@@ -603,4 +700,32 @@ it('disposes a Nostr client started after quiescence has taken the service snaps
   expect(env.restartApp).not.toHaveBeenCalled();
   expect(seen.client?.disposed).toBe(true);
   expect(seen.client?.signer).toBeUndefined();
+});
+
+it('alerts the user to reopen when an in-process switch fallback cannot restart', async () => {
+  const env = await setup();
+  const { Alert } = require('react-native');
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  env.CocoManager.cleanup.mockRejectedValueOnce(new Error('close failed'));
+  env.restartApp.mockReturnValueOnce(false);
+
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+  expect(env.restartApp).toHaveBeenCalledTimes(1);
+  expect(alertSpy).toHaveBeenCalledWith(
+    'Restart Required',
+    'Please close and reopen the app to finish switching profiles.',
+    [{ text: 'OK' }]
+  );
+  alertSpy.mockRestore();
+});
+
+it('refuses createAndSwitchProfile up front while the wallet is not ready for cleanup', async () => {
+  const env = await setup();
+  env.CocoManager.isReadyForCleanup.mockReturnValueOnce(false);
+  const derive = jest.fn(async () => ({ pubkey: 'c'.repeat(64) }));
+
+  expect(await env.createAndSwitchProfile({ getKeysForAccount: derive })).toBe(false);
+  expect(derive).not.toHaveBeenCalled();
+  expect(env.CocoManager.cleanup).not.toHaveBeenCalled();
+  expect(env.useProfileStore.getState().profiles).toHaveLength(2);
 });

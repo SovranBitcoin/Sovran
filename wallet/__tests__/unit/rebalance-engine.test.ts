@@ -320,6 +320,43 @@ describe('createRebalanceEngine (Coco ops.mintSwap)', () => {
     expect(wallet.mintSwap.execute).not.toHaveBeenCalled();
   });
 
+  it('keeps the prepared parent pending when execute and lookup both fail', async () => {
+    const wallet = makeWallet({
+      mintSwap: {
+        execute: vi.fn().mockRejectedValue(new Error('execute response lost')),
+        get: vi.fn().mockRejectedValue(new Error('lookup unavailable')),
+      },
+    });
+    const { sink, prepared, updates } = makeSink();
+    const findRoutes = vi.fn(async () => []);
+    const engine = createRebalanceEngine({
+      wallet: wallet.port,
+      findRoutes,
+      trustedMintUrls: new Set([MINT_A, MINT_B]),
+      minTransferThreshold: 10,
+      minFeeReserve: 2,
+      lock: createRebalanceLock(),
+      clock: makeClock(),
+    });
+
+    const outcome = await engine.executeTransfer(step(), {
+      isActive: () => true,
+      sink,
+    });
+    const parentId = prepared[0]?.op.id;
+
+    expect(parentId).toBeTruthy();
+    expect(outcome).toEqual({ status: 'pending', operationId: parentId });
+    expect(updates.at(-1)?.update).toMatchObject({
+      status: 'paymentPending',
+      operationId: parentId,
+    });
+    expect(wallet.mintSwap.get).toHaveBeenCalledWith(parentId);
+    expect(wallet.mintSwap.prepare).toHaveBeenCalledTimes(1);
+    expect(wallet.mintSwap.execute).toHaveBeenCalledTimes(1);
+    expect(findRoutes).not.toHaveBeenCalled();
+  });
+
   it('returns pending (paymentPending) when source_pending times out in waitForOutcome', async () => {
     const wallet = makeWallet({
       mintSwap: {

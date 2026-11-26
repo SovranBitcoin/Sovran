@@ -30,7 +30,7 @@ describe('Android flow presentation', () => {
     ]);
     for (const group of groups) {
       const source = readFileSync(join(ROUTES, group, '_layout.tsx'), 'utf8');
-      expect([group, source.includes('<FlowStack>')]).toEqual([group, true]);
+      expect([group, /<FlowStack[\s>]/.test(source)]).toEqual([group, true]);
     }
   });
 });

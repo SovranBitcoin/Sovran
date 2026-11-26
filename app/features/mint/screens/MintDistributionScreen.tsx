@@ -21,6 +21,7 @@ import {
   deriveSupportedUnitsFromInfo,
   toAccountUnit,
 } from 'wallet';
+import { toRealUnit } from 'wallet/units';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { MintDistributionCards } from '@/features/mint/components/distribution/MintDistributionCards';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -74,23 +75,31 @@ function isEvenSplit(distribution: Record<string, number>, mintUrls: string[]): 
 
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
-  const [foreground] = useThemeColor(['foreground'] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
+  const accountUnit = params?.unit?.toLowerCase() || 'sat';
+  if (accountUnit !== 'btc' && toRealUnit(accountUnit) !== 'sat') {
+    return (
+      <Screen name="MintDistributionScreen">
+        <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
+        <Text className="p-4">Balance split is available for Bitcoin accounts only.</Text>
+      </Screen>
+    );
+  }
+  return (
+    <SatMintDistribution
+      key={accountUnit}
+      initialCurrency={accountUnit === 'tsat' ? 'TSAT' : 'SAT'}
+    />
+  );
+}
+
+function SatMintDistribution({ initialCurrency }: { initialCurrency: string }) {
+  const [foreground] = useThemeColor(['foreground'] as const);
   const { trustedMints } = useMints();
   const { getMintInfo } = useMintManagement();
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
-  const rawUnit = params?.unit;
-  const normUnit = rawUnit?.toLowerCase();
-  // Treat btc as sats in the UI selector
-  const routeCurrency = !normUnit
-    ? null
-    : normUnit === 'btc' || normUnit === 'sat'
-      ? 'SAT'
-      : normUnit.toUpperCase();
-
-  // Seeded from the route so the first frame is already on its tab.
-  const [selectedCurrency, setSelectedCurrency] = useState<string>(() => routeCurrency ?? 'SAT');
+  const [selectedCurrency, setSelectedCurrency] = useState(initialCurrency);
 
   // Narrow the selector to the per-unit slice. Returning the whole `distributions`
   // record made any write to any unit re-render this screen even though only the
@@ -125,9 +134,9 @@ export function MintDistributionScreen() {
   for (const supported of Object.values(supportedUnitsByMint)) {
     for (const unit of supported) units.add(unit.toUpperCase());
   }
-  // Filter to the wallet's accounts (display order) and ensure at least SAT
-  const commonUnits = ACCOUNT_UNITS.map((unit) => unit.toUpperCase()).filter((c) => units.has(c));
-  const availableCurrencies = commonUnits.length > 0 ? commonUnits : ['SAT'];
+  const availableCurrencies = ACCOUNT_UNITS.filter((unit) => toRealUnit(unit) === 'sat')
+    .map((unit) => unit.toUpperCase())
+    .filter((currency) => currency === selectedCurrency || units.has(currency));
 
   const mintsForCurrency = trustedMints.filter((mint) =>
     (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(

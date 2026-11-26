@@ -233,6 +233,32 @@ test('marks a leg paymentPending when waitForOutcome times out in source_pending
   expect(mockStatus.settleUnknown).toHaveBeenCalledTimes(1);
 });
 
+test('keeps the parent tagged for reconciliation and skips it when retrying failed legs', async () => {
+  mockManager.ops.mintSwap.execute.mockRejectedValueOnce(new Error('execute response lost'));
+  mockManager.ops.mintSwap.get.mockRejectedValueOnce(new Error('lookup unavailable'));
+
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(600);
+  });
+
+  const parentId = mockManager.ops.mintSwap.prepare.mock.calls[0][0].id;
+  expect(mockTransactions.tagMintSwap).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(String),
+    parentId
+  );
+  expect(result.current.stepStates['step-1']).toMatchObject({
+    status: 'paymentPending',
+    operationId: parentId,
+  });
+
+  await act(async () => result.current.handleRetryFailed());
+  expect(mockManager.ops.mintSwap.prepare).toHaveBeenCalledTimes(1);
+  expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(1);
+});
+
 test('routes through a middleman mint on source_payment_rejected and releases temporary trust', async () => {
   mockLocalCandidates = [VIA];
   let first = true;
@@ -251,7 +277,7 @@ test('routes through a middleman mint on source_payment_rejected and releases te
   });
 
   expect(mockManager.mint.addMint).toHaveBeenCalledWith(VIA, { trusted: true });
-  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [VIA]);
+  expect(mockReleaseTrust).toHaveBeenCalledWith(mockManager, [VIA], expect.any(AbortSignal));
   expect(mockManager.ops.mintSwap.execute).toHaveBeenCalledTimes(3);
   expect(result.current.runStatus).toBe('finished');
 });

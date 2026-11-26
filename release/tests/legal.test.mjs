@@ -24,13 +24,13 @@ test('release requires matching, approved website and bundled policies', () => {
 
 test('raw publication without revisions preserves the existing acceptance fingerprints', () => {
   assert.equal(approved.revisions, undefined);
-  assert.equal(createHash('sha256').update(bytes).digest('hex'), 'ffaa48e2e6378c2931605c66ce00c4405aec82f8f96d57cbc08e42b65f4de7d4');
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), '9a29c32925f8d8b510b628b07c8b2ed8bb6e0b53ecb339ee9d90015e50d47118');
   const revisions = Object.fromEntries(['terms', 'privacy'].map((id) => [id,
     createHash('sha256').update(JSON.stringify({ operator: approved.operator, document: approved[id], publicationReady: approved.publicationReady })).digest('hex'),
   ]));
   assert.deepEqual(revisions, {
-    terms: 'f71f7d665b21a0322884c86e548ed4400836a6bf946d3511392bc9c20012f512',
-    privacy: '2afbd0f2a5962bb839d7541c88f0e9467fe64718ce422fd2f995fd045a0c3692',
+    terms: '16b8dce0cc3cc626be6b4b9965ae4a94dc065cc9ce107f79971de804f04afcbf',
+    privacy: '5639360e8c4a51b0b45cf2f7dabe47bbaba310cfcbc76506ba12b393300b9077',
   });
   assertMatchingLegalDocuments(approved, { ...approved, revisions });
   assertMatchingLegalDocuments({ ...approved, revisions }, approved);

@@ -135,17 +135,16 @@ async function runCocoPhase2({
     initLog('Coco-bg', 'Phase 2 starting');
     log.info('coco.phase2.start');
 
-    // Safe to enable observe-only watchers and pre-warm the seed cache
-    // immediately — neither uses the deterministic counter.
+    // Warm the seed cache without allocating any deterministic outputs.
     if (!isLive()) return;
-    await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
+    await initPhase('Coco-bg.seedCacheWarm', () => CocoManager.warmSeedCache());
 
     if (!isLive()) return;
     bgStage.log('Initializing default mints...');
     await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager, isLive));
 
-    // Block NPC sync + the mint-operation processor until the wallet
-    // has restored its NUT-13 counter (or proven restore isn't needed).
+    // Recovery and the automatic mint processor can allocate outputs.
+    // Start them once the NUT-13 counter is ready.
     // RestoreGate routes the user to /restore when this is pending.
     if (!isLive()) return;
     bgStage.log('Waiting for wallet restore...');
@@ -153,11 +152,13 @@ async function runCocoPhase2({
       awaitRestoreReady(useWalletLifecycleStore, signal)
     );
     if (!isLive()) return;
+    bgStage.log('Starting wallet recovery...');
+    await CocoManager.startOperationRecovery();
+    if (!isLive()) return;
     bgStage.log('Starting NPC sync...');
-    await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
+    await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSync());
 
-    // Each recovery stands alone: one that fails is reported and the rest still
-    // run, so a stuck send cannot hold back a melt, a receive or a refund.
+    // Receive and app-specific recoveries are outside Coco's startup sweeps.
     const recover = async (
       name: string,
       phase: string,
@@ -179,17 +180,8 @@ async function runCocoPhase2({
 
     if (!isLive()) return;
     bgStage.log('Recovering pending operations...');
-    await recover('send', 'Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
-    if (!isLive()) return;
-    await recover('melt', 'Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
-    if (!isLive()) return;
     await recover('receive', 'Coco-bg.receiveRecovery', () =>
       chainManager.ops.receive.recovery.run()
-    );
-    if (!isLive()) return;
-    // Safe no-op sweep while the NUT-18 incoming saga is unused.
-    await recover('payment_request_receive', 'Coco-bg.paymentRequestReceiveRecovery', () =>
-      chainManager.recoverPendingPaymentRequestReceiveAttempts()
     );
     if (!isLive()) return;
     // Change for a request that ended between paying and being paid back —
@@ -315,8 +307,7 @@ export function WalletCore({ children }: { children: ReactNode }) {
     bgStarted.current = true;
 
     // BTC-13: an unmount (profile switch remount) must stop this chain. The
-    // statics it calls (CocoManager.enableSafeWatchers /
-    // enableNpcSyncAndProcessor) act on CocoManager.instance — after a
+    // statics it calls act on the current CocoManager instance. After a
     // remount that is the NEW profile's manager, so an orphaned chain would
     // arm watchers/sync on it out of order. Abort on cleanup and assert the
     // captured manager is still the live instance before every step.
@@ -327,13 +318,10 @@ export function WalletCore({ children }: { children: ReactNode }) {
     const runBackground = () =>
       runCocoPhase2({ bgStage, chainManager, isLive, signal: controller.signal });
 
-    // Wait for the splash → QR button morph to settle before starting
-    // heavy background work (default mints, NPC sync, recovery). The fixed
-    // 2-second delay we used before was a conservative estimate of "is the
-    // morph done"; tying it directly to the morph signal saves ~1.5s on a
-    // typical boot. The 500ms timeout is a safety net for the case where
-    // the morph never fires (e.g., user lands on onboarding instead of the
-    // wallet, or Coco init beat the user to a screen with a QRButton).
+    // The splash signals completion for both a morph and its fallback fade
+    // (capped at OVERLAY_LIFETIME_CAP_MS = 10s). Wait for that signal before
+    // starting work that competes for the JS thread, with a 12s safety net in
+    // case the splash gate is not mounted.
     let started = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe: (() => void) | null = null;
@@ -362,10 +350,7 @@ export function WalletCore({ children }: { children: ReactNode }) {
       unsubscribe = subscribeBootMorphCompleted((completed) => {
         if (completed) start();
       });
-      // Safety fallback — start anyway after 500ms even without a morph
-      // completion signal, so background sync is never indefinitely
-      // postponed on screens that never mount the QRButton.
-      timeoutHandle = setTimeout(start, 500);
+      timeoutHandle = setTimeout(start, 12_000);
     }
 
     return () => {

@@ -3,7 +3,6 @@ import { ACCOUNT_UNITS } from 'wallet';
 
 import { discoverMints, DiscoverMintsResponse } from '@/shared/lib/apiClient';
 import { cacheOperatorStats } from '@/shared/lib/nostr/fetchProfiles';
-import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { useCachedRead, type ReadStatus } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
@@ -59,14 +58,6 @@ export function useMintSearch(
     fetcher: async ({ signal }) => {
       const res = await discoverMints({ signal });
       if (res.isErr()) throw res.error;
-      // Dev tier badges: discovery is served by nagg's app-view only (no
-      // cache/relay fallback exists for this surface), so every row that
-      // arrives is honestly 'n'. Keyed by mint URL — the badge store keys
-      // by string, not strictly event ids.
-      recordDebugTiers(
-        res.value.mints.map((m) => m.mintUrl),
-        'nagg'
-      );
       // Seed the unified cache from the discovery rows so the selector, audit
       // and operator-profile lookups all become cache hits (not round-trips).
       useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);

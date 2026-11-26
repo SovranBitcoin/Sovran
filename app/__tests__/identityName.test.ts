@@ -5,7 +5,7 @@
  * wins, in order, and what is shown when none is usable.
  */
 
-import { resolveIdentityName } from '@/shared/lib/identity';
+import { findOperatorMintUrl, resolveIdentityName } from '@/shared/lib/identity';
 import { getUsername } from '@/shared/lib/username';
 
 const PUBKEY = 'ab'.repeat(32);
@@ -87,5 +87,30 @@ describe('resolveIdentityName', () => {
     expect(
       resolveIdentityName({ mintName: 'Mint', nostrProfile: { displayName: 'Operator' } })
     ).toBe('Mint');
+  });
+
+  it('uses a mint the person operates only when they published no Nostr name', () => {
+    expect(
+      resolveIdentityName({
+        pubkey: PUBKEY,
+        mintFallbackName: 'Operated Mint',
+        nostrProfile: { displayName: 'Operator' },
+      })
+    ).toBe('Operator');
+    expect(
+      resolveIdentityName({ pubkey: PUBKEY, mintFallbackName: 'Operated Mint', nostrProfile: {} })
+    ).toBe('Operated Mint');
+  });
+});
+
+describe('findOperatorMintUrl', () => {
+  it('finds the mint whose operator is the pubkey', () => {
+    const byMintUrl = {
+      'https://a.example': { operatorPubkey: 'cd'.repeat(32) },
+      'https://b.example': { operatorPubkey: PUBKEY },
+    };
+    expect(findOperatorMintUrl(byMintUrl, PUBKEY)).toBe('https://b.example');
+    expect(findOperatorMintUrl(byMintUrl, 'ef'.repeat(32))).toBeNull();
+    expect(findOperatorMintUrl(byMintUrl, undefined)).toBeNull();
   });
 });

@@ -7,7 +7,7 @@
  * anchor). Replays on a profile switch. Lives outside the root route file so
  * `app/_layout.tsx` only composes providers and configures navigation.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
@@ -123,7 +123,7 @@ type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'unmo
 
 export function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
-  const { isInitializing, hasFailedStage } = useInitializationState();
+  const { isInitializing, hasFailedStage, profileSwitchHeld } = useInitializationState();
   const pageInsteadOfWallet = usePageInsteadOfWallet();
   const splash = useSplashGeometry();
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
@@ -143,6 +143,11 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // overlay at that exact spot we need to subtract our own window offset
   // (a parent View further up may not start at window (0,0)).
   const [parentOffset, setParentOffset] = useState({ x: 0, y: 0 });
+
+  useLayoutEffect(() => {
+    setBootMorphCompleted(false);
+    setBootSplashHandoff(false);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeQRButtonAnchor((next) => {
@@ -170,12 +175,12 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   useEffect(() => {
     const wasInitializing = wasInitializingRef.current;
     wasInitializingRef.current = isInitializing;
-    if (!wasInitializing && isInitializing && phase === 'unmounted') {
+    if (!wasInitializing && isInitializing && (phase === 'unmounted' || profileSwitchHeld)) {
       setBootMorphCompleted(false);
       setBootSplashHandoff(false);
       setPhase('await_init');
     }
-  }, [isInitializing, phase]);
+  }, [isInitializing, phase, profileSwitchHeld]);
 
   // Phase 1 — await_init: hide the native splash as soon as our root view
   // has laid out. The morph overlay is rendered the same frame, covering the
@@ -196,20 +201,20 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // and the wallet screen's anchor will never be published. Waiting out the
   // anchor fallback would keep that screen behind the splash for eight seconds.
   useEffect(() => {
-    if (phase !== 'await_anchor' || !hasFailedStage) return;
+    if (phase !== 'await_anchor' || profileSwitchHeld || !hasFailedStage) return;
     initLog('SplashMorph', 'a blocking stage failed — fading out');
     setPhase('fading');
-  }, [phase, hasFailedStage]);
+  }, [phase, hasFailedStage, profileSwitchHeld]);
 
   // The same for a page the app shows in place of the wallet home: Terms on a
   // first launch, onboarding, key recovery, the restore prompt. On a first
   // launch the Terms page was ready after two seconds and stayed behind the
   // splash for nine.
   useEffect(() => {
-    if (phase !== 'await_anchor' || !pageInsteadOfWallet) return;
+    if (phase !== 'await_anchor' || profileSwitchHeld || !pageInsteadOfWallet) return;
     initLog('SplashMorph', 'a page is shown in place of the wallet home — fading out');
     setPhase('fading');
-  }, [phase, pageInsteadOfWallet]);
+  }, [phase, pageInsteadOfWallet, profileSwitchHeld]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
   // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY_MS` ms because
@@ -218,7 +223,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // If we still have no anchor after `MORPH_FALLBACK_TIMEOUT_MS`, fall back to
   // a plain fade so we never strand the user on the splash.
   useEffect(() => {
-    if (phase !== 'await_anchor') return;
+    if (phase !== 'await_anchor' || profileSwitchHeld) return;
 
     let cancelled = false;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -292,7 +297,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
       clearTimeout(fallback);
       clearSettleTimer();
     };
-  }, [phase, splash]);
+  }, [phase, splash, profileSwitchHeld]);
 
   // Phase 3 — morphing: signal the handoff (so destination screens can start
   // their own entrance animation), then advance to `done` after the CSS
@@ -353,7 +358,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   useEffect(() => {
     // Only these two phases can meaningfully fast-forward: await_init must
     // still run its hideAsync handoff, and fading/done are already exiting.
-    if (phase !== 'await_anchor' && phase !== 'morphing') return;
+    if (profileSwitchHeld || (phase !== 'await_anchor' && phase !== 'morphing')) return;
     const check = () => {
       if (!shouldFastForwardBootOverlay(getWalletTabFocused(), getQRButtonAnchor())) return;
       initLog('SplashMorph', `wallet tab not focused (phase=${phase}) — fast-forwarding overlay`);
@@ -370,7 +375,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     };
     check();
     return subscribeWalletTabFocused(check);
-  }, [phase, anchor]);
+  }, [phase, anchor, profileSwitchHeld]);
 
   // Phase 3b — fading: same duration mirror, but the fade's target values
   // never depend on the anchor, so an anchor republish must NOT restart it.

@@ -31,13 +31,13 @@ Retention for other operator-controlled records is described by purpose-based cr
 
 Each document's full content, operator details and publication flag are fingerprinted with SHA-256. Explicit confirmation stores both revisions and a timestamp in `settings-store.legalAcceptance`. Website changes alone cannot reprompt an older/offline app: deliver the changed documents in an installed app update.
 
-The fingerprint input remains exactly `JSON.stringify({ operator, document, publicationReady })`, in that property order, with no whitespace or key sorting added. The move preserves these values and therefore does not require another acceptance prompt:
+The fingerprint input remains exactly `JSON.stringify({ operator, document, publicationReady })`, in that property order, with no whitespace or key sorting added. Current approved hashes (updated 2026-11-26):
 
 | Value | SHA-256 |
 | --- | --- |
-| Canonical file bytes | `ffaa48e2e6378c2931605c66ce00c4405aec82f8f96d57cbc08e42b65f4de7d4` |
-| Terms revision | `f71f7d665b21a0322884c86e548ed4400836a6bf946d3511392bc9c20012f512` |
-| Privacy revision | `2afbd0f2a5962bb839d7541c88f0e9467fe64718ce422fd2f995fd045a0c3692` |
+| Canonical file bytes | `9a29c32925f8d8b510b628b07c8b2ed8bb6e0b53ecb339ee9d90015e50d47118` |
+| Terms revision | `16b8dce0cc3cc626be6b4b9965ae4a94dc065cc9ce107f79971de804f04afcbf` |
+| Privacy revision | `5639360e8c4a51b0b45cf2f7dabe47bbaba310cfcbc76506ba12b393300b9077` |
 
 The app uses Terms then Privacy in the original card layout. The checkbox and continue button remain outside the scroll area. Scrolling to the end is not required; each step still requires explicit confirmation. Back navigation is allowed; partial progress does not record acceptance. Settings renders the same documents. Privacy acknowledgment is not consent to every optional processing activity.
 

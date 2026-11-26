@@ -63,6 +63,7 @@ interface SettingsState {
   mockNoGlass: boolean;
   /** Developer opt-in; failures retain the restart isolation boundary. */
   inProcessProfileSwitch: boolean;
+  restartOnProfileSwitch: boolean;
   /**
    * Draw the layout guides over every screen: the gutter, the footer inset
    * and the safe-area edges, as thin red lines. A review aid, so alignment in
@@ -192,7 +193,9 @@ const PersistedSettings = z.object({
   mockFailMelt: z.boolean().default(false).catch(false),
   mockFailPaymentRequest: z.boolean().default(false).catch(false),
   whitenoiseEnabled: z.boolean().default(false).catch(false),
+  // Retained for compatibility with settings saved before in-process switching became the default.
   inProcessProfileSwitch: z.boolean().default(false).catch(false),
+  restartOnProfileSwitch: z.boolean().default(false).catch(false),
   mockNoGlass: z.boolean().default(false).catch(false),
   layoutGuides: z.boolean().default(false).catch(false),
   showTouches: z.boolean().default(false).catch(false),
@@ -254,6 +257,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   mockFailPaymentRequest: false,
   whitenoiseEnabled: false,
   inProcessProfileSwitch: false,
+  restartOnProfileSwitch: false,
   mockNoGlass: false,
   layoutGuides: false,
   showTouches: false,
@@ -292,7 +296,7 @@ interface SettingsActions {
   setMockFailMelt: (enabled: boolean) => void;
   setMockFailPaymentRequest: (enabled: boolean) => void;
   setWhitenoiseEnabled: (enabled: boolean) => void;
-  setInProcessProfileSwitch: (enabled: boolean) => void;
+  setRestartOnProfileSwitch: (enabled: boolean) => void;
   setMockNoGlass: (enabled: boolean) => void;
   setLayoutGuides: (enabled: boolean) => void;
   setShowTouches: (enabled: boolean) => void;
@@ -387,7 +391,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           storeLog.info('store.settings.set_whitenoise_enabled', { enabled });
           set({ whitenoiseEnabled: enabled });
         },
-        setInProcessProfileSwitch: (enabled) => set({ inProcessProfileSwitch: enabled }),
+        setRestartOnProfileSwitch: (enabled) => set({ restartOnProfileSwitch: enabled }),
         setMockNoGlass: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_no_glass', { enabled });
           set({ mockNoGlass: enabled });
@@ -567,6 +571,7 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           mockFailPaymentRequest: state.mockFailPaymentRequest,
           whitenoiseEnabled: state.whitenoiseEnabled,
           inProcessProfileSwitch: state.inProcessProfileSwitch,
+          restartOnProfileSwitch: state.restartOnProfileSwitch,
           mockNoGlass: state.mockNoGlass,
           layoutGuides: state.layoutGuides,
           showTouches: state.showTouches,

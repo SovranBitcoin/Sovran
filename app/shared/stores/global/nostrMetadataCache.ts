@@ -29,6 +29,7 @@ export interface NostrProfileMetadata {
   banner?: string;
   nip05?: string;
   lud16?: string;
+  lud06?: string;
   website?: string;
   about?: string;
   /** ms since epoch. `0` marks an entry as immediately stale (search seeds). */
@@ -86,6 +87,7 @@ const NOSTR_PROFILE_FIELDS = {
   banner: z.string().max(2048).optional().catch(undefined),
   nip05: z.string().max(512).optional().catch(undefined),
   lud16: z.string().max(512).optional().catch(undefined),
+  lud06: z.string().max(2048).optional().catch(undefined),
   website: z.string().max(2048).optional().catch(undefined),
   about: z.string().max(4096).optional().catch(undefined),
 };
@@ -153,6 +155,7 @@ export function cachedProfileToMetadata(
     banner: record.banner,
     nip05: record.nip05,
     lud16: record.lud16,
+    lud06: record.lud06,
     website: record.website,
     about: record.about,
     fetchedAt: record.fetchedAt ?? 0,

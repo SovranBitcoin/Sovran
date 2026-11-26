@@ -250,7 +250,11 @@ describe("paymentRequestAvailability — each phase the entry can carry", () => 
       ...base,
       state: "pending",
       operationId: "op-9",
-      metadata: { operationId: "op-9", phase: "undelivered", tokenCreated: "true" },
+      metadata: {
+        operationId: "op-9",
+        phase: "undelivered",
+        tokenCreated: "true",
+      },
     });
     expect(actions.confirm.available).toBe(false);
     expect(actions.cancel.available).toBe(false);
@@ -397,7 +401,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "sendEcash",
       numericValue: 1e-5, // dollars in fiat mode
-      effectiveAmount: { value: 0, unit: 'sat' },
+      effectiveAmount: { value: 0, unit: "sat" },
     };
     const actions = getAvailableActions("amountEntry", entry);
     expect(actions.next.available).toBe(false);
@@ -409,7 +413,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "sendEcash",
       numericValue: 1, // sat mode
-      effectiveAmount: { value: 1, unit: 'sat' },
+      effectiveAmount: { value: 1, unit: "sat" },
     };
     const actions = getAvailableActions("amountEntry", entry);
     expect(actions.next.available).toBe(true);
@@ -429,7 +433,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("always exposes cancel as available", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveAmount: { value: 0, unit: 'sat' },
+      effectiveAmount: { value: 0, unit: "sat" },
     });
 
     expect(actions.cancel.available).toBe(true);
@@ -475,14 +479,18 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
       destination: "meltQuote",
       meltTarget: "lnbc1detecteddestination",
     };
-    expect(getAvailableActions("amountEntry", entry).paste.available).toBe(false);
-    expect(getAvailableActions("amountEntry", entry).scanQr.available).toBe(false);
+    expect(getAvailableActions("amountEntry", entry).paste.available).toBe(
+      false,
+    );
+    expect(getAvailableActions("amountEntry", entry).scanQr.available).toBe(
+      false,
+    );
   });
 
   it("hides onchain receive when no trusted mint advertises NUT-04 onchain", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveAmount: { value: 100, unit: 'sat' },
+      effectiveAmount: { value: 100, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -508,7 +516,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("shows onchain receive when a trusted mint advertises NUT-04 onchain (coco v2)", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveAmount: { value: 100, unit: 'sat' },
+      effectiveAmount: { value: 100, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1, MINT2],
@@ -621,7 +629,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("disables Lightning receive when no trusted mint advertises NUT-04 bolt11", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveAmount: { value: 100, unit: 'sat' },
+      effectiveAmount: { value: 100, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -652,7 +660,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 500, unit: 'sat' },
+      effectiveAmount: { value: 500, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -691,7 +699,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 500, unit: 'sat' },
+      effectiveAmount: { value: 500, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1, MINT2],
@@ -737,7 +745,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 500, unit: 'sat' },
+      effectiveAmount: { value: 500, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -770,7 +778,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 500, unit: 'sat' },
+      effectiveAmount: { value: 500, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -825,7 +833,12 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("reads an onchain minimum in every AmountLike form the mint info can carry", () => {
     // cashu-ts types NUT-04 bounds as AmountLike; a bound read as "numbers
     // only" is silently dropped and onchain is offered below the minimum.
-    for (const min_amount of [1_000, "1000", 1_000n, { toNumber: () => 1_000 }]) {
+    for (const min_amount of [
+      1_000,
+      "1000",
+      1_000n,
+      { toNumber: () => 1_000 },
+    ]) {
       const actions = getAvailableActions("amountEntry", {
         destination: "mintQuote",
         effectiveAmount: { value: 100, unit: "sat" },
@@ -833,21 +846,23 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
         methodContext: {
           trustedMintUrls: [MINT1],
           mintBalances: { [MINT1]: 0 },
-          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
-            {
-              mintUrl: MINT1,
-              mintInfo: {
-                nuts: {
-                  "4": {
-                    methods: [
-                      { method: "bolt11", unit: "sat" },
-                      { method: "onchain", unit: "sat", min_amount },
-                    ],
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+            [
+              {
+                mintUrl: MINT1,
+                mintInfo: {
+                  nuts: {
+                    "4": {
+                      methods: [
+                        { method: "bolt11", unit: "sat" },
+                        { method: "onchain", unit: "sat", min_amount },
+                      ],
+                    },
                   },
                 },
               },
-            },
-          ]),
+            ],
+          ),
         },
       });
       expect(
@@ -861,7 +876,13 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     // 1000 and "1000.5" as a fractional sat; neither is a count of minor units,
     // so each must read as "no bound advertised" rather than gate the rail on a
     // number the mint did not mean.
-    for (const min_amount of ["0x3e8", "1000.5", " 1e3", "1,000", Number.MAX_SAFE_INTEGER + 2]) {
+    for (const min_amount of [
+      "0x3e8",
+      "1000.5",
+      " 1e3",
+      "1,000",
+      Number.MAX_SAFE_INTEGER + 2,
+    ]) {
       const actions = getAvailableActions("amountEntry", {
         destination: "mintQuote",
         effectiveAmount: { value: 100, unit: "sat" },
@@ -869,21 +890,23 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
         methodContext: {
           trustedMintUrls: [MINT1],
           mintBalances: { [MINT1]: 0 },
-          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
-            {
-              mintUrl: MINT1,
-              mintInfo: {
-                nuts: {
-                  "4": {
-                    methods: [
-                      { method: "bolt11", unit: "sat" },
-                      { method: "onchain", unit: "sat", min_amount },
-                    ],
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+            [
+              {
+                mintUrl: MINT1,
+                mintInfo: {
+                  nuts: {
+                    "4": {
+                      methods: [
+                        { method: "bolt11", unit: "sat" },
+                        { method: "onchain", unit: "sat", min_amount },
+                      ],
+                    },
                   },
                 },
               },
-            },
-          ]),
+            ],
+          ),
         },
       });
       expect(
@@ -940,7 +963,11 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
         "4": {
           methods: [
             { method: "bolt11", unit: "sat" },
-            { method: "onchain", unit: "sat", ...(min_amount ? { min_amount } : {}) },
+            {
+              method: "onchain",
+              unit: "sat",
+              ...(min_amount ? { min_amount } : {}),
+            },
           ],
         },
       },
@@ -967,7 +994,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "meltQuote",
       meltTarget: "alice@example.com",
-      effectiveAmount: { value: 100, unit: 'sat' },
+      effectiveAmount: { value: 100, unit: "sat" },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -995,12 +1022,18 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     expect(actions.next.available).toBe(false);
   });
 
-  it('labels the Lightning variant "as Lightning (npub.cash)" for npc melt targets', () => {
-    // The npub.cash fallback (recipient without a lud16) must say where the
-    // money actually goes; a real lud16 keeps the generic label.
-    const entryFor = (meltTarget: string) => ({
+  describe("npub.cash provenance", () => {
+    // Only a target the app synthesized for a recipient with no published
+    // Lightning address is the "npub.cash" fallback. An @npub.cash /
+    // @npubx.cash address the person published themselves is a normal
+    // Lightning target with no caution.
+    const entryFor = (
+      meltTarget: string,
+      meltTargetIsNpcFallback?: boolean,
+    ) => ({
       destination: "meltQuote",
       meltTarget,
+      ...(meltTargetIsNpcFallback ? { meltTargetIsNpcFallback } : {}),
       effectiveAmount: { value: 100, unit: "sat" },
       unit: "sat",
       methodContext: {
@@ -1017,14 +1050,38 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
       },
     });
 
-    const labelFor = (meltTarget: string) =>
-      getAvailableActions("amountEntry", entryFor(meltTarget)).next.variants?.find(
-        (variant) => variant.id === "lightning",
-      )?.label;
+    const lightningFor = (meltTarget: string, fallback?: boolean) =>
+      getAvailableActions(
+        "amountEntry",
+        entryFor(meltTarget, fallback),
+      ).next.variants?.find((variant) => variant.id === "lightning");
 
-    expect(labelFor("npub1example@npubx.cash")).toBe("as Lightning (npub.cash)");
-    expect(labelFor("npub1example@npub.cash")).toBe("as Lightning (npub.cash)");
-    expect(labelFor("alice@example.com")).toBe("as Lightning");
+    it("labels a synthesized fallback as npub.cash with the caution", () => {
+      for (const target of [
+        "npub1example@npubx.cash",
+        "npub1example@npub.cash",
+      ]) {
+        const lightning = lightningFor(target, true);
+        expect(lightning?.label).toBe("as Lightning (npub.cash)");
+        expect(lightning?.isCaution).toBe(true);
+        expect(lightning?.description).toContain(
+          "They haven't published a Lightning address",
+        );
+      }
+    });
+
+    it("keeps a published npub.cash address as plain Lightning with no caution", () => {
+      for (const target of ["alice@npub.cash", "npub1example@npubx.cash"]) {
+        const lightning = lightningFor(target);
+        expect(lightning?.label).toBe("as Lightning");
+        expect(lightning?.isCaution).toBeUndefined();
+        expect(lightning?.description).not.toContain("haven't published");
+      }
+    });
+
+    it("keeps a regular published address generic", () => {
+      expect(lightningFor("alice@example.com")?.label).toBe("as Lightning");
+    });
   });
 });
 
@@ -1042,7 +1099,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
 describe("amountEntryAvailability — receive as Ecash (NUT-18 payment request)", () => {
   const mintQuoteEntry = (trustedMintUrls: string[]) => ({
     destination: "mintQuote",
-    effectiveAmount: { value: 100, unit: 'sat' },
+    effectiveAmount: { value: 100, unit: "sat" },
     unit: "sat",
     methodContext: {
       trustedMintUrls,
@@ -1080,7 +1137,10 @@ describe("amountEntryAvailability — receive as Ecash (NUT-18 payment request)"
     const ecash = actions.next.variants?.find(
       (variant) => variant.id === "ecash",
     );
-    expect(ecash).toMatchObject({ available: false, reason: "No trusted mints" });
+    expect(ecash).toMatchObject({
+      available: false,
+      reason: "No trusted mints",
+    });
   });
 
   it("disables the ecash variant on receive when no trusted mints exist", () => {
@@ -1101,7 +1161,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("flags a send amount above the largest mint balance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveAmount: { value: 2500, unit: 'sat' },
+      effectiveAmount: { value: 2500, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -1113,7 +1173,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("does not flag a send amount within the largest mint balance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveAmount: { value: 2000, unit: 'sat' },
+      effectiveAmount: { value: 2000, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -1124,7 +1184,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 1500, unit: 'sat' },
+      effectiveAmount: { value: 1500, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -1137,7 +1197,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "meltQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 5000, unit: 'sat' },
+      effectiveAmount: { value: 5000, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -1148,7 +1208,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveAmount: { value: 1_000_000, unit: 'sat' },
+      effectiveAmount: { value: 1_000_000, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 0 }),
     });
 
@@ -1158,7 +1218,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("does not flag a zero/empty amount", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveAmount: { value: 0, unit: 'sat' },
+      effectiveAmount: { value: 0, unit: "sat" },
       methodContext: balanceContext({ [MINT1]: 0, [MINT2]: 0 }),
     });
 
@@ -1267,7 +1327,13 @@ describe("amountEntry — the log explains each Next method", () => {
           {
             mintUrl: MINT1,
             mintInfo: {
-              nuts: { "4": { methods: [{ method: "bolt11", unit: "sat", min_amount: 1_000 }] } },
+              nuts: {
+                "4": {
+                  methods: [
+                    { method: "bolt11", unit: "sat", min_amount: 1_000 },
+                  ],
+                },
+              },
             },
           },
           { mintUrl: MINT2, mintInfo: { nuts: { "4": { methods: [] } } } },
@@ -1407,7 +1473,9 @@ describe("sendTokenAvailability — cancelling a locked send", () => {
       ["locktime", String(LOCKTIME_SEC)],
       ["refund", OUR_KEY],
     ]);
-    expect(cancelFor(entry, LOCKTIME_SEC * 1000 + 120_000).available).toBe(true);
+    expect(cancelFor(entry, LOCKTIME_SEC * 1000 + 120_000).available).toBe(
+      true,
+    );
   });
 
   it("still cancels a locked send that never executed", () => {
@@ -1421,7 +1489,8 @@ describe("sendTokenAvailability — cancelling a locked send", () => {
 // ---------------------------------------------------------------------------
 
 describe("amountEntryAvailability — required locks", () => {
-  const LOCK_KEY = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+  const LOCK_KEY =
+    "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
   const lockedEntry = (over: Record<string, unknown> = {}) => ({
     destination: "sendEcash",
     numericValue: 100,
@@ -1432,7 +1501,7 @@ describe("amountEntryAvailability — required locks", () => {
   it("offers only as Locked Ecash when the flow arrived with a lock key", () => {
     const actions = getAvailableActions(
       "amountEntry",
-      lockedEntry({ p2pkLockPubkey: LOCK_KEY })
+      lockedEntry({ p2pkLockPubkey: LOCK_KEY }),
     );
     expect(actions.next.variants?.map((v) => v.id)).toEqual(["locked-ecash"]);
     expect(actions.next.variants?.[0]).toMatchObject({
@@ -1444,7 +1513,7 @@ describe("amountEntryAvailability — required locks", () => {
   it("reads the seeded terms as well as the bare key", () => {
     const actions = getAvailableActions(
       "amountEntry",
-      lockedEntry({ p2pkLock: { pubkey: LOCK_KEY } })
+      lockedEntry({ p2pkLock: { pubkey: LOCK_KEY } }),
     );
     expect(actions.next.variants?.map((v) => v.id)).toEqual(["locked-ecash"]);
   });
@@ -1491,10 +1560,16 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
     numericValue: 100,
     effectiveAmount: { value: 100, unit: "sat" },
     meltTarget: `${NPUB}@npub.cash`,
+    meltTargetIsNpcFallback: true,
     methodContext: {
       mintBalances: { [MINT1]: 1000 },
       capabilities: deriveMintMethodCapabilityMapFromTrustedMints([
-        { mintUrl: MINT1, mintInfo: { nuts: { "5": { methods: [{ method: "bolt11", unit: "sat" }] } } } },
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: { "5": { methods: [{ method: "bolt11", unit: "sat" }] } },
+          },
+        },
       ]),
     },
   };
@@ -1513,12 +1588,17 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
   it("warns that npub.cash was our choice, not theirs", () => {
     const actions = getAvailableActions("amountEntry", npcEntry);
     const lightning = actions.next.variants?.find((v) => v.id === "lightning");
-    expect(lightning?.description).toContain("haven't published a Lightning address");
+    expect(lightning?.description).toContain(
+      "haven't published a Lightning address",
+    );
     expect(lightning?.isCaution).toBe(true);
   });
 
   it("disables everything that needs the mint while offline, keeping plain ecash", () => {
-    const actions = getAvailableActions("amountEntry", { ...npcEntry, offline: true });
+    const actions = getAvailableActions("amountEntry", {
+      ...npcEntry,
+      offline: true,
+    });
     const lightning = actions.next.variants?.find((v) => v.id === "lightning");
     expect(lightning?.available).toBe(false);
     expect(lightning?.reason).toBe("Needs the mint, and you're offline");
@@ -1528,7 +1608,8 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
       meltTarget: undefined,
       mintUnreachable: true,
     };
-    const send = getAvailableActions("amountEntry", sendEntry).next.variants ?? [];
+    const send =
+      getAvailableActions("amountEntry", sendEntry).next.variants ?? [];
     expect(send.find((v) => v.id === "ecash")?.available).toBe(true);
     const locked = send.find((v) => v.id === "locked-ecash");
     expect(locked?.label).toBe("as Locked Ecash");
@@ -1540,6 +1621,7 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
     const actions = getAvailableActions("amountEntry", {
       ...npcEntry,
       meltTarget: "calle@getalby.com",
+      meltTargetIsNpcFallback: undefined,
     });
     const lightning = actions.next.variants?.find((v) => v.id === "lightning");
     expect(lightning?.label).toBe("as Lightning");

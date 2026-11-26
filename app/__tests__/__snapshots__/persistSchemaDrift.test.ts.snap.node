@@ -2772,6 +2772,10 @@ exports[`persisted schema drift nostr-metadata-cache schema matches the golden s
                 "minimum": 0,
                 "type": "integer",
               },
+              "lud06": {
+                "maxLength": 2048,
+                "type": "string",
+              },
               "lud16": {
                 "maxLength": 512,
                 "type": "string",
@@ -2832,6 +2836,10 @@ exports[`persisted schema drift nostr-metadata-cache schema matches the golden s
                 "maximum": 9007199254740991,
                 "minimum": 0,
                 "type": "integer",
+              },
+              "lud06": {
+                "maxLength": 2048,
+                "type": "string",
               },
               "lud16": {
                 "maxLength": 512,
@@ -6820,6 +6828,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "restartOnProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "sendLocationEnabled": {
           "default": false,
           "type": "boolean",
@@ -7087,6 +7099,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "restartOnProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "sendLocationEnabled": {
           "default": false,
           "type": "boolean",
@@ -7146,6 +7162,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "mockFailPaymentRequest",
         "whitenoiseEnabled",
         "inProcessProfileSwitch",
+        "restartOnProfileSwitch",
         "mockNoGlass",
         "layoutGuides",
         "showTouches",

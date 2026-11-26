@@ -92,8 +92,7 @@ export type ReceiveExecutePendingResult = {
 };
 
 export type ReceiveExecuteResult =
-  | ReceiveExecuteFinalizedResult
-  | ReceiveExecutePendingResult;
+  ReceiveExecuteFinalizedResult | ReceiveExecutePendingResult;
 
 // ---------------------------------------------------------------------------
 // Recipient identity — populated by `operations.resolveRecipientPubkey`
@@ -217,6 +216,8 @@ export interface StepDataMap {
       supportedMintUrls?: string[];
       paymentRequest?: string;
       meltTarget?: string;
+      /** See `FlowContext.meltTargetIsNpcFallback`. */
+      meltTargetIsNpcFallback?: boolean;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
       /** Presence-only UI evidence and route survival for locked ecash sends. */
@@ -410,6 +411,13 @@ export interface FlowContext {
   paymentRequest?: string;
   meltTarget?: string;
   /**
+   * True when `meltTarget` is the npub.cash address the app synthesized for a
+   * recipient who published no Lightning address. An address the recipient
+   * published themselves (even an `@npub.cash` one) leaves this unset, so the
+   * npub.cash caution is never attached to a target they chose.
+   */
+  meltTargetIsNpcFallback?: boolean;
+  /**
    * Nostr pubkey (hex) of the recipient when this flow was launched from a
    * chat surface. Set on AMOUNT_ENTERED (or on the initial `enterAmount`
    * constraints) and propagated to terminal navigation step data so consumer
@@ -569,6 +577,8 @@ export type FlowEvent =
        * + meltTarget so the machine can route to navigateToMeltPreview.
        */
       meltTarget?: string;
+      /** See `FlowContext.meltTargetIsNpcFallback`. */
+      meltTargetIsNpcFallback?: boolean;
       /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
       recipientPubkey?: string;
       /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
@@ -605,6 +615,8 @@ export type FlowEvent =
        * the Lightning variant from the amount screen.
        */
       meltTarget?: string;
+      /** See `FlowContext.meltTargetIsNpcFallback`. */
+      meltTargetIsNpcFallback?: boolean;
       /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
       recipientPubkey?: string;
       /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
@@ -1261,10 +1273,7 @@ export interface ProcessResult {
 // ---------------------------------------------------------------------------
 
 export type ScanSourceResult =
-  | { data: string }
-  | { canceled: true }
-  | { empty: true }
-  | { error: Error };
+  { data: string } | { canceled: true } | { empty: true } | { error: Error };
 
 export interface ScanSources {
   clipboard?: () => Promise<ScanSourceResult>;
@@ -1395,6 +1404,7 @@ export interface PaymentMachine {
       meltQuoteMethod?: MeltQuoteMethod;
       offline?: boolean;
       meltTarget?: string;
+      meltTargetIsNpcFallback?: boolean;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
       /** See the AMOUNT_ENTERED event — tri-state: leave, clear, or set. */
@@ -1437,6 +1447,8 @@ export interface PaymentMachine {
   startSendEcash: (opts?: {
     reset?: boolean;
     meltTarget?: string;
+    /** See `FlowContext.meltTargetIsNpcFallback`. */
+    meltTargetIsNpcFallback?: boolean;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
     /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */

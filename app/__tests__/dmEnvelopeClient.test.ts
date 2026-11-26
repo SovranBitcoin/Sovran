@@ -10,7 +10,6 @@ type Resolved = { tier: string; envelopes: unknown[]; cursor: null; received?: n
 let mockOutcome: { ok: Resolved } | { err: { attempts: { tier: string; outcome: string }[] } };
 const mockGet = jest.fn();
 const mockSubscribe = jest.fn();
-const mockRecordTiers = jest.fn();
 
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => ({
@@ -23,9 +22,6 @@ jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
     },
     subscribeDmEnvelopes: (...args: unknown[]) => mockSubscribe(...args),
   }),
-}));
-jest.mock('@/shared/stores/runtime/debugTierStore', () => ({
-  recordDebugTiers: (...args: unknown[]) => mockRecordTiers(...args),
 }));
 jest.mock('@/shared/lib/logger', () => ({ paymentLog: { debug: jest.fn() } }));
 

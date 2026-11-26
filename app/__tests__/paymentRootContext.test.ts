@@ -47,8 +47,8 @@ describe('fresh payment-root context clearing', () => {
       start: 'machine.startSendEcash({',
     },
     {
-      // Search's Pay buttons and action card start a payment from outside the
-      // send flow, so they pass a root and the helper clears first.
+      // Search's action card starts a payment from outside the send flow, so
+      // it passes a root and the helper clears first.
       file: 'app/features/send/lib/startContactSend.ts',
       clear: 'if (options.root) clearPaymentContext(options.root)',
       start: 'machine.startSendEcash({',

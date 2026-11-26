@@ -5,7 +5,7 @@ import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 
 interface ManagerLike {
-  wallet: { balances: { byMint: () => Promise<BalanceMap> } };
+  wallet: { balances: { byMint: (filter: { units: string[] }) => Promise<BalanceMap> } };
   mint: { untrustMint: (url: string) => Promise<void> };
 }
 
@@ -29,7 +29,8 @@ interface ReleaseTrustWindowResult {
  */
 export async function releaseTrustWindow(
   manager: ManagerLike,
-  temporarilyTrusted: readonly string[]
+  temporarilyTrusted: readonly string[],
+  sessionSignal?: AbortSignal
 ): Promise<ReleaseTrustWindowResult> {
   if (temporarilyTrusted.length === 0) {
     cashuLog.debug('mint.rebalance.trust_window.release.result', {
@@ -44,7 +45,7 @@ export async function releaseTrustWindow(
     temporarilyTrustedCount: temporarilyTrusted.length,
     mintDomains: temporarilyTrusted.map(extractDomain),
   });
-  const balances = await manager.wallet.balances.byMint().catch((error) => {
+  const balances = await manager.wallet.balances.byMint({ units: ['sat'] }).catch((error) => {
     cashuLog.warn('mint.rebalance.trust_window.balance_failed', {
       temporarilyTrustedCount: temporarilyTrusted.length,
       errorName: error instanceof Error ? error.name : typeof error,
@@ -54,6 +55,7 @@ export async function releaseTrustWindow(
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];
   for (const url of temporarilyTrusted) {
+    if (sessionSignal?.aborted) break;
     const balance = amountToNumber(balances[url]?.total);
     if (balance > 0) {
       cashuLog.warn('mint.rebalance.trust_window.stranded_balance', {

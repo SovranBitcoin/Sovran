@@ -251,8 +251,7 @@ checker is not substantive approval of a claim.
 
 ## 10. Other Surfaces And Review Rules
 
-**Observed:** the [privacy notice](copy/legal/documents.json) describes AI prompts,
-public location rooms, nearby communication and service operators. Protocol and
+**Observed:** the [privacy notice](copy/legal/documents.json) describes direct Primal/relay/Vertex queries, `npub.cash` sync, mint auditors, BTC Map, NFC reader/writer access, public location rooms, nearby communication, legacy Routstr credit recovery, and service operators. Protocol and
 implementation presence are different from shipped channel availability.
 Primary texts fetched on 2026-09-14 are recorded below. Mutable upstream
 specifications are not a claim that the pinned app implements every current revision.
@@ -340,7 +339,7 @@ qualifying subtitle or treat the longer register as a substitute for public noti
 
 | Concept | Selected text / review result | Change and limit |
 | --- | --- | --- |
-| `app-overview` | "Money and messages, one app." / "Send digital cash, follow friends, and chat with AI." | Removed direct-bitcoin conflation from all alternatives. Explain mint trust in accompanying product material. |
+| `app-overview` | "Money and messages, one app." / "Send digital cash, follow friends, and chat with AI." | Removed direct-bitcoin conflation from all alternatives. Explain mint trust in accompanying product material. **Legacy artwork concept:** social feeds and active AI chat were removed in the wallet rebuild; retire or replace this artwork before republishing. |
 | `wallet` | "Cash on your phone." / "Digital cash on your phone. Its value depends on the mint." | Removed immediate readiness and single-balance assumptions. |
 | `receive-unified` | "Show a code. Get paid." / "Share a payment code with a compatible wallet." | Removed universal wallet and timing claims. |
 | `send` | "Send from your wallet." / "Choose a contact or scan a payment code. Check the details before sending." | Removed universal recipients/routes; keeps the confirmation step. |
@@ -348,12 +347,12 @@ qualifying subtitle or treat the longer register as a substitute for public noti
 | `mint-reviews` | "What others found." / "Read community reviews before choosing a mint. Reviews are not guarantees." | Removed implied authenticated users, independence and evidence of reserves. |
 | `mint-updates` | "See what changed." / "See recorded changes to your mint, with dates and details." | Selected wording retained; alternative no longer implies verified operator identity. Records need not be complete or current. |
 | `payments-instant` | "Pay like it's cash." / "Send digital cash. Fees and availability depend on your mint." | ID retained for renderer contracts; ID is not public timing copy. |
-| `social-feed` | "Keep up with your people." / "Catch up with people you follow, or explore a ranked feed." | Removed algorithm denial, authenticated-engagement and blanket ad-free implications. |
-| `social-thread` | "Follow the replies." / "Open a post to explore its replies and the conversation around it." | Removed completeness and universal ordering promises. |
-| `social-dm` | "Send cash in a message." / "Send digital cash in chat. You still rely on its issuer to redeem it." | Fixes the reported bitcoin/ecash conflation; alternate encryption wording remains transport-scoped by this concept, not all chat. |
+| `social-feed` | "Keep up with your people." / "Catch up with people you follow, or explore a ranked feed." | Removed algorithm denial, authenticated-engagement and blanket ad-free implications. **Legacy artwork concept:** social feed was removed in the wallet rebuild; do not publish for the rebuilt app. |
+| `social-thread` | "Follow the replies." / "Open a post to explore its replies and the conversation around it." | Removed completeness and universal ordering promises. **Legacy artwork concept:** social feed/threads were removed in the wallet rebuild; do not publish for the rebuilt app. |
+| `social-dm` | "Send cash in a message." / "Send digital cash in chat. You still rely on its issuer to redeem it." | Fixes the reported bitcoin/ecash conflation; alternate encryption wording remains transport-scoped by this concept, not all chat. **Legacy artwork concept:** the rebuilt app delivers contact ecash over Nostr DMs from the payment flow rather than a standalone chat tab; update wording to contact payments before republishing. |
 | `contacts` | "Pay by name." / "Find a friend, then review the payment before sending." | Removed one-tap completion implication; names are not verified identities. |
-| `ai-chat` | "Chat with AI, pay as you go." / "Top up AI credits from your wallet. Your provider receives your prompts." | Removed all-model, per-answer and blanket no-account claims. |
-| `ai-models` | "Choose a model. Pay for usage." / "Compare supported models. Prices and availability vary." | Same provider/cost limits; alternatives also corrected. |
+| `ai-chat` | "Chat with AI, pay as you go." / "Top up AI credits from your wallet. Your provider receives your prompts." | Removed all-model, per-answer and blanket no-account claims. **Legacy artwork concept:** active AI chat was removed in the wallet rebuild (Settings retains legacy Routstr credit recovery only); do not publish for the rebuilt app. |
+| `ai-models` | "Choose a model. Pay for usage." / "Compare supported models. Prices and availability vary." | Same provider/cost limits; alternatives also corrected. **Legacy artwork concept:** model selection was removed in the wallet rebuild; do not publish for the rebuilt app. |
 | `themes-colors` | "Your wallet, your colors." / "Choose wallpapers and colors for your wallet." | Removed every-screen coverage promise. |
 | `themes-artemis` | Selected headline/subtitle unchanged. | Describes collection/per-currency wallpaper; image provenance and rights still belong to frame/asset review, not claims lint. |
 | `portal-artemis` | Selected headline/subtitle unchanged. | Decorative collection copy, not evidence of NASA endorsement or permission for every asset. |

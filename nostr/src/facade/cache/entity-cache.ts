@@ -110,6 +110,14 @@ const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
       base[key as keyof CachedProfile] = value as never;
     }
   }
+  // A fresher full kind-0 event (seenAt > 0) is authoritative for payment
+  // endpoints: if it removed lud16 or lud06, clear the stale value so Send
+  // never pays an address the user removed. Minimal profile seeds (seenAt 0)
+  // never clear existing addresses.
+  if (incomingWins && incomingAt > 0) {
+    if (patch.lud16 === undefined) delete base.lud16;
+    if (patch.lud06 === undefined) delete base.lud06;
+  }
   return base;
 };
 

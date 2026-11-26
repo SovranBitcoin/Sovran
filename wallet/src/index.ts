@@ -17,10 +17,7 @@ export {
 export type { P2pkLockSpec, SpendingConditions } from "./p2pk";
 
 // Wallet seed helpers
-export {
-  createCashuSeedGetter,
-  deriveStandardCashuSeed,
-} from "./wallet-seed";
+export { createCashuSeedGetter, deriveStandardCashuSeed } from "./wallet-seed";
 
 // Onchain confirmations, explorer links and fee acceleration
 export {
@@ -53,10 +50,7 @@ export type {
 } from "./chain";
 
 // Copy / i18n
-export {
-  createPaymentCopyGroups,
-  createPaymentCopyResolver,
-} from "./copy";
+export { createPaymentCopyGroups, createPaymentCopyResolver } from "./copy";
 export type { PaymentCopyResolver } from "./copy";
 
 // History / payment-state timeline
@@ -135,10 +129,7 @@ export type {
 } from "./annotations";
 
 // Adapter contracts
-export type {
-  ChainTransactionStatus,
-  JsonRecord,
-} from "./adapters";
+export type { ChainTransactionStatus, JsonRecord } from "./adapters";
 
 // Subscription bus
 export type {
@@ -187,10 +178,7 @@ export { createPaymentMachine } from "./machine/createMachine";
 
 // Pipeline utilities (usable standalone)
 export { parsePaymentInput, looksLikeBitcoinAddress } from "./parse";
-export {
-  buildBip321OnchainUri,
-  buildUnifiedBip321Uri,
-} from "./bip321";
+export { buildBip321OnchainUri, buildUnifiedBip321Uri } from "./bip321";
 export { describeDestination } from "./destination-descriptor";
 export {
   decodeEcashTokenMetadata,
@@ -216,10 +204,7 @@ export {
   pickMintForUnit,
   resolveReceiveMethodMint,
 } from "./mint-capabilities";
-export {
-  FIAT_UNITS,
-  SWITCHABLE_UNITS,
-} from "./units/registry";
+export { FIAT_UNITS, SWITCHABLE_UNITS } from "./units/registry";
 export {
   ACCOUNT_UNITS,
   accountUnitLabel,
@@ -274,10 +259,10 @@ export {
 } from "./formatting";
 
 // LNURL resolution (lightning address & lnurlp → bolt11)
-export {
-  decodeUrlOrAddress,
-  isLightningInvoiceBolt11,
-} from "./lnurl";
+export { decodeUrlOrAddress, isLightningInvoiceBolt11 } from "./lnurl";
+
+// Lightning payment target a Nostr profile published (lud16 / lud06)
+export { extractLightningTarget } from "./lightning-target";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
 export {
@@ -299,7 +284,6 @@ export {
   withTimeout,
   type RequestControls,
 } from "./safeFetch";
-
 
 // Domain types
 export type {
