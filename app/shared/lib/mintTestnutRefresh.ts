@@ -15,21 +15,18 @@ import { storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 
-/** nagg re-probes weekly; a daily re-check picks a new verdict up promptly. */
+/** Re-probe once a day to pick up any backend changes promptly. */
 const RECHECK_MS = 24 * 60 * 60 * 1000;
 
 /**
- * A row nagg answered with no `probedAt` is "not probed yet", NOT "real mint" —
- * and `applyMintInfos` still stamps `checkedAt` on it so a pass does not spin.
+ * A row with no `probedAt` is "not probed yet", NOT "real mint" — and
+ * `applyMintInfos` still stamps `checkedAt` on it so a pass does not spin.
  * Re-asking on the daily clock therefore left an unprobed mint counted as real
- * for a whole day, and every account-scoped decision in between trusted it: a
- * captured session offered "as Onchain" for 1 sat because the only mint that
- * could serve it was an unclassified testnut, and the rail vanished the moment
- * an unrelated discovery call supplied the verdict.
+ * for a whole day, so unanswered mints retry sooner.
  */
 const UNPROBED_RECHECK_MS = 10 * 60 * 1000;
 
-/** nagg unreachable: leave it alone for a minute rather than retry per trigger. */
+/** Probe pass failed: leave it alone for a minute rather than retry per trigger. */
 const FAILURE_BACKOFF_MS = 60 * 1000;
 
 let inflight: Promise<void> | null = null;

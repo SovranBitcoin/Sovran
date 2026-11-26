@@ -624,9 +624,10 @@ export const discoverMints = ({ limit, signal }: { limit?: number; signal?: Abor
 export const MINT_INFO_MAX_URLS = 50;
 
 /**
- * Resolve mint testnut verdicts via enabled auditors (MintRadar `isTest`)
- * while preserving any existing saved verdicts so a plain `/v1/info` probe
- * never overwrites a known test mint as a real mainnet mint.
+ * Resolve mint testnut verdicts locally via NUT-04 unpaid-quote probes (plus
+ * known testnut hosts), falling back to enabled auditors only for mints that
+ * did not answer the local probe. Never downgrades a saved testnut verdict
+ * without a fresh probe.
  */
 export const fetchMintInfos = async (
   mintUrls: readonly string[],
@@ -638,28 +639,64 @@ export const fetchMintInfos = async (
   const { useMintTestnutStore } = require('@/shared/stores/global/mintTestnutStore') as {
     useMintTestnutStore: typeof import('@/shared/stores/global/mintTestnutStore').useMintTestnutStore;
   };
-  const discovered = await discoverMints({ signal: controls?.signal });
-  if (discovered.isErr()) return err(discovered.error);
-  const byKey = new Map(
-    discovered.value.mints.map((m) => [normalizeMintUrlKey(m.mintUrl), m] as const)
-  );
+  const { probeMintTestnut } = require('@/shared/lib/cashu/testnutProbe') as {
+    probeMintTestnut: typeof import('@/shared/lib/cashu/testnutProbe').probeMintTestnut;
+  };
+
   const existing = useMintTestnutStore.getState().byMintUrl;
   const nowSec = Math.floor(Date.now() / 1000);
+
+  // Run local NUT-04 unpaid-quote probes with bounded concurrency (max 4).
+  const probeResults = new Map<string, boolean | null>();
+  const CONCURRENCY = 4;
+  for (let i = 0; i < mintUrls.length; i += CONCURRENCY) {
+    const batch = mintUrls.slice(i, i + CONCURRENCY);
+    const settled = await Promise.all(
+      batch.map(async (mintUrl) => {
+        const verdict = await probeMintTestnut(mintUrl, { signal: controls?.signal });
+        return [mintUrl, verdict] as const;
+      })
+    );
+    for (const [mintUrl, verdict] of settled) {
+      probeResults.set(mintUrl, verdict);
+    }
+  }
+
+  // Only consult multi-auditor discovery for mints whose local probe was indeterminate.
+  const unresolved = mintUrls.filter((mintUrl) => probeResults.get(mintUrl) === null);
+  let auditorByKey = new Map<string, DiscoverMint>();
+  if (unresolved.length > 0 && !controls?.signal?.aborted) {
+    const discovered = await discoverMints({ signal: controls?.signal });
+    if (discovered.isOk()) {
+      auditorByKey = new Map(
+        discovered.value.mints.map((m) => [normalizeMintUrlKey(m.mintUrl), m] as const)
+      );
+    }
+  }
 
   return ok(
     mintUrls.map((mintUrl) => {
       const key = normalizeMintUrlKey(mintUrl);
-      const found = byKey.get(key);
+      const localVerdict = probeResults.get(mintUrl) ?? null;
+      const found = auditorByKey.get(key);
       const saved = existing[key];
-      // Only trust an explicit auditor verdict; never downgrade a saved testnut.
       const hasAuditedVerdict = found?.hasAudit === true && typeof found.testnut === 'boolean';
+      const hasVerdict = localVerdict !== null || hasAuditedVerdict;
       const testnut =
-        saved?.testnut === true ? true : hasAuditedVerdict ? (found.testnut as boolean) : false;
+        localVerdict !== null
+          ? saved?.testnut === true
+            ? true
+            : localVerdict
+          : saved?.testnut === true
+            ? true
+            : hasAuditedVerdict
+              ? (found.testnut as boolean)
+              : false;
       return {
         mintUrl,
         testnut,
-        known: Boolean(found),
-        ...(hasAuditedVerdict ? { probedAt: nowSec } : {}),
+        known: localVerdict !== null || Boolean(found),
+        ...(hasVerdict ? { probedAt: nowSec } : {}),
         ...(found?.operatorPubkey ? { operatorPubkey: found.operatorPubkey } : {}),
       };
     })
