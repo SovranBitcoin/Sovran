@@ -3,21 +3,17 @@ import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
-  useAnimatedProps,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 import Svg, {
   Circle,
   ClipPath,
   Defs,
-  FeGaussianBlur,
-  Filter,
   G,
   Path,
   RadialGradient,
@@ -27,7 +23,7 @@ import Svg, {
 } from 'react-native-svg';
 
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
-import { generateTierRingTheme, type TierRingBlob } from '@/shared/lib/avatarGradient';
+import { generateTierRingTheme } from '@/shared/lib/avatarGradient';
 import { PROFILE_TIER_LABEL, type ProfileTier } from '@/shared/lib/profile/profileTier';
 
 // Geometry at the profile avatar's reference size (90); everything scales
@@ -42,20 +38,15 @@ const OUTER_MARGIN = 3; // layout reserved outside the band
 /** Where the lettering is centred, in degrees (0 = right, 90 = bottom). */
 const LABEL_ANGLE = 45;
 const LABEL_SPAN = 110;
-/**
- * The glow's blurred stroke reaches well past the layout box; the canvas is
- * drawn larger than the box (a bleed) so no side ever clips it.
- */
+/** The glow reaches past the layout box; the canvas bleeds so no side clips it. */
 const BLEED = GLOW_STROKE / 2 + GLOW_BLUR * 2.5;
 /** One seamless loop of the film: a slow sheen, never something you watch. */
 const LOOP_MS = 60_000;
 /** Entrance: the film rushes through a stretch of its loop while the ring fades and scales in. */
 const INTRO_MS = 900;
 const INTRO_LOOP = 0.04;
-const TAU = Math.PI * 2;
 /** Blobs are a sheen, not patches. */
-const BLOB_OPACITY = 0.3;
-const BREATH = 0.12;
+const BLOB_OPACITY = 0.35;
 
 /** How far the ring layout extends beyond the avatar on each side. */
 export function profileTierRingInset(size: number): number {
@@ -75,21 +66,16 @@ interface ProfileTierRingProps {
 }
 
 /**
- * The tier ring around a profile avatar, built from three references:
- * Primal's legend avatars (a thin two-tone metal band plus a coloured glow),
- * the "glow border" pattern (a blurred copy of the band under a sharp
- * one), and the CSS soap-bubble recipe (a film whose colours move around the
- * circumference, a specular kiss at the upper left, a thin refractive rim).
+ * The tier ring around a profile avatar: a coloured radial glow, two-tone metal
+ * band, drifting iridescent colour film, fixed upper-left bevel + specular
+ * kisses, thin inner rim, and the tier name engraved on the lower-right rim.
  *
- * The film is not a rotating gradient: it is a handful of soft colour blobs
- * that drift around the band at their own speeds and directions, wobbling
- * and breathing, clipped to the band — on a seamless loop. Layers, bottom to
- * top: blurred glow (band + blobs) → band → blobs → bevel (light arc
- * upper-left, shade arc lower-right) → specular kisses → inner rim → the
- * tier name engraved into the band at the lower right like a coin's rim
- * inscription. The lighting layers do not move, so the ring reads as a lit
- * object with colour moving through it. Layout is reserved even without a
- * tier, so the avatar never moves when the tier resolves.
+ * Performance: zero `<FeGaussianBlur>` filters and zero `useAnimatedProps` on
+ * SVG nodes (both force synchronous CoreImage / CoreGraphics re-rasterization
+ * every frame on iOS). Instead, soft `<RadialGradient>`s draw the glow and
+ * speculars statically once, and the iridescent colour film rotates on its own
+ * GPU-composited `<Animated.View>` (`transform: [{ rotate }]`) underneath the
+ * fixed lighting and inscription layer.
  */
 export function ProfileTierRing({ tier, seed, size, background, children }: ProfileTierRingProps) {
   const uid = useId();
@@ -103,23 +89,12 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const ringRadius = size / 2 + (GAP + STROKE / 2) * scale;
   const bandWidth = STROKE * scale;
   const fontSize = LABEL_FONT * scale;
-  // Inscribed ON the band: the path IS the band's centre line and the text is
-  // set on its central baseline, so the letters sit centred in the metal
-  // without guessing at font metrics.
   const labelRadius = ringRadius;
   const labelArcLength = (labelRadius * LABEL_SPAN * Math.PI) / 180;
   const theme = useMemo(() => (tier ? generateTierRingTheme(tier, seed) : null), [tier, seed]);
-  // The blobs are clipped to the band: an annulus, two circles filled even-odd.
   const band = `${circlePath(center, ringRadius + bandWidth / 2)} ${circlePath(center, ringRadius - bandWidth / 2)}`;
   const id = (name: string) => `${uid}-${name}`;
 
-  // The tier is rarely known on the first frame (counts and score land after
-  // the header). When it resolves the ring fades and scales in while the film
-  // rushes through a stretch of its loop, then settles into its slow drift.
-  // The perpetual tick is skipped under reduced motion and on the Android e2e
-  // lane (uiautomator never reaches idle with one running); the entrance is
-  // instant under reduced motion. Keyed on the tier and seed, never the theme
-  // object — this header re-renders constantly and must not replay the entrance.
   const clock = useSharedValue(0);
   const appear = useSharedValue(0);
   const animate = !!tier && !reducedMotion && !IS_ANDROID_E2E;
@@ -139,8 +114,6 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
     clock.value = -INTRO_LOOP;
     clock.value = withSequence(
       withTiming(0, { duration: INTRO_MS, easing: Easing.out(Easing.cubic) }),
-      // Every blob term is a whole number of cycles per loop, and the loop
-      // restarts from 0 on each repeat: seamless.
       withRepeat(withTiming(1, { duration: LOOP_MS, easing: Easing.linear }), -1, false)
     );
     return () => {
@@ -148,14 +121,16 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
       cancelAnimation(appear);
     };
   }, [animate, appear, clock, seed, tier]);
+
   const entrance = useAnimatedStyle(() => ({
     opacity: appear.value,
     transform: [{ scale: 0.9 + 0.1 * appear.value }],
   }));
 
-  // Lower-right arc travelled bottom → right (decreasing angle, sweep 0), so
-  // the glyph tops point at the centre and the word reads upright-ish where a
-  // coin's rim lettering would.
+  const filmSpin = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${clock.value * 360}deg` }],
+  }));
+
   const labelFrom = polar(center, center, labelRadius, LABEL_ANGLE + LABEL_SPAN / 2);
   const labelTo = polar(center, center, labelRadius, LABEL_ANGLE - LABEL_SPAN / 2);
   const labelPath = `M ${labelFrom.x} ${labelFrom.y} A ${labelRadius} ${labelRadius} 0 0 0 ${labelTo.x} ${labelTo.y}`;
@@ -164,68 +139,39 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const kiss = polar(center, center, ringRadius, 225);
   const kiss2 = polar(center, center, ringRadius, 135);
 
+  const glowPeak = ringRadius / center;
+  const glowSpread = ((GLOW_STROKE * 0.5 + GLOW_BLUR * 1.6) * scale) / center;
+  const glowInner = Math.max(0, glowPeak - glowSpread);
+  const glowOuter = Math.min(1, glowPeak + glowSpread);
+
+  const canvasBox = {
+    position: 'absolute' as const,
+    left: -bleed,
+    top: -bleed,
+    width: canvas,
+    height: canvas,
+  };
+
   return (
     <View style={{ width: outer, height: outer }} testID="profile-tier-ring">
       {theme && tier ? (
         <Animated.View style={[StyleSheet.absoluteFill, entrance]} pointerEvents="none">
+          {/* Layer 1: static outer radial glow + base metal band */}
           <Svg
-            style={{
-              position: 'absolute',
-              left: -bleed,
-              top: -bleed,
-              width: canvas,
-              height: canvas,
-            }}
+            style={canvasBox}
             width={canvas}
             height={canvas}
             viewBox={`0 0 ${canvas} ${canvas}`}
             pointerEvents="none"
             accessibilityLabel={`${PROFILE_TIER_LABEL[tier]} tier`}>
             <Defs>
-              <Path id={id('label-path')} d={labelPath} />
-              <ClipPath id={id('band')}>
-                <Path d={band} clipRule="evenodd" />
-              </ClipPath>
-              <BlurFilter id={id('blur-glow')} size={canvas} blur={GLOW_BLUR * scale} />
-              <BlurFilter id={id('blur-light')} size={canvas} blur={0.9 * scale} />
-              <BlurFilter id={id('blur-shade')} size={canvas} blur={1.1 * scale} />
-              <BlurFilter id={id('blur-kiss')} size={canvas} blur={1.3 * scale} />
-              <BlurFilter id={id('blur-kiss2')} size={canvas} blur={1 * scale} />
-              {theme.blobs.map((blob, index) => (
-                // objectBoundingBox (the default) centres each gradient on its
-                // own moving circle, so the colour travels with the blob.
-                <RadialGradient key={index} id={id(`blob-${index}`)} cx="50%" cy="50%" r="50%">
-                  <Stop offset={0} stopColor={blob.color} />
-                  <Stop offset={0.3} stopColor={blob.color} />
-                  <Stop offset={1} stopColor={blob.color} stopOpacity={0} />
-                </RadialGradient>
-              ))}
+              <RadialGradient id={id('glow-ring')} cx="50%" cy="50%" r="50%">
+                <Stop offset={glowInner} stopColor={theme.glow} stopOpacity={0} />
+                <Stop offset={glowPeak} stopColor={theme.glow} stopOpacity={0.5} />
+                <Stop offset={glowOuter} stopColor={theme.glow} stopOpacity={0} />
+              </RadialGradient>
             </Defs>
-            {/* glow: the band and its blobs, wide and blurred, under everything */}
-            <G opacity={0.55}>
-              <Circle
-                cx={center}
-                cy={center}
-                r={ringRadius}
-                fill="none"
-                strokeWidth={GLOW_STROKE * scale}
-                stroke={theme.glow}
-                filter={`url(#${id('blur-glow')})`}
-              />
-              {theme.blobs.map((blob, index) => (
-                <FilmBlob
-                  key={index}
-                  blob={blob}
-                  fill={`url(#${id(`blob-${index}`)})`}
-                  clock={clock}
-                  center={center}
-                  ringRadius={ringRadius}
-                  bandWidth={bandWidth}
-                  filter={`url(#${id('blur-glow')})`}
-                />
-              ))}
-            </G>
-            {/* the band, and the blobs drifting through it */}
+            <Circle cx={center} cy={center} r={center} fill={`url(#${id('glow-ring')})`} />
             <Circle
               cx={center}
               cy={center}
@@ -234,52 +180,97 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               strokeWidth={bandWidth}
               stroke={theme.base}
             />
-            <G clipPath={`url(#${id('band')})`}>
-              {theme.blobs.map((blob, index) => (
-                <FilmBlob
-                  key={index}
-                  blob={blob}
-                  fill={`url(#${id(`blob-${index}`)})`}
-                  clock={clock}
-                  center={center}
-                  ringRadius={ringRadius}
-                  bandWidth={bandWidth}
-                />
-              ))}
-            </G>
-            {/* bevel: lit from the upper left, shaded lower right */}
+          </Svg>
+
+          {/* Layer 2: GPU-rotated iridescent colour film (0% CPU, no SVG re-rasterization) */}
+          <Animated.View style={[canvasBox, filmSpin]} pointerEvents="none">
+            <Svg
+              width={canvas}
+              height={canvas}
+              viewBox={`0 0 ${canvas} ${canvas}`}
+              pointerEvents="none">
+              <Defs>
+                <ClipPath id={id('band')}>
+                  <Path d={band} clipRule="evenodd" />
+                </ClipPath>
+                {theme.blobs.map((blob, index) => (
+                  <RadialGradient key={index} id={id(`blob-${index}`)} cx="50%" cy="50%" r="50%">
+                    <Stop offset={0} stopColor={blob.color} />
+                    <Stop offset={0.35} stopColor={blob.color} />
+                    <Stop offset={1} stopColor={blob.color} stopOpacity={0} />
+                  </RadialGradient>
+                ))}
+              </Defs>
+              <G opacity={0.35}>
+                {theme.blobs.map((blob, index) => {
+                  const cx = center + ringRadius * Math.cos(blob.angle);
+                  const cy = center + ringRadius * Math.sin(blob.angle);
+                  return (
+                    <Circle
+                      key={index}
+                      cx={cx}
+                      cy={cy}
+                      r={blob.radius * bandWidth * 1.45}
+                      fill={`url(#${id(`blob-${index}`)})`}
+                      opacity={BLOB_OPACITY}
+                    />
+                  );
+                })}
+              </G>
+              <G clipPath={`url(#${id('band')})`}>
+                {theme.blobs.map((blob, index) => {
+                  const cx = center + ringRadius * Math.cos(blob.angle);
+                  const cy = center + ringRadius * Math.sin(blob.angle);
+                  return (
+                    <Circle
+                      key={index}
+                      cx={cx}
+                      cy={cy}
+                      r={blob.radius * bandWidth}
+                      fill={`url(#${id(`blob-${index}`)})`}
+                      opacity={BLOB_OPACITY}
+                    />
+                  );
+                })}
+              </G>
+            </Svg>
+          </Animated.View>
+
+          {/* Layer 3: fixed lighting (bevel, specular kisses, inner rim) + engraved inscription */}
+          <Svg
+            style={canvasBox}
+            width={canvas}
+            height={canvas}
+            viewBox={`0 0 ${canvas} ${canvas}`}
+            pointerEvents="none">
+            <Defs>
+              <Path id={id('label-path')} d={labelPath} />
+              <RadialGradient id={id('kiss-1')} cx="50%" cy="50%" r="50%">
+                <Stop offset={0} stopColor="rgba(255,255,255,0.95)" />
+                <Stop offset={0.45} stopColor="rgba(255,255,255,0.6)" />
+                <Stop offset={1} stopColor="rgba(255,255,255,0)" />
+              </RadialGradient>
+              <RadialGradient id={id('kiss-2')} cx="50%" cy="50%" r="50%">
+                <Stop offset={0} stopColor="rgba(255,255,255,0.55)" />
+                <Stop offset={1} stopColor="rgba(255,255,255,0)" />
+              </RadialGradient>
+            </Defs>
             <Path
               d={light}
               fill="none"
               strokeWidth={1.6 * scale}
               strokeLinecap="round"
-              stroke="rgba(255,255,255,0.78)"
-              filter={`url(#${id('blur-light')})`}
+              stroke="rgba(255,255,255,0.68)"
             />
             <Path
               d={shade}
               fill="none"
               strokeWidth={1.6 * scale}
               strokeLinecap="round"
-              stroke="rgba(0,0,0,0.32)"
-              filter={`url(#${id('blur-shade')})`}
+              stroke="rgba(0,0,0,0.28)"
             />
-            {/* specular kisses */}
-            <Circle
-              cx={kiss.x}
-              cy={kiss.y}
-              r={2 * scale}
-              fill="rgba(255,255,255,0.95)"
-              filter={`url(#${id('blur-kiss')})`}
-            />
-            <Circle
-              cx={kiss2.x}
-              cy={kiss2.y}
-              r={1.1 * scale}
-              fill="rgba(255,255,255,0.5)"
-              filter={`url(#${id('blur-kiss2')})`}
-            />
-            {/* thin refractive rim on the inside edge */}
+            <Circle cx={kiss.x} cy={kiss.y} r={3.6 * scale} fill={`url(#${id('kiss-1')})`} />
+            <Circle cx={kiss2.x} cy={kiss2.y} r={2.2 * scale} fill={`url(#${id('kiss-2')})`} />
             <Circle
               cx={center}
               cy={center}
@@ -288,9 +279,6 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               strokeWidth={0.8 * scale}
               stroke="rgba(255,255,255,0.28)"
             />
-            {/* engraved: a dark copy offset toward the light (up-left, i.e. toward
-                the centre on this arc), a light face on top — the cut edge shows
-                as the dark sliver along the letters' upper-left */}
             <Text
               fill={theme.inkDark}
               fontSize={fontSize}
@@ -329,63 +317,6 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
         {children}
       </View>
     </View>
-  );
-}
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-/** A Gaussian blur over the whole canvas (so a wide glow is never cropped). */
-function BlurFilter({ id, size, blur }: { id: string; size: number; blur: number }) {
-  return (
-    <Filter id={id} filterUnits="userSpaceOnUse" x={0} y={0} width={size} height={size}>
-      <FeGaussianBlur stdDeviation={blur} />
-    </Filter>
-  );
-}
-
-/**
- * One blob of colour drifting around the band: its centre rides the ring's
- * centre line at `angle + turns·clock + wobble·sin(…)`, and its radius
- * breathes. Every term is a whole number of cycles per loop, so the loop
- * wraps without a jump. Position and radius are computed on the UI thread.
- */
-function FilmBlob({
-  blob,
-  fill,
-  clock,
-  center,
-  ringRadius,
-  bandWidth,
-  filter,
-}: {
-  blob: TierRingBlob;
-  fill: string;
-  clock: SharedValue<number>;
-  center: number;
-  ringRadius: number;
-  bandWidth: number;
-  filter?: string;
-}) {
-  const animatedProps = useAnimatedProps(() => {
-    const t = clock.value;
-    const angle =
-      blob.angle + blob.turns * TAU * t + blob.wobble * Math.sin(TAU * blob.wobbleCycles * t);
-    return {
-      cx: center + ringRadius * Math.cos(angle),
-      cy: center + ringRadius * Math.sin(angle),
-      r:
-        blob.radius * bandWidth * (1 + BREATH * Math.sin(TAU * blob.breathCycles * t + blob.phase)),
-    };
-  });
-  // Translucent with a long, gentle falloff: the colour diffuses into the
-  // band rather than sitting on it as a spot.
-  return (
-    <AnimatedCircle
-      animatedProps={animatedProps}
-      fill={fill}
-      opacity={BLOB_OPACITY}
-      filter={filter}
-    />
   );
 }
 
