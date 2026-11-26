@@ -136,9 +136,20 @@ jest.mock('react-native-web/dist/exports/AppState', () => ({
   __esModule: true,
   default: { currentState: 'active', addEventListener: () => ({ remove: () => {} }) },
 }));
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
-}));
+// A real context, so the preview's close-button inset reaches the page it frames.
+jest.mock('react-native-safe-area-context', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const SafeAreaInsetsContext = ReactActual.createContext({
+    top: 47,
+    bottom: 34,
+    left: 0,
+    right: 0,
+  });
+  return {
+    SafeAreaInsetsContext,
+    useSafeAreaInsets: () => ReactActual.useContext(SafeAreaInsetsContext),
+  };
+});
 jest.mock('react-native-reanimated', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const shared = <T,>(initial: T) => {

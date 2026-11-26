@@ -20,9 +20,11 @@ import {
   type UiKitFilter,
 } from '@/features/settings/design-system/uiKit';
 import { SettingsDesignSystemScrubberScreen } from '@/features/settings/screens/SettingsDesignSystemScrubberScreen';
+import { SettingsDesignSystemTimelineScreen } from '@/features/settings/screens/SettingsDesignSystemTimelineScreen';
 import { SettingsDesignSystemUiKitScreen } from '@/features/settings/screens/SettingsDesignSystemUiKitScreen';
 import { CapabilityProvider, type Capabilities } from '@/shared/ui/capability';
 import { PillTabs } from '@/shared/ui/composed/PillTabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 
 const CAPABILITIES: Capabilities = {
   liquidGlass: false,
@@ -71,9 +73,27 @@ jest.mock('liquid-glass-text', () => ({ LiquidGlassText: 'LiquidGlassText' }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
 
 // The page frame owns navigation, headers and safe areas; none of it is under test.
-jest.mock('@/shared/ui/composed/Screen', () => ({
-  Screen: ({ children }: { children?: React.ReactNode }) => children,
-}));
+// Pinned chrome (`stickyContent`) is drawn before the page, as the frame does.
+jest.mock('@/shared/ui/composed/Screen', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Screen: ({
+      children,
+      stickyContent,
+    }: {
+      children?: React.ReactNode;
+      stickyContent?: React.ReactNode;
+    }) =>
+      ReactActual.createElement(
+        ReactActual.Fragment,
+        null,
+        stickyContent
+          ? ReactActual.createElement('sticky-content', { testID: 'screen-sticky' }, stickyContent)
+          : null,
+        children
+      ),
+  };
+});
 jest.mock('@/shared/ui/composed/ScreenScrollView', () => ({ ScreenScrollView: 'ScrollView' }));
 
 // Both resolve per platform in the app; the test draws the non-glass tier.
@@ -391,6 +411,17 @@ describe('State-locked UI kit screen', () => {
     }
   });
 
+  it('pins the filter bar above the scrolling states', () => {
+    const view = render(<SettingsDesignSystemUiKitScreen />, { wrapper: Wrapper });
+    try {
+      const pinned = screen.getByTestId('screen-sticky');
+      expect(pinned.findByType(PillTabs).props.tabs).toEqual(UI_KIT_FILTERS);
+      expect(pinned.findAllByProps({ testID: 'design-system-ui-kit-count' })).toHaveLength(0);
+    } finally {
+      view.unmount();
+    }
+  });
+
   it('marks the chosen pill selected and counts its states', () => {
     const view = render(<SettingsDesignSystemUiKitScreen />, { wrapper: Wrapper });
     try {
@@ -543,6 +574,30 @@ describe('Animation frame scrubber screen', () => {
       expect(stylesUnder('design-system-scrub-selectable-check').map((s) => s.opacity)).toContain(
         0.375
       );
+    } finally {
+      view.unmount();
+    }
+  });
+});
+
+describe('Timeline screen', () => {
+  it('pins the payment-type tabs and path pills under the header, outside the scroll', () => {
+    const view = render(<SettingsDesignSystemTimelineScreen />, { wrapper: Wrapper });
+    try {
+      const pinned = screen.getByTestId('screen-sticky');
+      expect(pinned.findByType(UnderlineTabs).props.tabs).toEqual([
+        'Cashu',
+        'Locked',
+        'Lightning',
+        'Onchain',
+        'Request',
+      ]);
+      expect(pinned.findAllByType(PillTabs)).toHaveLength(1);
+      // The transport controls scroll with the page.
+      expect(pinned.findAllByProps({ testID: 'design-system-timeline-step' })).toHaveLength(0);
+      expect(
+        screen.UNSAFE_root.findAllByProps({ testID: 'design-system-timeline-step' }).length
+      ).toBeGreaterThan(0);
     } finally {
       view.unmount();
     }

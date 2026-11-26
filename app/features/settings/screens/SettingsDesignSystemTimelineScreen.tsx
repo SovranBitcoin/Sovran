@@ -1,4 +1,3 @@
-import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -121,139 +120,140 @@ export function SettingsDesignSystemTimelineScreen() {
   };
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemTimelineScreen" scroll="custom" safeArea="scroll">
-      {/* Receive-hub-style header: full-bleed top-level method tabs, then the
-          scenario pill row — hairline separators on each band. */}
-      <View style={[styles.tabBand, { borderBottomColor: separator }]}>
-        <UnderlineTabs
-          tabs={groups}
-          selectedTab={selectedScenario.group}
-          handleTabPress={onSelectGroup}
+    <ScreenWrapper
+      name="SettingsDesignSystemTimelineScreen"
+      // Receive-hub chrome, pinned under the header as Receive pins it: the
+      // scroll content starts below both bands and passes under them.
+      headerAppearance="opaque"
+      stickyContent={
+        <>
+          <View style={[styles.tabBand, { borderBottomColor: separator }]}>
+            <UnderlineTabs
+              tabs={groups}
+              selectedTab={selectedScenario.group}
+              handleTabPress={onSelectGroup}
+            />
+          </View>
+          <View style={[styles.pillBand, { borderBottomColor: separator }]}>
+            <PillTabs
+              tabs={variants}
+              activeTab={selectedScenario.variant}
+              onTabChange={onSelectVariant}
+            />
+          </View>
+        </>
+      }>
+      <Text size={12} className="text-foreground/60 mb-4 mt-2">
+        The payment{' '}
+        <Text size={12} bold className="text-foreground">
+          Timeline
+        </Text>{' '}
+        only ever adds rows: every finished step stays, in the past tense, above the one step being
+        waited on. Pick a payment type, then a path through it, and watch it step from the first
+        state to the last.
+      </Text>
+
+      {/* Cancel the page's 16px padding so the Timeline's own 16px margin aligns with the cards. */}
+      <View style={{ marginHorizontal: -16 }}>
+        <HistoryEntryTimeline
+          key={`${selectedScenarioId}:${loopIteration}`}
+          historyEntry={currentFrame.historyEntry}
+          meltQuote={currentFrame.meltQuote}
+          tokenCreated={currentFrame.tokenCreated}
+          nostrSent={currentFrame.nostrSent}
+          onchainConfirmationProgress={currentFrame.onchainConfirmationProgress}
+          onchainSettledInternally={currentFrame.onchainSettledInternally}
+          cancelling={currentFrame.cancelling}
         />
       </View>
-      <View style={[styles.pillBand, { borderBottomColor: separator }]}>
-        <PillTabs
-          tabs={variants}
-          activeTab={selectedScenario.variant}
-          onTabChange={onSelectVariant}
-        />
-      </View>
 
-      <ScreenScrollView className="px-4">
-        <Text size={12} className="text-foreground/60 mb-4 mt-2">
-          The payment{' '}
-          <Text size={12} bold className="text-foreground">
-            Timeline
-          </Text>{' '}
-          only ever adds rows: every finished step stays, in the past tense, above the one step
-          being waited on. Pick a payment type, then a path through it, and watch it step from the
-          first state to the last.
-        </Text>
+      <Card variant="secondary" className="mb-4 mt-3">
+        <Card.Body className="gap-4 py-6">
+          <VStack align="center" gap={2}>
+            <Text size={11} bold className="text-foreground/50 tracking-widest">
+              {selectedScenario.label.toUpperCase()}
+            </Text>
+            <Text size={18} bold className="text-foreground">
+              {currentFrame.note}
+            </Text>
+            <Text size={11} className="text-foreground/50">
+              Step {Math.min(frameIndex, frameCount - 1) + 1}/{frameCount}
+            </Text>
+          </VStack>
 
-        {/* Cancel the ScrollView's px-4 so the Timeline's own 16px margin aligns with the cards. */}
-        <View style={{ marginHorizontal: -16 }}>
-          <HistoryEntryTimeline
-            key={`${selectedScenarioId}:${loopIteration}`}
-            historyEntry={currentFrame.historyEntry}
-            meltQuote={currentFrame.meltQuote}
-            tokenCreated={currentFrame.tokenCreated}
-            nostrSent={currentFrame.nostrSent}
-            onchainConfirmationProgress={currentFrame.onchainConfirmationProgress}
-            onchainSettledInternally={currentFrame.onchainSettledInternally}
-            cancelling={currentFrame.cancelling}
-          />
-        </View>
+          <View className="bg-surface-secondary/40 mt-1 gap-1 rounded-2xl p-4">
+            <Text size={11} bold className="text-foreground/50 tracking-widest">
+              CODE STATE
+            </Text>
+            <Text size={11} className="text-foreground/50">
+              {frameState.source}
+            </Text>
+            <Text
+              size={15}
+              bold
+              className="text-foreground"
+              style={{ fontVariant: ['tabular-nums'] }}>
+              {frameState.code}
+            </Text>
+            <Text size={12} className="text-foreground/70">
+              {frameState.meaning}
+            </Text>
+            {frameState.detail?.length ? (
+              <VStack gap={4} className="mt-2">
+                {frameState.detail.map((row) => (
+                  <HStack key={row.label} justify="space-between" align="center">
+                    <Text size={11} className="text-foreground/50">
+                      {row.label}
+                    </Text>
+                    <Text size={11} className="text-foreground/80">
+                      {row.value}
+                    </Text>
+                  </HStack>
+                ))}
+              </VStack>
+            ) : null}
+          </View>
 
-        <Card variant="secondary" className="mb-4 mt-3">
-          <Card.Body className="gap-4 py-6">
-            <VStack align="center" gap={2}>
-              <Text size={11} bold className="text-foreground/50 tracking-widest">
-                {selectedScenario.label.toUpperCase()}
-              </Text>
-              <Text size={18} bold className="text-foreground">
-                {currentFrame.note}
-              </Text>
-              <Text size={11} className="text-foreground/50">
-                Step {Math.min(frameIndex, frameCount - 1) + 1}/{frameCount}
-              </Text>
-            </VStack>
-
-            <View className="bg-surface-secondary/40 mt-1 gap-1 rounded-2xl p-4">
-              <Text size={11} bold className="text-foreground/50 tracking-widest">
-                CODE STATE
-              </Text>
-              <Text size={11} className="text-foreground/50">
-                {frameState.source}
-              </Text>
-              <Text
-                size={15}
-                bold
-                className="text-foreground"
-                style={{ fontVariant: ['tabular-nums'] }}>
-                {frameState.code}
-              </Text>
-              <Text size={12} className="text-foreground/70">
-                {frameState.meaning}
-              </Text>
-              {frameState.detail?.length ? (
-                <VStack gap={4} className="mt-2">
-                  {frameState.detail.map((row) => (
-                    <HStack key={row.label} justify="space-between" align="center">
-                      <Text size={11} className="text-foreground/50">
-                        {row.label}
-                      </Text>
-                      <Text size={11} className="text-foreground/80">
-                        {row.value}
-                      </Text>
-                    </HStack>
-                  ))}
-                </VStack>
-              ) : null}
+          <HStack gap={8}>
+            <View className="flex-1">
+              <PillButton
+                variant={timelineAuto ? 'primary' : 'secondary'}
+                size="sm"
+                testID="design-system-timeline-auto"
+                accessibilityRole="switch"
+                accessibilityLabel="Auto-play"
+                accessibilityState={{ checked: timelineAuto }}
+                onPress={() => setTimelineAuto((value) => !value)}>
+                <PillButton.Label>{timelineAuto ? 'Pause' : 'Play'}</PillButton.Label>
+              </PillButton>
             </View>
-
-            <HStack gap={8}>
-              <View className="flex-1">
-                <PillButton
-                  variant={timelineAuto ? 'primary' : 'secondary'}
-                  size="sm"
-                  testID="design-system-timeline-auto"
-                  accessibilityRole="switch"
-                  accessibilityLabel="Auto-play"
-                  accessibilityState={{ checked: timelineAuto }}
-                  onPress={() => setTimelineAuto((value) => !value)}>
-                  <PillButton.Label>{timelineAuto ? 'Pause' : 'Play'}</PillButton.Label>
-                </PillButton>
-              </View>
-              <View className="flex-1">
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  text="Step"
-                  testID="design-system-timeline-step"
-                  onPress={onStepFrame}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  text="Reset"
-                  testID="design-system-timeline-reset"
-                  onPress={onResetFrames}
-                />
-              </View>
-            </HStack>
-          </Card.Body>
-        </Card>
-
-        {TIMELINE_FAMILY.scenarios.map((scenario) => (
-          <Section key={scenario.id} title={scenario.title}>
-            <View testID={`design-system-scenario-timeline-${scenario.id}`}>
-              {scenario.render()}
+            <View className="flex-1">
+              <Button
+                variant="secondary"
+                size="compact"
+                text="Step"
+                testID="design-system-timeline-step"
+                onPress={onStepFrame}
+              />
             </View>
-          </Section>
-        ))}
-      </ScreenScrollView>
+            <View className="flex-1">
+              <Button
+                variant="secondary"
+                size="compact"
+                text="Reset"
+                testID="design-system-timeline-reset"
+                onPress={onResetFrames}
+              />
+            </View>
+          </HStack>
+        </Card.Body>
+      </Card>
+
+      {TIMELINE_FAMILY.scenarios.map((scenario) => (
+        <Section key={scenario.id} title={scenario.title}>
+          <View testID={`design-system-scenario-timeline-${scenario.id}`}>{scenario.render()}</View>
+        </Section>
+      ))}
     </ScreenWrapper>
   );
 }

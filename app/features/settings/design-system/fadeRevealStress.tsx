@@ -30,6 +30,26 @@ type FadeStressDiagnosticState = 'animated' | 'visible' | 'hidden' | 'stuck';
 
 export const FADE_STRESS_TILE_COUNT = 45;
 export const FADE_STRESS_CYCLE_MS = 2000;
+
+/** Nine full rows of five. */
+export const FADE_STRESS_COLUMNS = 5;
+/** The page's padding either side of the grid. */
+export const FADE_STRESS_PAGE_PADDING = 16;
+/** The dark field's own padding around its tiles. */
+export const FADE_STRESS_GRID_PADDING = 8;
+export const FADE_STRESS_GRID_GAP = 8;
+
+/**
+ * The tile edge that fits `FADE_STRESS_COLUMNS` to a row at this window
+ * width: the page padding, the grid's own padding and the gaps all come off
+ * first. Floored, so subpixel rounding can never push the last tile of a row
+ * onto the next.
+ */
+export function fadeStressTileSize(windowWidth: number): number {
+  const inner = windowWidth - 2 * FADE_STRESS_PAGE_PADDING - 2 * FADE_STRESS_GRID_PADDING;
+  const tiles = inner - FADE_STRESS_GRID_GAP * (FADE_STRESS_COLUMNS - 1);
+  return Math.max(0, Math.floor(tiles / FADE_STRESS_COLUMNS));
+}
 /** Latest reveal: withDelay caps at 300ms + 350ms timing → 650ms; probe well past it. */
 const PROBE_DEADLINE_MS = 1200;
 const DIAGNOSTIC_TILE_SIZE = 40;

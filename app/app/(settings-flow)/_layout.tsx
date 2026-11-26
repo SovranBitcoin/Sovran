@@ -3,7 +3,8 @@
  *
  * Nested stack for the settings pages. The root Stack presents this group as a
  * pushed page (`slideFromRight('(settings-flow)')` in config/modalScreens.ts);
- * screens within push horizontally with a back header.
+ * screens within push horizontally with a back header. Being a pushed page,
+ * not a sheet, its first screen goes back with the arrow on iOS too.
  */
 
 import { Stack } from 'expo-router';
@@ -37,7 +38,7 @@ const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
   return (
-    <FlowStack>
+    <FlowStack pushed>
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />

@@ -9,9 +9,13 @@ import { Card } from '@/shared/ui/composed/ListGroup';
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import {
   FADE_STRESS_CYCLE_MS,
+  FADE_STRESS_GRID_GAP,
+  FADE_STRESS_GRID_PADDING,
+  FADE_STRESS_PAGE_PADDING,
   FADE_STRESS_TILE_COUNT,
   FADE_STRESS_TILE_VARIANTS,
   FadeStressTile,
+  fadeStressTileSize,
 } from '@/features/settings/design-system/fadeRevealStress';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
@@ -100,10 +104,7 @@ export function SettingsDesignSystemFadeStressScreen() {
     return () => clearInterval(interval);
   }, [auto]);
 
-  const COLUMNS = 5;
-  const GRID_PADDING = 16;
-  const GRID_GAP = 8;
-  const tileSize = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
+  const tileSize = fadeStressTileSize(screenWidth);
 
   return (
     <ScreenWrapper name="SettingsDesignSystemFadeStressScreen" scroll="custom" safeArea="scroll">
@@ -139,7 +140,7 @@ export function SettingsDesignSystemFadeStressScreen() {
           {/* key={cycle} remounts every tile — each cycle re-races mount-commit
               vs the reanimated update batch, exactly like navigating to the
               profile / wallet screens does. */}
-          <View key={cycle} style={[styles.grid, { gap: GRID_GAP }]} testID="fade-stress-grid">
+          <View key={cycle} style={styles.grid} testID="fade-stress-grid">
             {Array.from({ length: FADE_STRESS_TILE_COUNT }, (_, i) => (
               <FadeStressTile
                 key={i}
@@ -166,7 +167,7 @@ export function SettingsDesignSystemFadeStressScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    padding: 16,
+    padding: FADE_STRESS_PAGE_PADDING,
   },
   statsCard: {
     padding: 12,
@@ -176,6 +177,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     backgroundColor: '#101014',
     borderRadius: 12,
-    padding: 8,
+    padding: FADE_STRESS_GRID_PADDING,
+    gap: FADE_STRESS_GRID_GAP,
   },
 });

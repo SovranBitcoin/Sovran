@@ -14,10 +14,21 @@
  * The rows navigate through the same helpers the wallet uses. The entries are
  * the Timeline page's scenarios (`designSystemTimelineScenarios`), so a state
  * added there appears here too.
+ *
+ * A pinned jump index (options, each payment type, profiles, mints) scrolls
+ * to its section and follows the scroll, so the options stay one tap away.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+} from 'react-native';
 import type { HistoryEntry } from '@cashu/coco-core';
+
+import { activeJumpSection } from '@/features/settings/design-system/jumpIndex';
 
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -28,7 +39,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { ListRow } from '@/shared/ui/composed/ListRow';
-import { PillTabs } from '@/shared/ui/composed/PillTabs';
+import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { SectionHeading } from '@/shared/ui/composed/SectionHeading';
@@ -36,7 +47,10 @@ import { Surface, useSurfaceInset } from '@/shared/ui/composed/Surface';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
-import { buildTimelineScenarios } from './designSystemTimelineScenarios';
+import {
+  buildTimelineScenarios,
+  type TimelineScenarioGroup,
+} from './designSystemTimelineScenarios';
 
 const UNITS = ['sat', 'usd', 'eur'] as const;
 type Unit = (typeof UNITS)[number];
@@ -81,6 +95,18 @@ const MINTS = [
   { id: 'dead', title: 'A mint that does not', mintUrl: 'https://mint.example' },
 ] as const;
 
+type JumpSection = 'options' | TimelineScenarioGroup | 'profiles' | 'mints' | 'wallet';
+
+const JUMP_LABEL: Record<Exclude<JumpSection, TimelineScenarioGroup>, string> = {
+  options: 'Options',
+  profiles: 'Profiles',
+  mints: 'Mints',
+  wallet: 'Your mints',
+};
+const jumpLabel = (section: JumpSection) =>
+  section in JUMP_LABEL ? JUMP_LABEL[section as keyof typeof JUMP_LABEL] : section;
+const jumpTestID = (section: JumpSection) => `ds-screens-jump-${section.toLowerCase()}`;
+
 function withVariant(entry: HistoryEntry, unit: Unit, locked: boolean): HistoryEntry {
   return asHistoryEntry({
     ...entry,
@@ -104,135 +130,217 @@ export function SettingsDesignSystemScreensScreen() {
 
   // Fixed for the life of the screen so rows keep their timestamps.
   const scenarios = useMemo(() => buildTimelineScenarios(Date.now() - 5 * 60 * 1000), []);
+  const groups = useMemo(() => [...new Set(scenarios.map((s) => s.group))], [scenarios]);
+  const sections = useMemo<readonly JumpSection[]>(
+    () => ['options', ...groups, 'profiles', 'mints', 'wallet'],
+    [groups]
+  );
+
+  // Section tops inside the content frame. The frame starts right below the
+  // pinned index, so scrolling to a top puts that section just under it.
+  const scrollRef = useRef<ScrollView>(null);
+  const offsets = useRef<Partial<Record<JumpSection, number>>>({});
+  // A jump's own scroll animation must not walk the index back through the
+  // sections it passes; clear once the jump settles (momentum end or fallback
+  // timeout for accessibility/non-drag scrolling) or on the next touch drag.
+  const jumping = useRef(false);
+  const jumpResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [active, setActive] = useState<JumpSection>('options');
+
+  const clearJump = () => {
+    jumping.current = false;
+    if (jumpResetTimer.current !== null) {
+      clearTimeout(jumpResetTimer.current);
+      jumpResetTimer.current = null;
+    }
+  };
+
+  useEffect(() => clearJump, []);
+
+  const measure = (section: JumpSection) => (event: LayoutChangeEvent) => {
+    offsets.current[section] = event.nativeEvent.layout.y;
+  };
+  const jump = (section: JumpSection) => {
+    clearJump();
+    jumping.current = true;
+    setActive(section);
+    scrollRef.current?.scrollTo({ y: offsets.current[section] ?? 0, animated: true });
+    jumpResetTimer.current = setTimeout(clearJump, 600);
+  };
+  const onScroll = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (jumping.current) return;
+    const y = nativeEvent.contentOffset.y;
+    const atEnd =
+      y > 0 && y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 1;
+    const next = activeJumpSection(sections, offsets.current, y, atEnd);
+    if (next) setActive(next);
+  };
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemScreensScreen" scroll="custom" safeArea="scroll">
+    <ScreenWrapper
+      name="SettingsDesignSystemScreensScreen"
+      scroll="custom"
+      safeArea="scroll"
+      headerAppearance="opaque"
+      stickyContentHeight={PILL_TABS_HEIGHT}
+      stickyContent={
+        <View className="border-separator border-b">
+          <PillTabs
+            tabs={sections}
+            activeTab={active}
+            onTabChange={jump}
+            labelFor={jumpLabel}
+            testIDFor={jumpTestID}
+          />
+        </View>
+      }>
       <ScreenScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        onScrollBeginDrag={clearJump}
+        onMomentumScrollEnd={clearJump}
         contentContainerStyle={{
-          gap: paint.style.space.group,
+          paddingTop: PILL_TABS_HEIGHT + paint.style.space.item,
           paddingHorizontal: paint.style.space.gutter,
         }}>
-        <Text size={13} color={paint.text.secondary}>
-          Real screens on made-up data. Nothing here moves money: the entries exist only on this
-          page, and their mint is not a real one.
-        </Text>
-
-        <View style={{ gap: paint.style.space.item }}>
-          <Control label="Unit">
-            <PillTabs
-              tabs={UNITS}
-              activeTab={unit}
-              onTabChange={setUnit}
-              labelFor={(tab) => tab.toUpperCase()}
-              testIDFor={(tab) => `ds-screens-unit-${tab}`}
-            />
-          </Control>
-          <Control label="Lock">
-            <PillTabs
-              tabs={LOCKS}
-              activeTab={lock}
-              onTabChange={setLock}
-              testIDFor={(tab) => `ds-screens-lock-${tab.toLowerCase()}`}
-            />
-          </Control>
-          <Control label="Bitcoin display · changes your setting">
-            <PillTabs
-              tabs={BTC_DISPLAYS}
-              activeTab={BTC_DISPLAYS.find((d) => d === String(displayBtc)) ?? '3'}
-              onTabChange={(tab) => setDisplayBtc(Number(tab))}
-              labelFor={(tab) => BTC_DISPLAY_LABEL[tab]}
-              testIDFor={(tab) => `ds-screens-btc-${tab}`}
-            />
-          </Control>
-        </View>
-
-        {scenarios.map((scenario) => (
-          <Surface key={scenario.id} testID={`ds-screens-scenario-${scenario.id}`}>
-            <SectionHeading label={scenario.label} detail={`${scenario.frames.length} states`} />
-            {scenario.frames.map((frame, index) => (
-              <LinkRow
-                key={`${scenario.id}-${index}`}
-                testID={`ds-screens-${scenario.id}-${index}`}
-                title={frame.note}
-                subtitle={`${frame.historyEntry.type} · ${String(
-                  (frame.historyEntry as { state?: unknown }).state ?? 'no state'
-                )}`}
-                onPress={() =>
-                  navigateToTransactionDetail(
-                    withVariant(frame.historyEntry, unit, lock === 'Locked'),
-                    'design-system.screens'
-                  )
-                }
+        <View className="gap-6">
+          <View className="gap-3" onLayout={measure('options')} testID="ds-screens-options">
+            <Text size={13} color={paint.text.secondary}>
+              Real screens on made-up data. Nothing here moves money: the entries exist only on this
+              page, and their mint is not a real one.
+            </Text>
+            <Control label="Unit">
+              <PillTabs
+                tabs={UNITS}
+                activeTab={unit}
+                onTabChange={setUnit}
+                labelFor={(tab) => tab.toUpperCase()}
+                testIDFor={(tab) => `ds-screens-unit-${tab}`}
               />
-            ))}
-          </Surface>
-        ))}
+            </Control>
+            <Control label="Lock">
+              <PillTabs
+                tabs={LOCKS}
+                activeTab={lock}
+                onTabChange={setLock}
+                testIDFor={(tab) => `ds-screens-lock-${tab.toLowerCase()}`}
+              />
+            </Control>
+            <Control label="Bitcoin display · changes your setting">
+              <PillTabs
+                tabs={BTC_DISPLAYS}
+                activeTab={BTC_DISPLAYS.find((d) => d === String(displayBtc)) ?? '3'}
+                onTabChange={(tab) => setDisplayBtc(Number(tab))}
+                labelFor={(tab) => BTC_DISPLAY_LABEL[tab]}
+                testIDFor={(tab) => `ds-screens-btc-${tab}`}
+              />
+            </Control>
+          </View>
 
-        <Surface testID="ds-screens-profiles">
-          <SectionHeading label="Profiles" />
-          {ownPubkey ? (
-            <LinkRow
-              testID="ds-screens-profile-own"
-              title="Your own profile"
-              subtitle="Edit affordances instead of pay and follow"
-              onPress={() => router.navigate(buildModalProfileHref({ pubkey: ownPubkey }))}
-            />
-          ) : null}
-          {PROFILES.map((profile) => (
-            <LinkRow
-              key={profile.id}
-              testID={`ds-screens-profile-${profile.id}`}
-              title={profile.title}
-              subtitle={profile.subtitle}
-              onPress={() => router.navigate(buildModalProfileHref({ pubkey: profile.pubkey }))}
-            />
+          {groups.map((group) => (
+            <View key={group} className="gap-6" onLayout={measure(group)}>
+              {scenarios
+                .filter((scenario) => scenario.group === group)
+                .map((scenario) => (
+                  <Surface key={scenario.id} testID={`ds-screens-scenario-${scenario.id}`}>
+                    <SectionHeading
+                      label={scenario.label}
+                      detail={`${scenario.frames.length} states`}
+                    />
+                    {scenario.frames.map((frame, index) => (
+                      <LinkRow
+                        key={`${scenario.id}-${index}`}
+                        testID={`ds-screens-${scenario.id}-${index}`}
+                        title={frame.note}
+                        subtitle={`${frame.historyEntry.type} · ${String(
+                          (frame.historyEntry as { state?: unknown }).state ?? 'no state'
+                        )}`}
+                        onPress={() =>
+                          navigateToTransactionDetail(
+                            withVariant(frame.historyEntry, unit, lock === 'Locked'),
+                            'design-system.screens'
+                          )
+                        }
+                      />
+                    ))}
+                  </Surface>
+                ))}
+            </View>
           ))}
-        </Surface>
 
-        {MINTS.map((mint) => (
-          <Surface key={mint.id} testID={`ds-screens-mint-${mint.id}`}>
-            <SectionHeading label={mint.title} detail={new URL(mint.mintUrl).host} />
-            <LinkRow
-              testID={`ds-screens-mint-${mint.id}-info`}
-              title="Mint info"
-              subtitle="Identity, contact, limits, supported features"
-              onPress={() => router.navigate(buildMintInfoHref(mint.mintUrl))}
-            />
-            <LinkRow
-              testID={`ds-screens-mint-${mint.id}-reviews`}
-              title="Ratings and reviews"
-              subtitle="Score, review list and its empty state"
-              onPress={() =>
-                router.navigate({
-                  pathname: '/(mint-flow)/reviews',
-                  params: { mintUrl: mint.mintUrl },
-                })
-              }
-            />
-            <LinkRow
-              testID={`ds-screens-mint-${mint.id}-history`}
-              title="Change history"
-              subtitle="What the mint has changed about itself"
-              onPress={() => router.navigate(buildMintHistoryHref(mint.mintUrl))}
-            />
-          </Surface>
-        ))}
+          <View onLayout={measure('profiles')}>
+            <Surface testID="ds-screens-profiles">
+              <SectionHeading label="Profiles" />
+              {ownPubkey ? (
+                <LinkRow
+                  testID="ds-screens-profile-own"
+                  title="Your own profile"
+                  subtitle="Edit affordances instead of pay and follow"
+                  onPress={() => router.navigate(buildModalProfileHref({ pubkey: ownPubkey }))}
+                />
+              ) : null}
+              {PROFILES.map((profile) => (
+                <LinkRow
+                  key={profile.id}
+                  testID={`ds-screens-profile-${profile.id}`}
+                  title={profile.title}
+                  subtitle={profile.subtitle}
+                  onPress={() => router.navigate(buildModalProfileHref({ pubkey: profile.pubkey }))}
+                />
+              ))}
+            </Surface>
+          </View>
 
-        <Surface testID="ds-screens-wallet">
-          <SectionHeading label="Your mints" />
-          <LinkRow
-            testID="ds-screens-mint-add"
-            title="Add a mint"
-            subtitle="Discovery, search and recommended mints"
-            onPress={() => router.navigate('/(mint-flow)/add')}
-          />
-          <LinkRow
-            testID="ds-screens-mint-distribution"
-            title="Balance by mint"
-            subtitle="How the balance is spread, and rebalancing"
-            onPress={() => router.navigate('/(mint-flow)/distribution')}
-          />
-        </Surface>
+          <View className="gap-6" onLayout={measure('mints')}>
+            {MINTS.map((mint) => (
+              <Surface key={mint.id} testID={`ds-screens-mint-${mint.id}`}>
+                <SectionHeading label={mint.title} detail={new URL(mint.mintUrl).host} />
+                <LinkRow
+                  testID={`ds-screens-mint-${mint.id}-info`}
+                  title="Mint info"
+                  subtitle="Identity, contact, limits, supported features"
+                  onPress={() => router.navigate(buildMintInfoHref(mint.mintUrl))}
+                />
+                <LinkRow
+                  testID={`ds-screens-mint-${mint.id}-reviews`}
+                  title="Ratings and reviews"
+                  subtitle="Score, review list and its empty state"
+                  onPress={() =>
+                    router.navigate({
+                      pathname: '/(mint-flow)/reviews',
+                      params: { mintUrl: mint.mintUrl },
+                    })
+                  }
+                />
+                <LinkRow
+                  testID={`ds-screens-mint-${mint.id}-history`}
+                  title="Change history"
+                  subtitle="What the mint has changed about itself"
+                  onPress={() => router.navigate(buildMintHistoryHref(mint.mintUrl))}
+                />
+              </Surface>
+            ))}
+          </View>
+
+          <View onLayout={measure('wallet')}>
+            <Surface testID="ds-screens-wallet">
+              <SectionHeading label="Your mints" />
+              <LinkRow
+                testID="ds-screens-mint-add"
+                title="Add a mint"
+                subtitle="Discovery, search and recommended mints"
+                onPress={() => router.navigate('/(mint-flow)/add')}
+              />
+              <LinkRow
+                testID="ds-screens-mint-distribution"
+                title="Balance by mint"
+                subtitle="How the balance is spread, and rebalancing"
+                onPress={() => router.navigate('/(mint-flow)/distribution')}
+              />
+            </Surface>
+          </View>
+        </View>
       </ScreenScrollView>
     </ScreenWrapper>
   );
@@ -241,7 +349,7 @@ export function SettingsDesignSystemScreensScreen() {
 function Control({ label, children }: { label: string; children: React.ReactNode }) {
   const paint = useStylePaint();
   return (
-    <View style={{ gap: paint.style.space.related }}>
+    <View className="gap-1">
       <Text size={13} semibold color={paint.text.secondary}>
         {label}
       </Text>
