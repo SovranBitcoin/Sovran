@@ -2,13 +2,15 @@
  * The app root: everything that outlives an account.
  *
  * Starts the headless `appRuntime` for the process, applies the theme, and
- * mounts the third-party root adapters (gestures, keyboard) and the
- * review overlays. Below it, the splash and migration gates hold the account
+ * mounts the third-party root adapters (gestures, keyboard, safe-area insets)
+ * and the review overlays. Below it, the splash and migration gates hold the account
  * scope until fonts, the native layout and the global migrations are done.
  * Nothing here remounts on a profile switch.
  */
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
+import { SafeAreaListener } from 'react-native-safe-area-context';
+import { Uniwind } from 'uniwind';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
@@ -46,7 +48,12 @@ function ProcessChrome({ children }: { children: React.ReactNode }) {
           {/* The outermost layer covers whatever is not inside a screen, a
               sheet or a popup of its own (the wallet home, tab bar, drawer). */}
           <TouchIndicatorLayer>
-            <HeroTransitionProvider>{children}</HeroTransitionProvider>
+            {/* Feeds the native insets to Uniwind so `*-safe*` classes resolve
+                (`pb-safe-offset-5` and friends). The SafeAreaProvider is
+                expo-router's. */}
+            <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
+              <HeroTransitionProvider>{children}</HeroTransitionProvider>
+            </SafeAreaListener>
           </TouchIndicatorLayer>
         </TouchIndicatorEnabled.Provider>
         <LayoutGuides enabled={guides} />

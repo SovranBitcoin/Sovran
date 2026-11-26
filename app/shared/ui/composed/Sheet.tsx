@@ -90,7 +90,10 @@ type SheetProps = {
   surfaceStyle?: ComponentProps<typeof Animated.View>['style'];
   /** `false` keeps the handle's space but draws no grab bar. */
   handle?: boolean;
-  /** Merged over the content padding (`p-5`, safe area + 12pt at the bottom). */
+  /**
+   * Merged over the content padding: `p-5`, with the bottom at safe area + 20pt
+   * on an edge sheet and 12pt on a detached card (already lifted by the inset).
+   */
   contentClassName?: string;
   children: ReactNode;
 };
@@ -237,7 +240,9 @@ export function Sheet({
             </View>
             <View
               className={cn(
-                'pb-safe-offset-3 p-5',
+                'p-5',
+                // A detached card already sits `insets.bottom` above the edge.
+                detached ? 'pb-3' : 'pb-safe-offset-5',
                 fixedHeight != null && 'flex-1',
                 contentClassName
               )}>

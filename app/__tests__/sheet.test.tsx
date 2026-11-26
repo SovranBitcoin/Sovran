@@ -117,6 +117,37 @@ describe('Sheet', () => {
     expect(panel(r).findAllByProps({ testID: 'body' }).length).toBeGreaterThan(0);
   });
 
+  it('pads an edge sheet past the safe area but not a detached card, which already sits above it', () => {
+    /** The content wrapper: the view holding the body, inside the surface. */
+    const content = (r: TestRenderer.ReactTestRenderer) =>
+      panel(r).findAll(
+        (node) =>
+          typeof node.props.className === 'string' &&
+          node.props.className.includes('p-5') &&
+          node.findAllByProps({ testID: 'body' }).length > 0
+      )[0]!;
+    const bottom = (r: TestRenderer.ReactTestRenderer) =>
+      (content(r).props.className as string).split(' ').filter((c) => /^pb-/.test(c));
+
+    const edge = mount();
+    expect(bottom(edge)).toEqual(['pb-safe-offset-5']);
+    // An edge sheet stays on the bottom edge.
+    expect(([] as unknown[]).concat(panel(edge).props.style).flat(Infinity)).toContainEqual(
+      expect.objectContaining({ bottom: 0 })
+    );
+
+    act(() => edge.update(draw({ detached: true })));
+    // Lifted by the inset already, so no second inset inside.
+    expect(bottom(edge)).toEqual(['pb-3']);
+    expect(([] as unknown[]).concat(panel(edge).props.style).flat(Infinity)).toContainEqual(
+      expect.objectContaining({ bottom: 34 })
+    );
+
+    // A caller's bottom padding still wins.
+    act(() => edge.update(draw({ contentClassName: 'px-3 pb-0' })));
+    expect(bottom(edge)).toEqual(['pb-0']);
+  });
+
   it('asks to dismiss from the scrim only when it is dismissable', () => {
     const onDismissRequest = jest.fn();
     const r = mount({ onDismissRequest });
