@@ -5,7 +5,7 @@ import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 
 interface ManagerLike {
-  wallet: { balances: { byMint: () => Promise<BalanceMap> } };
+  wallet: { balances: { byMint: (filter: { units: string[] }) => Promise<BalanceMap> } };
   mint: { untrustMint: (url: string) => Promise<void> };
 }
 
@@ -44,7 +44,7 @@ export async function releaseTrustWindow(
     temporarilyTrustedCount: temporarilyTrusted.length,
     mintDomains: temporarilyTrusted.map(extractDomain),
   });
-  const balances = await manager.wallet.balances.byMint().catch((error) => {
+  const balances = await manager.wallet.balances.byMint({ units: ['sat'] }).catch((error) => {
     cashuLog.warn('mint.rebalance.trust_window.balance_failed', {
       temporarilyTrustedCount: temporarilyTrusted.length,
       errorName: error instanceof Error ? error.name : typeof error,

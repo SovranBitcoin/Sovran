@@ -70,11 +70,15 @@ afterEach(() => {
 });
 
 describe('createRebalanceWalletPort', () => {
-  it('reports each mint balance as its total', async () => {
+  it.each(['usd', 'eur', 'gbp', 'tusd'])('rejects the %s account', (unit) => {
+    expect(() => port(createFakeManager(), unit)).toThrow(/sat/i);
+  });
+
+  it.each(['sat', 'tsat'])('reads sat totals for the %s account', async (unit) => {
     const fake = createFakeManager();
 
-    await expect(port(fake, 'sat').balancesByMint()).resolves.toEqual({ [A]: 1200, [B]: 0 });
-    expect(fake.manager.wallet.balances.byMint).toHaveBeenCalledWith();
+    await expect(port(fake, unit).balancesByMint()).resolves.toEqual({ [A]: 1200, [B]: 0 });
+    expect(fake.manager.wallet.balances.byMint).toHaveBeenCalledWith({ units: ['sat'] });
   });
 
   it('prices the input fee from the ready proofs of the sat wallet', async () => {
@@ -82,7 +86,7 @@ describe('createRebalanceWalletPort', () => {
 
     await expect(port(fake, 'sat').worstCaseInputFee(A)).resolves.toBe(3);
 
-    expect(fake.manager.proofService.getReadyProofs).toHaveBeenCalledWith(A);
+    expect(fake.manager.proofService.getReadyProofs).toHaveBeenCalledWith(A, { units: ['sat'] });
     expect(fake.manager.walletService.getWallet).toHaveBeenCalledWith(A, 'sat');
     expect(fake.wallet.getFeesForProofs).toHaveBeenCalledWith([{ amount: 8 }]);
   });

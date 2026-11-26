@@ -28,7 +28,6 @@ import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'w
 import { createExecuteMintQuote, createExecuteReceive } from 'wallet/operations';
 import { prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
-import { mintLocalId } from '@/shared/lib/id';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import {
   createColada,
@@ -561,7 +560,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           getOffline,
           verifyOfflineReceive: requirePreparedOfflineReceiveDleq,
           pendingMessage: RECEIVE_PENDING_TOAST_COPY.subtitle,
-          newLocalId: mintLocalId,
         }),
         executeMintQuote: createExecuteMintQuote({ getManager, prepareMintQuote }),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.

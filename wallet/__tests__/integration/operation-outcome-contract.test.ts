@@ -317,7 +317,6 @@ function appReceive(manager: Manager, verify = async () => {}) {
     getManager: () => manager,
     verifyOfflineReceive: verify,
     pendingMessage: "Waiting for the mint",
-    newLocalId: (prefix) => `${prefix}-local`,
   });
 }
 

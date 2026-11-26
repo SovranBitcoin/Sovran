@@ -586,7 +586,10 @@ describe('a leg backed by a native Coco mintSwap operation', () => {
   function swapManager(state: string) {
     return {
       ops: {
-        mintSwap: { get: jest.fn(async () => ({ state })) },
+        mintSwap: {
+          get: jest.fn(async () => ({ state })),
+          cancel: jest.fn(async () => ({ state: 'cancelled' })),
+        },
         mint: { get: jest.fn(async () => null) },
         melt: { get: jest.fn(async () => null), cancel: jest.fn(async () => undefined) },
       },
@@ -633,4 +636,15 @@ describe('a leg backed by a native Coco mintSwap operation', () => {
       expect(leg().localStatus).toBe('paymentPending');
     }
   );
+
+  it('cancels a prepared Coco mintSwap stuck in paymentPending and marks the leg failed', async () => {
+    const leg = swapLeg('paymentPending');
+    const coco = swapManager('prepared');
+
+    await reconcileSwapLegs(coco);
+
+    expect(coco.ops.mintSwap.cancel).toHaveBeenCalledWith('swap-op-1');
+    expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+    expect(groupState(leg.groupId)).toBe('finished');
+  });
 });

@@ -49,6 +49,7 @@ interface MintLite {
 interface UseMintRebalanceOrchestratorArgs {
   unit: string;
   computedPlan: RebalancePlan;
+  isInAccount?: (mintUrl: string) => boolean;
   trustedMints: MintLite[];
   mintInfoMap: Record<string, GetInfoResponse | null>;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -155,6 +156,7 @@ function toRunResult(outcome: RebalanceTransferOutcome): RunResult {
 export function useMintRebalanceOrchestrator({
   unit,
   computedPlan,
+  isInAccount,
   trustedMints,
   mintInfoMap,
   middlemanRouting,
@@ -270,6 +272,7 @@ export function useMintRebalanceOrchestrator({
           fromMintUrl,
           toMintUrl,
           planSteps: runPlan?.steps ?? null,
+          isInAccount,
           trustedMintUrls,
           mintInfoMap,
           middlemanRouting,
@@ -283,6 +286,7 @@ export function useMintRebalanceOrchestrator({
   }, [
     manager,
     unit,
+    isInAccount,
     runPlan,
     trustedMints,
     mintInfoMap,
@@ -483,6 +487,7 @@ export function useMintRebalanceOrchestrator({
 
       const chainPath = suggestion.path;
       if (chainPath.length < 3) return; // Need at least A → via → B
+      if (isInAccount && !chainPath.every(isInAccount)) return;
 
       // Held while the intermediaries are trusted, so nothing else starts.
       const run = claimRun();
@@ -511,7 +516,7 @@ export function useMintRebalanceOrchestrator({
         () => run
       );
     },
-    [claimRun, isRunActive, runPlan, runSteps, engine, insertChainRows]
+    [claimRun, isRunActive, runPlan, runSteps, engine, insertChainRows, isInAccount]
   );
 
   const handleCancelRun = useCallback(() => {

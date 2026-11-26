@@ -80,7 +80,6 @@ function receive(
     getOffline,
     verifyOfflineReceive,
     pendingMessage: "Waiting for the mint",
-    newLocalId: (prefix) => `${prefix}-local`,
   });
 }
 
@@ -141,12 +140,58 @@ describe("createExecuteReceive", () => {
   it("returns this receive's row when another receive from the same mint was saved first", async () => {
     const { api, manager, saved } = receiveManager({ execute: "finalizes" });
     const other = { ...saved, id: "receive:other-op", operationId: "other-op" };
-    api.history.getHistoryEntryById.mockResolvedValue(null);
-    api.history.getPaginatedHistory.mockResolvedValueOnce([]).mockResolvedValue([other, saved]);
+    api.history.getHistoryEntryById
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(saved);
+    api.history.getPaginatedHistory
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([other]);
 
-    const result = await receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 });
+    const result = await receive(manager, async () => {})({
+      tokenString: TOKEN,
+      mintUrl: MINT_URL,
+      amount: 1,
+    });
 
-    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
+    expect(
+      JSON.parse((result as { historyEntry: string }).historyEntry),
+    ).toEqual(saved);
+    expect(api.history.getHistoryEntryById).toHaveBeenNthCalledWith(
+      1,
+      saved.id,
+    );
+    expect(api.history.getHistoryEntryById).toHaveBeenNthCalledWith(
+      2,
+      saved.id,
+    );
+    expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
+  });
+
+  it("projects the same history ID from the finalized operation when lookup stays unavailable", async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+      api.history.getHistoryEntryById.mockRejectedValue(new Error("history unavailable"));
+
+      const pending = receive(manager, async () => {})({
+        tokenString: TOKEN,
+        mintUrl: MINT_URL,
+        amount: 1,
+      });
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(result).toMatchObject({ status: "finalized" });
+      expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toMatchObject({
+        id: saved.id,
+        operationId: saved.operationId,
+        source: "operation",
+        state: "finalized",
+      });
+      expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says so when there is no wallet", async () => {
@@ -154,7 +199,6 @@ describe("createExecuteReceive", () => {
       getManager: () => null,
       verifyOfflineReceive: async () => {},
       pendingMessage: "",
-      newLocalId: (prefix) => prefix,
     });
     await expect(execute({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toThrow("Wallet manager is not available");
   });

@@ -35,10 +35,12 @@ export async function findRebalanceRouteCandidates({
   fromMintUrl,
   toMintUrl,
   planSteps,
+  isInAccount = () => true,
   trustedMintUrls,
   mintInfoMap,
   middlemanRouting,
 }: {
+  isInAccount?: (mintUrl: string) => boolean;
   fromMintUrl: string;
   toMintUrl: string;
   /** Steps of the running plan; null before a run starts (no graph search). */
@@ -47,6 +49,8 @@ export async function findRebalanceRouteCandidates({
   mintInfoMap: Record<string, GetInfoResponse | null>;
   middlemanRouting: MiddlemanRoutingSettings;
 }): Promise<RebalanceRoute[]> {
+  if (!isInAccount(fromMintUrl) || !isInAccount(toMintUrl)) return [];
+
   const swapGroups = Object.values(useSwapTransactionsStore.getState().groups);
   const localFallbacks = getLocalCandidatesForDestination(swapGroups, toMintUrl, fromMintUrl);
 
@@ -61,7 +65,9 @@ export async function findRebalanceRouteCandidates({
         fromMintUrl,
         toMintUrl,
       ])
-    ).slice(0, MAX_GRAPH_CANDIDATES);
+    )
+      .filter(isInAccount)
+      .slice(0, MAX_GRAPH_CANDIDATES);
     const graph = buildSwapGraph(await fetchRebalanceRouteAudits(candidates, fetchAudit));
     // Personally observed routes supplement the auditor data.
     addLocalHistoryEdges(graph, swapGroups);
@@ -81,5 +87,5 @@ export async function findRebalanceRouteCandidates({
     suggestion,
     localFallbackMintUrls: localFallbacks,
     getMintName: (mintUrl) => mintInfoMap[mintUrl]?.name || extractDomain(mintUrl),
-  });
+  }).filter((route) => route.path.every(isInAccount));
 }

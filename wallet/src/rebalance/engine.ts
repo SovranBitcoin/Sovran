@@ -360,21 +360,28 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
     // 2. Authorize payment ONCE via Coco ops.mintSwap.execute
     sink.legUpdated(legId, { status: 'melting', operationId: prepared.id });
-    let op: MintSwapOperation | null = null;
+    let op: MintSwapOperation | null;
     let executeError: unknown;
     try {
       op = await wallet.mintSwap.execute(prepared.id);
     } catch (err) {
       executeError = err;
-      op = await wallet.mintSwap.get(prepared.id).catch(() => null);
+      op = await wallet.mintSwap.get(prepared.id).catch((lookupError: unknown) => {
+        debug({ event: 'execute_outcome_unknown', legId, error: errField(lookupError) });
+        return null;
+      });
+      if (!op) {
+        run.unsettledMints.add(fromMintUrl);
+        sink.legUpdated(legId, { status: 'paymentPending', operationId: prepared.id });
+        return { kind: 'pending', operationId: prepared.id };
+      }
     }
 
     // 3. Observe durable outcome if Coco left the swap in flight
     if (
-      op &&
-      (op.state === 'source_pending' ||
-        op.state === 'destination_funded' ||
-        op.state === 'destination_pending')
+      op.state === 'source_pending' ||
+      op.state === 'destination_funded' ||
+      op.state === 'destination_pending'
     ) {
       if (op.state === 'destination_funded' || op.state === 'destination_pending') {
         sink.legUpdated(legId, { status: 'verifying' });
@@ -389,10 +396,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         debug({ event: 'wait_outcome_error', legId, error: errField(err) });
         op = (await wallet.mintSwap.get(op.id).catch(() => null)) ?? op;
       }
-    }
-
-    if (!op) {
-      throw executeError ?? new Error('Mint swap operation not found');
     }
 
     switch (op.state) {

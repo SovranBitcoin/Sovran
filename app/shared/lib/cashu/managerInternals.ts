@@ -55,7 +55,7 @@ interface ManagerInternals {
     getProofsBySecrets(mintUrl: string, secrets: string[]): Promise<CoreProof[]>;
   };
   proofService: {
-    getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
+    getReadyProofs(mintUrl: string, filter?: { units: string[] }): Promise<CoreProof[]>;
     setProofState(
       mintUrl: string,
       secrets: string[],
@@ -213,12 +213,16 @@ export function getStoredProofsBySecrets(
 }
 
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */
-export async function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
+export async function getReadyProofs(
+  manager: Manager,
+  mintUrl: string,
+  filter?: { units: string[] }
+): Promise<CoreProof[]> {
   cashuLog.debug('cashu.manager_internals.ready_proofs.start', {
     ...mintUrlLogFields(mintUrl),
   });
   try {
-    const proofs = await internals(manager).proofService.getReadyProofs(mintUrl);
+    const proofs = await internals(manager).proofService.getReadyProofs(mintUrl, filter);
     cashuLog.debug('cashu.manager_internals.ready_proofs.done', {
       ...mintUrlLogFields(mintUrl),
       count: proofs.length,
