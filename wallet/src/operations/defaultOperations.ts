@@ -848,12 +848,10 @@ export function createDefaultOperations(
         amount,
         hadMemo: !!normalizeMemo(memo),
       });
-      // Prepared from the mint's stored keysets without contacting it. Coco
-      // refuses, before reserving anything, when no exact match exists.
+      // Unmodified upstream Coco prepares exact-match sends without a mint swap.
       const prepared = await mgr.ops.send.prepare({
         mintUrl,
         amount,
-        offline: true,
       });
       logger.info("operations.executeOfflineSend.prepared", {
         operationId: prepared.id,

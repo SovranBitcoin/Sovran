@@ -31,55 +31,28 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
-const COCO_VERSION = '0.0.0-nightly-20261120132306-58abfae';
-const OFFLINE_SEND_PATCH = `@cashu%2Fcoco-core@${COCO_VERSION}.patch`;
 const PATCHES_DIR = resolve(__dirname, '..', 'patches');
 
-describe('@cashu/coco-core carries one patch', () => {
+describe('@cashu/coco-core ships unmodified', () => {
   it('found the installed bundle to check', () => {
     expect(bundlePath).toBeTruthy();
   });
 
-  it('has only the offline-send patch registered against a coco package', () => {
+  it('has no patch registered against any coco package', () => {
     const root = JSON.parse(
       readFileSync(resolve(__dirname, '..', '..', 'package.json'), 'utf8')
     ) as { patchedDependencies?: Record<string, string> };
     const patched = Object.entries(root.patchedDependencies ?? {}).filter(([name]) =>
       name.startsWith('@cashu/coco-')
     );
-    expect(patched).toEqual([
-      [`@cashu/coco-core@${COCO_VERSION}`, `app/patches/${OFFLINE_SEND_PATCH}`],
-    ]);
+    expect(patched).toEqual([]);
   });
 
-  it('has no other coco patch file waiting to be registered', () => {
+  it('has no coco patch file waiting to be registered', () => {
     const files = readdirSync(PATCHES_DIR).filter(
       (name) => /coco/i.test(name) && /\.patch$/.test(name)
     );
-    expect(files).toEqual([OFFLINE_SEND_PATCH]);
-  });
-
-  it('changes the bundle and its type declarations, nothing else', () => {
-    const patch = readFileSync(resolve(PATCHES_DIR, OFFLINE_SEND_PATCH), 'utf8');
-    const files = patch
-      .split('\n')
-      .filter((line) => line.startsWith('diff --git '))
-      .map((line) => line.split(' b/')[1]);
-    expect(files).toEqual(['dist/index-40_H-rgL.d.ts', 'dist/index.d.ts', 'dist/index.js']);
-  });
-
-  it('carries the offline prepare option and refuses what needs a swap', () => {
-    expect(bundle).toContain('return this.sendOperationService.prepare(initOp, {');
-    expect(bundle).toContain('offline: input.offline');
-    expect(bundle).toContain('async getStoredMint(mintUrl) {');
-    expect(bundle).toContain('Offline send needs proofs that add up to exactly');
-    expect(bundle).toContain('requires the mint and cannot be prepared offline');
-  });
-
-  it('keeps the online path refreshing stale mint data', () => {
-    expect(bundle).toContain(
-      'await this.mintMetadataRefresh.refreshAndCommitIfStaleWithStatus(operation.mintUrl)'
-    );
+    expect(files).toEqual([]);
   });
 
   it('carries none of the reclaim code the earlier patch added', () => {

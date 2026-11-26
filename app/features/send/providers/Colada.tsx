@@ -265,9 +265,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     [offlineListeners]
   );
   useEffect(() => {
-    manager?.setOffline(isOffline);
     for (const listener of offlineListeners) listener();
-  }, [manager, isOffline, offlineListeners]);
+  }, [isOffline, offlineListeners]);
 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
