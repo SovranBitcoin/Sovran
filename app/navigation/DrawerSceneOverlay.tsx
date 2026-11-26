@@ -4,7 +4,6 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useDrawerProgress } from 'expo-router/drawer';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { withAlpha } from '@/shared/lib/color';
 import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 import { alpha, radius, zIndex } from '@/shared/styles/tokens';
 
@@ -37,24 +36,27 @@ export function computeDrawerWidth(windowWidth: number, deviceRadius: number): n
  */
 export function DrawerSceneOverlay() {
   const progress = useDrawerProgress();
-  const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
+  const border = useThemeColor('separator-secondary');
   const deviceRadius = getScreenCornerRadius(radius['2xl']);
 
   const staticStyle = useMemo(
     () => ({
-      backgroundColor: withAlpha(surface, alpha.strong),
+      backgroundColor: `rgba(0,0,0,${alpha.strong})`,
       borderTopLeftRadius: deviceRadius,
       borderBottomLeftRadius: deviceRadius,
       borderCurve: 'continuous' as const,
       boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
       zIndex: zIndex.overlay,
     }),
-    [surface, border, deviceRadius]
+    [border, deviceRadius]
   );
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.get(),
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.get(),
+    }),
+    [progress]
+  );
 
   return (
     <Animated.View
