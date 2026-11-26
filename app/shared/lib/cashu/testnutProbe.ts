@@ -90,7 +90,7 @@ async function pickProbeUnit(
   return activeUnits[0] ?? 'sat';
 }
 
-export interface ProbeMintTestnutOptions {
+interface ProbeMintTestnutOptions {
   signal?: AbortSignal;
   delayMs?: number;
   timeoutMs?: number;

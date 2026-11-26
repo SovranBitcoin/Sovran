@@ -274,7 +274,7 @@ it('a run that outlives an account switch finishes its leg in flight, starts no 
   await act(async () => {
     await reconcileSwapLegs({
       ops: {
-        mintSwap: { get: async () => ({ state: 'completed' }) },
+        mintSwap: { get: async () => ({ state: 'completed' }), cancel: async () => undefined },
         melt: { get: async () => ({ state: 'finalized' }), cancel: async () => {} },
         mint: { get: async () => ({ state: 'finalized' }) },
       },

@@ -491,7 +491,7 @@ function SatMintRebalancePlan({ accountUnit }: { accountUnit: string }) {
       </View>
 
       {runStatus === 'idle' && !canStart && (
-        <Text className="mx-4 my-2" style={{ color: fgMuted }}>
+        <Text className="text-muted mx-4 my-2">
           {checkingDestinations
             ? 'Checking destination mint support…'
             : 'A destination mint does not support Lightning minting with NUT-09 and NUT-20.'}

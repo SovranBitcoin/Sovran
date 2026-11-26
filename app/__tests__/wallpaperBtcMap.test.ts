@@ -2,7 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
-import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
+import {
+  BTCMAP_PLACES_URL,
+  btcMapPlaceDetailsUrl,
+  useBTCMapStore,
+} from '@/shared/stores/global/btcMapStore';
 import { THEMES } from '@/themes';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -143,7 +147,7 @@ it('routes BTC Map list and details directly to the public BTC Map v4 API, prese
   expect(await useBTCMapStore.getState().fetchPlaces(false, { signal: controller.signal })).toEqual(
     [place]
   );
-  expect(mockFetch).toHaveBeenLastCalledWith('https://api.btcmap.org/v4/places', {
+  expect(mockFetch).toHaveBeenLastCalledWith(BTCMAP_PLACES_URL, {
     signal: controller.signal,
   });
   // A fresh cache avoids a second request.
@@ -154,7 +158,7 @@ it('routes BTC Map list and details directly to the public BTC Map v4 API, prese
   respond(details);
   expect(await useBTCMapStore.getState().fetchPlaceDetails(42)).toEqual(details);
   expect(mockFetch).toHaveBeenLastCalledWith(
-    'https://api.btcmap.org/v4/places/42',
+    btcMapPlaceDetailsUrl(42),
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
   await useBTCMapStore.getState().fetchPlaceDetails(42);
