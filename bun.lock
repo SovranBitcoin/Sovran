@@ -20,9 +20,9 @@
         "@bacons/apple-targets": "^4.0.6",
         "@bacons/text-decoder": "0.0.0",
         "@cashu/cashu-ts": "5.0.0-rc.4",
-        "@cashu/coco-core": "2.0.0",
-        "@cashu/coco-expo-sqlite": "2.0.0",
-        "@cashu/coco-react": "2.0.0",
+        "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
+        "@cashu/coco-expo-sqlite": "0.0.0-nightly-20261120132306-58abfae",
+        "@cashu/coco-react": "0.0.0-nightly-20261120132306-58abfae",
         "@expo/ui": "~56.0.26",
         "@gandlaf21/bc-ur": "^1.1.12",
         "@noble/curves": "^2.2.0",
@@ -178,7 +178,7 @@
         "zod": "^4.3.6",
       },
       "devDependencies": {
-        "@cashu/coco-core": "2.0.0",
+        "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
         "@scure/base": "2.3.0",
         "@types/react": "~19.2.2",
         "fast-check": "^4.0.0",
@@ -187,7 +187,7 @@
         "vitest": "^3.0.0",
       },
       "peerDependencies": {
-        "@cashu/coco-core": "2.0.0",
+        "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
         "react": ">=18.0.0",
       },
       "optionalPeers": [
@@ -201,11 +201,12 @@
   ],
   "patchedDependencies": {
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
-    "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch",
     "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
+    "@cashu/coco-core@0.0.0-nightly-20261120132306-58abfae": "app/patches/@cashu%2Fcoco-core@0.0.0-nightly-20261120132306-58abfae.patch",
   },
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
+    "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
     "neverthrow": "8.2.0",
     "nostr-tools": "2.24.2",
     "zod": "4.4.3",
@@ -431,11 +432,11 @@
 
     "@cashu/cashu-ts": ["@cashu/cashu-ts@5.0.0-rc.4", "", { "dependencies": { "@noble/curves": "^2.2.0", "@noble/hashes": "^2.2.0", "@scure/base": "^2.2.0", "@scure/bip32": "^2.2.0" } }, "sha512-6ck7cHdGnvg+ZNGQduaJ5YyNMrLh9Qf1534GR6IxEXX1OuF0SS7I2qXo8p6zD3kRaemynnjJPqjaHgs1EJhAWg=="],
 
-    "@cashu/coco-core": ["@cashu/coco-core@2.0.0", "", { "dependencies": { "@cashu/cashu-ts": "5.0.0-rc.4", "@noble/curves": "^2.0.1", "@noble/hashes": "^2.0.1", "@scure/bip32": "^2.0.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-pUdY+kygjD0biXz+JsezRt7Hej0JcJteFaX9mBt7mPyhLjRZvwV5XSYkDrzOi4IY22286T44yEiml3wjKTC1Mw=="],
+    "@cashu/coco-core": ["@cashu/coco-core@0.0.0-nightly-20261120132306-58abfae", "", { "dependencies": { "@cashu/cashu-ts": "5.0.0-rc.4", "@noble/curves": "^2.0.1", "@noble/hashes": "^2.0.1", "@scure/bip32": "^2.0.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-n1LbP2kvswsly/D8GP/ZIv3CGJ15BOHE+VWTlT57HeSepM39gQmp7a2zlipZJ0v9kcLETEE7j4KiWCC1Q2VwOg=="],
 
-    "@cashu/coco-expo-sqlite": ["@cashu/coco-expo-sqlite@2.0.0", "", { "peerDependencies": { "@cashu/cashu-ts": "5.0.0-rc.4", "@cashu/coco-core": "2.0.0", "expo-sqlite": "*", "typescript": "^5" } }, "sha512-aj+qyaACdyf6qynUtmy6nyU3galQt94zgMheoyx4eERPds+a/gePsTUZKF8nB3L6C+V7wOlXkYyy+Vtah7f6CQ=="],
+    "@cashu/coco-expo-sqlite": ["@cashu/coco-expo-sqlite@0.0.0-nightly-20261120132306-58abfae", "", { "peerDependencies": { "@cashu/cashu-ts": "5.0.0-rc.4", "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae", "expo-sqlite": "*", "typescript": "^5" } }, "sha512-EsFm+/OASgx98fHqcpuVbYVCax7FxX85nmVKE15SkENhXjaX0nv+shBMpPgOXqYCrPVHc3HGrkXSX+luyaSqiQ=="],
 
-    "@cashu/coco-react": ["@cashu/coco-react@2.0.0", "", { "peerDependencies": { "@cashu/coco-core": "2.0.0", "react": "^19" } }, "sha512-QXRpBcVhy0dJjT1BY3Jp7Yxd7jnnOnXRbDR4QDsBV6S1e8/Ou5dq/XwhBzZAqienPEUxFBQ16dotbRMQ/uoBMQ=="],
+    "@cashu/coco-react": ["@cashu/coco-react@0.0.0-nightly-20261120132306-58abfae", "", { "peerDependencies": { "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae", "react": "^19" } }, "sha512-nfOT49ZEwI3oP9LHDMloGjpD8M6y7bg9zv8S/TtXZu31pLyAD/2mL+bPOZ3Szybcjg2S7Nq/jjyFROKk5LVRLA=="],
 
     "@docsearch/css": ["@docsearch/css@3.8.2", "", {}, "sha512-y05ayQFyUmCXze79+56v/4HpycYF3uFqB78pLPrSV5ZKAlDuIAAJNhaRi8tTdRNXh05yxX/TyNnzD6LwSM89vQ=="],
 
@@ -2905,7 +2906,7 @@
 
     "@cashu/cashu-ts/@noble/curves": ["@noble/curves@2.3.0", "", { "dependencies": { "@noble/hashes": "2.3.0" } }, "sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg=="],
 
-    "@cashu/coco-core/@noble/curves": ["@noble/curves@2.3.0", "", { "dependencies": { "@noble/hashes": "2.3.0" } }, "sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg=="],
+    "@cashu/coco-core/@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 

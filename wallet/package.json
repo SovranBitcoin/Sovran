@@ -38,7 +38,7 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "@cashu/coco-core": "2.0.0"
+    "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -49,7 +49,7 @@
     }
   },
   "devDependencies": {
-    "@cashu/coco-core": "2.0.0",
+    "@cashu/coco-core": "0.0.0-nightly-20261120132306-58abfae",
     "@scure/base": "2.3.0",
     "@types/react": "~19.2.2",
     "fast-check": "^4.0.0",

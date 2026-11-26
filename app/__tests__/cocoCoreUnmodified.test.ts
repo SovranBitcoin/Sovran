@@ -31,7 +31,8 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
-const OFFLINE_SEND_PATCH = '@cashu+coco-core+2.0.0.patch';
+const COCO_VERSION = '0.0.0-nightly-20261120132306-58abfae';
+const OFFLINE_SEND_PATCH = `@cashu%2Fcoco-core@${COCO_VERSION}.patch`;
 const PATCHES_DIR = resolve(__dirname, '..', 'patches');
 
 describe('@cashu/coco-core carries one patch', () => {
@@ -46,7 +47,9 @@ describe('@cashu/coco-core carries one patch', () => {
     const patched = Object.entries(root.patchedDependencies ?? {}).filter(([name]) =>
       name.startsWith('@cashu/coco-')
     );
-    expect(patched).toEqual([['@cashu/coco-core@2.0.0', `app/patches/${OFFLINE_SEND_PATCH}`]]);
+    expect(patched).toEqual([
+      [`@cashu/coco-core@${COCO_VERSION}`, `app/patches/${OFFLINE_SEND_PATCH}`],
+    ]);
   });
 
   it('has no other coco patch file waiting to be registered', () => {
@@ -62,28 +65,26 @@ describe('@cashu/coco-core carries one patch', () => {
       .split('\n')
       .filter((line) => line.startsWith('diff --git '))
       .map((line) => line.split(' b/')[1]);
-    expect(files).toEqual(['dist/index-CvKNFBXJ.d.ts', 'dist/index.d.ts', 'dist/index.js']);
+    expect(files).toEqual(['dist/index-40_H-rgL.d.ts', 'dist/index.d.ts', 'dist/index.js']);
   });
 
   it('carries the offline prepare option and refuses what needs a swap', () => {
-    expect(bundle).toContain(
-      'return this.sendOperationService.prepare(initOp, { offline: input.offline });'
-    );
-    expect(bundle).toContain('async getOfflineWallet(mintUrl, unit) {');
+    expect(bundle).toContain('return this.sendOperationService.prepare(initOp, {');
+    expect(bundle).toContain('offline: input.offline');
+    expect(bundle).toContain('async getStoredMint(mintUrl) {');
     expect(bundle).toContain('Offline send needs proofs that add up to exactly');
     expect(bundle).toContain('requires the mint and cannot be prepared offline');
   });
 
   it('keeps the online path refreshing stale mint data', () => {
     expect(bundle).toContain(
-      'const { mint, keysets } = await this.mintService.ensureUpdatedMint(normalizedMintUrl);'
+      'await this.mintMetadataRefresh.refreshAndCommitIfStaleWithStatus(operation.mintUrl)'
     );
   });
 
   it('carries none of the reclaim code the earlier patch added', () => {
     expect(bundle).not.toContain('collectSigningKeys');
     expect(bundle).not.toContain('assertReclaimable');
-    expect(bundle).not.toContain('getP2PKExpectedWitnessPubkeys');
     expect(bundle).not.toContain('no key held that may spend it yet');
   });
 });
@@ -158,10 +159,13 @@ describe('@cashu/coco-core and a P2PK send that has left', () => {
 
   it('refuses to reclaim it and leaves it pending', async () => {
     const manager = await walletWithPendingLockedSend();
-
-    await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
-      'Cannot rollback pending P2PK send operation'
-    );
-    expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+    try {
+      await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
+        'P2PK Send Operation in pending state can not be rolled back.'
+      );
+      expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+    } finally {
+      await manager.dispose();
+    }
   });
 });

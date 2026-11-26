@@ -116,7 +116,10 @@ function wrapKeyRingRepository(
       });
       return first.done ? null : first.value;
     },
-    getLastDerivationIndex: (purpose) => repository.getLastDerivationIndex(purpose),
+    getLastAllocatedIndex: (purpose) => repository.getLastAllocatedIndex(purpose),
+    getHighestStoredDerivationIndex: (purpose) =>
+      repository.getHighestStoredDerivationIndex(purpose),
+    setLastAllocatedIndex: (index, purpose) => repository.setLastAllocatedIndex(index, purpose),
   };
 }
 

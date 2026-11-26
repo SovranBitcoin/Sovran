@@ -97,7 +97,9 @@ describe('ephemeral keyring overlay', () => {
       getLatestKeyPair: jest.fn(
         async (purpose?: KeypairPurpose) => byPurpose(purpose).pop() ?? null
       ),
-      getLastDerivationIndex: jest.fn(async () => 0),
+      getLastAllocatedIndex: jest.fn(async () => null),
+      getHighestStoredDerivationIndex: jest.fn(async () => null),
+      setLastAllocatedIndex: jest.fn(async () => undefined),
     };
   }
 

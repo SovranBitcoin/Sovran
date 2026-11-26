@@ -115,7 +115,7 @@ function syntheticMint() {
       if (fault === "down") down = true;
       if (down) throw new TypeError("Network request failed");
       if (fault === "refuse")
-        return json({ detail: `refused ${route}`, code: 11001 }, 400);
+        return json({ detail: `refused ${route}`, code: 11005 }, 400);
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       const expiry = Math.floor(Date.now() / 1000) + 3600;
       const spend = (inputs: { secret: string }[]) => {
@@ -386,11 +386,11 @@ describe("send: executeSend against a real Coco Manager", () => {
 
     await expect(
       ops.executeSend!({ mintUrl: MINT_URL, amount: 10 }),
-    ).rejects.toMatchObject({ name: "MintOperationError", code: 11001 });
+    ).rejects.toMatchObject({ name: "MintOperationError", code: 11005 });
 
     expect(await historyRows(manager)).toEqual([["send", "rolled_back"]]);
     expect(await balance(manager)).toEqual({ spendable: 100, reserved: 0 });
-    expect(mint.calls).toEqual(["swap", "checkstate"]);
+    expect(mint.calls).toEqual(["swap"]);
   });
 
   it.each(["down", "lost"] as const)(
@@ -413,7 +413,7 @@ describe("send: executeSend against a real Coco Manager", () => {
       );
       expect(await historyRows(manager)).toEqual([["send", "executing"]]);
       expect(await balance(manager)).toEqual({ spendable: 68, reserved: 32 });
-      expect(mint.calls).toEqual(["swap", "checkstate"]);
+      expect(mint.calls).toEqual(["swap"]);
     },
   );
 });
@@ -445,14 +445,21 @@ describe("payment request over Nostr: executePaymentRequest against a real Coco 
     // Coco's first write of an execute marks the send "executing". When that
     // write fails nothing has started: the send is still "prepared", with its
     // proofs reserved, and Coco's own recovery has nothing to undo.
-    const update = repos.sendOperationRepository.update.bind(
-      repos.sendOperationRepository,
-    );
-    vi.spyOn(repos.sendOperationRepository, "update").mockImplementation(
-      async (operation) => {
-        if (operation.state === "executing") throw new Error("database is locked");
-        return update(operation);
-      },
+    const withTransaction = repos.withTransaction.bind(repos);
+    vi.spyOn(repos, "withTransaction").mockImplementation(async (fn) =>
+      withTransaction(async (txRepos) => {
+        const transition = txRepos.sendOperationRepository.transition.bind(
+          txRepos.sendOperationRepository,
+        );
+        vi.spyOn(txRepos.sendOperationRepository, "transition").mockImplementation(
+          async (input) => {
+            if (input.next.state === "executing")
+              throw new Error("database is locked");
+            return transition(input);
+          },
+        );
+        return fn(txRepos);
+      }),
     );
 
     await expect(
@@ -505,7 +512,7 @@ describe("receive: the app's createExecuteReceive against a real Coco Manager", 
         mintUrl: MINT_URL,
         amount: 8,
       } as never),
-    ).rejects.toMatchObject({ name: "MintOperationError", code: 11001 });
+    ).rejects.toMatchObject({ name: "MintOperationError", code: 11005 });
 
     expect(await historyRows(manager)).toEqual([["receive", "rolled_back"]]);
     expect(await balance(manager)).toEqual({ spendable: 0, reserved: 0 });
@@ -671,15 +678,20 @@ describe("melt: quoteMelt then executeMelt against a real Coco Manager", () => {
     },
   );
 
-  it("rejects on a melt refusal, rolls back and leaves the full balance spendable", async () => {
+  it("defers on a melt refusal and rolls back via refresh leaving the full balance spendable", async () => {
     const { manager, mint, ops } = await harness();
     const quote = await ops.quoteMelt!(MELT_INPUT as never);
     mint.faults.melt = "refuse";
 
     await expect(
       ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId } as never),
-    ).rejects.toMatchObject({ name: "MintOperationError", code: 11001 });
+    ).rejects.toMatchObject({
+      name: "MeltOutcomeUnknownError",
+      cause: { name: "MintOperationError", code: 11005 },
+    });
 
+    const operationId = await onlyOperationId(manager);
+    await manager.ops.melt.refresh(operationId);
     expect(await historyRows(manager)).toEqual([["melt", "rolled_back"]]);
     expect(await balance(manager)).toEqual({ spendable: 100, reserved: 0 });
     expect(mint.calls.filter((call) => call === "melt")).toHaveLength(1);
@@ -704,20 +716,24 @@ describe("melt: quoteMelt then executeMelt against a real Coco Manager", () => {
     expect(mint.calls.filter((call) => call === "melt")).toHaveLength(1);
   });
 
-  it("returns paid evidence when Coco recovered the paid melt after a lost reply", async () => {
+  it("throws MeltOutcomeUnknownError on a lost reply and recovers to finalized on refresh", async () => {
     const { manager, mint, ops } = await harness();
     const quote = await ops.quoteMelt!(MELT_INPUT as never);
     mint.faults.melt = "lost";
 
-    // Coco rethrows the transport error even after recovering to finalized.
-    // The default operation returns that finalized record as paid evidence.
-    const result = await ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId });
-    expect(JSON.parse(result.historyEntry)).toMatchObject({
-      id: await onlyOperationId(manager),
-      state: "PAID",
-      quoteId: quote.quoteId,
+    // Coco nightly leaves a lost-reply melt in "executing" so recovery can
+    // confirm payment via meltQuoteState before finalizing.
+    await expect(
+      ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId }),
+    ).rejects.toMatchObject({
+      name: "MeltOutcomeUnknownError",
+      operationId: expect.any(String),
+      cause: { name: "NetworkError" },
     });
 
+    const operationId = await onlyOperationId(manager);
+    const recovered = await manager.ops.melt.refresh(operationId);
+    expect(recovered.state).toBe("finalized");
     expect(await historyRows(manager)).toEqual([["melt", "finalized"]]);
     expect(await balance(manager)).toEqual({ spendable: 88, reserved: 0 });
     expect(mint.calls.filter((call) => call === "melt")).toHaveLength(1);

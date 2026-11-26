@@ -144,5 +144,17 @@
     "database": "cashu-coco-expo-sqlite@2.0.0.db",
     "written": "cashu-coco-expo-sqlite@2.0.0.json",
     "sha256": "e439cb8e33cf85d8b2476d8720f8e6624531cd7feb55ea05e786ba9614b5dd7d"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "0.0.0-nightly-20261120132306-58abfae",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "0.0.0-nightly-20261120132306-58abfae",
+    "releases": [
+      "0.1.4 (unreleased)"
+    ],
+    "database": "cashu-coco-expo-sqlite@0.0.0-nightly-20261120132306-58abfae.db",
+    "written": "cashu-coco-expo-sqlite@0.0.0-nightly-20261120132306-58abfae.json",
+    "sha256": "efbf62988ff28dad3bdd74490e6bdc7b1ee7c53afd1f84e7a855151b96e3b8d8"
   }
 ]

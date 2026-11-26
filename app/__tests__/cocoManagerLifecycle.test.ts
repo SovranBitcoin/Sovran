@@ -3,7 +3,8 @@
  * `initialize`, `cleanup`, `isInitialized` and `peekInstance`. The database
  * and the plugins are stand-ins; the coco Manager is the real one.
  */
-import { Manager } from '@cashu/coco-core';
+import { Manager, MemoryRepositories } from '@cashu/coco-core';
+import { createP2PKImportPlugin } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import * as SQLite from 'expo-sqlite';
 import { getPublicKey } from 'nostr-tools/pure';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -96,7 +97,7 @@ beforeEach(() => {
     return db;
   });
   repositories.mockReset();
-  repositories.mockReturnValue({ init: async () => undefined });
+  repositories.mockImplementation(() => new MemoryRepositories());
   useProfileStore.setState({
     activeAccountIndex: 0,
     profiles: [{ accountIndex: 0, pubkey: getPublicKey(SIGNER_KEY), addedAt: 1 }],
@@ -194,9 +195,15 @@ describe('closing', () => {
 // The wallet is ready once its plugins have started, and a start that
 // failed is not handed to anyone.
 describe('starting the plugins', () => {
+  const p2pkPlugin = createP2PKImportPlugin as jest.Mock;
+
   it('is not ready, and hands nobody the wallet, until its plugins have started', async () => {
     const started = deferred();
-    jest.spyOn(Manager.prototype, 'initPlugins').mockImplementationOnce(() => started.promise);
+    p2pkPlugin.mockReturnValueOnce({
+      name: 'p2pk-import',
+      required: [],
+      onInit: () => started.promise,
+    });
     const first = CocoManager.initialize();
     for (let i = 0; i < 20 && opened.length === 0; i++) await tick();
     await tick();
@@ -216,13 +223,11 @@ describe('starting the plugins', () => {
     expect(CocoManager.isInitialized()).toBe(true);
   });
 
-  it('closes a wallet whose plugins failed to start, and opens a new one next time', async () => {
-    const dispose = jest.spyOn(Manager.prototype, 'dispose');
-    jest.spyOn(Manager.prototype, 'initPlugins').mockRejectedValueOnce(new Error('plugin failed'));
+  it('closes a wallet whose startup failed, and opens a new one next time', async () => {
+    jest.spyOn(Manager, 'create').mockRejectedValueOnce(new Error('plugin failed'));
     await expect(CocoManager.initialize()).rejects.toThrow('plugin failed');
     expect(CocoManager.isInitialized()).toBe(false);
     expect(CocoManager.peekInstance()).toBeNull();
-    expect(dispose).toHaveBeenCalledTimes(1);
     expect(opened[0].closeAsync).toHaveBeenCalledTimes(1);
 
     const wallet = await CocoManager.initialize();

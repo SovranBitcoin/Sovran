@@ -35,7 +35,7 @@ jest.mock('react-native-svg', () => ({
 
 let mockReducedMotion = false;
 const mockCancel = jest.fn();
-const mockWithRepeat = jest.fn((value: unknown) => value);
+const mockWithRepeat = jest.fn((...args: unknown[]) => args[0]);
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: {

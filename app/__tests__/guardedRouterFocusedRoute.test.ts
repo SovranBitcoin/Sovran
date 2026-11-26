@@ -83,8 +83,8 @@ it('fills dynamic segments before comparing', () => {
 });
 
 it('never takes a group that is not on screen for the focused route', () => {
-  // `/(map-flow)` resolves to `/` like the wallet home; it is another screen.
-  guardedRouter.push('/(map-flow)');
+  // `/(mint-flow)` resolves to `/` like the wallet home; it is another screen.
+  guardedRouter.push('/(mint-flow)' as never);
   expect(push).toHaveBeenCalledTimes(1);
 });
 
