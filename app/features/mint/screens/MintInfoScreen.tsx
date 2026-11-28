@@ -46,6 +46,7 @@ import {
 import { copyPopup } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
+import { resolveMintInfoIdentity } from '@/features/mint/lib/mintInfoIdentity';
 import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
@@ -140,18 +141,8 @@ export function MintInfoScreen() {
   // log as `mintUrl: 24x new object identity`, invalidating everything keyed on
   // it. A primitive compares by value, so those re-renders simply stop.
   const mintUrl = entry?.mintUrl != null ? String(entry.mintUrl) : '';
-  // Fetched value first, then whatever the caller already had on screen, then
-  // the URL. The seed is why opening a mint from search paints its name and
-  // icon on the first frame instead of skeletoning them for a round-trip.
-  const seedDisplayName = entry?.seedDisplayName;
-  const displayName =
-    entry?.displayName != null
-      ? String(entry.displayName)
-      : typeof seedDisplayName === 'string' && seedDisplayName.length > 0
-        ? seedDisplayName
-        : mintUrl;
-  const iconUrl =
-    (entry?.iconUrl as string | undefined) ?? (entry?.seedIconUrl as string | undefined);
+  const cachedMeta = useCachedMintMetadata(mintUrl || null);
+  const { displayName, iconUrl } = resolveMintInfoIdentity(entry, cachedMeta, mintUrl);
   const morph = useIdentityHeader({
     identity: {
       kind: 'mint',
@@ -173,7 +164,6 @@ export function MintInfoScreen() {
   // made an installed mint flash "Add mint" and delayed its Settings section,
   // because `!entry?.isTrusted` reads UNKNOWN as UNTRUSTED.
   const isTrusted = useIsMintTrusted(mintUrl) || entry?.isTrusted === true;
-  const cachedMeta = useCachedMintMetadata(mintUrl || null);
   const detail = useMintDetailRead(mintUrl, entry);
   const kymScore =
     typeof entry?.kymScore === 'number'
