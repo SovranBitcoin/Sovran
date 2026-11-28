@@ -358,8 +358,11 @@ const meltReversed = (ctx: TimelineContext) =>
 // "Rollback requested by handler", whatever a later version adds). So the
 // known thing is the cancellation, and every other reason is a failure:
 // guessing the other way round calls a failed payment a choice the user made.
+// A melt that ended `failed` was never backed out of: coco records the user's
+// cancel as `rolled_back` with the reason above.
 const USER_CANCELLED = /user cancel|rolled back by user/i;
 const meltPaymentFailed = (ctx: TimelineContext) => {
+  if (ctx.state === FAILED_STATE) return true;
   const reason = entryError(ctx);
   return reason !== undefined && !USER_CANCELLED.test(reason);
 };

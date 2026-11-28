@@ -127,7 +127,20 @@ describe('history timeline — lightning SEND (melt)', () => {
     ]);
   });
 
-  it.each(['rolled_back', 'rolledBack', 'failed'])(
+  // coco records the user backing out as `rolled_back` with a reason; a melt
+  // that ended `failed` never did so by choice, reason or not.
+  it('failed reads as a failed payment even without a recorded reason', () => {
+    const failed = melt('failed');
+    const timeline = build(failed);
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'rolled-back | Payment failed | Funds returned to your balance',
+    ]);
+    const { steps } = buildTimelineModel({ historyEntry: failed as never, currentTime: CREATED_AT });
+    expect(getCardLabel(failed as never, steps)).toBe('Send • Failed');
+  });
+
+  it.each(['rolled_back', 'rolledBack'])(
     '%s without a recorded reason reads as the user backing out',
     (state) => {
       expect(rows(build(melt(state)))).toEqual([
@@ -334,13 +347,17 @@ describe('history timeline — onchain SEND (melt)', () => {
     ]);
   });
 
-  it.each(['rolled_back', 'rolledBack', 'failed'])('%s → funds returned', (state) => {
+  it.each([
+    ['rolled_back', 'Cancelled'],
+    ['rolledBack', 'Cancelled'],
+    ['failed', 'Payment failed'],
+  ])('%s → funds returned', (state, label) => {
     const timeline = build(melt(state), { onchainConfirmationProgress: progress() });
     expect(rows(timeline)).toEqual([
       'complete | Payment prepared',
-      'rolled-back | Cancelled | Funds returned to your balance',
+      `rolled-back | ${label} | Funds returned to your balance`,
     ]);
-    expect(getStatusHeader(timeline)).toBe('CANCELLED');
+    expect(getStatusHeader(timeline)).toBe(label.toUpperCase());
   });
 });
 
