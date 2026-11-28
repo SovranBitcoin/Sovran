@@ -1,9 +1,16 @@
+import type { Manager } from '@cashu/coco-core';
+
 import {
+  buildBolt12Items,
   classifyOnchainQuote,
   classifyPaymentRequest,
   isExpiryElapsed,
   isRailItemCopyable,
 } from '@/features/receive/lib/receiveRailItems';
+
+jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
+  useMintMetadataStore: { getState: () => ({ getCached: () => undefined }) },
+}));
 
 describe('receiveRailItems classification', () => {
   describe('classifyPaymentRequest', () => {
@@ -44,11 +51,16 @@ describe('receiveRailItems classification', () => {
     });
   });
 
-  describe('isExpiryElapsed (mirrors coco isExpiredMintQuoteSnapshot)', () => {
+  describe('isExpiryElapsed (same rule as the wallet keeps a standing quote by)', () => {
     const nowSeconds = 1_783_520_800;
 
-    it('treats expiry 0 as expired — coco reads 0 <= now, so bolt12 offers (expiry 0) are never watched', () => {
-      expect(isExpiryElapsed(0, nowSeconds)).toBe(true);
+    // Coco 58abfae watches and claims a pending mint quote whatever its expiry
+    // (coco models/MintQuoteClaimability.ts:85, MintOperationWatcherService
+    // has no expiry gate), and mints send bolt12 offers with `expiry: 0`
+    // meaning "no expiry" (NUT-25 allows null). The wallet keeps such an offer
+    // as the standing one (`wallet/src/quotes/reusable.ts` isUnexpired).
+    it('treats expiry 0 as no expiry', () => {
+      expect(isExpiryElapsed(0, nowSeconds)).toBe(false);
     });
 
     it('treats null / undefined expiry as never-expiring', () => {
@@ -74,5 +86,31 @@ describe('receiveRailItems classification', () => {
       expect(isRailItemCopyable('cancelled')).toBe(false);
       expect(isRailItemCopyable('expired')).toBe(false);
     });
+  });
+});
+
+describe('buildBolt12Items', () => {
+  it('lists an offer with expiry 0 as reusable and listening, not expired', async () => {
+    const manager = {
+      quotes: {
+        mint: {
+          listPending: async () => [
+            {
+              mintUrl: 'https://mint.example',
+              quoteId: 'offer-1',
+              method: 'bolt12',
+              request: 'lno1offer',
+              unit: 'sat',
+              expiry: 0,
+              createdAt: 1,
+            },
+          ],
+        },
+      },
+    } as unknown as Manager;
+
+    const [item] = await buildBolt12Items(manager, { standingIds: new Set() });
+
+    expect(item).toMatchObject({ status: 'reusable', listening: true });
   });
 });
