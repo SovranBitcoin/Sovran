@@ -31,7 +31,20 @@ function summarizeAddress(address: string | null): Record<string, unknown> {
   };
 }
 
-export function useMempoolAddressSummary(address: string | null | undefined): {
+interface MempoolAddressWatchOptions {
+  /**
+   * Read only while the address is on screen. A hidden tab or a screen under
+   * another one keeps the last summary and asks again when shown.
+   */
+  enabled?: boolean;
+  /** Stop asking once nothing the page shows can change (e.g. confirmed and credited). */
+  isSettled?: (summary: MempoolAddressSummary) => boolean;
+}
+
+export function useMempoolAddressSummary(
+  address: string | null | undefined,
+  { enabled = true, isSettled }: MempoolAddressWatchOptions = {}
+): {
   summary: MempoolAddressSummary | null;
   isLoading: boolean;
   isRefreshing: boolean;
@@ -43,10 +56,33 @@ export function useMempoolAddressSummary(address: string | null | undefined): {
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const cacheSummary = useMemo<CacheSummaryState>(() => {
+    if (!cacheEntry) return { status: 'missing', summary: null };
+    const parsed = MempoolAddressStatsSchema.safeParse(cacheEntry.stats);
+    if (!parsed.success) {
+      return {
+        status: 'invalid',
+        summary: null,
+        issueCount: parsed.error.issues.length,
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          code: issue.code,
+        })),
+      };
+    }
+    return {
+      status: 'parsed',
+      summary: summarizeMempoolAddress(parsed.data),
+    };
+  }, [cacheEntry]);
+  const settled = !!cacheSummary.summary && !!isSettled?.(cacheSummary.summary);
+  const watching = enabled && !settled;
 
   useEffect(() => {
-    if (!normalizedAddress) {
-      log.debug('mempool.address.summary.idle', { reason: 'missing_address' });
+    if (!normalizedAddress || !watching) {
+      log.debug('mempool.address.summary.idle', {
+        reason: normalizedAddress ? 'not_watching' : 'missing_address',
+      });
       setIsRefreshing(false);
       setError(null);
       return;
@@ -127,27 +163,7 @@ export function useMempoolAddressSummary(address: string | null | undefined): {
         activeRequests: controllers.size,
       });
     };
-  }, [normalizedAddress]);
-
-  const cacheSummary = useMemo<CacheSummaryState>(() => {
-    if (!cacheEntry) return { status: 'missing', summary: null };
-    const parsed = MempoolAddressStatsSchema.safeParse(cacheEntry.stats);
-    if (!parsed.success) {
-      return {
-        status: 'invalid',
-        summary: null,
-        issueCount: parsed.error.issues.length,
-        issues: parsed.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          code: issue.code,
-        })),
-      };
-    }
-    return {
-      status: 'parsed',
-      summary: summarizeMempoolAddress(parsed.data),
-    };
-  }, [cacheEntry]);
+  }, [normalizedAddress, watching]);
 
   useEffect(() => {
     if (cacheSummary.status === 'missing') {

@@ -48,6 +48,11 @@ interface ReceiveReusableQuoteTabProps {
   active?: boolean;
   /** Hidden tabs must not create a quote for a method excluded from Unified. */
   enabled?: boolean;
+  /**
+   * The standing address is on screen (this tab, or Unified showing it) and
+   * the screen is focused: only then is mempool.space asked about deposits.
+   */
+  watchDeposits?: boolean;
   actions: UseScreenActionsResult<'receive'>['actions'];
   muted: string;
   /** Reports the rail's copyable payload (bare offer/address) upward for the
@@ -78,6 +83,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   unit,
   active = true,
   enabled = true,
+  watchDeposits = active,
   actions,
   muted,
   onQrPayload,
@@ -194,7 +200,9 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // unambiguous), and the old quote stays pending in coco so the in-flight
   // deposit still auto-mints. Bolt12 offers never watch/rotate.
   const onchainStandingAddress = method === 'onchain' ? request : null;
-  const standingMempool = useMempoolAddressSummary(onchainStandingAddress);
+  const standingMempool = useMempoolAddressSummary(onchainStandingAddress, {
+    enabled: watchDeposits,
+  });
   const mempoolReport = standingMempool.summary;
   const depositObserved = !!mempoolReport && mempoolReport.totalReceivedSats > 0;
   const rotatedForAddressRef = useRef<string | null>(null);

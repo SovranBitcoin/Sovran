@@ -53,6 +53,7 @@ jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
 // Each poll of the standing address hands the tab a fresh summary object; a
 // test publishes one with `mockReportMempool` and the tab re-renders on it.
 let mockMempoolSummary: { totalReceivedSats: number } | null = null;
+const mockMempoolCalls: unknown[][] = [];
 const mockMempoolListeners = new Set<() => void>();
 const mockReportMempool = (summary: { totalReceivedSats: number } | null) => {
   mockMempoolSummary = summary;
@@ -65,9 +66,10 @@ jest.mock('@/shared/hooks/useMempoolAddressSummary', () => {
     return () => mockMempoolListeners.delete(listener);
   };
   return {
-    useMempoolAddressSummary: () => ({
-      summary: useSyncExternalStore(subscribe, () => mockMempoolSummary),
-    }),
+    useMempoolAddressSummary: (...args: unknown[]) => {
+      mockMempoolCalls.push(args);
+      return { summary: useSyncExternalStore(subscribe, () => mockMempoolSummary) };
+    },
   };
 });
 jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
@@ -279,6 +281,41 @@ describe('receive rail presentation', () => {
     } finally {
       act(() => renderer?.unmount());
       mockReportMempool(null);
+      mockQuote.mockReset();
+      mockQuote.mockImplementation(() => ({
+        quote: { request: 'lno-fixture', expiry: 10_000_000_000 },
+        error: null,
+        rotate: jest.fn(),
+      }));
+    }
+  });
+  it('asks mempool.space about the standing address only while it is on screen', () => {
+    mockQuote.mockImplementation(() => ({
+      quote: { request: 'bc1qstanding', expiry: 10_000_000_000 },
+      error: null,
+      rotate: jest.fn(),
+    }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    try {
+      act(() => {
+        renderer = TestRenderer.create(
+          <ReceiveReusableQuoteTab {...props} method="onchain" active={false} />
+        );
+      });
+      expect(mockMempoolCalls.at(-1)).toEqual(['bc1qstanding', { enabled: false }]);
+      act(() =>
+        renderer.update(<ReceiveReusableQuoteTab {...props} method="onchain" active />)
+      );
+      expect(mockMempoolCalls.at(-1)).toEqual(['bc1qstanding', { enabled: true }]);
+      // Unified shows the address while this tab is hidden.
+      act(() =>
+        renderer.update(
+          <ReceiveReusableQuoteTab {...props} method="onchain" active={false} watchDeposits />
+        )
+      );
+      expect(mockMempoolCalls.at(-1)).toEqual(['bc1qstanding', { enabled: true }]);
+    } finally {
+      act(() => renderer?.unmount());
       mockQuote.mockReset();
       mockQuote.mockImplementation(() => ({
         quote: { request: 'lno-fixture', expiry: 10_000_000_000 },

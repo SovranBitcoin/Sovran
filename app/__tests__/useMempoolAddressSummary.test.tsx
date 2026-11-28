@@ -74,6 +74,46 @@ describe('useMempoolAddressSummary', () => {
     expect(fetchStats).toHaveBeenCalledTimes(2);
   });
 
+  it('reads nothing while disabled, and reads again once shown', async () => {
+    const { rerender, unmount } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useMempoolAddressSummary(ADDRESS, { enabled }),
+      { initialProps: { enabled: false } }
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLL_MS * 3);
+    });
+    expect(fetchStats).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+    await flush();
+    expect(fetchStats).toHaveBeenCalledTimes(1);
+
+    rerender({ enabled: false });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLL_MS * 3);
+    });
+    expect(fetchStats).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('stops once the summary is settled, keeping the summary', async () => {
+    const { result, unmount } = renderHook(() =>
+      useMempoolAddressSummary(ADDRESS, { isSettled: () => true })
+    );
+    await flush();
+    expect(fetchStats).toHaveBeenCalledTimes(1);
+    expect(result.current.summary).toMatchObject({ address: ADDRESS });
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLL_MS * 3);
+    });
+    expect(fetchStats).toHaveBeenCalledTimes(1);
+    expect(result.current.summary).toMatchObject({ address: ADDRESS });
+
+    unmount();
+  });
+
   it('reads nothing without an address', async () => {
     renderHook(() => useMempoolAddressSummary(null));
     await act(async () => {
