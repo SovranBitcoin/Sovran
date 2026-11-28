@@ -229,40 +229,35 @@ describe('negative cache: an absent profile is not refetched on every mount', ()
   test('a miss backs off 1 min, then 10 min, then 1 h', () => {
     const cache = createNostrEntityCache();
     expect(cache.isProfileMissed(PK, NOW)).toBe(false);
-    cache.settleProfileFetch([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
     expect(cache.isProfileMissed(PK, NOW + 59_000)).toBe(true);
     expect(cache.isProfileMissed(PK, NOW + 61_000)).toBe(false);
-    cache.settleProfileFetch([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
     expect(cache.isProfileMissed(PK, NOW + 9 * 60_000)).toBe(true);
     expect(cache.isProfileMissed(PK, NOW + 11 * 60_000)).toBe(false);
-    cache.settleProfileFetch([PK], 'answered', NOW);
-    cache.settleProfileFetch([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
     expect(cache.isProfileMissed(PK, NOW + 59 * 60_000)).toBe(true);
     expect(cache.isProfileMissed(PK, NOW + 61 * 60_000)).toBe(false);
   });
 
   test('a fetch no source answered is retried after 30 s and does not escalate', () => {
     const cache = createNostrEntityCache();
-    cache.settleProfileFetch([PK], 'failed', NOW);
-    cache.settleProfileFetch([PK], 'failed', NOW);
-    cache.settleProfileFetch([PK], 'failed', NOW);
+    cache.recordProfileMisses([PK], 'failed', NOW);
+    cache.recordProfileMisses([PK], 'failed', NOW);
+    cache.recordProfileMisses([PK], 'failed', NOW);
     expect(cache.isProfileMissed(PK, NOW + 29_000)).toBe(true);
     expect(cache.isProfileMissed(PK, NOW + 31_000)).toBe(false);
   });
 
-  test('a profile that was found is not a miss, and finding it clears an earlier one', () => {
+  test('finding the profile clears an earlier miss and its escalation', () => {
     const cache = createNostrEntityCache();
-    cache.settleProfileFetch([PK], 'answered', NOW);
-    cache.ingestProfileMetadata({ [PK]: { name: 'alice' } }, 1, 'relay', { createdAt: { [PK]: 1_700_000_500 } });
-    cache.settleProfileFetch([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
+    cache.recordProfileMisses([PK], 'answered', NOW);
+    cache.clearProfileMisses([PK]);
     expect(cache.isProfileMissed(PK, NOW)).toBe(false);
-  });
-
-  test('a seed alone does not count as found', () => {
-    const cache = createNostrEntityCache();
-    cache.ingestProfileInfos({ [PK]: { name: 'seed' } }, 'nagg');
-    cache.settleProfileFetch([PK], 'answered', NOW);
-    expect(cache.isProfileMissed(PK, NOW)).toBe(true);
+    cache.recordProfileMisses([PK], 'answered', NOW);
+    expect(cache.isProfileMissed(PK, NOW + 61_000)).toBe(false);
   });
 });
 

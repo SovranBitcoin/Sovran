@@ -34,6 +34,7 @@ import {
 } from './profile-stats';
 import type { ProfileSearchBundle, ProfileSearchHit, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
+import { createBatcher, type Batcher } from './batcher';
 import {
   createNostrEntityCache,
   type NostrEntityCache,
@@ -68,7 +69,14 @@ export type NostrDataLayerConfig = {
    */
   cache?: NostrEntityCache;
   cacheLimits?: EntityCacheLimits;
+  /** How long a profile load waits for others to join its request. Default 16 ms. */
+  profileBatchWindowMs?: number;
+  /** Most pubkeys in one profile request. Default 100. */
+  profileBatchMaxKeys?: number;
 };
+
+/** A cached profile older than this is revalidated in the background. */
+const DEFAULT_PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export interface NostrDataLayer {
   /** The shared additive entity cache this layer populates. Read/subscribe from a binding. */
@@ -95,6 +103,21 @@ export interface NostrDataLayer {
     onEnvelope: (envelope: DmEnvelope) => void,
   ): () => void;
   getProfiles(request: ProfilesRequest): Promise<Result<ResolvedProfiles, TierResolutionError>>;
+  /**
+   * Fetch profiles through the per-frame batcher: every pubkey asked for
+   * within one frame, by any caller, goes out as one request per source, and
+   * a pubkey already being fetched is not asked for again. Always asks the
+   * sources. Resolves with the pubkeys that have a real kind-0; never rejects.
+   */
+  loadProfiles(pubkeys: readonly string[]): Promise<Record<string, ProfileMetadata>>;
+  /**
+   * Make sure these profiles are loaded, without waiting: schedules a batched
+   * fetch for each pubkey that has no cached record or one older than
+   * `maxAgeMs` (default 24 h), is not within a recorded miss, and is not
+   * already queued or in flight. Returns the pubkeys it scheduled. Callers
+   * read the result from `cache.profiles` (per-key subscription).
+   */
+  ensureProfiles(pubkeys: readonly string[], options?: { maxAgeMs?: number }): string[];
   getProfileStats(
     request: ProfileStatsRequest,
   ): Promise<Result<ResolvedProfileStats, TierResolutionError>>;
@@ -109,6 +132,108 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   const cache = config.cache ?? createNostrEntityCache(config.cacheLimits);
 
   const dmLiveTier = config.tiers.find((t) => typeof t.dmLiveSubscribe === 'function');
+
+  /**
+   * One aggregate profile fetch: every tier that serves profiles is asked at
+   * once, each answer is merged into the cache newest-event-wins, and the
+   * promise resolves at the first-paint gate. `onSettled` fires once every
+   * source has settled (or the read failed), after the cache has recorded
+   * which pubkeys nobody returned.
+   */
+  async function fetchProfiles(
+    request: ProfilesRequest,
+    onSettled?: () => void,
+  ): Promise<Result<ResolvedProfiles, TierResolutionError>> {
+    return runRead(
+      'profiles',
+      request,
+      { pubkeys: request.pubkeys.length },
+      async (ctx) => {
+        // Cache-first: split into what we already hold vs what to fetch.
+        const { profiles: cached, missing } = cache.readProfiles(request.pubkeys);
+        const cachedMeta = metadataMapOf(cached);
+        // Everything already cached → serve instantly, no network round-trip.
+        if (missing.length === 0 && !request.refresh) {
+          onSettled?.();
+          return ok<ResolvedProfiles, TierResolutionError>({ tier: 'cache', profiles: cachedMeta });
+        }
+        // Otherwise fan out for the missing (or all, on refresh) and merge.
+        // Mark those pubkeys pending so a binding shows a skeleton (not a
+        // fallback) until every tier has settled — a slower tier may still
+        // fill a gap, or hold a newer event than, the first one.
+        const toFetch = request.refresh ? request.pubkeys : missing;
+        const fetchReq = request.refresh ? request : { ...request, pubkeys: missing };
+        cache.pendingProfiles.begin(toFetch);
+        let ended = false;
+        const returned = new Set<string>();
+        /** Every source has settled: record the misses, then stop the skeletons. */
+        const settle = (outcome: 'answered' | 'failed') => {
+          if (ended) return;
+          ended = true;
+          cache.clearProfileMisses([...returned]);
+          cache.recordProfileMisses(
+            toFetch.filter((pubkey) => !returned.has(pubkey)),
+            outcome,
+          );
+          cache.pendingProfiles.end(toFetch);
+          onSettled?.();
+        };
+        const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
+        const first = await resolveAllTiers<ProfilesBundle>(candidates, {
+          ...ctx,
+          gate: { minItems: toFetch.length, capMs: AGGREGATE_CAP_MS.profiles },
+          count: (bundle) => Object.keys(bundle.profiles).length,
+          merge: (acc, next, tier) => {
+            // Each answer is cached with its own event times: the cache keeps the newest kind-0.
+            ingestProfiles(cache, { tier, profiles: next.profiles, createdAt: next.createdAt });
+            for (const pubkey of Object.keys(next.profiles)) returned.add(pubkey);
+            return mergeProfileBundles(acc, next, tier);
+          },
+          onUpdate: (agg) => {
+            if (agg.complete) settle('answered');
+          },
+        });
+        if (first.isErr()) {
+          settle('failed');
+          return err(first.error);
+        }
+        if (first.value.complete) settle('answered');
+        return ok<ResolvedProfiles, TierResolutionError>({
+          tier: first.value.tier,
+          profiles: { ...cachedMeta, ...first.value.value.profiles },
+          provenance: provenanceOf(ctx.readId, first.value),
+        });
+      },
+      (r) => ({ profiles: Object.keys(r.profiles).length, ...describeProvenance(r.provenance) }),
+    );
+  }
+
+  /**
+   * Every profile asked for within one frame goes out as ONE fetch per source
+   * (D1). A key resolves as soon as a source returned it; a key nobody has
+   * returned yet waits for the last source, so a slow tier can still fill it.
+   */
+  const profileBatcher: Batcher<ProfileMetadata | undefined> = createBatcher({
+    windowMs: config.profileBatchWindowMs,
+    maxKeys: config.profileBatchMaxKeys,
+    fetch(keys) {
+      let markSettled!: () => void;
+      const settled = new Promise<void>((resolve) => {
+        markSettled = resolve;
+      });
+      const painted = fetchProfiles({ pubkeys: keys, refresh: true }, markSettled);
+      const held = (key: string) => {
+        const record = cache.profiles.peek(key);
+        return record && record.seenAt > 0 ? metadataOf(record) : undefined;
+      };
+      return (key) =>
+        painted.then(async (result) => {
+          if (result.isOk() && Object.hasOwn(result.value.profiles, key)) return held(key);
+          await settled;
+          return held(key);
+        });
+    },
+  });
 
   return {
     cache,
@@ -212,52 +337,31 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     },
 
     async getProfiles(request) {
-      return runRead(
-        'profiles',
-        request,
-        { pubkeys: request.pubkeys.length },
-        async (ctx) => {
-          // Cache-first: split into what we already hold vs what to fetch.
-          const { profiles: cached, missing } = cache.readProfiles(request.pubkeys);
-          const cachedMeta = metadataMapOf(cached);
-          // Everything already cached → serve instantly, no network round-trip.
-          if (missing.length === 0 && !request.refresh) {
-            return ok<ResolvedProfiles, TierResolutionError>({ tier: 'cache', profiles: cachedMeta });
-          }
-          // Otherwise fan out for the missing (or all, on refresh) and merge:
-          // Primal answers most, relays fill the rest. Mark those pubkeys pending
-          // so a binding shows a skeleton (not a fallback) until every tier has
-          // settled — a slower tier may still fill a gap the first one left.
-          const toFetch = request.refresh ? request.pubkeys : missing;
-          const fetchReq = request.refresh ? request : { ...request, pubkeys: missing };
-          cache.pendingProfiles.begin(toFetch);
-          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
-          const first = await resolveAllTiers<ProfilesBundle>(candidates, {
-            ...ctx,
-            gate: { minItems: toFetch.length, capMs: AGGREGATE_CAP_MS.profiles },
-            count: (bundle) => Object.keys(bundle.profiles).length,
-            merge: (acc, next, tier) => {
-              // Each answer is cached with its own event times: the cache keeps the newest kind-0.
-              ingestProfiles(cache, { tier, profiles: next.profiles, createdAt: next.createdAt });
-              return mergeProfileBundles(acc, next, tier);
-            },
-            onUpdate: (agg) => {
-              if (agg.complete) cache.pendingProfiles.end(toFetch);
-            },
-          });
-          if (first.isErr()) {
-            cache.pendingProfiles.end(toFetch);
-            return err(first.error);
-          }
-          if (first.value.complete) cache.pendingProfiles.end(toFetch);
-          return ok<ResolvedProfiles, TierResolutionError>({
-            tier: first.value.tier,
-            profiles: { ...cachedMeta, ...first.value.value.profiles },
-            provenance: provenanceOf(ctx.readId, first.value),
-          });
-        },
-        (r) => ({ profiles: Object.keys(r.profiles).length, ...describeProvenance(r.provenance) }),
+      return fetchProfiles(request);
+    },
+
+    async loadProfiles(pubkeys) {
+      const unique = [...new Set(pubkeys)];
+      const loaded = await Promise.all(
+        unique.map(async (pubkey) => [pubkey, await profileBatcher.load(pubkey)] as const),
       );
+      const out: Record<string, ProfileMetadata> = {};
+      for (const [pubkey, metadata] of loaded) if (metadata) out[pubkey] = metadata;
+      return out;
+    },
+
+    ensureProfiles(pubkeys, options) {
+      const maxAgeMs = options?.maxAgeMs ?? DEFAULT_PROFILE_MAX_AGE_MS;
+      const now = Date.now();
+      const scheduled: string[] = [];
+      for (const pubkey of new Set(pubkeys)) {
+        if (!pubkey || profileBatcher.has(pubkey) || cache.isProfileMissed(pubkey, now)) continue;
+        const record = cache.profiles.peek(pubkey);
+        if (record && now - (record.fetchedAt ?? 0) <= maxAgeMs) continue;
+        scheduled.push(pubkey);
+        void profileBatcher.load(pubkey);
+      }
+      return scheduled;
     },
 
     async getProfileStats(request) {
@@ -627,7 +731,7 @@ function short(id: string): string {
 
 /** Strip a cached profile down to the contract `ProfileMetadata` (drop pubkey/seenAt/srcRank). */
 function metadataOf(cached: CachedProfile): ProfileMetadata {
-  const { pubkey: _pubkey, seenAt: _seenAt, srcRank: _srcRank, ...metadata } = cached;
+  const { pubkey: _pubkey, seenAt: _seenAt, srcRank: _srcRank, fetchedAt: _fetchedAt, ...metadata } = cached;
   return metadata;
 }
 

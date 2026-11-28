@@ -217,13 +217,14 @@ export interface NostrEntityCache {
     times?: ProfileIngestTimes,
   ): void;
   /**
-   * Record how a fetch for these pubkeys ended, once every source has settled.
-   * `answered`: at least one source replied; a pubkey still without a real
-   * kind-0 is a miss, backed off 1 min → 10 min → 1 h. `failed`: no source
-   * replied; ask again in 30 s, without escalating. A pubkey that now has a
-   * real kind-0 has its miss cleared either way.
+   * Record that a fetch, with every source settled, did not return these
+   * pubkeys. `answered`: at least one source replied and none had them, so
+   * they back off 1 min → 10 min → 1 h. `failed`: no source replied; ask again
+   * in 30 s, without escalating.
    */
-  settleProfileFetch(pubkeys: readonly string[], outcome: 'answered' | 'failed', now?: number): void;
+  recordProfileMisses(pubkeys: readonly string[], outcome: 'answered' | 'failed', now?: number): void;
+  /** A fetch returned these pubkeys: forget any miss. */
+  clearProfileMisses(pubkeys: readonly string[]): void;
   /** True while a recorded miss says not to ask for this profile again yet. */
   isProfileMissed(pubkey: string, now?: number): boolean;
   ingestProfileStats(stats: CachedProfileStats): void;
@@ -311,12 +312,11 @@ export function createNostrEntityCache(
         }),
       );
     },
-    settleProfileFetch(pubkeys, outcome, now = Date.now()) {
+    clearProfileMisses(pubkeys) {
+      for (const pubkey of pubkeys) profileMisses.delete(pubkey);
+    },
+    recordProfileMisses(pubkeys, outcome, now = Date.now()) {
       for (const pubkey of pubkeys) {
-        if ((profiles.peek(pubkey)?.seenAt ?? 0) > 0) {
-          profileMisses.delete(pubkey);
-          continue;
-        }
         const misses = profileMisses.peek(pubkey)?.misses ?? 0;
         if (outcome === 'failed') {
           profileMisses.set(pubkey, { missUntil: now + FAILED_FETCH_RETRY_MS, misses });
