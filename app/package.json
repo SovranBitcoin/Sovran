@@ -117,7 +117,6 @@
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.7",
     "expo-system-ui": "~56.0.5",
-    "expo-video": "~56.1.4",
     "liquid-glass-menu": "file:./modules/liquid-glass-menu",
     "liquid-glass-text": "file:./modules/liquid-glass-text",
     "neverthrow": "^8.2.0",

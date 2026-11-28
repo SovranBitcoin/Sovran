@@ -115,7 +115,6 @@
         }
       ],
       "expo-router",
-      "expo-video",
       "expo-secure-store",
       "expo-sqlite",
       "expo-image",
