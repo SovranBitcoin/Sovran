@@ -1,8 +1,5 @@
 import { summarizeMempoolAddress, type MempoolAddressStats } from 'wallet';
-import {
-  getCachedMempoolAddressStats,
-  useMempoolAddressCache,
-} from '@/shared/stores/global/mempoolAddressCache';
+import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -113,57 +110,5 @@ describe('mempool address summaries', () => {
 
     const retained = useMempoolAddressCache.getState().byAddress[ADDRESS]?.stats;
     expect(retained?.fundingTxs).toBeUndefined();
-  });
-
-  it('returns a fresh cached value without refetching', async () => {
-    const now = jest.spyOn(Date, 'now').mockReturnValue(10_000);
-    const cached = stats();
-    useMempoolAddressCache.getState().setAddressStats(ADDRESS, cached);
-    const fetcher = jest.fn(async () => stats({ address: 'unused' }));
-
-    const result = await getCachedMempoolAddressStats(fetcher, ADDRESS);
-
-    expect(result).toEqual(cached);
-    expect(fetcher).not.toHaveBeenCalled();
-    now.mockRestore();
-  });
-
-  it('treats malformed rehydrated stats as a cache miss', async () => {
-    const now = jest.spyOn(Date, 'now').mockReturnValue(10_000);
-    useMempoolAddressCache.setState({
-      byAddress: {
-        [ADDRESS]: {
-          stats: { address: ADDRESS } as unknown as MempoolAddressStats,
-          fetchedAt: 10_000,
-        },
-      },
-    });
-    const fetched = stats();
-    const fetcher = jest.fn(async () => fetched);
-
-    await expect(getCachedMempoolAddressStats(fetcher, ADDRESS)).resolves.toBe(fetched);
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    now.mockRestore();
-  });
-
-  it('dedupes concurrent cache misses for the same address', async () => {
-    const now = jest.spyOn(Date, 'now').mockReturnValue(10_000);
-    const fetched = stats();
-    let resolveFetch: (value: MempoolAddressStats) => void = () => {};
-    const fetcher = jest.fn(
-      () =>
-        new Promise<MempoolAddressStats>((resolve) => {
-          resolveFetch = resolve;
-        })
-    );
-
-    const first = getCachedMempoolAddressStats(fetcher, ADDRESS);
-    const second = getCachedMempoolAddressStats(fetcher, ADDRESS);
-    resolveFetch(fetched);
-
-    await expect(Promise.all([first, second])).resolves.toEqual([fetched, fetched]);
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(useMempoolAddressCache.getState().byAddress[ADDRESS]?.stats).toBe(fetched);
-    now.mockRestore();
   });
 });

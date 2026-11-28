@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 
 import {
   fetchMempoolAddressStats,
@@ -6,13 +7,12 @@ import {
   summarizeMempoolAddress,
   type MempoolAddressSummary,
 } from 'wallet';
-import {
-  getCachedMempoolAddressStats,
-  useMempoolAddressCache,
-} from '@/shared/stores/global/mempoolAddressCache';
+import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';
 import { log } from '@/shared/lib/logger';
 
 const MEMPOOL_ADDRESS_POLL_MS = 70_000;
+
+const inForeground = () => AppState.currentState !== 'background';
 
 type CacheSummaryState =
   | { status: 'missing'; summary: null }
@@ -33,8 +33,9 @@ function summarizeAddress(address: string | null): Record<string, unknown> {
 
 interface MempoolAddressWatchOptions {
   /**
-   * Read only while the address is on screen. A hidden tab or a screen under
-   * another one keeps the last summary and asks again when shown.
+   * Read only while the address is on screen. A hidden tab, a screen under
+   * another one or a backgrounded app keeps the last summary and asks again,
+   * at once, when shown.
    */
   enabled?: boolean;
   /** Stop asking once nothing the page shows can change (e.g. confirmed and credited). */
@@ -76,7 +77,15 @@ export function useMempoolAddressSummary(
     };
   }, [cacheEntry]);
   const settled = !!cacheSummary.summary && !!isSettled?.(cacheSummary.summary);
-  const watching = enabled && !settled;
+  // Not in the background: coming back to the foreground re-runs the watch,
+  // which reads at once and restarts the interval (`inactive` — the app
+  // switcher, a system sheet — still counts as shown).
+  const [foreground, setForeground] = useState(inForeground);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', () => setForeground(inForeground()));
+    return () => subscription.remove();
+  }, []);
+  const watching = enabled && foreground && !settled;
 
   useEffect(() => {
     if (!normalizedAddress || !watching) {
@@ -95,7 +104,12 @@ export function useMempoolAddressSummary(
       pollMs: MEMPOOL_ADDRESS_POLL_MS,
     });
 
-    const refresh = (useCache: boolean) => {
+    // Every read asks mempool.space afresh, cache freshness aside: a deposit
+    // that arrived while the address was hidden or the app was in the
+    // background must show the moment it is shown again, since the standing
+    // address only rotates once it sees one. The cache only keeps the last
+    // summary on screen meanwhile.
+    const refresh = (reason: 'shown' | 'poll') => {
       const controller = new AbortController();
       controllers.add(controller);
       setIsRefreshing(true);
@@ -103,24 +117,16 @@ export function useMempoolAddressSummary(
       const startedAt = Date.now();
       log.info('mempool.address.summary.refresh.start', {
         ...summarizeAddress(normalizedAddress),
-        useCache,
+        reason,
         activeRequests: controllers.size,
       });
 
-      const fetcher = (addr: string) =>
-        fetchMempoolAddressStats(addr, { signal: controller.signal });
-      const request = useCache
-        ? getCachedMempoolAddressStats(fetcher, normalizedAddress)
-        : fetcher(normalizedAddress).then((stats) => {
-            useMempoolAddressCache.getState().setAddressStats(normalizedAddress, stats);
-            return stats;
-          });
-
-      request
+      fetchMempoolAddressStats(normalizedAddress, { signal: controller.signal })
         .then((stats) => {
+          useMempoolAddressCache.getState().setAddressStats(normalizedAddress, stats);
           log.info('mempool.address.summary.refresh.done', {
             ...summarizeAddress(normalizedAddress),
-            useCache,
+            reason,
             confirmedTxCount: stats.chain_stats.tx_count,
             mempoolTxCount: stats.mempool_stats.tx_count,
             durationMs: Date.now() - startedAt,
@@ -131,7 +137,7 @@ export function useMempoolAddressSummary(
             setError(err instanceof Error ? err : new Error(String(err)));
             log.warn('mempool.address.summary.refresh.failed', {
               ...summarizeAddress(normalizedAddress),
-              useCache,
+              reason,
               durationMs: Date.now() - startedAt,
               error: err instanceof Error ? err : new Error(String(err)),
             });
@@ -139,7 +145,7 @@ export function useMempoolAddressSummary(
           }
           log.debug('mempool.address.summary.refresh.ignored', {
             ...summarizeAddress(normalizedAddress),
-            useCache,
+            reason,
             aborted: controller.signal.aborted,
             mounted,
             durationMs: Date.now() - startedAt,
@@ -151,8 +157,8 @@ export function useMempoolAddressSummary(
         });
     };
 
-    refresh(true);
-    const interval = setInterval(() => refresh(false), MEMPOOL_ADDRESS_POLL_MS);
+    refresh('shown');
+    const interval = setInterval(() => refresh('poll'), MEMPOOL_ADDRESS_POLL_MS);
 
     return () => {
       mounted = false;
