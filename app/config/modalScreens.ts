@@ -116,23 +116,6 @@ const modalWithGradient = (
   };
 };
 
-/** Card with fade: for shared-element transitions. */
-const cardFade = (
-  name: string,
-  overrides?: Partial<NativeStackNavigationOptions> & { title?: string }
-): ModalConfig => {
-  const { title, ...opts } = overrides ?? {};
-  return {
-    name,
-    ...(title && { title }),
-    options: {
-      animation: 'fade',
-      headerTransparent: true,
-      ...opts,
-    },
-  };
-};
-
 const TRANSPARENT_HEADER_OPTIONS = {
   headerTransparent: true,
   headerStyle: { backgroundColor: 'transparent' as const },
@@ -232,13 +215,6 @@ const standaloneScreens: ModalConfig[] = [
   modalWithGradient('preview', 'modal', 'Theme preview'),
   modalWithGradient('background', 'modal', 'Background'),
   modalWithGradient('gallery', 'modal', 'Gallery'),
-  cardFade('claimUsername', {
-    headerShadowVisible: false,
-    headerTitle: '',
-    headerBackVisible: false,
-    headerBlurEffect: 'none',
-    headerBackground: () => null,
-  }),
 ];
 
 export const MODAL_SCREENS: ModalConfig[] = [...flowGroups, ...standaloneScreens];

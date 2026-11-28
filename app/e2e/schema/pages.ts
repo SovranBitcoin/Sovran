@@ -66,7 +66,6 @@ export const CANONICAL_PAGES = [
   // Additional route surfaces: catalogued, not necessarily native-covered.
   'bitchat-dm',
   'bitchat-network',
-  'claim-username',
   'geohash-chat',
   'map-detail',
   'near-pay',

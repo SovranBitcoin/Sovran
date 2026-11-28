@@ -112,19 +112,6 @@
       "count": 3
     }
   },
-  "shared/providers/hero-transition/HeroTransitionProvider.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "shared/providers/hero-transition/measure.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "shared/stores/profile/restoreActiveSessionView.ts": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1

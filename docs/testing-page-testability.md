@@ -46,7 +46,6 @@ Generated from the route catalog and authored screenshot scenarios. These are ca
 | map | `map.tsx` | **Gap** | **Gap** |
 | bitchat-dm | `bitchatDM.tsx` | **Gap** | **Gap** |
 | bitchat-network | `bitchatNetwork.tsx` | **Gap** | **Gap** |
-| claim-username | `claimUsername.tsx` | **Gap** | **Gap** |
 | composer | `composer.tsx` | **Gap** | **Gap** |
 | geohash-chat | `geohashChat.tsx` | **Gap** | **Gap** |
 | map-detail | `detail.tsx` | **Gap** | **Gap** |

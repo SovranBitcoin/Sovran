@@ -90,5 +90,4 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   transactions: ['transactions.tsx'],
   'geohash-chat': ['geohashChat.tsx'],
   'not-found': ['+not-found.tsx'],
-  'claim-username': ['claimUsername.tsx'],
 };

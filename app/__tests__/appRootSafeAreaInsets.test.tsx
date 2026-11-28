@@ -49,9 +49,6 @@ jest.mock('@/shared/ui/composed/TouchIndicator', () => ({
   TouchIndicatorEnabled: jest.requireActual('react').createContext(false),
   TouchIndicatorLayer: passthrough,
 }));
-jest.mock('@/shared/providers/hero-transition/HeroTransitionProvider', () => ({
-  HeroTransitionProvider: passthrough,
-}));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (select: (s: object) => unknown) =>
     select({ layoutGuides: false, showTouches: false }),
