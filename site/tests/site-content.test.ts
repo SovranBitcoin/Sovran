@@ -40,16 +40,18 @@ test('mint comparisons retain the reserve and future-reliability limits', () => 
   expect(custody).toContain('do not prove reserves or guarantee future reliability');
 });
 
-test('FAQ source and license links are explicit and availability scrolls to downloads', () => {
+test('FAQ source and license links are explicit and availability points to the download page', () => {
   const links = siteCopy.faq.flatMap(item => 'links' in item ? [...item.links] : []);
   expect(links.map(link => link.href)).toEqual([
     'https://github.com/SovranBitcoin/Sovran',
     'https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE',
-    '#download',
+    '/download',
   ]);
-  const home = readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8');
-  expect(home).toContain('href={link.href}');
-  expect(home).toContain('id="download"');
+  const faq = readFileSync(new URL('../src/pages/faq.astro', import.meta.url), 'utf8');
+  expect(faq).toContain('href={link.href}');
+  expect(faq).not.toMatch(/<details\b|<summary\b|<script\b/);
+  // Old links to sovran.money/#download still land on the home download buttons.
+  expect(readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8')).toContain('id="download"');
 });
 
 test('roadmap and release content stays visible in native Astro without disclosure widgets', () => {

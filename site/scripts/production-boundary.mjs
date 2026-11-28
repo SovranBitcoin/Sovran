@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const PUBLIC_ROUTES = {
   '/': 'index.astro', '/download': 'download.astro', '/releases': 'releases.astro',
-  '/roadmap': 'roadmap.astro', '/[legal]': '[legal].astro', '/404': '404.astro',
+  '/roadmap': 'roadmap.astro', '/faq': 'faq.astro', '/[legal]': '[legal].astro', '/404': '404.astro',
   '/health': 'health.ts', '/build.json': 'build.json.ts', '/legal/documents.json': 'legal/documents.json.ts',
 };
 export const privateRoute = path => /^\/(?:dev|screenshots|logos|social|mockups|scenes[^/]*|__artwork)(?:\/|$)/.test(path);

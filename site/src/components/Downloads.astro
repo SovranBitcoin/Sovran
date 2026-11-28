@@ -7,6 +7,10 @@ import freedomStore from '../../public/downloads/freedom-store.svg?raw';
 import zapstore from '../../public/downloads/zapstore.svg?raw';
 import googlePlay from '../../public/downloads/google-play.svg?raw';
 import githubApk from '../../public/downloads/github-apk.svg?raw';
+interface Props { compact?: boolean }
+// Compact: the home page's badge rows only. The heading stays for screen readers;
+// the QR card and publisher fingerprints live on /download.
+const { compact = false } = Astro.props;
 const copy = siteCopy.downloads;
 const badges = { appStore, freedomStore, zapstore, googlePlay, githubApk };
 const groups = [
@@ -14,12 +18,12 @@ const groups = [
   { label: 'Android', channels: ['zapstore', 'googlePlay', 'githubApk'] },
 ] as const;
 ---
-<section class="downloads" data-downloads data-state="loading" data-failure={copy.failure} data-ready={copy.ready} aria-labelledby="download-heading">
-  <div class="download-copy">
+<section class:list={['downloads', { 'downloads-compact': compact }]} data-downloads data-state="loading" data-failure={copy.failure} data-ready={copy.ready} aria-labelledby="download-heading">
+  {compact ? <h2 id="download-heading" class="visually-hidden">Download Sovran</h2> : <div class="download-copy">
     <p class="download-kicker"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>Download</p>
     <h2 id="download-heading">{copy.title}</h2>
     <p class="lede">{copy.text}</p>
-  </div>
+  </div>}
   <div class="download-options-layout">
     <div class="download-platforms" aria-label="Download options">
       {groups.map((group) => <section class="download-platform-row" data-platform-row={group.label.toLowerCase()} aria-label={`${group.label} downloads`}>
@@ -35,15 +39,16 @@ const groups = [
         </ul>
       </section>)}
     </div>
-    <a href="/download" class="download-qr-card" aria-label="Open the Sovran universal download link">
+    {!compact && <a href="/download" class="download-qr-card" aria-label="Open the Sovran universal download link">
       <img src="/downloads/download-qr.svg" alt="QR code for the Sovran download page" width="168" height="168" loading="lazy" />
       <span>Scan to download</span>
       <small>/download</small>
-    </a>
+    </a>}
   </div>
   <div class="download-feedback">
     <p class="download-status" role="status" aria-live="polite" aria-atomic="true">Checking availability...</p>
     <button type="button" data-retry hidden disabled>{copy.retry}</button>
+    {compact && <a class="download-more" href="/download">All download options</a>}
   </div>
   <noscript><p>Enable JavaScript to check download availability. Store links stay disabled until checked.</p></noscript>
 </section>

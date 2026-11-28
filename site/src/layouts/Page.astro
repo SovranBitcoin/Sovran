@@ -5,7 +5,9 @@ import { websiteAssetStatus } from '../../scripts/website-assets.mjs';
 interface Props { title?: string; description?: string; noindex?: boolean }
 const { title = siteCopy.title, description = siteCopy.description, noindex = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
-const links = [['/#features', 'Product'], ['/#faq', 'FAQ'], ['/roadmap', 'Roadmap'], ['/releases', 'Releases'], ['/download', 'Download']];
+const source = 'https://github.com/SovranBitcoin/Sovran';
+const header = [['/releases', 'Releases'], ['/roadmap', 'Roadmap'], ['/download', 'Download']];
+const footer = [['/download', 'Download'], ['/releases', 'Releases'], ['/roadmap', 'Roadmap'], ['/faq', 'FAQ'], ['/terms', 'Terms'], ['/privacy', 'Privacy']];
 // Never advertise an old scene export after the screenshots or composition change.
 let socialImage;
 try {
@@ -18,12 +20,15 @@ try {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content={description} />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#080808" />
+    <meta name="color-scheme" content="dark" />
     <title>{title}</title>
     <link rel="canonical" href={new URL(path, 'https://sovran.money')} />
+    <link rel="preload" href="/fonts/MonaSans/MonaSans-ExtraBold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/MonaSans/MonaSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
@@ -34,21 +39,21 @@ try {
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
-    <div class="header-shell"><header class="site-header wrap">
-      <a class="brand" href="/" aria-label="Sovran home"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a>
+    <header class="site-header wrap">
+      <a class="brand" href="/" aria-label="Sovran home"><img src="/sovran-mark.svg" alt="" width="20" height="20" />SOVRAN</a>
       <nav aria-label="Main navigation">
-        {links.map(([href, label]) => <a href={href} class:list={{ 'nav-download': href === '/download' }} aria-current={path === href ? 'page' : undefined}>{label}</a>)}
+        {header.map(([href, label]) => <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>)}
       </nav>
-      <details class="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{links.map(([href, label]) => <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>)}</nav></details>
-    </header></div>
+    </header>
     <main id="main"><slot /></main>
     <footer class="site-footer">
-      <div class="wrap footer-top">
-        <div><a class="brand" href="/"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a><p>{siteCopy.hero.text}</p></div>
-        <nav aria-label="Footer navigation"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/roadmap">Roadmap</a><a href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Source code</a></nav>
-        <small>&copy; {new Date().getFullYear()} SOVRAN LTD. <a href="https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE">MPL-2.0</a> · <a href="/licenses/README.txt">Third-party notices</a></small>
+      <div class="wrap footer-inner">
+        <nav aria-label="Footer navigation">
+          {footer.map(([href, label]) => <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>)}
+          <a href={source} rel="noreferrer">Source code</a>
+        </nav>
+        <small>&copy; {new Date().getFullYear()} SOVRAN LTD · <a href={`${source}/blob/main/LICENSE`}>MPL-2.0</a> · <a href="/licenses/README.txt">Third-party notices</a></small>
       </div>
-      <p class="wrap footer-mark" aria-hidden="true">SOVRAN</p>
     </footer>
   </body>
 </html>

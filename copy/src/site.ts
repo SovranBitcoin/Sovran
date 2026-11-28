@@ -2,27 +2,15 @@
 export const siteCopy = {
   title: 'Sovran - Private Bitcoin and Cashu ecash wallet',
   description: 'A focused Bitcoin and Cashu ecash wallet with contacts, NFC payments, and independent mint discovery. Understand the risks, choose your mint, and start small.',
-  hero: { title: 'Sound money, without the middleman.', text: 'Cashu ecash, Lightning, contacts, and open mint discovery in one focused wallet.', action: 'Download' },
-  manifesto: { text: 'Two persons may exchange messages, conduct business, and negotiate electronic contracts without ever knowing the True Name, or legal identity, of the other.', cite: 'Timothy C. May, The Crypto Anarchist Manifesto (1988)', href: 'https://www.activism.net/cypherpunk/crypto-anarchy.html' },
-  statement: { problem: 'Custodial apps trap money, contacts, and payment history behind accounts and walled gardens.', solution: 'Sovran puts Cashu ecash, Lightning, and contacts on open protocols. You choose which mints, relays, and public auditors to trust.' },
-  benefits: [
-    { id: 'wallet', eyebrow: 'Pay', title: 'Pay a friend.\nPick your mint.', text: 'Pay a Lightning address, scan a code, or send Cashu ecash. Your phone holds the digital cash; the issuing mint holds the bitcoin behind it and is responsible for redemption.', points: ['Send and receive Cashu ecash', 'Pay supported Lightning invoices and addresses', 'Choose and manage your mints'], note: 'You are not holding bitcoin directly on-chain. Fees and availability depend on the mint and payment route.' },
-    { id: 'contacts', eyebrow: 'Contacts', title: 'Receive silently\nfrom anyone.', text: 'Pay contacts directly and receive ecash or NUT-18 payment requests sent over encrypted Nostr messages (NIP-17) from Sovran or other compatible wallets.', points: ['Find people over Nostr and Vertex', 'Pay contacts without copying addresses', 'Auto-redeem incoming NIP-17 ecash quietly'], note: 'Relays can restrict access; encrypted messages do not hide every kind of network metadata.' },
-    { id: 'mints', eyebrow: 'Mints', title: 'Compare mints\non your terms.', text: 'Discover and inspect mints using Nostr NIP-87 alongside optional public auditors like MintRadar, Cashu Auditor, and IMF.gg — each toggleable in Settings.', points: ['Inspect operator profiles, reviews, and audit checks', 'Toggle individual HTTP auditors on or off', 'Run Nostr-only discovery with zero HTTP auditor calls'], note: 'Reviews and audit checks do not prove reserves or guarantee future reliability.' },
-    { id: 'offline', eyebrow: 'Nearby', title: 'Pass digital cash.\nEven offline.', text: 'Supported NFC and Bluetooth paths let you hand ecash to someone nearby without an internet connection at the moment of transfer.', points: ['Share tokens with people nearby', 'Use supported NFC and Bluetooth handoffs', 'Reconnect to check and redeem with the mint'], note: 'Handoff is not settlement. Redemption and spendability checks need the relevant mint. Support varies by device and installed version.' },
-  ],
-  stack: { title: 'The freedom stack,\nin one wallet.', text: 'Built on open protocols and projects, with source you can inspect. Different components have their own licenses, and you choose which mints, relays, and public auditors to use.', items: [
-    { name: 'Bitcoin', role: 'Backing asset', logo: 'bitcoin' },
-    { name: 'Cashu', role: 'Digital cash', logo: 'cashu' },
-    { name: 'Nostr', role: 'Contacts & NIP-17', logo: 'nostr' },
-    { name: 'BitChat', role: 'Nearby communication', logo: '' },
-    { name: 'BTC Map', role: 'Places to spend', logo: 'btcmap' },
-    { name: 'Vertex', role: 'Direct people search', logo: 'vertex' },
-    { name: 'Coco', role: 'Wallet engine', logo: 'coco' },
-    { name: 'npub.cash', role: 'Lightning addresses', logo: 'npubcash' },
-    { name: 'MintRadar', role: 'Optional mint auditor', logo: '' },
-    { name: 'IMF.gg', role: 'Optional mint directory', logo: '' },
-  ] },
+  hero: {
+    title: 'Pay a friend.\nPick your mint.',
+    text: 'A Bitcoin and Cashu ecash wallet. Your phone holds the digital cash; the mint you pick holds the bitcoin behind it.',
+    alt: 'The Sovran wallet screen: a balance from the selected mint, Receive, scan and Send buttons, and recent payments.',
+  },
+  proof: {
+    source: { label: 'App source on GitHub under MPL-2.0', href: 'https://github.com/SovranBitcoin/Sovran' },
+    grant: { label: 'Supported by an OpenSats grant (July 2025)', href: 'https://opensats.org/blog/twelfth-wave-of-bitcoin-grants#sovran' },
+  },
   faq: [
     { question: 'What is Sovran?', answer: 'Sovran is a Cashu ecash and Lightning wallet with Nostr contacts, silent NIP-17 ecash receiving, nearby NFC/Bluetooth handoffs, and pluggable mint discovery. Features vary by platform and installed version.' },
     { question: 'Do I hold my own money?', answer: 'Your phone holds your keys and digital cash. The issuing mint holds the backing bitcoin and must redeem your ecash, including when the mint is Sovran-branded. Community reviews, operator reputations, and payment-test results from auditors can help you compare mints. They do not prove reserves or guarantee future reliability. A mint can fail or restrict redemption. Start with small amounts you can afford to lose.' },
@@ -30,7 +18,7 @@ export const siteCopy = {
     { question: 'Is my public identity connected to my money?', answer: 'For profiles you create in Sovran, your recovery words derive separate Nostr identity keys and Cashu wallet keys. Your Nostr key alone does not recreate your Cashu wallet. Keep it private, though: someone who gets it may read retained messages and spend unredeemed ecash tokens inside them. Payment addresses, public posts, timing, and network information can still link activity across separate keys.' },
     { question: 'Can I pay people without the internet?', answer: 'Supported NFC and Bluetooth paths can hand off ecash tokens offline. The recipient needs the relevant mint to check spendability and redeem them. An offline handoff is not proof of settlement, and support varies by device and version.' },
     { question: 'Is Sovran open source?', answer: 'The main Sovran app source is published under the Mozilla Public License 2.0 (MPL-2.0). You can read the code and its license on GitHub. Dependencies, artwork, and other components have their own licenses. This does not mean every hosted service is open source or every store build is reproducible.', links: [{ label: 'View the source', href: 'https://github.com/SovranBitcoin/Sovran' }, { label: 'Read the MPL-2.0 license', href: 'https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE' }] },
-    { question: 'Which phones can run it?', answer: 'See the iOS and Android download options below. Each store has its own release schedule, so versions and features may differ. The download section checks current availability before showing a link.', links: [{ label: 'See download options', href: '#download' }] },
+    { question: 'Which phones can run it?', answer: 'Sovran has iOS and Android download options. Each store has its own release schedule, so versions and features may differ. The download page checks current availability before showing a link.', links: [{ label: 'See download options', href: '/download' }] },
   ],
   risk: 'Cashu ecash is experimental. Mints can fail, and funds can be lost. Use small amounts you can afford to lose. Back up your recovery information; recovery is not guaranteed.',
   downloads: {
