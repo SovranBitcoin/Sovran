@@ -108,7 +108,9 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   }
 
   if (!entry) {
-    return <TransactionDetailSkeleton screenName="ReceiveTokenScreen" label="Loading transaction" />;
+    return (
+      <TransactionDetailSkeleton screenName="ReceiveTokenScreen" label="Loading transaction" />
+    );
   }
 
   const amount = amountToNumber(entry.amount);

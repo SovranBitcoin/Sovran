@@ -186,7 +186,9 @@ export function LightningSendScreen({
   }
 
   if (!entry) {
-    return <TransactionDetailSkeleton screenName="LightningSendScreen" label="Loading transaction" />;
+    return (
+      <TransactionDetailSkeleton screenName="LightningSendScreen" label="Loading transaction" />
+    );
   }
 
   const isPreview = !entry.quoteId;

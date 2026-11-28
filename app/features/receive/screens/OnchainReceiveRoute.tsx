@@ -94,7 +94,9 @@ function OnchainReceiveRouteContent({
   }
 
   if (!typedEntry) {
-    return <TransactionDetailSkeleton screenName="OnchainReceiveScreen" label="Loading transaction" />;
+    return (
+      <TransactionDetailSkeleton screenName="OnchainReceiveScreen" label="Loading transaction" />
+    );
   }
 
   return (

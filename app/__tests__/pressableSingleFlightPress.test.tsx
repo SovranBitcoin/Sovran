@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+// eslint-disable-next-line no-restricted-imports -- the test inspects the host the shared primitive wraps
 import { Pressable as RNPressable, StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
@@ -43,7 +44,9 @@ it('keeps press-in and the pressed look live while the previous tap is still run
   });
   expect(onPress).toHaveBeenCalledTimes(1);
 
-  act(() => host().onPressIn({}));
+  act(() => {
+    host().onPressIn({});
+  });
   expect(onPressIn).toHaveBeenCalledTimes(1);
   expect(host().disabled).toBeFalsy();
   expect(StyleSheet.flatten(host().style({ pressed: true, hovered: false })).opacity).toBe(0.7);

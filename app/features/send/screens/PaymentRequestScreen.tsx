@@ -66,7 +66,12 @@ export function PaymentRequestScreen({
   }
 
   if (!entry) {
-    return <TransactionDetailSkeleton screenName="PaymentRequestScreen" label="Loading payment request" />;
+    return (
+      <TransactionDetailSkeleton
+        screenName="PaymentRequestScreen"
+        label="Loading payment request"
+      />
+    );
   }
 
   const tokenCreated = entry.metadata?.tokenCreated === 'true';

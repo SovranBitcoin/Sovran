@@ -91,7 +91,9 @@ export function LightningReceiveScreen({
   }
 
   if (!entry) {
-    return <TransactionDetailSkeleton screenName="LightningReceiveScreen" label="Loading transaction" />;
+    return (
+      <TransactionDetailSkeleton screenName="LightningReceiveScreen" label="Loading transaction" />
+    );
   }
 
   const bottomButtons = (

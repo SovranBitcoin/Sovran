@@ -8,6 +8,7 @@
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
+import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -44,17 +45,17 @@ function mount(
 ) {
   const close = jest.fn();
   const onDismiss = jest.fn();
+  const payload: ActionSheetPayloads['action-menu'] = { title: 'Pay', buttons, onDismiss };
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     tree = TestRenderer.create(
-      <ActionMenuSheetContent
-        payload={{ title: 'Pay', buttons, onDismiss } as never}
-        close={close}
-        setFooterConfig={jest.fn()}
-      />
+      <ActionMenuSheetContent payload={payload} close={close} setFooterConfig={jest.fn()} />
     );
   });
-  const press = (testID: string) => act(() => tree.root.findByProps({ testID }).props.onPress());
+  const press = (testID: string) =>
+    act(() => {
+      tree.root.findByProps({ testID }).props.onPress();
+    });
   return { tree, close, onDismiss, press };
 }
 
