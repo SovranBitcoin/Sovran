@@ -106,6 +106,29 @@ function readCapability(
 }
 
 /**
+ * Every NUT-05 method name the mint advertises for melting `unit`, whether or
+ * not this wallet implements it. Empty when NUT-05 is disabled or unreadable.
+ */
+export function meltMethodNamesFromInfo(
+  mintInfo: unknown,
+  unit: string,
+): string[] {
+  const settings = getNutSettings(mintInfo, 5);
+  if (settings?.disabled === true || !Array.isArray(settings?.methods)) {
+    return [];
+  }
+  const normalizedUnit = normalizeUnit(unit);
+  const names = settings.methods.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const method = methodToString(entry.method);
+    const entryUnit =
+      typeof entry.unit === "string" ? normalizeUnit(entry.unit) : null;
+    return method && entryUnit === normalizedUnit ? [method] : [];
+  });
+  return [...new Set(names)];
+}
+
+/**
  * NUT-04/05 amount bounds are optional and UNTRUSTED mint input. cashu-ts types
  * them `AmountLike` (number, bigint, numeric string or an `Amount`), so every
  * one of those forms is a bound: reading numbers only would drop the minimum

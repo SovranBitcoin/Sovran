@@ -13,6 +13,7 @@ import { amountToNumberOrUndefined } from "./amount";
 import { P2PK_PUBKEY_RE, p2pkXOnly } from "./p2pk";
 import { logger } from "./logger";
 import { canonicalizePaymentRequest } from "./payment-request-canonical";
+import { splitSupportedMethods } from "./payment-request-methods";
 import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
@@ -72,7 +73,11 @@ export function decodePaymentRequestInfo(
     });
     return null;
   }
-  const decoded = tryDecode(() => decodePaymentRequest(trimmed));
+  // NUT-18 `sm` is read here, not by the SDK (see payment-request-methods).
+  const split = splitSupportedMethods(trimmed);
+  const decoded = tryDecode(() =>
+    decodePaymentRequest(split?.request ?? trimmed),
+  );
   if (!decoded) {
     logger.warn("paymentRequest.decode.failed", {
       inputLength: trimmed.length,
@@ -108,6 +113,7 @@ export function decodePaymentRequestInfo(
     unit: decoded.unit ?? "sat",
     transports,
     lockP2pkPubkey,
+    ...(split?.methods.length ? { supportedMethods: split.methods } : {}),
   };
   logger.debug("paymentRequest.decode.ok", {
     inputLength: trimmed.length,
@@ -118,6 +124,45 @@ export function decodePaymentRequestInfo(
     hasLock: !!lockP2pkPubkey,
   });
   return info;
+}
+
+/**
+ * The request as the SDK (cashu-ts, and Coco through it) can decode it. Only
+ * a request with NUT-18 supported methods differs from its input: those are
+ * removed, having been read into `PaymentRequestInfo.supportedMethods`. A
+ * caller that hands this on must have checked `supportedMethodsRefusal`.
+ */
+export function sdkPaymentRequest(value: string): string {
+  return (
+    splitSupportedMethods(canonicalizePaymentRequest(value))?.request ?? value
+  );
+}
+
+/**
+ * Why `mintUrl` may not pay a request under its NUT-18 supported methods, or
+ * null when it may. NUT-18: the ecash MUST come from a mint that melts the
+ * request unit by a listed method (`meltMethods` are the ones this mint
+ * offers for that unit). A mint outside the request's list also owes the
+ * lowest `mf` among the listed methods it supports; this wallet cannot add
+ * that to a payment yet, so such a mint is refused rather than underpaying.
+ */
+export function supportedMethodsRefusal(
+  info: Pick<PaymentRequestInfo, "supportedMethods" | "mints">,
+  mintUrl: string,
+  meltMethods: readonly string[],
+): string | null {
+  const methods = info.supportedMethods;
+  if (!methods?.length) return null;
+  const usable = methods.filter(({ method }) => meltMethods.includes(method));
+  if (usable.length === 0) {
+    const names = methods.map(({ method }) => method).join(" or ");
+    return `This request only accepts ecash from a mint that can pay out by ${names}. Choose another mint.`;
+  }
+  if (info.mints.includes(canonicalMintUrl(mintUrl))) return null;
+  if (Math.min(...usable.map(({ fee }) => fee)) > 0) {
+    return "This request charges an extra fee for ecash from this mint, which this wallet cannot add yet. Pay from a mint the request lists.";
+  }
+  return null;
 }
 
 /**

@@ -18,6 +18,8 @@ import { defaultDetectors } from "../../src/detectors";
 import {
   decodePaymentRequestInfo,
   lockableMintsFromRequest,
+  sdkPaymentRequest,
+  supportedMethodsRefusal,
 } from "../../src/payment-request";
 import { parsePaymentInput } from "../../src/parse";
 import { reencodeSingleUsePaymentRequest } from "../../src/payment-request-receive";
@@ -35,30 +37,92 @@ const MALFORMED_SHORT_AMOUNT_TAG = "CREQB1QGQQYQGZSWP0M3";
 
 const parse = (value: string) => parsePaymentInput(value, defaultDetectors);
 
-describe("unsupported NUT-18 method constraints fail closed", () => {
+describe("NUT-18 supported methods are read at Colada's boundary", () => {
   // cashubtc/nuts tests/18-tests.md: Preferred Mint List with Supported Methods.
   const creqA =
     "creqApmFpdXByZWZlcnJlZF9mZWVfbWV0aG9kc2FhGGRhdWNzYXRhbYF4GGh0dHBzOi8vbWludC5leGFtcGxlLmNvbWJtcPVic22CoWJtbmZib2x0MTGiYm1uZmJvbHQxMmJtZgU=";
-  const base = bech32m.fromWords(bech32m.decode(SPEC_VECTOR, false).words);
-  // NUT-26 0x0a supported-method TLV containing mn=bolt11 (subtag 0x01).
-  const creqB = bech32m.encode(
-    "creqb",
-    bech32m.toWords(
-      Uint8Array.from([...base, 10, 0, 9, 1, 0, 6, 98, 111, 108, 116, 49, 49]),
-    ),
-    false,
-  );
+  // The same request as NUT-26 (cashu-ts test/wallet/paymentRequests.test.ts:247).
+  const creqB =
+    "CREQB1QYQP2URJV4NX2UNJV4J97EN9V40K6ET5DPHKGUCZQQYQQQQQQQQQQQRYQVQQZQQ9QQVXSAR5WPEN5TE0D45KUAPWV4UXZMTSD3JJUCM0D5YSQQGPPGQQJQGQQE3X7MR5XYCS5QQ5QYQQVCN0D36RZVSZQQYQQQQQQQQQQQQ9FJ2568";
 
-  it.each([creqA, creqB, creqB.toUpperCase()])(
-    "rejects constraints rather than paying without them %#",
+  it.each([creqA, creqB, creqB.toLowerCase()])(
+    "decodes the request and its methods instead of failing %#",
     (encoded) => {
+      // The patched SDK still refuses it: the leniency is Colada's.
       expect(() => decodePaymentRequest(encoded)).toThrow(
         "payment method constraints",
       );
-      expect(decodePaymentRequestInfo(encoded)).toBeNull();
-      expect(defaultDetectors.isPaymentRequest(encoded)).toBe(false);
+      expect(decodePaymentRequestInfo(encoded)).toMatchObject({
+        requestId: "preferred_fee_methods",
+        amount: 100,
+        unit: "sat",
+        mints: ["https://mint.example.com"],
+        mintsPreferred: true,
+        supportedMethods: [
+          { method: "bolt11", fee: 0 },
+          { method: "bolt12", fee: 5 },
+        ],
+      });
+      expect(defaultDetectors.isPaymentRequest(encoded)).toBe(true);
     },
   );
+
+  it.each([creqA, creqB, creqB.toLowerCase()])(
+    "hands the SDK the same request without the methods %#",
+    (encoded) => {
+      const forSdk = sdkPaymentRequest(encoded);
+      const decoded = decodePaymentRequest(forSdk);
+      expect(decoded.id).toBe("preferred_fee_methods");
+      expect(decoded.amount?.toNumber()).toBe(100);
+      expect(decoded.mints).toEqual(["https://mint.example.com"]);
+      expect(decoded.mintsPreferred).toBe(true);
+      // Nothing else is rewritten: the request keeps its encoding and case.
+      expect(forSdk.slice(0, 6)).toBe(encoded.slice(0, 6));
+    },
+  );
+
+  it("leaves a request without methods exactly as it was", () => {
+    for (const encoded of [SPEC_VECTOR, SPEC_VECTOR.toLowerCase(), "creqABC", "creqHTTP"]) {
+      expect(sdkPaymentRequest(encoded)).toBe(encoded);
+    }
+    expect(decodePaymentRequestInfo(SPEC_VECTOR)?.supportedMethods).toBeUndefined();
+  });
+
+  it("still fails closed on methods it cannot read", () => {
+    // `sm` holding a text string instead of an array of methods.
+    const malformed = "creqAomFhAWJzbWFh";
+    expect(decodePaymentRequestInfo(malformed)).toBeNull();
+  });
+
+  describe("which mints may pay under them", () => {
+    const info = decodePaymentRequestInfo(creqA)!;
+    const listed = "https://mint.example.com";
+    const outside = "https://other.example.com";
+
+    it("accepts a listed mint that melts by a listed method, with no fee owed", () => {
+      expect(supportedMethodsRefusal(info, listed, ["bolt12"])).toBeNull();
+      expect(supportedMethodsRefusal(info, listed, ["bolt11", "onchain"])).toBeNull();
+    });
+    it("accepts a mint outside the list when its cheapest listed method is free", () => {
+      expect(supportedMethodsRefusal(info, outside, ["bolt11", "bolt12"])).toBeNull();
+    });
+    it("refuses a mint that cannot melt by any listed method", () => {
+      expect(supportedMethodsRefusal(info, listed, ["onchain"])).toMatch(
+        /pay out by bolt11 or bolt12/,
+      );
+      expect(supportedMethodsRefusal(info, listed, [])).toMatch(/pay out by/);
+    });
+    it("refuses a mint outside the list that owes a method fee it cannot add", () => {
+      expect(supportedMethodsRefusal(info, outside, ["bolt12"])).toMatch(
+        /extra fee/,
+      );
+    });
+    it("has nothing to say about a request without methods", () => {
+      expect(
+        supportedMethodsRefusal(decodePaymentRequestInfo(SPEC_VECTOR)!, outside, []),
+      ).toBeNull();
+    });
+  });
 });
 
 describe("NUT-18 creqA installed-codec boundary", () => {

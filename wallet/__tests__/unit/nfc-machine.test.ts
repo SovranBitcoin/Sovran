@@ -23,6 +23,7 @@ function setup({
   unitSwitchTakes = true,
   transports,
   lockP2pkPubkey,
+  supportedMethods,
   operations = {},
 }: {
   unit?: string;
@@ -40,6 +41,7 @@ function setup({
   /** The transports the request offers; none means the tag takes the token. */
   transports?: PaymentRequestInfo["transports"];
   lockP2pkPubkey?: string;
+  supportedMethods?: PaymentRequestInfo["supportedMethods"];
   operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
@@ -51,6 +53,7 @@ function setup({
     hasSpendingCondition,
     ...(transports ? { transports } : {}),
     ...(lockP2pkPubkey ? { lockP2pkPubkey } : {}),
+    ...(supportedMethods ? { supportedMethods } : {}),
   };
   const unitBalances: Record<string, Record<string, number>> = {
     sat: satBalances,
@@ -1275,5 +1278,36 @@ describe("an NFC tag that holds an ecash token", () => {
     });
     expect(adapter.writeToken).not.toHaveBeenCalled();
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// NUT-18 `sm`: the operations decide whether a mint meets the request's
+// supported methods, so a tap tells them which request it is paying.
+describe("an NFC request that names supported methods", () => {
+  const supportedMethods = [{ method: "bolt11", fee: 0 }];
+
+  it("asks the gate and the send about that request", async () => {
+    const { tm } = setup({ supportedMethods });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    const request = expect.stringMatching(/^creqA/);
+    expect(
+      tm.operationCalls.find((c) => c.name === "paymentRequestPayabilityFrom")?.args,
+    ).toEqual([{ mintUrl: accepted, unit: "sat", paymentRequest: request }]);
+    expect(sentMint(tm)?.args).toEqual([
+      { mintUrl: accepted, amount: 50, unit: "sat", paymentRequest: request },
+    ]);
+  });
+
+  it("skips a mint the methods rule out and says why when none is left", async () => {
+    const reason = "This request only accepts ecash from a mint that can pay out by bolt11. Choose another mint.";
+    const { tm, adapter } = setup({
+      supportedMethods,
+      operations: { paymentRequestPayabilityFrom: async () => ({ payable: false, reason }) },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertError({ code: "PAYMENT_REQUEST_FAILED", message: reason });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
   });
 });

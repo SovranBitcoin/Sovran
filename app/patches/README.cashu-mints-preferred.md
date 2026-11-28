@@ -6,9 +6,14 @@ The registered patch for `@cashu/cashu-ts@5.0.0-rc.4` preserves NUT-18
 ESM/types entry points used by the app and wallet.
 
 The patch also rejects NUT-18 `sm` and NUT-26 tag `0x0a`. The installed SDK
-otherwise silently discards these required payment-method constraints. Until
-the wallet can enforce method/unit compatibility and the additional method fee,
-rejecting the request prevents unsupported or insufficient payments.
+otherwise silently discards these required payment-method constraints. The
+wallet reads them itself before the SDK sees the request
+(`wallet/src/payment-request-methods.ts`) and hands the SDK a copy without
+them. It pays only from a mint that melts the request unit by a listed method
+and owes no method fee (`supportedMethodsRefusal`); any other mint is refused
+before proofs are prepared, because the wallet cannot add the fee yet. A
+request whose methods cannot be read still reaches the SDK unchanged and is
+rejected.
 
 The change to `sm` and net input-fee handling is in
 [NUT-18 revision df1ca22](https://github.com/cashubtc/nuts/blob/df1ca22e77756556223ab05cea89500402922a3e/18.md).

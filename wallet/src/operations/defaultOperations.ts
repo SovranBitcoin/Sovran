@@ -65,9 +65,14 @@ import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, requireAmount, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
 import {
+  sdkPaymentRequest,
+  supportedMethodsRefusal,
+} from "../payment-request";
+import {
   compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
+  meltMethodNamesFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
 import { normalizeMintUrl } from "../transport/plan";
@@ -542,17 +547,53 @@ async function attemptRollback(
   }
 }
 
+type RequestInfo = NonNullable<
+  ReturnType<typeof defaultDetectors.getPaymentRequestInfo>
+>;
+
+/**
+ * NUT-18 `sm`: the ecash must come from a mint that melts the request unit by
+ * a listed method, and a mint outside the request's list owes a method fee
+ * this wallet cannot add. Refused here, before any ecash is reserved; a mint
+ * whose methods cannot be read is one that meets none.
+ */
+async function assertSupportedMethodsHonoured(
+  mgr: Manager,
+  info: RequestInfo,
+  mintUrl: string,
+  unit: string,
+): Promise<void> {
+  if (!info.supportedMethods?.length) return;
+  const meltMethods = await mgr.mint
+    .getMintInfo(mintUrl)
+    .then((mintInfo) => meltMethodNamesFromInfo(mintInfo, unit))
+    .catch((error: unknown) => {
+      logger.warn("operations.paymentRequest.methods.mintInfoFailed", {
+        ...mintUrlFields(mintUrl),
+        error: errField(error),
+      });
+      return [];
+    });
+  const refusal = supportedMethodsRefusal(info, mintUrl, meltMethods);
+  if (refusal) {
+    logger.warn("operations.paymentRequest.methods.refused", {
+      ...mintUrlFields(mintUrl),
+      requested: info.supportedMethods.map(({ method }) => method),
+      meltMethods,
+    });
+    throw new AuthoredError(refusal);
+  }
+}
+
 /** The request as Coco's payment-request API takes it. */
-function requestForCoco(
-  paymentRequest: string,
-  info: NonNullable<
-    ReturnType<typeof defaultDetectors.getPaymentRequestInfo>
-  >,
-): string {
-  if (!info.mintsPreferred) return paymentRequest;
+function requestForCoco(paymentRequest: string, info: RequestInfo): string {
+  // Coco decodes with the SDK, which refuses supported methods; they were
+  // checked by `assertSupportedMethodsHonoured` and are left out of its copy.
+  const sdkReadable = sdkPaymentRequest(paymentRequest);
+  if (!info.mintsPreferred) return sdkReadable;
   // Coco 2.0.0 treats every m list as strict. Remove only the advisory
   // list in its input copy; the original request remains the flow identity.
-  const sdkRequest = decodePaymentRequest(paymentRequest);
+  const sdkRequest = decodePaymentRequest(sdkReadable);
   sdkRequest.mints = undefined;
   return sdkRequest.toEncodedRequest();
 }
@@ -1247,10 +1288,14 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
-    paymentRequestPayabilityFrom: async ({ mintUrl, unit }) => {
+    paymentRequestPayabilityFrom: async ({ mintUrl, unit, paymentRequest }) => {
       const mgr = requireManager();
       try {
         await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+        const info = paymentRequest
+          ? defaultDetectors.getPaymentRequestInfo(paymentRequest)
+          : null;
+        if (info) await assertSupportedMethodsHonoured(mgr, info, mintUrl, unit);
         return { payable: true };
       } catch (error) {
         return {
@@ -1271,7 +1316,17 @@ export function createDefaultOperations(
         amount,
         forLockedRequest: !!paymentRequest,
       });
-      const { operation, token } = paymentRequest
+      const requestInfo = paymentRequest
+        ? defaultDetectors.getPaymentRequestInfo(paymentRequest)
+        : null;
+      if (paymentRequest && !requestInfo) {
+        throw new AuthoredError("Invalid payment request");
+      }
+      if (requestInfo) {
+        await assertSupportedMethodsHonoured(mgr, requestInfo, mintUrl, unit);
+      }
+      const { operation, token } = paymentRequest &&
+      (requestInfo?.hasSpendingCondition || requestInfo?.lockP2pkPubkey)
         ? await createLockedRequestToken(mgr, {
             paymentRequest,
             mintUrl,
@@ -1927,6 +1982,7 @@ export function createDefaultOperations(
       }
 
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+      await assertSupportedMethodsHonoured(mgr, info, mintUrl, unit);
 
       let operationId: string;
       let handOver: Extract<
@@ -1938,7 +1994,7 @@ export function createDefaultOperations(
         // Sovran creates plain permanent P2PK requests. Reject conditions we
         // cannot preserve rather than silently stripping their tags.
         const nut10 = info.lockP2pkPubkey
-          ? decodePaymentRequest(paymentRequest).nut10
+          ? decodePaymentRequest(sdkPaymentRequest(paymentRequest)).nut10
           : undefined;
         const lock =
           nut10?.kind === "P2PK" && !nut10.tags?.length

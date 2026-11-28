@@ -361,8 +361,11 @@ interface RunNfcWriteBackEffectConfig {
   data: StepDataMap['navigateToPaymentRequest'];
   executeNfcSend: NonNullable<MachineOperations['executeNfcSend']>;
   rollbackSend?: MachineOperations['rollbackSend'];
-  /** The request locks the ecash: the send is told which request it answers. */
-  lockedRequest?: boolean;
+  /**
+   * The request constrains the payment (a NUT-10 lock, NUT-18 supported
+   * methods): the send is told which request it answers.
+   */
+  constrainedRequest?: boolean;
   nfcAdapter: Pick<NfcIOAdapter, 'writeToken' | 'releaseSession'> & {
     ownsSession?: () => boolean;
   };
@@ -1677,7 +1680,7 @@ export function runNfcWriteBackEffect({
   data,
   executeNfcSend,
   rollbackSend,
-  lockedRequest = false,
+  constrainedRequest = false,
   nfcAdapter,
   context,
   onProgress,
@@ -1751,7 +1754,9 @@ export function runNfcWriteBackEffect({
           mintUrl: data.mintUrl,
           amount: data.amount,
           unit: data.unit,
-          ...(lockedRequest ? { paymentRequest: data.paymentRequest } : {}),
+          ...(constrainedRequest
+            ? { paymentRequest: data.paymentRequest }
+            : {}),
         });
         logger.info('effects.nfcWriteBack.tokenCreated', {
           operationIdPresent: nfcSendResult.operationId.length > 0,

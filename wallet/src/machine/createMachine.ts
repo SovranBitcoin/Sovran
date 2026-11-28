@@ -973,6 +973,19 @@ export function createPaymentMachine(
   }
 
   /**
+   * The request, for the operations that must meet its NUT-18 supported
+   * methods; nothing for a request that names none.
+   */
+  function methodConstraint(
+    paymentRequest: string | undefined,
+  ): { paymentRequest: string } | undefined {
+    return paymentRequest &&
+      detectors.getPaymentRequestInfo(paymentRequest)?.supportedMethods?.length
+      ? { paymentRequest }
+      : undefined;
+  }
+
+  /**
    * Whether a tapped request is paid over its own transport instead of by
    * writing the token back to the tag: it is when it offers nostr and no
    * HTTP POST, the one case `executePaymentRequest` sends as a NIP-17 DM.
@@ -1863,6 +1876,7 @@ export function createPaymentMachine(
                   ? await operations.paymentRequestPayabilityFrom({
                       mintUrl: candidate.mintUrl,
                       unit: flowCtx.unit,
+                      ...methodConstraint(flowCtx.paymentRequest),
                     })
                   : { payable: true as const };
                 // Overtaken: the tap's end lets go of the tag and the unit.
@@ -1978,6 +1992,7 @@ export function createPaymentMachine(
                   await operations.paymentRequestPayabilityFrom({
                     mintUrl: data.mintUrl,
                     unit: data.unit,
+                    ...methodConstraint(data.paymentRequest),
                   });
                 // Overtaken: the tap's end lets go of the tag and the unit.
                 if (stale("nfc.payability")) {
@@ -2106,7 +2121,9 @@ export function createPaymentMachine(
                   data,
                   executeNfcSend: operations.executeNfcSend,
                   rollbackSend: operations.rollbackSend,
-                  lockedRequest: !!flowCtx.paymentRequestLockPubkey,
+                  constrainedRequest:
+                    !!flowCtx.paymentRequestLockPubkey ||
+                    !!methodConstraint(data.paymentRequest),
                   nfcAdapter: {
                     writeToken: (token) => writeNfcToken(nfcTap, token),
                     releaseSession: () => releaseNfcSession(nfcTap),

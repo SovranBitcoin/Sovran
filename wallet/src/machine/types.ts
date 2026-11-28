@@ -1132,9 +1132,10 @@ export interface MachineOperations {
    * Execute a send for NFC POS payment. Unlike `executeSend`, returns the
    * encoded V4 token (for NFC write-back) and the operationId (for rollback).
    *
-   * `paymentRequest` is set only for a request that locks the ecash (NUT-10):
-   * the token must then carry that request's lock, or the send must refuse
-   * before reserving anything.
+   * `paymentRequest` is set only for a request that constrains the payment:
+   * one that locks the ecash (NUT-10), whose lock the token must then carry,
+   * or one that names supported methods (NUT-18 `sm`), which the paying mint
+   * must meet. The send honours them or refuses before reserving anything.
    */
   executeNfcSend?: (request: {
     mintUrl: string;
@@ -1158,6 +1159,8 @@ export interface MachineOperations {
   paymentRequestPayabilityFrom?: (request: {
     mintUrl: string;
     unit: string;
+    /** Set for a request that names supported methods (NUT-18 `sm`). */
+    paymentRequest?: string;
   }) => Promise<{ payable: true } | { payable: false; reason: string }>;
 
   // ── Screen action operations ────────────────────────────────────────
