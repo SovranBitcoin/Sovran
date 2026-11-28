@@ -190,6 +190,20 @@ describe("createExecuteReceive", () => {
     expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 
+  it("reads the receive's row again after a transient error instead of projecting it", async () => {
+    const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+    api.history.getHistoryEntryById.mockRejectedValueOnce(new Error("database is locked"));
+
+    const result = await receive(manager, async () => {})({
+      tokenString: TOKEN,
+      mintUrl: MINT_URL,
+      amount: 1,
+    });
+
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(2);
+  });
+
   it("says so when there is no wallet", async () => {
     const execute = createExecuteReceive({
       getManager: () => null,
@@ -246,12 +260,8 @@ describe("createExecuteMintQuote", () => {
     expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["has no row", (api: ReturnType<typeof quoteManager>["api"]) => api.history.getHistoryEntryById.mockResolvedValue(null)],
-    ["cannot be read", (api: ReturnType<typeof quoteManager>["api"]) => api.history.getHistoryEntryById.mockRejectedValue(new Error("locked"))],
-  ])("falls back at once to an entry built from the quote when history %s", async (_label, arrange) => {
-    const { api, manager } = quoteManager(savedRow);
-    arrange(api);
+  it("falls back at once to an entry under Coco's history id when history has no row", async () => {
+    const { api, manager } = quoteManager(null);
     const execute = createExecuteMintQuote({
       getManager: () => manager,
       prepareMintQuote: vi.fn().mockResolvedValue(prepared),
@@ -260,7 +270,8 @@ describe("createExecuteMintQuote", () => {
     const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
 
     expect(JSON.parse(result.historyEntry)).toMatchObject({
-      id: "mint-op",
+      id: "mint:mint-op",
+      operationId: "mint-op",
       type: "mint",
       quoteId: "quote-1",
       state: "UNPAID",
@@ -268,5 +279,41 @@ describe("createExecuteMintQuote", () => {
       paymentRequest: "lnbc1fixture",
     });
     expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(1);
+  });
+
+  // The fallback id flows to scan-history linking and location capture
+  // (app/features/send/lib/sovranPaymentConfig.ts), which must match the row
+  // Coco commits as `mint:<operationId>` (sql-storage HistoryRepository.ts:92).
+  it("reads again after a transient error and returns the row Coco saved", async () => {
+    const { api, manager } = quoteManager(savedRow);
+    api.history.getHistoryEntryById.mockRejectedValueOnce(new Error("database is locked"));
+    const execute = createExecuteMintQuote({
+      getManager: () => manager,
+      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
+    });
+
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:mint-op", state: "UNPAID" });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps Coco's history id when every bounded read fails", async () => {
+    const { api, manager } = quoteManager(savedRow);
+    api.history.getHistoryEntryById.mockRejectedValue(new Error("database is locked"));
+    const execute = createExecuteMintQuote({
+      getManager: () => manager,
+      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
+    });
+
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: "mint:mint-op",
+      operationId: "mint-op",
+      quoteId: "quote-1",
+    });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(3);
+    expect(api.history.getHistoryEntryById.mock.calls.every(([id]) => id === "mint:mint-op")).toBe(true);
   });
 });

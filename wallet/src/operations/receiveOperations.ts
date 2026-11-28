@@ -81,29 +81,57 @@ function isRecoverableReceiveError(err: unknown): boolean {
   return kind === 'network' || kind === 'retryable';
 }
 
+/** Waits before each re-read of a history row after a read error. */
+const HISTORY_READ_RETRY_DELAYS_MS = [100, 300];
+
+/**
+ * Reads one history row by id, reading again (a bounded number of times) when
+ * the read throws: a transient storage error must not hand a caller a row it
+ * could have read. A missing row is not retried — Coco commits the row with
+ * the operation it belongs to. Returns null when there is no row or every
+ * read failed.
+ */
+async function readHistoryEntryById(
+  manager: Manager,
+  historyId: string,
+  readFailedEvent: string,
+  operationId: string
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await manager.history.getHistoryEntryById(historyId);
+    } catch (e) {
+      logger.warn(readFailedEvent, {
+        operationId,
+        attempt: attempt + 1,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      const delay = HISTORY_READ_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) return null;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 /**
  * Coco's history is a view over its operation tables, so a receive's row
  * exists as soon as `execute` returns it finalized
  * (`sql-storage/src/repositories/HistoryRepository.ts:150-171`).
  */
 async function readReceiveHistoryEntry(manager: Manager, operationId: string, mintUrl: string) {
-  try {
-    const entry = await manager.history.getHistoryEntryById(
-      operationHistoryId('receive', operationId)
-    );
-    if (entry?.type === 'receive' && entry.operationId === operationId) {
-      logger.info('payment.execute_receive.found', {
-        ...mintUrlFields(mintUrl),
-        realId: entry.id,
-        operationId,
-      });
-      return entry;
-    }
-  } catch (e) {
-    logger.warn('payment.execute_receive.read_failed', {
+  const entry = await readHistoryEntryById(
+    manager,
+    operationHistoryId('receive', operationId),
+    'payment.execute_receive.read_failed',
+    operationId
+  );
+  if (entry?.type === 'receive' && entry.operationId === operationId) {
+    logger.info('payment.execute_receive.found', {
+      ...mintUrlFields(mintUrl),
+      realId: entry.id,
       operationId,
-      error: e instanceof Error ? e.message : String(e),
     });
+    return entry;
   }
   return null;
 }
@@ -305,8 +333,9 @@ const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
  *
  * Coco's history row id (`mint:<operationId>`) is what flows downstream to
  * onTransactionCreated and the scan-history link, so the id stamped there
- * matches what `usePaginatedHistory` returns later. The row is read once by
- * that id; an entry built from the operation is the fallback.
+ * matches what `usePaginatedHistory` returns later. The row is read by that
+ * id (again after a transient error); the fallback is an entry built from the
+ * operation under the same id.
  */
 export function createExecuteMintQuote(
   deps: MintQuoteDeps
@@ -335,11 +364,13 @@ export function createExecuteMintQuote(
     });
 
     // Constructed entry — used as a fallback (same shape as the plain
-    // executeMintQuote) when Coco's row cannot be read.
+    // executeMintQuote) when Coco's row cannot be read. It carries the id
+    // Coco gives the row (`mint:<operationId>`), so scan-history links and
+    // location capture still find it.
     // A freshly prepared bolt11 quote is always UNPAID (v2 moved observed
     // state to the canonical quote row); amount serializes as a number.
     const constructedEntry: Omit<LegacyMintHistoryEntry, 'amount'> & { amount: number } = {
-      id: mintOp.id,
+      id: operationHistoryId('mint', mintOp.id),
       type: 'mint',
       source: 'legacy',
       legacyHistoryId: mintOp.id,
@@ -358,27 +389,23 @@ export function createExecuteMintQuote(
     // Coco's history is a view over its operation tables: a prepared
     // (pending) mint operation has its row as soon as `prepare` returns
     // (`sql-storage/src/repositories/HistoryRepository.ts:92-117`).
-    try {
-      const persisted = await manager.history.getHistoryEntryById(
-        operationHistoryId('mint', mintOp.id)
-      );
-      if (persisted?.type === 'mint') {
-        logger.info('payment.execute_mint_quote.found', {
-          ...mintUrlFields(mintUrl),
-          persistedId: persisted.id,
-          constructedId: mintOp.id,
-        });
-        // Coco's persisted row is authoritative — its `id` is what flows
-        // downstream to onTransactionCreated and the scan-history link.
-        // Serialize through colada's contract (legacy state vocabulary +
-        // numeric amount) so this path matches the fallback below.
-        return { historyEntry: serializeHistoryEntry(persisted) };
-      }
-    } catch (e) {
-      logger.warn('payment.execute_mint_quote.read_failed', {
+    const persisted = await readHistoryEntryById(
+      manager,
+      operationHistoryId('mint', mintOp.id),
+      'payment.execute_mint_quote.read_failed',
+      mintOp.id
+    );
+    if (persisted?.type === 'mint') {
+      logger.info('payment.execute_mint_quote.found', {
+        ...mintUrlFields(mintUrl),
+        persistedId: persisted.id,
         operationId: mintOp.id,
-        error: e instanceof Error ? e.message : String(e),
       });
+      // Coco's persisted row is authoritative — its `id` is what flows
+      // downstream to onTransactionCreated and the scan-history link.
+      // Serialize through colada's contract (legacy state vocabulary +
+      // numeric amount) so this path matches the fallback below.
+      return { historyEntry: serializeHistoryEntry(persisted) };
     }
 
     // Last resort: the constructed entry. Logged loudly because Coco should
