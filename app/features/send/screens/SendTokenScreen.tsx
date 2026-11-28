@@ -258,10 +258,7 @@ export function SendTokenScreen({
               description: 'Transmit to a nearby phone',
               icon: 'lucide:nfc',
               variant: 'secondary',
-              onPress: async () => {
-                await new Promise((r) => setTimeout(r, 400));
-                await actions.nfc.execute();
-              },
+              onPress: () => actions.nfc.execute(),
               condition: hasFeature('nfc') && actions.nfc.available,
               disabled: actions.cancel.loading,
             },

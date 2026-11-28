@@ -10,6 +10,7 @@ import { SendTokenScreen } from '@/features/send/screens/SendTokenScreen';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockCopy = jest.fn(async () => undefined);
+const mockNfc = jest.fn(async () => undefined);
 const mockActionMenuPopup = jest.fn();
 const mockActionMenuSheet = jest.fn();
 let mockCancelLoading = false;
@@ -53,7 +54,7 @@ jest.mock('wallet/react', () => ({
         ],
       },
       share: { available: true, execute: jest.fn() },
-      nfc: { available: true, execute: jest.fn() },
+      nfc: { available: true, execute: mockNfc },
       checkStatus: { available: true, loading: false, execute: jest.fn() },
       cancel: { available: true, loading: mockCancelLoading, execute: jest.fn() },
     },
@@ -229,6 +230,20 @@ describe('SendTokenScreen Copy menu', () => {
     expect(
       renderer.root.findByProps({ testID: 'send-token-cancel-transaction' }).props.disabled
     ).toBe(false);
+  });
+
+  it('starts the NFC write in the same tick as the tap, with no fixed delay', async () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <SendTokenScreen sendHistoryEntry="send:1" onNavigateBack={jest.fn()} />
+      );
+    });
+    mockNfc.mockClear();
+    act(() => {
+      void renderer.root.findByProps({ testID: 'send-token-nfc' }).props.onPress();
+    });
+    expect(mockNfc).toHaveBeenCalledTimes(1);
   });
 
   it('opens its variants above the native transaction-flow modal', async () => {
