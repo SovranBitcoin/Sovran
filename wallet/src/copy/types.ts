@@ -110,6 +110,7 @@ export type PaymentCopyKey =
   | "timeline.status.alreadySpent"
   | "timeline.status.notAdded"
   | "timeline.status.pending"
+  | "timeline.status.expired"
   | "timeline.onchain.waitingFirstConfirmation"
   | "timeline.onchain.paymentConfirmed"
   | "timeline.onchain.confirmations"

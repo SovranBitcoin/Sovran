@@ -96,6 +96,7 @@ export const paymentCopyDefaults = {
   "timeline.status.alreadySpent": "Already Spent",
   "timeline.status.notAdded": "Not Added",
   "timeline.status.pending": "Pending",
+  "timeline.status.expired": "Expired",
   "timeline.onchain.waitingFirstConfirmation": "Waiting for first confirmation",
   "timeline.onchain.paymentConfirmed": "Payment confirmed onchain",
   "timeline.onchain.confirmations": "{current}/{required} confirmations",

@@ -118,6 +118,8 @@ describe('history timeline — lightning SEND (melt)', () => {
       'expired | Quote expired | It ran out before the payment was sent',
     ]);
     expect(getStatusColorType(timeline)).toBe('error');
+    // I-8: an expiry is not a failure.
+    expect(getCardLabel(melt('UNPAID') as never, timeline)).toBe('Send • Expired');
   });
 
   it('rolling_back is the reversal in flight, not its result', () => {
@@ -372,7 +374,10 @@ describe('history timeline — bearer SEND', () => {
   });
 
   it.each(['prepared', 'executing'])('%s → the token is still being made', (state) => {
-    expect(rows(build(send(state)))).toEqual(['current | Creating token | Setting aside ecash']);
+    const timeline = build(send(state));
+    expect(rows(timeline)).toEqual(['current | Creating token | Setting aside ecash']);
+    // I-9: the card does not call a spinning row "Ready".
+    expect(getCardLabel(send(state) as never, timeline)).toBe('Send • In Progress');
   });
 
   it('pending → created, waiting on the recipient', () => {

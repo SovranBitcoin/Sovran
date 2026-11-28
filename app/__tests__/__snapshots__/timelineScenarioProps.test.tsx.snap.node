@@ -100,7 +100,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-send (Cashu 
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -453,7 +453,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-receive-expired
     },
   ],
   "texts": [
-    "Receive • Failed",
+    "Receive • Expired",
     "INVOICE EXPIRED",
     "Invoice created",
     "2026-05-22",
@@ -795,7 +795,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-send-expired (L
     },
   ],
   "texts": [
-    "Send • Failed",
+    "Send • Expired",
     "QUOTE EXPIRED",
     "Payment prepared",
     "2026-05-22",
@@ -1597,7 +1597,7 @@ exports[`timeline scenario pins (redesign acceptance surface) locked-permanent (
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -6394,7 +6394,7 @@ exports[`timeline scenario pins (redesign acceptance surface) payment-request (R
   ],
   "lines": [],
   "texts": [
-    "Payment • Ready",
+    "Payment • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -6434,7 +6434,7 @@ exports[`timeline scenario pins (redesign acceptance surface) payment-request (R
     },
   ],
   "texts": [
-    "Payment • Ready",
+    "Payment • In Progress",
     "DELIVERING",
     "Created",
     "2026-05-22",
@@ -7807,7 +7807,7 @@ exports[`timeline scenario pins (redesign acceptance surface) send-cancelled-ear
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -7854,7 +7854,7 @@ exports[`timeline scenario pins (redesign acceptance surface) send-rolled-back (
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",

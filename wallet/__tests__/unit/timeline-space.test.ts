@@ -69,15 +69,7 @@ describe('timeline state space', () => {
         lines.add(`${space.flow}: "${surfaces.cardLabel}" over "${surfaces.statusHeader}"`);
       }
     }
-    expect([...lines]).toMatchInlineSnapshot(`
-      [
-        "lightning-mint: "Receive • Failed" over "INVOICE EXPIRED"",
-        "lightning-melt: "Send • Failed" over "QUOTE EXPIRED"",
-        "send: "Send • Ready" over "CREATING TOKEN"",
-        "payment-request-send: "Payment • Ready" over "CREATING TOKEN"",
-        "payment-request-send: "Payment • Ready" over "DELIVERING"",
-      ]
-    `);
+    expect([...lines]).toMatchInlineSnapshot(`[]`);
   });
 
   // The same check for the title read off the entry alone (a caller with no
