@@ -7,7 +7,7 @@ import { GlassView } from 'expo-glass-effect';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
+import { firePressHaptic, useHapticsEnabled } from '@/shared/ui/primitives/Haptics';
 import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
@@ -27,6 +27,7 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
   const [foreground] = useThemeColor(['foreground'] as const);
   const { icon, onPress, onPressIn, onPressOut, haptics, disabled = false, color } = props;
   const iconColor = color ?? foreground;
+  const hapticsEnabled = useHapticsEnabled();
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
 
   // Preserve the single-flight guard the shared Pressable used to provide so a
@@ -44,14 +45,14 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
         .enabled(interactive)
         .onBegin(() => {
           // The Tap bypasses Pressable, so it fires the same press-in haptic.
-          if (onPress) firePressHaptic(haptics);
+          if (onPress && hapticsEnabled) firePressHaptic(haptics);
           onPressIn?.();
         })
         .onFinalize(() => onPressOut?.())
         .onEnd((_event, success) => {
           if (success) void guardedPress();
         }),
-    [interactive, onPress, haptics, onPressIn, onPressOut, guardedPress]
+    [interactive, onPress, haptics, hapticsEnabled, onPressIn, onPressOut, guardedPress]
   );
 
   // The RNGH Tap above lives entirely OUTSIDE React Native's JS responder

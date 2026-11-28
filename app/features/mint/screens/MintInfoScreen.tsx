@@ -44,6 +44,7 @@ import {
   useNostrProfileMetadataMany,
 } from '@/shared/hooks/useNostrProfileMetadata';
 import { copyPopup } from '@/shared/lib/popup';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -298,6 +299,7 @@ export function MintInfoScreen() {
     if (!mintUrl) return;
     log.info('mint.info.address.copy');
     await Clipboard.setStringAsync(mintUrl);
+    void EnhancedHaptics.copyHaptic();
   };
 
   const handleContactPress = async (method: string, info: string, pubkey?: string) => {
@@ -307,6 +309,7 @@ export function MintInfoScreen() {
       if (result.isErr()) {
         log.warn('mint.info.contact.open_failed', { method, reason: result.error.type });
         await Clipboard.setStringAsync(info);
+        void EnhancedHaptics.copyHaptic();
       }
     };
     switch (method.toLowerCase()) {
@@ -327,6 +330,7 @@ export function MintInfoScreen() {
       }
       default:
         await Clipboard.setStringAsync(info);
+        void EnhancedHaptics.copyHaptic();
     }
   };
 

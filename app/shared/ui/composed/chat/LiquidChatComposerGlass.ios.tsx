@@ -19,6 +19,7 @@ import {
   Namespace,
   GlassEffectContainer,
 } from '@expo/ui/swift-ui';
+import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
 import {
   Animation,
   accessibilityLabel as swiftAccessibilityLabel,
@@ -182,7 +183,14 @@ export function LiquidChatComposerGlass({
                   animation(SEND_SPRING, hasText),
                   swiftAccessibilityLabel(plusA11yLabel(plusDisabled)),
                 ]}
-                onPress={disabled ? () => {} : onPlusPress}>
+                onPress={
+                  disabled
+                    ? () => {}
+                    : () => {
+                        firePressHaptic();
+                        onPlusPress();
+                      }
+                }>
                 <SwiftUIHStack
                   alignment="center"
                   modifiers={[
@@ -270,7 +278,14 @@ export function LiquidChatComposerGlass({
                   animation(SEND_SPRING, hasText),
                   swiftAccessibilityLabel('Send message'),
                 ]}
-                onPress={canSend ? onSend : () => {}}>
+                onPress={
+                  canSend
+                    ? () => {
+                        firePressHaptic({ type: 'impact', impactStyle: 'medium' });
+                        onSend();
+                      }
+                    : () => {}
+                }>
                 <SwiftUIHStack
                   alignment="center"
                   modifiers={[

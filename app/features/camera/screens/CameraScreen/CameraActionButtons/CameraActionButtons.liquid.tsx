@@ -7,6 +7,7 @@ import {
   HStack as SwiftUIHStack,
   Image as SwiftUIImage,
 } from '@expo/ui/swift-ui';
+import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { CAMERA_ACTIONS, type CameraActionButtonsProps } from './CameraActionButtons.types';
@@ -56,7 +57,11 @@ function GlassCircleButton({
             frame({ height: GLASS_BUTTON_SIZE, width: GLASS_BUTTON_SIZE }),
             glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
           ]}
-          onPress={() => void onPress()}>
+          onPress={() => {
+            // SwiftUI reports only the tap; the haptic lands with it.
+            firePressHaptic();
+            void onPress();
+          }}>
           <SwiftUIHStack
             alignment="center"
             modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>

@@ -8,7 +8,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { EnhancedHaptics } from './Haptics';
+import { EnhancedHaptics, useHapticsEnabled } from './Haptics';
 
 const THUMB_WIDTH = 28;
 
@@ -60,12 +60,13 @@ export function Slider({
     last.set(value);
   }, [dragging, last, minValue, percent, range, value]);
 
+  const hapticsEnabled = useHapticsEnabled();
   const emit = (next: number, end: boolean) => {
     if (end) onChangeEnd?.(next);
     else {
       // `moveTo` emits a move only when the snapped value changes, so this is
       // one selection tick per step crossed, not one per frame.
-      void EnhancedHaptics.navigateHaptic();
+      if (hapticsEnabled) void EnhancedHaptics.navigateHaptic();
       onChange?.(next);
     }
   };

@@ -8,6 +8,7 @@ import { useStylePaint } from '@/shared/styles/appStyle';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import * as Clipboard from 'expo-clipboard';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   log,
   useLifecycleLogger,
@@ -135,6 +136,7 @@ async function shareStorageDumpAction(io: {
 async function copyCocoReportAction(setError: SetError): Promise<void> {
   try {
     await Clipboard.setStringAsync(buildCocoFeedbackReport());
+    void EnhancedHaptics.copyHaptic();
     Alert.alert('Copied', 'coco v2 feedback report copied — paste into a cashubtc/coco issue.');
   } catch (copyError) {
     setError(copyError instanceof Error ? copyError.message : 'Copy failed');
@@ -148,6 +150,7 @@ async function copyDebugLogsAction(io: {
   io.setIsCopyingLogs(true);
   try {
     await Clipboard.setStringAsync(log.dumpForLLM());
+    void EnhancedHaptics.copyHaptic();
     Alert.alert('Copied', 'Debug logs copied to clipboard.');
   } catch (copyError) {
     io.setError(copyError instanceof Error ? copyError.message : 'Copy failed');

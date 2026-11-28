@@ -12,6 +12,7 @@ import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
+import { HapticsOff } from '@/shared/ui/primitives/Haptics';
 import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -55,7 +56,9 @@ export interface ScrubTransition {
 function ButtonPressFrame({ progress }: FrameProps) {
   return (
     <View className="w-full">
-      <Button text="Send" onPress={noop} pressProgress={progress} />
+      <HapticsOff>
+        <Button text="Send" onPress={noop} pressProgress={progress} />
+      </HapticsOff>
     </View>
   );
 }

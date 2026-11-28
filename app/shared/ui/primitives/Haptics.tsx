@@ -1,3 +1,4 @@
+import { createContext, useContext, type ReactNode } from 'react';
 import * as ExpoHaptics from 'expo-haptics';
 import { log } from '@/shared/lib/logger';
 
@@ -220,4 +221,19 @@ export function outcomeHaptic(severity: 'success' | 'warning' | 'error' | 'info'
   if (severity === 'success') void EnhancedHaptics.successHaptic();
   else if (severity === 'warning') void EnhancedHaptics.warningHaptic();
   else if (severity === 'error') void EnhancedHaptics.errorHaptic();
+}
+
+const HapticsEnabledContext = createContext(true);
+
+/**
+ * Silences press haptics for every shared control below it — the design-system
+ * demo screens, whose controls are specimens rather than actions.
+ */
+export function HapticsOff({ children }: { children: ReactNode }) {
+  return <HapticsEnabledContext.Provider value={false}>{children}</HapticsEnabledContext.Provider>;
+}
+
+/** `false` inside a `HapticsOff` scope; press surfaces skip their haptic. */
+export function useHapticsEnabled(): boolean {
+  return useContext(HapticsEnabledContext);
 }

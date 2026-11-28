@@ -3,6 +3,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { HapticsOff } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -19,7 +20,7 @@ export function SettingsDesignSystemFoundationsScreen() {
         {FOUNDATIONS_FAMILY.scenarios.map((scenario) => (
           <Section key={scenario.id} title={scenario.title}>
             <View testID={`design-system-scenario-foundations-${scenario.id}`}>
-              {scenario.render()}
+              <HapticsOff>{scenario.render()}</HapticsOff>
             </View>
           </Section>
         ))}

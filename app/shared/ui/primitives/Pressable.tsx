@@ -12,6 +12,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import {
   fireHapticConfig,
   resolvePressHaptics,
+  useHapticsEnabled,
   type HapticConfig,
   type PressHaptics,
 } from './Haptics';
@@ -58,7 +59,8 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
 ) {
   // A container Pressable (only onPressIn/out, or nothing) is not a control.
   const pressable = !rest.disabled && !!(onPress || rest.onLongPress);
-  const hapticConfig = pressable ? resolvePressHaptics(haptics) : null;
+  const hapticsEnabled = useHapticsEnabled();
+  const hapticConfig = pressable && hapticsEnabled ? resolvePressHaptics(haptics) : null;
 
   // Fire-and-forget: the press handler never waits on the haptic bridge.
   const triggerHaptic = (trigger: 'start' | 'end') => {
