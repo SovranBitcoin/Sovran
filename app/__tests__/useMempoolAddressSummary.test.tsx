@@ -62,7 +62,8 @@ describe('useMempoolAddressSummary', () => {
     appStateListeners = [];
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
       appStateListeners.push(listener as (state: AppStateStatus) => void);
-      return { remove: jest.fn() } as never;
+      const subscription: ReturnType<typeof AppState.addEventListener> = { remove: jest.fn() };
+      return subscription;
     });
   });
 
