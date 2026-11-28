@@ -25,6 +25,7 @@ const DESIGN_SYSTEM_SCRUBBER_OPTIONS = { title: 'Animation frame scrubber' };
 const DESIGN_SYSTEM_LOADING_OPTIONS = { title: 'Loading indicator' };
 const DESIGN_SYSTEM_SEGMENTED_OPTIONS = { title: 'Segmented progress' };
 const DESIGN_SYSTEM_TIMELINE_OPTIONS = { title: 'Timeline' };
+const DESIGN_SYSTEM_TIMELINE_MATRIX_OPTIONS = { title: 'Timeline states' };
 const DESIGN_SYSTEM_EMPTY_STATES_OPTIONS = { title: 'Empty states' };
 const DESIGN_SYSTEM_SKELETON_CROSSFADE_OPTIONS = { title: 'Skeleton crossfade' };
 const DESIGN_SYSTEM_FADE_STRESS_OPTIONS = { title: 'Fade-reveal stress' };
@@ -60,6 +61,10 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="design-system-loading" options={DESIGN_SYSTEM_LOADING_OPTIONS} />
       <Stack.Screen name="design-system-segmented" options={DESIGN_SYSTEM_SEGMENTED_OPTIONS} />
       <Stack.Screen name="design-system-timeline" options={DESIGN_SYSTEM_TIMELINE_OPTIONS} />
+      <Stack.Screen
+        name="design-system-timeline-matrix"
+        options={DESIGN_SYSTEM_TIMELINE_MATRIX_OPTIONS}
+      />
       <Stack.Screen
         name="design-system-empty-states"
         options={DESIGN_SYSTEM_EMPTY_STATES_OPTIONS}

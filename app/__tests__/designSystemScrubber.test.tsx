@@ -20,8 +20,10 @@ import {
   type UiKitFilter,
 } from '@/features/settings/design-system/uiKit';
 import { SettingsDesignSystemScrubberScreen } from '@/features/settings/screens/SettingsDesignSystemScrubberScreen';
+import { SettingsDesignSystemTimelineMatrixScreen } from '@/features/settings/screens/SettingsDesignSystemTimelineMatrixScreen';
 import { SettingsDesignSystemTimelineScreen } from '@/features/settings/screens/SettingsDesignSystemTimelineScreen';
 import { SettingsDesignSystemUiKitScreen } from '@/features/settings/screens/SettingsDesignSystemUiKitScreen';
+import { TimelineCardView } from '@/features/transactions';
 import { CapabilityProvider, type Capabilities } from '@/shared/ui/capability';
 import { PillTabs } from '@/shared/ui/composed/PillTabs';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
@@ -598,6 +600,52 @@ describe('Timeline screen', () => {
       expect(
         screen.UNSAFE_root.findAllByProps({ testID: 'design-system-timeline-step' }).length
       ).toBeGreaterThan(0);
+    } finally {
+      view.unmount();
+    }
+  });
+});
+
+describe('Timeline state matrix screen', () => {
+  const count = () => {
+    const text = byTestId('timeline-matrix-count').props.children as unknown[];
+    return text.join('');
+  };
+
+  it('draws one card per distinct state of the selected payment type', () => {
+    const view = render(<SettingsDesignSystemTimelineMatrixScreen />, { wrapper: Wrapper });
+    try {
+      const pinned = screen.getByTestId('screen-sticky');
+      const tabs = pinned.findByType(PillTabs).props.tabs as string[];
+      expect(tabs).toContain('lightning-mint');
+      expect(tabs).toContain('locked-send(timed-refund)');
+      expect(tabs).toHaveLength(12);
+
+      expect(count()).toBe('18 of 18 distinct states');
+      expect(allByTestId('timeline-matrix-cell-17')).toHaveLength(1);
+      expect(queryByTestId('timeline-matrix-cell-18')).toBeNull();
+      // The cards are the real timeline card, drawing the fixture's rows.
+      const cards = screen.UNSAFE_root.findAllByType(TimelineCardView);
+      expect(cards).toHaveLength(18);
+      expect(
+        (cards[0].props.timeline as { displayLabel: string }[]).map((step) => step.displayLabel)
+      ).toEqual(['Invoice created', 'Waiting for payment']);
+
+      pressAndFlush('timeline-matrix-every-frame');
+      expect(count()).toBe('36 of 36 frames');
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it('narrows to the states whose title and timeline disagree', () => {
+    const view = render(<SettingsDesignSystemTimelineMatrixScreen />, { wrapper: Wrapper });
+    try {
+      pressAndFlush('timeline-matrix-only-disagreements');
+      const shown = Number(count().split(' of ')[0]);
+      expect(shown).toBeGreaterThan(0);
+      expect(shown).toBeLessThan(18);
+      expect(allByTestId('timeline-matrix-disagreement')).toHaveLength(shown);
     } finally {
       view.unmount();
     }

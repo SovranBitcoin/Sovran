@@ -64,6 +64,7 @@ const localPackageEntryPaths = {
   'wallet/safeFetch': path.join(walletPath, 'src', 'safeFetch.ts'),
   'wallet/operations': path.join(walletPath, 'src', 'operations', 'index.ts'),
   'wallet/redeemEntry': path.join(walletPath, 'src', 'transport', 'redeemEntry.ts'),
+  'wallet/timeline-space': path.join(walletPath, 'src', 'history', 'timeline', 'space.ts'),
   nostr: path.join(nostrPath, 'src', 'index.ts'),
   'nostr/map': path.join(nostrPath, 'src', 'map', 'index.ts'),
   'nostr/recipes': path.join(nostrPath, 'src', 'recipes', 'index.ts'),

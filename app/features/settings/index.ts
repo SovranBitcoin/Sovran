@@ -14,6 +14,7 @@ export { SettingsDesignSystemUiKitScreen } from './screens/SettingsDesignSystemU
 export { SettingsDesignSystemScrubberScreen } from './screens/SettingsDesignSystemScrubberScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';
+export { SettingsDesignSystemTimelineMatrixScreen } from './screens/SettingsDesignSystemTimelineMatrixScreen';
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';

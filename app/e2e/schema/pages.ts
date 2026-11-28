@@ -91,6 +91,7 @@ export const CANONICAL_PAGES = [
   'settings-design-system-segmented',
   'settings-design-system-skeleton-crossfade',
   'settings-design-system-timeline',
+  'settings-design-system-timeline-matrix',
   'settings-design-system-wallet-controls',
   'settings-design-system-ui-kit',
   'settings-design-system-scrubber',
