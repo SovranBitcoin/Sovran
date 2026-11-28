@@ -3,6 +3,7 @@
  */
 
 import { utf8ToBytes } from '@noble/hashes/utils.js';
+import { base64urlnopad } from '@scure/base';
 import { NfcError } from './errors';
 import { NDEF_TEXT_LANG, SHORT_RECORD_FLAG } from './constants';
 import { nfcLog } from '../logger';
@@ -194,7 +195,8 @@ function parseFirstRecord(ndef: number[]): NdefRecord {
  * - Text RTD (`T`): the NFC Forum text record, UTF-8 or UTF-16.
  * - URI RTD (`U`): identifier-code prefix expanded, so `cashu:…`,
  *   `bitcoin:?creq=…` and `https://…` all come back as the full string.
- * - MIME (TNF 2) and NFC-external (TNF 4) records: payload as UTF-8.
+ * - MIME (TNF 2) and NFC-external (TNF 4) records: payload as UTF-8, or,
+ *   when it is a binary ecash token (`crawB`), that token in its text form.
  *
  * Anything else raises `UNSUPPORTED_RECORD` with the type in the message.
  */
@@ -225,6 +227,11 @@ export function decodeNdefText(ndef: number[]): string {
     return uri;
   }
   if (record.tnf === TNF_MIME || record.tnf === TNF_EXTERNAL) {
+    const token = binaryTokenText(record.payload);
+    if (token !== null) {
+      nfcLog.debug('nfc.ndef.decoded', { kind: 'binary-token', type: typeText });
+      return token;
+    }
     const text = new TextDecoder().decode(Uint8Array.from(record.payload));
     nfcLog.debug('nfc.ndef.decoded', {
       kind: record.tnf === TNF_MIME ? 'mime' : 'external',
@@ -237,6 +244,22 @@ export function decodeNdefText(ndef: number[]): string {
     `Unsupported NDEF record (tnf=${record.tnf}, type=${JSON.stringify(typeText)})`,
     'UNSUPPORTED_RECORD'
   );
+}
+
+const RAW_TOKEN_V4 = [0x63, 0x72, 0x61, 0x77, 0x42]; // "crawB"
+
+/**
+ * NUT-00 binary token to its text form. The two carry the same CBOR:
+ * `utf8("craw") || utf8("B") || cbor` against `"cashuB" || base64url(cbor)`.
+ * cashu.me and cashu-wallet write the binary form in a MIME
+ * `application/octet-stream` record; reading those bytes as UTF-8 destroys
+ * them. Only the framing changes here: the wallet's parser still decides
+ * whether the result is a token. Null for anything that is not `crawB`.
+ */
+function binaryTokenText(payload: number[]): string | null {
+  if (payload.length <= RAW_TOKEN_V4.length) return null;
+  if (RAW_TOKEN_V4.some((byte, index) => payload[index] !== byte)) return null;
+  return `cashuB${base64urlnopad.encode(Uint8Array.from(payload.slice(RAW_TOKEN_V4.length)))}`;
 }
 
 /** Text RTD payload: status byte, IANA language tag, then the text. */

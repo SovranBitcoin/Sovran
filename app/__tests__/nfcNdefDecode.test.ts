@@ -1,3 +1,4 @@
+import { getDecodedTokenBinary, getTokenMetadata } from '@cashu/cashu-ts';
 import { Buffer } from 'buffer';
 
 import { buildTextNdef, decodeNdefText, parseCapabilityContainer } from '@/shared/lib/nfc/ndef';
@@ -207,5 +208,55 @@ describe('parseCapabilityContainer', () => {
     expect(parseCapabilityContainer(numo.slice(0, 10))).toBeNull();
     expect(parseCapabilityContainer([0x00, 0x05, ...numo.slice(2)])).toBeNull();
     expect(parseCapabilityContainer([...numo.slice(0, 7), 0x05, ...numo.slice(8)])).toBeNull();
+  });
+});
+
+// cashu.me writes a token to a tag as a MIME `application/octet-stream`
+// record holding NUT-00's binary form, utf8("craw") || utf8("B") || CBOR
+// (cashu.me src/components/DisplayTokenComponent.vue:595-600 `getEncodedTokenBinary`).
+describe('binary ecash token records', () => {
+  // cashubtc/nuts 00.md, the V4 example token.
+  const V4 =
+    'cashuBpGFtd2h0dHBzOi8vODMzMy5zcGFjZTozMzM4YXVjc2F0YWRqVGhhbmsgeW91LmF0gaJhaUgAmh8pMlPkHmFwgqRhYQJhc3hANDA3OTE1YmMyMTJiZTYxYTc3ZTNlNmQyYWViNGM3Mjc5ODBiZGE1MWNkMDZhNmFmYzI5ZTI4NjE3NjhhNzgzN2FjWCECvJCXmX2Br7LMc0a15DRak0a9KlBut5WFmKcvDPhRY-phZPakYWEIYXN4QGZlMTUxMDkzMTRlNjFkNzc1NmIwZjhlZTBmMjNhNjI0YWNhYTNmNGUwNDJmNjE0MzNjNzI4YzcwNTdiOTMxYmVhY1ghAp6OUFC4kKfWwJaNsWvB1dX6BA6h3ihPbsadYSmfZxBZYWT2';
+  const cbor = [...Buffer.from(V4.slice(6), 'base64url')];
+  const crawB = [...Buffer.from('crawB'), ...cbor];
+
+  function record(tnf: number, type: string, payload: number[]): number[] {
+    const typeBytes = [...Buffer.from(type)];
+    // Normal (4-byte length) record: the token is longer than 255 bytes.
+    return [
+      0xc0 | tnf,
+      typeBytes.length,
+      (payload.length >>> 24) & 0xff,
+      (payload.length >>> 16) & 0xff,
+      (payload.length >>> 8) & 0xff,
+      payload.length & 0xff,
+      ...typeBytes,
+      ...payload,
+    ];
+  }
+
+  it('reads a MIME application/octet-stream crawB record as the same token in text form', () => {
+    expect(decodeNdefText(record(0x02, 'application/octet-stream', crawB))).toBe(V4);
+  });
+
+  it('reads crawB bytes in an external record too', () => {
+    expect(decodeNdefText(record(0x04, 'cashu.space:token', crawB))).toBe(V4);
+  });
+
+  it('agrees with cashu-ts about what the bytes hold', () => {
+    const text = decodeNdefText(record(0x02, 'application/octet-stream', crawB));
+    expect(getTokenMetadata(text)).toEqual(getTokenMetadata(V4));
+    expect(getDecodedTokenBinary(Uint8Array.from(crawB)).mint).toBe(getTokenMetadata(text).mint);
+  });
+
+  it('still reads a MIME record of text as text', () => {
+    const text = [...Buffer.from(V4)];
+    expect(decodeNdefText(record(0x02, 'text/plain', text))).toBe(V4);
+  });
+
+  it('does not take other binary for a token', () => {
+    const other = [...Buffer.from('crawA'), ...cbor];
+    expect(decodeNdefText(record(0x02, 'application/octet-stream', other))).not.toMatch(/^cashuB/);
   });
 });

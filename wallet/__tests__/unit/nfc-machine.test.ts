@@ -4,6 +4,7 @@ import { INPUTS, MINT1, MINT2, WALLETS } from "../_harness/fixtures";
 import type { MachineOperations } from "../../src/machine/types";
 import type { WalletContext, PaymentRequestInfo } from "../../src/types";
 import { PaymentRequestUndeliveredError } from "../../src/errors";
+import { NUT00_V4_TOKEN } from "../_harness/tokenVectors";
 
 const accepted = "https://mint1.example.com";
 const other = "https://mint2.example.com";
@@ -1250,5 +1251,29 @@ describe("an NFC request locked to a P2PK key", () => {
     });
     expect(sentMint(tm)).toBeUndefined();
     expect(adapter.writeToken).not.toHaveBeenCalled();
+  });
+});
+
+// A tag can hold a token instead of a request (cashu.me writes them, as text
+// or as a binary record the NFC layer turns into text). It is received like
+// a scanned token, and the tag is let go.
+describe("an NFC tag that holds an ecash token", () => {
+  it("opens the receive step and lets the tag go", async () => {
+    const adapter = {
+      readPaymentRequest: vi.fn(async () => NUT00_V4_TOKEN),
+      writeToken: vi.fn(async () => {}),
+      releaseSession: vi.fn(async () => {}),
+      isAvailable: vi.fn(async () => true),
+    };
+    const tm = createTestMachine({ nfcAdapter: adapter });
+    await tm.machine.scan!(NUT00_V4_TOKEN, { source: "nfc" });
+
+    tm.assertStep("receiveToken");
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: "receiveToken",
+      data: { token: NUT00_V4_TOKEN },
+    });
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
   });
 });
