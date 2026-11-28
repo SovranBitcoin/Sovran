@@ -9,6 +9,7 @@ import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const mockNearPay = { radarVisible: false };
 const mockPaymentStatus: { active: Record<string, unknown> | null } = {
   active: { id: 'quote-1', state: 'processing' },
 };
@@ -71,7 +72,7 @@ jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
 }));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: (selector: (state: { radarVisible: boolean }) => unknown) =>
-    selector({ radarVisible: false }),
+    selector(mockNearPay),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { displayBtc: number }) => unknown) =>
@@ -113,6 +114,32 @@ jest.mock('@/shared/lib/popup/StatusToast', () => {
 describe('PaymentStatusToast selectors', () => {
   beforeEach(() => {
     mockPaymentStatus.active = { id: 'quote-1', state: 'processing' };
+    mockNearPay.radarVisible = false;
+  });
+
+  it('owns the outcome haptic, except an ecash receive on the Nut Drop radar', async () => {
+    mockPaymentStatus.active = { id: 'quote-1', state: 'confirmed' };
+    const render = async (variant: 'receive' | 'receive-ecash') => {
+      let renderer: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        renderer = TestRenderer.create(
+          <PaymentStatusToast
+            variant={variant}
+            paymentId="quote-1"
+            mintUrl="https://mint.sovran.money"
+            amount={33}
+            unit="sat"
+            hide={jest.fn()}
+          />
+        );
+      });
+      return renderer!.root.find((node) => (node.type as unknown) === 'MockStatusToast').props
+        .outcomeHaptics;
+    };
+    expect(await render('receive-ecash')).toBe(true);
+    mockNearPay.radarVisible = true;
+    expect(await render('receive')).toBe(true);
+    expect(await render('receive-ecash')).toBe(false);
   });
 
   it('names the root and receive processing stage', async () => {
