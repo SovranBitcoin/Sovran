@@ -11,6 +11,7 @@ import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 
 import { amountToNumberOrUndefined } from "./amount";
 import { isEvenHex } from "./hex";
+import { base64UrlEncode } from "./payment-request-canonical";
 import { logger } from "./logger";
 import { extractP2PKPubkey } from "./p2pk";
 
@@ -116,6 +117,26 @@ export function isWellFormedEcashToken(token: string): boolean {
 /** True when `token` decodes as a valid cashu token. */
 export function isValidEcashToken(token: string): boolean {
   return decodeEcashTokenMetadata(token) !== null;
+}
+
+const RAW_TOKEN_V4 = [0x63, 0x72, 0x61, 0x77, 0x42]; // "crawB"
+
+/**
+ * A NUT-00 binary token as the same token in text form. The two carry the
+ * same CBOR: `utf8("craw") || utf8("B") || cbor` against
+ * `"cashuB" || base64url(cbor)`. cashu.me and cashu-wallet write the binary
+ * form to NFC tags; reading those bytes as UTF-8 destroys them. Only the
+ * framing changes here: the parser still decides whether the result is a
+ * token. Null for anything that is not `crawB`.
+ */
+export function ecashTokenTextFromBinary(
+  bytes: ArrayLike<number>,
+): string | null {
+  if (bytes.length <= RAW_TOKEN_V4.length) return null;
+  if (RAW_TOKEN_V4.some((byte, index) => bytes[index] !== byte)) return null;
+  return `cashuB${base64UrlEncode(
+    Uint8Array.from(Array.from(bytes).slice(RAW_TOKEN_V4.length)),
+  )}`;
 }
 
 type EncodableToken = Parameters<typeof getEncodedToken>[0];

@@ -182,6 +182,7 @@ export { buildBip321OnchainUri, buildUnifiedBip321Uri } from "./bip321";
 export { describeDestination } from "./destination-descriptor";
 export {
   decodeEcashTokenMetadata,
+  ecashTokenTextFromBinary,
   encodeTokenChecked,
   isValidEcashToken,
   isWellFormedEcashToken,
