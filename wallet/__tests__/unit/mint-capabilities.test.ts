@@ -342,6 +342,16 @@ describe('keyset-backed unit gating', () => {
     expect(satSupport.mint.bolt11?.supported).toBe(true);
   });
 
+  it('pickMintForUnit keeps the earlier mint on a balance tie and reads a missing balance as 0', () => {
+    const mints = [
+      { mintUrl: MINT1, mintInfo: chorusInfo, keysetUnits: ['sat'] },
+      { mintUrl: MINT2, mintInfo: chorusInfo, keysetUnits: ['sat'] },
+    ];
+    expect(pickMintForUnit(mints, 'sat', { [MINT1]: 7, [MINT2]: 7 })).toBe(MINT1);
+    expect(pickMintForUnit(mints, 'sat', {})).toBe(MINT1);
+    expect(pickMintForUnit(mints, 'sat', { [MINT2]: 1 })).toBe(MINT2);
+  });
+
   it('pickMintForUnit skips mints without keysets for the unit', () => {
     const mints = [
       { mintUrl: MINT1, mintInfo: chorusInfo, keysetUnits: ['sat'] },
