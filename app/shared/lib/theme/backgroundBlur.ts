@@ -6,6 +6,7 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Easing, makeMutable, withTiming, type SharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { log } from '@/shared/lib/logger';
 
 /**
@@ -87,6 +88,23 @@ interface BackgroundValues {
 
 let values: BackgroundValues | null = null;
 
+// The full-screen blur is mounted from the moment full mode is chosen until
+// its fade-out ends: at opacity 0 it may still capture the backdrop each frame.
+let fullBlurShown = false;
+const fullBlurListeners = new Set<() => void>();
+function setFullBlurShown(shown: boolean): void {
+  if (fullBlurShown === shown) return;
+  fullBlurShown = shown;
+  fullBlurListeners.forEach((listener) => listener());
+}
+const hideFullBlurUnlessFull = () =>
+  getBackgroundValues().blurMode.get() !== 2 && setFullBlurShown(false);
+export function subscribeFullBlurShown(listener: () => void): () => void {
+  fullBlurListeners.add(listener);
+  return () => void fullBlurListeners.delete(listener);
+}
+export const isFullBlurShown = (): boolean => fullBlurShown;
+
 /** The shared background values, created on first use (partial blur). */
 export function getBackgroundValues(): BackgroundValues {
   values ??= {
@@ -148,22 +166,30 @@ function setBackgroundConfig(config: BackgroundConfig): void {
   backgroundColor.set(bgColor); // Color changes instantly (no animation)
 
   // Animate opacity based on mode
+  const fadeOutFullBlur = () =>
+    fullBlurOpacity.set(
+      withTiming(0, ANIMATION_CONFIG, (finished) => {
+        'worklet';
+        if (finished) scheduleOnRN(hideFullBlurUnlessFull);
+      })
+    );
   switch (config.blurMode) {
     case 'none':
       partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
-      fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+      fadeOutFullBlur();
       break;
     case 'partial':
       partialBlurOpacity.set(withTiming(1, ANIMATION_CONFIG));
-      fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+      fadeOutFullBlur();
       break;
     case 'full':
       partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+      setFullBlurShown(true);
       fullBlurOpacity.set(withTiming(1, ANIMATION_CONFIG));
       break;
     case 'gradient':
       partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
-      fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+      fadeOutFullBlur();
       break;
   }
 }
