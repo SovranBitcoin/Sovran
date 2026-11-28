@@ -8,7 +8,8 @@ type IdleCounter =
   | 'secure_vault.read'
   | 'wallet_projection.query'
   | 'store.write'
-  | 'nearby_payments.drain';
+  | 'nearby_payments.drain'
+  | 'wallpaper.spring';
 
 const COUNTING = typeof __DEV__ !== 'undefined' && __DEV__;
 const counts = new Map<IdleCounter, number>();
