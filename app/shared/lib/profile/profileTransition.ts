@@ -21,7 +21,7 @@ import { log, redactError } from '../logger';
 import { TIMED_OUT, settleWithin } from './settleWithin';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { restartApp } from '@/shared/lib/profile/appRestart';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { paymentToasts } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import {
   PROFILE_STORE_PERSIST_VERSION,
@@ -156,7 +156,8 @@ export function activateProfileInMemory(accountIndex: number): void {
 
 export async function teardownAndRestart(): Promise<boolean> {
   usePopupStore.getState().destroySheet();
-  usePaymentStatusStore.getState().setActive(null);
+  // No toast of the profile being left may outlive it.
+  paymentToasts.dismissAll();
 
   const restarted = restartApp();
   if (!restarted) {

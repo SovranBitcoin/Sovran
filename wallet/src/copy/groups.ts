@@ -175,35 +175,48 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
 
     TOAST_COPY: {
       receive: {
+        working: text("toast.receive.working"),
         message: text("toast.receive.message"),
         processing: text("toast.receive.processing"),
         confirmed: text("toast.receive.confirmed"),
         failed: text("toast.receive.failed"),
       },
       send: {
+        working: text("toast.send.working"),
         message: text("toast.send.message"),
         processing: text("toast.send.processing"),
         confirmed: text("toast.send.confirmed"),
         failed: text("toast.send.failed"),
       },
       "payment-request": {
+        working: text("toast.paymentRequest.working"),
         message: text("toast.paymentRequest.message"),
         processing: text("toast.paymentRequest.processing"),
-        delivered: text("toast.paymentRequest.delivered"),
+        handedOff: text("toast.paymentRequest.handedOff"),
         confirmed: text("toast.paymentRequest.confirmed"),
         failed: text("toast.paymentRequest.failed"),
       },
       melt: {
+        working: text("toast.melt.working"),
         message: text("toast.melt.message"),
         processing: text("toast.melt.processing"),
         confirmed: text("toast.melt.confirmed"),
         failed: text("toast.melt.failed"),
       },
       "receive-ecash": {
+        working: text("toast.receiveEcash.working"),
         message: text("toast.receiveEcash.message"),
         processing: text("toast.receiveEcash.processing"),
         confirmed: text("toast.receiveEcash.confirmed"),
         failed: text("toast.receiveEcash.failed"),
+      },
+      slow: {
+        title: text("toast.slow.title"),
+        subtitle: text("toast.slow.subtitle"),
+      },
+      unconfirmed: {
+        title: text("toast.unconfirmed.title"),
+        subtitle: text("toast.unconfirmed.subtitle"),
       },
     },
   } as const;

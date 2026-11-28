@@ -1,28 +1,24 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
-import { MeltQuoteState } from '@cashu/cashu-ts';
-import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
-import { createPaymentCopyGroups, type PaymentCopyResolver } from 'wallet';
+import { createPaymentCopyGroups } from 'wallet';
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
-import { CocoManager } from '@/shared/lib/cashu/manager';
+import {
+  usePaymentStatusStore,
+  type PaymentToastView,
+} from '@/shared/stores/runtime/paymentStatusStore';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import {
-  getMeltDetailPathname,
-  getMintDetailPathname,
-} from '@/shared/lib/nav/transactionDetailRoutes';
 import { useToastSurface } from './useToastSurface';
-import { fmt, isAmountSegment, type PopupTextSegment } from './format';
-import { StatusToast, type StatusToastStatus } from './StatusToast';
+import { isAmountSegment } from './format';
+import { presentPaymentToast } from './paymentToastPresentation';
+import { openToastTransaction } from './paymentToastTarget';
+import { StatusToast } from './StatusToast';
 import { E2EPaymentToastRenderMarker } from './E2EToastProbe';
-
-type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 const SEGMENT_FONT_SIZE = 13;
 
@@ -52,296 +48,84 @@ function ToastAmountText({ amount, unit, color }: { amount: number; unit: string
   );
 }
 
-function createPaymentStatusToastCases(paymentCopy: PaymentCopyResolver) {
-  const { TOAST_COPY } = createPaymentCopyGroups(paymentCopy);
-
-  return {
-    receive: {
-      message: TOAST_COPY.receive.message,
-      submessagePending: TOAST_COPY.receive.processing,
-      submessageConfirmed: (amount: number, unit: string) =>
-        fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
-      submessageFailed: TOAST_COPY.receive.failed,
-      history: { type: 'mint' as const, idField: 'quoteId' as const },
-      route: { pathname: '/lightningReceive' as const, paramKey: 'mintHistoryEntry' },
-    },
-    send: {
-      message: TOAST_COPY.send.message,
-      submessagePending: TOAST_COPY.send.processing,
-      submessageConfirmed: (amount: number, unit: string) =>
-        fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
-      submessageFailed: TOAST_COPY.send.failed,
-      history: { type: 'send' as const, idField: 'operationId' as const },
-      route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
-    },
-    'payment-request': {
-      message: TOAST_COPY['payment-request'].message,
-      submessagePending: TOAST_COPY['payment-request'].processing,
-      submessageDelivered: TOAST_COPY['payment-request'].delivered,
-      submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
-      submessageFailed: TOAST_COPY['payment-request'].failed,
-      history: { type: 'send' as const, idField: 'operationId' as const },
-      route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
-    },
-    melt: {
-      message: TOAST_COPY.melt.message,
-      submessagePending: TOAST_COPY.melt.processing,
-      submessageConfirmed: (amount: number, unit: string) =>
-        fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
-      submessageFailed: TOAST_COPY.melt.failed,
-      history: { type: 'melt' as const, idField: 'quoteId' as const },
-      route: { pathname: '/lightningSend' as const, paramKey: 'meltHistoryEntry' },
-    },
-    'receive-ecash': {
-      message: TOAST_COPY['receive-ecash'].message,
-      submessagePending: TOAST_COPY['receive-ecash'].processing,
-      submessageConfirmed: (amount: number, unit: string) =>
-        fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
-      submessageFailed: TOAST_COPY['receive-ecash'].failed,
-      history: { type: 'receive' as const, idField: 'id' as const },
-      route: { pathname: '/receiveToken' as const, paramKey: 'receiveHistoryEntry' },
-    },
-  } as const;
-}
-
 type PaymentStatusToastProps = {
-  variant: PaymentStatusToastVariant;
-  /** Payment id (quoteId or operationId or receiveHistoryEntry.id) */
-  paymentId: string;
-  mintUrl: string;
-  amount: number;
-  unit: string;
-  /** For melt: operationId used to construct MeltHistoryEntry when not in history */
-  operationId?: string;
-  /** For receive-ecash: receiveEntryId set when receive:created fires, used for View button */
-  receiveEntryId?: string;
-  toastId?: string;
-  debugLabel?: string;
-  toastDebugFields?: Record<string, unknown>;
-  /** All remaining props come from ToastComponentProps and are forwarded to Toast root */
+  /** The toast to draw: its id in `usePaymentStatusStore.toasts`. */
+  paymentToastId: string;
+  /** All remaining props come from ToastHost and are forwarded to the slab. */
   [key: string]: unknown;
 };
 
-type PaymentStatusToastCase = ReturnType<
-  typeof createPaymentStatusToastCases
->[PaymentStatusToastVariant];
-
 /**
- * Navigate to the transaction a status toast is reporting on.
- *
- * At module scope rather than inline in the toast: the body's ternary and
- * optional chains live inside a try/catch, which React Compiler cannot lower —
- * and this component is a global overlay that renders on every payment.
+ * One payment's toast. It draws what the payment toast machine says is on
+ * screen for it and decides nothing itself: no timers, no phase logic.
+ * Tapping it (anywhere, or View once the payment is done) opens that
+ * transaction.
  */
-async function openToastTransaction({
-  config,
-  variant,
-  paymentId,
-  mintUrl,
-  amount,
-  unit,
-  effectiveReceiveEntryId,
-  effectiveOperationId,
-}: {
-  config: PaymentStatusToastCase;
-  variant: PaymentStatusToastVariant;
-  paymentId: string;
-  mintUrl: string;
-  amount: number;
-  unit: string;
-  effectiveReceiveEntryId: string | undefined;
-  effectiveOperationId: string | undefined;
-}): Promise<void> {
-  try {
-    const manager = CocoManager.getInstance();
-    const history = await manager.history.getPaginatedHistory(0, 100);
-    const { type, idField } = config.history;
-    // For receive-ecash, use effectiveReceiveEntryId when available (real entry id from receive:created)
-    const lookupId =
-      variant === 'receive-ecash' && effectiveReceiveEntryId ? effectiveReceiveEntryId : paymentId;
-    let entry = history.find(
-      (h) =>
-        h.type === type &&
-        idField in h &&
-        (h as Record<string, unknown>)[idField] === lookupId &&
-        h.mintUrl === mintUrl
-    );
-    // v3 melts are not in history; construct MeltHistoryEntry from operationId
-    if (!entry && variant === 'melt' && effectiveOperationId) {
-      const now = Date.now();
-      entry = asHistoryEntry({
-        type: 'melt',
-        id: effectiveOperationId,
-        source: 'legacy',
-        legacyHistoryId: effectiveOperationId,
-        quoteId: paymentId,
-        mintUrl,
-        amount,
-        unit,
-        state: MeltQuoteState.PAID,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-    if (entry) {
-      if (entry.type === 'mint') {
-        guardedRouter.navigate({
-          pathname: getMintDetailPathname(entry),
-          params: { mintHistoryEntry: JSON.stringify(entry) },
-        });
-      } else if (entry.type === 'melt') {
-        guardedRouter.navigate({
-          pathname: getMeltDetailPathname(entry),
-          params: { meltHistoryEntry: JSON.stringify(entry) },
-        });
-      } else {
-        guardedRouter.navigate({
-          pathname: config.route.pathname,
-          params: { [config.route.paramKey]: JSON.stringify(entry) },
-        });
-      }
-    }
-  } catch (e) {
-    popupLog.warn('popup.open_transaction_failed', { error: e });
-  }
-}
-
-export function PaymentStatusToast({
-  variant,
-  paymentId,
-  mintUrl,
-  amount,
-  unit,
-  operationId,
-  receiveEntryId,
-  toastId,
-  debugLabel,
-  toastDebugFields,
-  ...toastProps
-}: PaymentStatusToastProps) {
+export function PaymentStatusToast({ paymentToastId, ...toastProps }: PaymentStatusToastProps) {
   const hide = toastProps.hide as (ids?: string | string[] | 'all') => void;
-  const toastDebugFieldsRef = React.useRef(toastDebugFields);
+  const live = usePaymentStatusStore((s) => s.toasts.find((t) => t.id === paymentToastId));
+  // The machine drops a toast the moment it closes, while the stack is still
+  // animating it out: keep drawing what it last showed. Adjusted during
+  // render (not a ref write) so the React Compiler keeps this component.
+  const [last, setLast] = React.useState<PaymentToastView | undefined>(live);
+  if (live && live !== last) setLast(live);
+  const view = live ?? last;
+
   const paymentCopy = usePaymentCopyResolver();
-  const cases = React.useMemo(() => createPaymentStatusToastCases(paymentCopy), [paymentCopy]);
-  const config = cases[variant];
-  const active = usePaymentStatusStore((s) => s.active);
-  const activeForPayment = active?.id === paymentId ? active : null;
-  // Once the payment reaches a terminal state, hold that snapshot so the toast
-  // keeps rendering it after `active` clears. Kept in state and adjusted during
-  // render rather than written to a ref mid-render: a render-phase ref write is
-  // the rule violation that made the React Compiler skip this entire component
-  // (30 functions). `Object.is` keeps the conditional update convergent.
-  const [terminalSnapshotState, setTerminalSnapshotState] = React.useState<typeof active>(null);
-  if (
-    activeForPayment &&
-    (activeForPayment.state === 'waiting' ||
-      activeForPayment.state === 'confirmed' ||
-      activeForPayment.state === 'failed') &&
-    !Object.is(terminalSnapshotState, activeForPayment)
-  ) {
-    setTerminalSnapshotState(activeForPayment);
-  }
-  const terminalSnapshot = terminalSnapshotState?.id === paymentId ? terminalSnapshotState : null;
-  const effectiveActive = activeForPayment ?? terminalSnapshot;
-  const isDelivered = activeForPayment?.state === 'delivered';
-  const isWaiting = effectiveActive?.state === 'waiting';
-  const isConfirmed = effectiveActive?.state === 'confirmed';
-  const isFailed = effectiveActive?.state === 'failed';
-  const status: StatusToastStatus = isConfirmed
-    ? 'confirmed'
-    : isFailed
-      ? 'failed'
-      : isWaiting
-        ? 'warning'
-        : isDelivered
-          ? 'delivered'
-          : 'pending';
-  // For melt: operationId may be set by melt-op:finalized after toast mounts
-  const effectiveOperationId =
-    variant === 'melt' ? (effectiveActive?.operationId ?? operationId) : operationId;
-  // For receive-ecash: receiveEntryId may be set by receive:created after toast mounts
-  const effectiveReceiveEntryId =
-    variant === 'receive-ecash' ? (effectiveActive?.receiveEntryId ?? receiveEntryId) : undefined;
-  React.useEffect(() => {
-    popupLog.info('popup.status_toast.status', {
-      toastId: toastId ?? null,
-      debugLabel: debugLabel ?? null,
-      variant,
-      paymentId,
-      status,
-      hasMintUrl: mintUrl.length > 0,
-      mintUrlLength: mintUrl.length,
-      amount,
-      unit,
-      activeState: activeForPayment?.state ?? null,
-      effectiveState: effectiveActive?.state ?? null,
-      hasTerminalSnapshot: !!terminalSnapshot,
-      operationId: effectiveOperationId ?? null,
-      receiveEntryId: effectiveReceiveEntryId ?? null,
-      ...(toastDebugFieldsRef.current ?? {}),
-    });
-  }, [
-    activeForPayment?.state,
-    amount,
-    debugLabel,
-    effectiveActive?.state,
-    effectiveOperationId,
-    effectiveReceiveEntryId,
-    mintUrl,
-    paymentId,
-    status,
-    terminalSnapshot,
-    toastId,
-    unit,
-    variant,
-  ]);
-  const confirmedSubmessage =
-    typeof config.submessageConfirmed === 'function'
-      ? config.submessageConfirmed(amount, unit)
-      : config.submessageConfirmed;
-
-  const pendingSubtitle = effectiveActive?.subtitleOverride ?? config.submessagePending;
-  const submessage = isConfirmed
-    ? confirmedSubmessage
-    : isFailed
-      ? (effectiveActive?.errorMessage ?? config.submessageFailed)
-      : isDelivered && 'submessageDelivered' in config
-        ? config.submessageDelivered
-        : 'submessagePending' in config
-          ? pendingSubtitle
-          : confirmedSubmessage;
-
+  const copy = React.useMemo(() => createPaymentCopyGroups(paymentCopy).TOAST_COPY, [paymentCopy]);
   // Foreground tracks the toast surface so the segmented amount row matches
   // the rest of the title/subtitle text in both light and dark themes.
   const { fg: surfaceFg } = useToastSurface();
+  // Nut Drop special case: while the radar screen is up, an incoming ecash
+  // receive is titled "Received payment" (the lightning ceremony is already
+  // playing — the toast just confirms it). Reactive on purpose: leave the
+  // radar and the title reverts.
+  const radarVisible = useNearPaySessionStore((s) => s.radarVisible);
 
-  // Wrap in single-flight: a rapid double-tap on the toast's "View" action
-  // would otherwise call `getPaginatedHistory(0, 100)` twice and stack two
-  // copies of the destination screen on the back stack — `guardedRouter`'s
-  // 600ms debounce only catches the navigation, not the history fetch.
-  const onPressViewTransaction = useSingleFlight(async () => {
-    // Guard stays HERE, not in the helper: an uninitialised manager leaves the
-    // toast up rather than dismissing it with nothing to show for the tap.
-    if (!CocoManager.isInitialized()) return;
-    await openToastTransaction({
-      config,
-      variant,
-      paymentId,
-      mintUrl,
-      amount,
-      unit,
-      effectiveReceiveEntryId,
-      effectiveOperationId,
-    });
-    hide();
+  const content = view?.content;
+  const phase = view?.phase;
+  React.useEffect(() => {
+    if (!phase) return;
+    popupLog.info('popup.status_toast.status', { paymentToastId, phase });
+  }, [paymentToastId, phase]);
+
+  const target = content?.kind === 'payment' ? content.target : undefined;
+  const mintUrl = content?.kind === 'payment' ? content.mintUrl : undefined;
+  const groupId = content?.kind === 'steps' ? content.groupId : undefined;
+  const canOpen = (target !== undefined && mintUrl !== undefined) || groupId !== undefined;
+  // Single-flight: a rapid double tap would otherwise read history twice and
+  // stack two copies of the destination — `guardedRouter`'s debounce only
+  // catches the navigation, not the lookup.
+  const open = useSingleFlight(async () => {
+    if (groupId !== undefined) {
+      guardedRouter.push({ pathname: '/swap', params: { groupId } });
+      hide();
+      return;
+    }
+    if (target === undefined || mintUrl === undefined) return;
+    // The toast stays up when nothing opened, so the tap is not swallowed
+    // with nothing to show for it.
+    if (await openToastTransaction(target, mintUrl)) hide();
   });
+  const onOpen = () => void open();
 
+  if (!view || !content || !phase) return null;
+
+  const presented = presentPaymentToast(view, copy);
+  const title =
+    content.kind === 'payment' &&
+    content.variant === 'receive-ecash' &&
+    radarVisible &&
+    phase === 'done'
+      ? 'Received payment'
+      : presented.title;
+  const subtitle = presented.subtitle;
   const subtitleNode =
-    typeof submessage === 'string' ? (
-      submessage
+    subtitle === undefined || typeof subtitle === 'string' ? (
+      subtitle
     ) : (
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {(submessage as PopupTextSegment[]).map((segment, i) =>
+        {subtitle.map((segment, i) =>
           isAmountSegment(segment) ? (
             <ToastAmountText
               key={i}
@@ -357,56 +141,43 @@ export function PaymentStatusToast({
                 fontSize: SEGMENT_FONT_SIZE,
                 color: surfaceFg,
               }}>
-              {segment as string}
+              {segment}
             </RNText>
           )
         )}
       </View>
     );
 
-  // Action shown only on confirmed (not on failed) — failure leaves the
-  // toast empty on the right so the error message has full breathing room.
+  // The pill is shown once the payment is done; a failure leaves the right
+  // side empty so the reason has room. The body opens it in every phase.
   const action =
-    isConfirmed && !isFailed
-      ? { label: 'View', onPress: onPressViewTransaction, testID: 'payment-status-view' }
+    phase === 'done' && canOpen
+      ? { label: 'View', onPress: onOpen, testID: 'payment-status-view' }
       : undefined;
-
-  // Nut Drop special case: while the radar screen is up, an incoming ecash
-  // receive is titled "Received payment" (the lightning ceremony is already
-  // playing — the toast just confirms it). Standard green coloring.
-  // Reactive on purpose: leave the radar and the title reverts.
-  const radarVisible = useNearPaySessionStore((s) => s.radarVisible);
-  const onNutDropRadar = variant === 'receive-ecash' && radarVisible;
-  const title =
-    effectiveActive?.titleOverride ?? (onNutDropRadar ? 'Received payment' : config.message);
+  const probeVariant = content.kind === 'payment' ? content.variant : undefined;
   const selectorVariant =
-    variant === 'receive' || variant === 'receive-ecash' ? 'receive' : variant;
-  const selectorStage = status === 'pending' ? 'processing' : status;
-  const statusToastDebugFields = React.useMemo(
-    () => ({
-      toastId: toastId ?? null,
-      debugLabel: debugLabel ?? null,
-      variant,
-      paymentId,
-      status,
-    }),
-    [debugLabel, paymentId, status, toastId, variant]
-  );
+    probeVariant === undefined
+      ? 'swap'
+      : probeVariant === 'receive-ecash'
+        ? 'receive'
+        : probeVariant;
 
   return (
     <>
-      <E2EPaymentToastRenderMarker
-        variant={variant}
-        stage={selectorStage}
-        {...(action ? { onView: action.onPress } : {})}
-      />
+      {probeVariant ? (
+        <E2EPaymentToastRenderMarker
+          variant={probeVariant}
+          stage={presented.stage}
+          {...(action ? { onView: action.onPress } : {})}
+        />
+      ) : null}
       <StatusToast
-        status={status}
+        status={presented.status}
         title={title}
         subtitle={subtitleNode}
         action={action}
-        statusTestID={`payment-status-${selectorVariant}-${selectorStage}`}
-        debugFields={statusToastDebugFields}
+        {...(canOpen ? { onPress: onOpen } : {})}
+        statusTestID={`payment-status-${selectorVariant}-${presented.stage}`}
         toastProps={{ ...toastProps, hide, testID: 'payment-status-toast' }}
       />
     </>

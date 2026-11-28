@@ -47,7 +47,7 @@ jest.mock('@/shared/lib/logger', () => {
 });
 
 jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: () => ({ setActive: jest.fn() }) },
+  paymentToasts: { dismissAll: jest.fn() },
 }));
 
 jest.mock('@/shared/stores/runtime/popupStore', () => ({

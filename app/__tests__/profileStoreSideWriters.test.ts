@@ -85,7 +85,7 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
   CocoManager: { cleanup: jest.fn(async () => {}), completeReset: jest.fn(async () => {}) },
 }));
 jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: () => ({ setActive: jest.fn() }) },
+  paymentToasts: { dismissAll: jest.fn() },
 }));
 jest.mock('@/shared/stores/runtime/popupStore', () => ({
   usePopupStore: { getState: () => ({ close: jest.fn(), destroySheet: jest.fn() }) },

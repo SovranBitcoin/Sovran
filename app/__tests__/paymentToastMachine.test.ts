@@ -133,6 +133,30 @@ describe('one payment', () => {
     expect(screen()).toEqual(['melt:q1:slow:pay']);
   });
 
+  it('takes a later, sooner slow moment for a spinner already on screen', () => {
+    const { machine, screen } = setup();
+    machine.start('melt:q1', 'pay');
+    advance(spinnerDelayMs);
+    machine.report('melt:q1', 'working', 'pay', { slowAt: Date.now() + 2000 });
+    advance(1999);
+    expect(screen()).toEqual(['melt:q1:working:pay']);
+    advance(1);
+    expect(screen()).toEqual(['melt:q1:slow:pay']);
+  });
+
+  it('answers what is known about a payment whether or not its toast is on screen', () => {
+    const { machine } = setup();
+    expect(machine.get('melt:q1')).toBeUndefined();
+    machine.start('melt:q1', 'pay');
+    expect(machine.views()).toEqual([]);
+    expect(machine.get('melt:q1')).toEqual({ key: 'melt:q1', phase: 'working', content: 'pay' });
+    expect(machine.tracked()).toEqual([{ key: 'melt:q1', phase: 'working', content: 'pay' }]);
+    machine.report('melt:q1', 'done', 'paid');
+    advance(resultMs);
+    expect(machine.get('melt:q1')).toBeUndefined();
+    expect(machine.tracked()).toEqual([]);
+  });
+
   it('lets a late success correct a failure still on screen', () => {
     const { machine, screen } = setup();
     machine.start('melt:q1', 'pay');
@@ -320,6 +344,19 @@ describe('overlapping payments', () => {
     expect(screen()).toEqual(['send:op1:done:claimed']);
   });
 
+  it('merges the early result into what the bound toast showed, when told how', () => {
+    const changes: ToastView<string>[][] = [];
+    const machine = createPaymentToastMachine<string>({
+      onChange: (views) => changes.push(views),
+      merge: (own, early) => `${own}+${early}`,
+    });
+    machine.start('pending:x', 'request', { unbound: { group: 'send' } });
+    advance(spinnerDelayMs + minVisibleMs);
+    machine.report('send:op1', 'done', 'claimed', { holdForGroup: 'send' });
+    machine.bind('pending:x', 'send:op1');
+    expect(machine.views().map((v) => v.content)).toEqual(['request+claimed']);
+  });
+
   it('gives a held result its own toast when it was another payment after all', () => {
     const { machine, screen } = setup();
     machine.start('pending:x', 'request', { unbound: { group: 'send' } });
@@ -379,7 +416,12 @@ describe('a payment in steps (swap, rebalance)', () => {
     machine.report('swap:g1', 'done', 'Swap complete');
     advance(resultMs);
     // "Step two" is never drawn: the toast goes from the long step to the result.
-    expect(drawn('swap:g1')).toEqual(['hidden', 'working:Step one', 'done:Swap complete', 'hidden']);
+    expect(drawn('swap:g1')).toEqual([
+      'hidden',
+      'working:Step one',
+      'done:Swap complete',
+      'hidden',
+    ]);
   });
 
   it('draws the next step only once it has lasted the spinner delay', () => {
@@ -404,7 +446,12 @@ describe('a payment in steps (swap, rebalance)', () => {
     advance(50);
     machine.report('swap:g1', 'done', 'Swap complete');
     advance(minVisibleMs + resultMs);
-    expect(drawn('swap:g1')).toEqual(['hidden', 'working:Step one', 'done:Swap complete', 'hidden']);
+    expect(drawn('swap:g1')).toEqual([
+      'hidden',
+      'working:Step one',
+      'done:Swap complete',
+      'hidden',
+    ]);
   });
 
   it('does not replay a completed step when it is reported again', () => {

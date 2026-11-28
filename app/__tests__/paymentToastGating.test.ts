@@ -1,18 +1,18 @@
 /**
  * @jest-environment node
  *
- * Toast gating for onchain melts: the processing toast is suppressed at Pay
- * time (onchain settles in minutes-to-hours; only the terminal state toasts),
- * and failures must still surface even though no processing toast exists to
- * flip. Lightning (no `method` in the payload) keeps the full multi-stage
- * behavior.
+ * What the payment flow's notifications do to the payment toasts: which toast
+ * a flow starts and under which key, that it only ever changes its own, and
+ * what its toast says when the payment is confirmed, cancelled or fails.
+ *
+ * Onchain melts start no toast at Pay time (they settle in minutes-to-hours;
+ * only the result is told), and their failures must still be told.
  */
 
 import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConfig';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
-import { paymentStatusPopup } from '@/shared/lib/popup';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { paymentToasts } from '@/shared/stores/runtime/paymentStatusStore';
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), replace: jest.fn(), dismiss: jest.fn() },
@@ -52,7 +52,6 @@ jest.mock('@/shared/lib/popup', () => ({
   nfcEcashSharedPopup: jest.fn(),
   nfcSendFailedPopup: jest.fn(),
   paymentCancelledPopup: jest.fn(),
-  paymentStatusPopup: jest.fn(),
   sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),
@@ -95,36 +94,38 @@ const BASE = { mintUrl: 'https://mint1.example.com', amount: 200, unit: 'sat' };
 // NUT-18 request with id 'req-1' for 200 sat at BASE.mintUrl.
 const PAYMENT_REQUEST =
   'creqApWF0gGFpZXJlcS0xYWEYyGF1Y3NhdGFtgXgZaHR0cHM6Ly9taW50MS5leGFtcGxlLmNvbQ==';
-const PROCESSING_MELT = {
-  variant: 'melt' as const,
-  id: 'melt-1',
-  owner: { kind: 'pending' as const, key: 'melt-1' },
-  state: 'processing' as const,
+
+/** Every payment with a toast, as `{ key, phase, content }`. */
+const toasts = () => paymentToasts.tracked();
+/** The one toast there is. */
+const toast = () => {
+  expect(toasts()).toHaveLength(1);
+  return toasts()[0]!;
 };
-const activeStatus = () => usePaymentStatusStore.getState().active;
+
+beforeEach(() => {
+  paymentToasts.dismissAll();
+  (setTransactionAnnotation as jest.Mock).mockClear();
+});
+
+// Toasts in flight hold timers: none may outlive its test.
+afterEach(() => paymentToasts.dismissAll());
 
 describe('payment toast gating (onchain melt)', () => {
-  beforeEach(() => {
-    usePaymentStatusStore.setState({ active: null });
-    (paymentStatusPopup as jest.Mock).mockClear();
-  });
-
-  it('suppresses the processing toast for an onchain melt', () => {
+  it('starts no toast for an onchain melt', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', method: 'onchain', ...BASE });
-    expect(activeStatus()).toBeNull();
-    expect(paymentStatusPopup).not.toHaveBeenCalled();
+    expect(toasts()).toEqual([]);
   });
 
-  it('keeps the processing toast for a lightning melt (no method)', () => {
+  it('starts a toast for a lightning melt (no method)', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    expect(activeStatus()).toMatchObject({ variant: 'melt', state: 'processing' });
-    expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
+    expect(toast()).toMatchObject({ phase: 'working', content: { variant: 'melt', ...BASE } });
   });
 
   // The message is the exception's own text, so the toast shows catalogue copy for it.
-  it('creates a fresh failed toast when a payment fails with no active toast', () => {
+  it('gives a failure its own toast when the payment had none', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentFailed!({
       variant: 'melt',
@@ -132,41 +133,35 @@ describe('payment toast gating (onchain melt)', () => {
       message: 'Mint rejected the melt',
       rolledBack: true,
     });
-    expect(activeStatus()).toMatchObject({
-      variant: 'melt',
-      state: 'failed',
-      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
+    expect(toast()).toMatchObject({
+      phase: 'failed',
+      content: {
+        variant: 'melt',
+        subtitle: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
+      },
     });
-    expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
 
-  it('flips the existing processing toast on failure instead of creating a new one', () => {
+  it('fails the toast the flow started instead of adding one', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    const key = activeStatus()!.id;
-    void notifications.onPaymentFailed!({
-      variant: 'melt',
-      ...BASE,
-      message: 'Route failed',
-    });
-    expect(activeStatus()).toMatchObject({ id: key, state: 'failed' });
-    expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
+    const { key } = toast();
+    void notifications.onPaymentFailed!({ variant: 'melt', ...BASE, message: 'Route failed' });
+    expect(toast()).toMatchObject({ key, phase: 'failed' });
   });
 
   it('says the funds came back when the failed payment already had a toast', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    const key = activeStatus()!.id;
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
       message: 'Route failed',
       rolledBack: true,
     });
-    expect(activeStatus()).toMatchObject({
-      id: key,
-      state: 'failed',
-      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
+    expect(toast()).toMatchObject({
+      phase: 'failed',
+      content: { subtitle: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.` },
     });
   });
 
@@ -179,81 +174,65 @@ describe('payment toast gating (onchain melt)', () => {
       message: 'Amount must be between 1 and 10 sats',
       authored: true,
     });
-    expect(activeStatus()).toMatchObject({
-      state: 'failed',
-      errorMessage: 'Amount must be between 1 and 10 sats',
+    expect(toast()).toMatchObject({
+      phase: 'failed',
+      content: { subtitle: 'Amount must be between 1 and 10 sats' },
     });
   });
 
-  it('replaces an unrelated status instead of failing the wrong payment', () => {
-    usePaymentStatusStore.setState({
-      active: {
-        ...PROCESSING_MELT,
-        id: 'other-melt',
-        mintUrl: 'https://other.example.com',
-        amount: 999,
-        unit: 'sat',
-      },
-    });
+  it('does not show a payment whose outcome is unknown as a failure', () => {
     const notifications = createSovranNotifications();
+    void notifications.onPaymentProcessing!({ variant: 'melt', quoteId: 'mq-1', ...BASE });
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
-      message: 'This melt failed',
+      message: 'The payment may still complete. Check your history before you pay again.',
       authored: true,
+      outcomeUnknown: true,
     });
-    expect(activeStatus()).toMatchObject({
-      variant: 'melt',
-      mintUrl: BASE.mintUrl,
-      amount: BASE.amount,
-      state: 'failed',
-      errorMessage: 'This melt failed',
+    expect(toast()).toMatchObject({
+      key: 'melt:mq-1',
+      phase: 'slow',
+      content: { unconfirmed: true },
     });
-    expect(activeStatus()?.id).not.toBe('other-melt');
-    expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
+    expect(toast().content).not.toHaveProperty('subtitle');
   });
 });
 
-describe('payment confirmation history parsing', () => {
-  /** A flow that has opened its processing toast for a payment of `variant`. */
+describe('payment confirmation', () => {
+  /** A flow that has started its toast for a payment of `variant`. */
   function started(variant: 'melt' | 'paymentRequest') {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant, ...BASE });
-    return { notifications, key: activeStatus()!.id };
+    return notifications;
   }
 
-  beforeEach(() => {
-    usePaymentStatusStore.setState({ active: null });
-    (setTransactionAnnotation as jest.Mock).mockClear();
-  });
-
-  it('holds the melt toast while the history entry is still PENDING', () => {
-    void started('melt').notifications.onPaymentConfirmed!({
+  it('keeps the melt toast working while the history entry is still PENDING', () => {
+    void started('melt').onPaymentConfirmed!({
       variant: 'melt',
       ...BASE,
       historyEntry: JSON.stringify({ id: 'h1', type: 'melt', state: 'PENDING' }),
     });
-    expect(activeStatus()?.state).toBe('processing');
+    expect(toast().phase).toBe('working');
   });
 
-  it('confirms the melt when the history entry is malformed', () => {
-    const { notifications, key } = started('melt');
-    void notifications.onPaymentConfirmed!({
+  it('finishes the melt when the history entry is malformed', () => {
+    void started('melt').onPaymentConfirmed!({
       variant: 'melt',
       ...BASE,
       historyEntry: 'not json',
     });
-    expect(activeStatus()).toMatchObject({ id: key, state: 'confirmed' });
+    expect(toast().phase).toBe('done');
   });
 
-  it('annotates a confirmed payment-request send from its parsed metadata', () => {
-    const { notifications, key } = started('paymentRequest');
-    void notifications.onPaymentConfirmed!({
+  it('annotates a delivered payment-request send from its parsed metadata, and hands the toast off', () => {
+    void started('paymentRequest').onPaymentConfirmed!({
       variant: 'paymentRequest',
       ...BASE,
       historyEntry: JSON.stringify({
         id: 'h1',
         type: 'send',
+        state: 'pending',
         operationId: 'op-1',
         metadata: { transportType: 'nostr', paymentRequest: PAYMENT_REQUEST },
       }),
@@ -261,10 +240,11 @@ describe('payment confirmation history parsing', () => {
     expect(setTransactionAnnotation).toHaveBeenCalledWith('op:op-1', {
       paymentRequest: { role: 'payer', requestId: 'req-1', transport: 'nostr' },
     });
-    expect(activeStatus()).toMatchObject({ id: key, state: 'delivered' });
+    // Delivered, waiting on the recipient: not spinning, not yet done.
+    expect(toast()).toMatchObject({ key: 'send:op-1', phase: 'handed-off' });
   });
 
-  it('annotates the send even when the flow has no toast on screen', () => {
+  it('annotates the send even when the flow has no toast', () => {
     void createSovranNotifications().onPaymentConfirmed!({
       variant: 'paymentRequest',
       ...BASE,
@@ -276,119 +256,109 @@ describe('payment confirmation history parsing', () => {
       }),
     });
     expect(setTransactionAnnotation).toHaveBeenCalledWith('op:op-1', expect.anything());
+    expect(toasts()).toEqual([]);
   });
 });
 
-describe('a payment flow changes only the toast it opened', () => {
-  const RECEIVING = {
-    variant: 'receive' as const,
-    id: 'quote-in',
-    ...BASE,
-    state: 'processing' as const,
-  };
+describe('a payment flow changes only the toast it started', () => {
+  const receiving = () =>
+    paymentToasts.start('mint:quote-in', { kind: 'payment', variant: 'receive', ...BASE });
+  const other = () => paymentToasts.get('mint:quote-in');
 
-  beforeEach(() => {
-    usePaymentStatusStore.setState({ active: null });
-    (paymentStatusPopup as jest.Mock).mockClear();
-  });
-
-  it('leaves a toast that replaced its own alone when its payment is confirmed', () => {
+  it('leaves another payment’s toast alone when its own payment is confirmed', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'paymentRequest', ...BASE });
-    usePaymentStatusStore.setState({ active: RECEIVING });
+    receiving();
     void notifications.onPaymentConfirmed!({
       variant: 'paymentRequest',
       ...BASE,
-      historyEntry: JSON.stringify({ id: 'h1', type: 'send', operationId: 'op-1' }),
+      historyEntry: JSON.stringify({
+        id: 'h1',
+        type: 'send',
+        state: 'pending',
+        operationId: 'op-1',
+      }),
     });
-    expect(activeStatus()).toEqual(RECEIVING);
-  });
-
-  it('leaves another payment’s toast alone when its own melt is confirmed late', () => {
-    const first = createSovranNotifications();
-    void first.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    const other = { ...PROCESSING_MELT, id: 'melt-other', ...BASE, amount: 300 };
-    usePaymentStatusStore.setState({ active: other });
-    void first.onPaymentConfirmed!({
-      variant: 'melt',
-      ...BASE,
-      historyEntry: JSON.stringify({ id: 'mo-1', type: 'melt', quoteId: 'mq-1', state: 'PAID' }),
-    });
-    expect(activeStatus()).toEqual(other);
+    expect(other()).toMatchObject({ phase: 'working', content: { variant: 'receive' } });
+    expect(paymentToasts.get('send:op-1')).toMatchObject({ phase: 'handed-off' });
   });
 
   it('fails only its own toast: one from another flow for the same mint and amount is left alone', () => {
-    const other = { ...PROCESSING_MELT, ...BASE };
-    usePaymentStatusStore.setState({ active: other });
+    void createSovranNotifications().onPaymentProcessing!({ variant: 'melt', ...BASE });
+    const before = toast();
     void createSovranNotifications().onPaymentFailed!({
       variant: 'melt',
       ...BASE,
       message: 'This melt failed',
       authored: true,
     });
-    expect(activeStatus()).toMatchObject({ state: 'failed', errorMessage: 'This melt failed' });
-    expect(activeStatus()?.id).not.toBe(other.id);
-    expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
+    expect(toasts()).toHaveLength(2);
+    expect(paymentToasts.get(before.key)).toEqual(before);
+    expect(toasts().find((t) => t.key !== before.key)).toMatchObject({
+      phase: 'failed',
+      content: { subtitle: 'This melt failed' },
+    });
   });
 
   it('dismisses only its own toast when its payment is cancelled', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    usePaymentStatusStore.setState({ active: RECEIVING });
+    receiving();
     void notifications.onPaymentCancelled!({ variant: 'melt', ...BASE });
-    expect(activeStatus()).toEqual(RECEIVING);
+    expect(toasts().map((t) => t.key)).toEqual(['mint:quote-in']);
 
-    const own = createSovranNotifications();
-    void own.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    void own.onPaymentCancelled!({ variant: 'melt', ...BASE });
-    expect(activeStatus()).toBeNull();
+    // A flow that started nothing dismisses nothing.
+    void createSovranNotifications().onPaymentCancelled!({ variant: 'melt', ...BASE });
+    expect(toasts().map((t) => t.key)).toEqual(['mint:quote-in']);
   });
 
-  it('opens each toast under its own key, even in the same millisecond', () => {
+  it('starts each toast under its own key, even in the same millisecond', () => {
     const now = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     try {
       void createSovranNotifications().onPaymentProcessing!({ variant: 'melt', ...BASE });
-      const first = activeStatus()!.id;
       void createSovranNotifications().onPaymentProcessing!({ variant: 'melt', ...BASE });
-      expect(activeStatus()!.id).not.toBe(first);
+      expect(new Set(toasts().map((t) => t.key)).size).toBe(2);
     } finally {
       now.mockRestore();
     }
   });
 });
 
-describe('the payment a processing toast belongs to', () => {
-  beforeEach(() => {
-    usePaymentStatusStore.setState({ active: null });
-  });
-
+describe('the payment a toast belongs to', () => {
   it('is the quote of a melt from a preview, from the start', () => {
     void createSovranNotifications().onPaymentProcessing!({
       variant: 'melt',
       quoteId: 'mq-1',
       ...BASE,
     });
-    expect(activeStatus()).toMatchObject({
-      state: 'processing',
-      owner: { kind: 'melt', quoteId: 'mq-1' },
+    expect(toast()).toMatchObject({
+      key: 'melt:mq-1',
+      phase: 'working',
+      content: { target: { type: 'melt', quoteId: 'mq-1' } },
     });
   });
 
-  it('is held under the starter’s key until a payment request’s send reports its operation', () => {
+  it('is held under the starter’s key, with nothing to open, until a payment request’s send reports its operation', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'paymentRequest', ...BASE });
-    const key = activeStatus()!.id;
-    expect(activeStatus()).toMatchObject({ owner: { kind: 'pending', key } });
+    expect(toast().key).toMatch(/^pending:/);
+    // No id the wallet issued yet: a tap could only open something made up.
+    expect(toast().content).not.toHaveProperty('target');
 
     void notifications.onPaymentConfirmed!({
       variant: 'paymentRequest',
       ...BASE,
-      historyEntry: JSON.stringify({ id: 'h1', type: 'send', operationId: 'op-1' }),
+      historyEntry: JSON.stringify({
+        id: 'h1',
+        type: 'send',
+        state: 'pending',
+        operationId: 'op-1',
+      }),
     });
-    expect(activeStatus()).toMatchObject({
-      id: key,
-      state: 'delivered',
-      owner: { kind: 'send', operationId: 'op-1' },
+    expect(toast()).toMatchObject({
+      key: 'send:op-1',
+      phase: 'handed-off',
+      content: { variant: 'payment-request', target: { type: 'send', operationId: 'op-1' } },
     });
   });
 
@@ -400,13 +370,14 @@ describe('the payment a processing toast belongs to', () => {
       ...BASE,
       historyEntry: JSON.stringify({ id: 'mo-9', type: 'melt', quoteId: 'mq-9', state: 'PENDING' }),
     });
-    expect(activeStatus()).toMatchObject({
-      state: 'processing',
-      owner: { kind: 'melt', quoteId: 'mq-9' },
+    expect(toast()).toMatchObject({
+      key: 'melt:mq-9',
+      phase: 'working',
+      content: { target: { type: 'melt', quoteId: 'mq-9' } },
     });
   });
 
-  it('takes its melt for View when the flow confirms it', () => {
+  it('is done, and opens its melt, when the flow confirms it paid', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
     void notifications.onPaymentConfirmed!({
@@ -414,10 +385,10 @@ describe('the payment a processing toast belongs to', () => {
       ...BASE,
       historyEntry: JSON.stringify({ id: 'mo-9', type: 'melt', quoteId: 'mq-9', state: 'PAID' }),
     });
-    expect(activeStatus()).toMatchObject({
-      state: 'confirmed',
-      owner: { kind: 'melt', quoteId: 'mq-9' },
-      operationId: 'mo-9',
+    expect(toast()).toMatchObject({
+      key: 'melt:mq-9',
+      phase: 'done',
+      content: { target: { type: 'melt', quoteId: 'mq-9' } },
     });
   });
 
@@ -428,6 +399,6 @@ describe('the payment a processing toast belongs to', () => {
       ...BASE,
       historyEntry: JSON.stringify({ id: 'h1', type: 'send', operationId: 'op-other' }),
     });
-    expect(activeStatus()).toMatchObject({ owner: { kind: 'pending' } });
+    expect(toast().key).toMatch(/^pending:/);
   });
 });

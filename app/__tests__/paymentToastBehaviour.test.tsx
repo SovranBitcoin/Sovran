@@ -9,7 +9,6 @@
  * Each case is a way the toasts used to go wrong (T1–T11 of the toast audit).
  */
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { useManagerContext } from '@cashu/coco-react';
@@ -18,8 +17,11 @@ import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConf
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { showToast } from '@/shared/lib/popup/popups/bridge';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+// The module that puts the payment toasts on the stack; the app's popup index loads it.
+import '@/shared/lib/popup/popups/payment';
+import { focusTransaction, paymentToasts } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { transactionFocusIds } from '@/features/transactions/lib/useFocusedTransaction';
 import { ToastHost } from '@/shared/ui/composed/ToastHost';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -87,15 +89,6 @@ jest.mock('@/shared/lib/popup', () => ({
   sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),
-  // The toasts under test are the real ones.
-  ...(() => {
-    const payment = jest.requireActual('@/shared/lib/popup/popups/payment');
-    const real: Record<string, unknown> = {};
-    for (const name of ['paymentStatusPopup', 'swapStatusPopup', 'isSwapStatusToastMounted']) {
-      if (name in payment) real[name] = payment[name];
-    }
-    return real;
-  })(),
 }));
 jest.mock('@/shared/lib/popup/popups/factory', () => ({
   makeStaticPopup: () => () => undefined,
@@ -303,14 +296,7 @@ const requestEntry = (operationId: string, state = 'pending') => ({
 });
 
 function resetToasts(): void {
-  const store = usePaymentStatusStore as unknown as {
-    getState: () => { reset?: () => void };
-    setState: (state: unknown) => void;
-    getInitialState: () => unknown;
-  };
-  const reset = store.getState().reset;
-  if (reset) reset();
-  else store.setState(store.getInitialState());
+  act(() => paymentToasts.dismissAll());
 }
 
 beforeEach(() => {
@@ -336,7 +322,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  act(() => paymentToasts.setFocus(null));
   act(() => renderer.unmount());
+  // Toasts in flight hold timers: none may outlive its test.
+  paymentToasts.dismissAll();
   jest.useRealTimers();
 });
 
@@ -536,6 +525,19 @@ describe('timing', () => {
   });
 });
 
+describe('timing follows the timeline', () => {
+  it('turns slow when the timeline does: two minutes after the payment went out, not after the toast appeared', () => {
+    startMelt('mq1');
+    advance(1000);
+    // The mint took the payment 90 s ago and has not settled it.
+    confirm('melt', meltEntry('mq1', 'PENDING', { updatedAt: Date.now() - 90_000 }));
+    advance(29_000);
+    expect(stages()).toEqual(['melt-processing']);
+    advance(1500);
+    expect(stages()).toEqual(['melt-warning']);
+  });
+});
+
 describe('wording', () => {
   it('does not say a payment was sent while it is still being sent (T7)', () => {
     startMelt('mq1');
@@ -557,7 +559,7 @@ describe('wording', () => {
           message: 'The payment may still complete. Check your history before you pay again.',
           authored: true,
           outcomeUnknown: true,
-        } as never)
+        })
     );
     advance(1000);
     expect(stages()).toEqual(['melt-warning']);
@@ -578,5 +580,120 @@ describe('wording', () => {
     emit('melt-op:finalized', meltFinalized('mq1'));
     advance(1000);
     expect(stages()).toEqual(['melt-confirmed']);
+  });
+});
+
+describe('tapping the toast (T3)', () => {
+  /** The toast's own body: the pressable row, not the View pill inside it. */
+  const body = () =>
+    renderer.root.find(
+      (n) =>
+        typeof n.type !== 'string' &&
+        n.props?.accessibilityRole === 'button' &&
+        typeof n.props.onPress === 'function' &&
+        n.props.testID === undefined
+    );
+
+  it('opens that transaction from a tap anywhere, while it is still being paid', async () => {
+    mockHistory.push(meltEntry('mq1', 'pending'));
+    startMelt('mq1');
+    advance(1000);
+    expect(stages()).toEqual(['melt-processing']);
+    await act(async () => {
+      await body().props.onPress();
+    });
+    await settle();
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate.mock.calls[0]![0]).toMatchObject({
+      pathname: '/lightningSend',
+      params: { historyView: '1' },
+    });
+    // Opened: the toast gets out of the way, and stays out of it when the
+    // stack next changes.
+    expect(stages()).toEqual([]);
+    paidInvoice('q7');
+    advance(1000);
+    expect(stages()).toEqual(['receive-processing']);
+    // Its result is still told.
+    emit('melt-op:finalized', meltFinalized('mq1'));
+    advance(100);
+    expect(stages().sort()).toEqual(['melt-confirmed', 'receive-processing']);
+  });
+
+  it('offers nothing to tap before the wallet has issued an id for the payment', () => {
+    startRequest();
+    advance(1000);
+    expect(stages()).toEqual(['payment-request-processing']);
+    expect(() => body()).toThrow();
+  });
+});
+
+describe('the transaction screen in front (T11)', () => {
+  it('shows no toast for the invoice whose screen is open, and shows it once the screen is left', () => {
+    let blur: () => void = () => undefined;
+    act(() => {
+      blur = focusTransaction('screen-1', ['q1']);
+    });
+    paidInvoice('q1');
+    advance(1000);
+    expect(stages()).toEqual([]);
+    mintFinalized('q1');
+    advance(1000);
+    expect(stages()).toEqual([]);
+
+    // Another payment is still told while that screen is up.
+    emit('melt-op:finalized', meltFinalized('mq9'));
+    advance(100);
+    expect(stages()).toEqual(['melt-confirmed']);
+
+    act(() => blur());
+    expect(stages().sort()).toEqual(['melt-confirmed', 'receive-confirmed']);
+  });
+
+  it('shows no toast for a payment started from the screen in front, before it has an id', () => {
+    let blur: () => void = () => undefined;
+    act(() => {
+      blur = focusTransaction('screen-1', ['preview-entry']);
+    });
+    startRequest();
+    advance(1000);
+    expect(stages()).toEqual([]);
+    // The preview becomes the payment's own entry: same screen, new ids, still quiet.
+    act(() => {
+      blur = focusTransaction('screen-1', ['send-op-1']);
+    });
+    expect(stages()).toEqual([]);
+    act(() => blur());
+    expect(stages()).toEqual(['payment-request-processing']);
+  });
+
+  it('is not cleared by a screen that is no longer the one in front', () => {
+    let blurFirst: () => void = () => undefined;
+    act(() => {
+      blurFirst = focusTransaction('screen-1', ['q0']);
+      focusTransaction('screen-2', ['q1']);
+    });
+    paidInvoice('q1');
+    advance(1000);
+    // The first screen's late blur must not un-quiet the second's transaction.
+    act(() => blurFirst());
+    expect(stages()).toEqual([]);
+  });
+
+  it('knows a transaction screen by every id a toast could know its entry by', () => {
+    const entry = (fields: Record<string, unknown>) => fields as never;
+    expect(
+      transactionFocusIds(
+        entry({
+          id: 'entry-1',
+          operationId: 'op-1',
+          quoteId: 'q-1',
+          metadata: { operationId: 'op-2' },
+        })
+      )
+    ).toEqual(['entry-1', 'op-1', 'q-1', 'op-2']);
+    expect(transactionFocusIds(entry({ id: 'same', operationId: 'same' }))).toEqual(['same']);
+    expect(transactionFocusIds(undefined)).toEqual([]);
   });
 });

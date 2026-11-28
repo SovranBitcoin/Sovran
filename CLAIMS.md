@@ -162,7 +162,7 @@ fees, instant finality or universal wallet compatibility.
 
 **Follow-up:** native handoff and settlement need separate verification. Existing
 catalog labels such as `timeline.paymentRequest.nostrSent.label` and
-`toast.paymentRequest.delivered` still merit state-specific review; referencing a
+`toast.paymentRequest.handedOff` still merit state-specific review; referencing a
 catalog is not certifying every label. No wallet behavior changed here.
 
 ## 7. Distribution And Store Copy

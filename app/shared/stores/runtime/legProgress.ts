@@ -25,12 +25,10 @@ type LegLogger = {
   debug: (message: string, fields?: Record<string, unknown>) => void;
 };
 
-export type LegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
-
-export type ProgressState = 'running' | 'done' | 'failed' | 'cancelled' | 'unsettled';
+type LegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
 /** A leg's error belongs to its failure: no other status carries one. */
-export type ProgressLeg = {
+type ProgressLeg = {
   id: string;
   /** Optional human label, e.g. "Mint A → Mint B" or "relay.example.com". */
   label?: string;

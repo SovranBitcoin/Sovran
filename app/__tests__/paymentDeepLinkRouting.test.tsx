@@ -92,7 +92,6 @@ jest.mock('@/shared/lib/popup', () => ({
   nfcEcashSharedPopup: jest.fn(),
   nfcSendFailedPopup: jest.fn(),
   paymentCancelledPopup: jest.fn(),
-  paymentStatusPopup: jest.fn(),
   sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),

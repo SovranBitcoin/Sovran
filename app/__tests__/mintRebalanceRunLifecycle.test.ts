@@ -31,7 +31,6 @@ jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn() },
   mintUrlLogFields: () => ({}),
 }));
-jest.mock('@/shared/lib/popup', () => ({ swapStatusPopup: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
 }));

@@ -15,6 +15,8 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { paymentToasts } from '@/shared/stores/runtime/paymentStatusStore';
+import { teardownAndRestart } from '@/shared/lib/profile/profileTransition';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -43,7 +45,7 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
   CocoManager: { cleanup: jest.fn(async () => {}), completeReset: jest.fn(async () => {}) },
 }));
 jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: () => ({ setActive: jest.fn() }) },
+  paymentToasts: { dismissAll: jest.fn() },
 }));
 jest.mock('@/shared/stores/runtime/popupStore', () => ({
   usePopupStore: { getState: () => ({ close: jest.fn(), destroySheet: jest.fn() }) },
@@ -239,4 +241,10 @@ it('clears secure data and preferences before restarting fresh', async () => {
   expect(prepareSecureDataReset).toHaveBeenCalledWith([0, 3], [], ['a'.repeat(64), 'b'.repeat(64)]);
   expect(AsyncStorage.clear).toHaveBeenCalled();
   expect(restartApp).toHaveBeenCalledTimes(1);
+});
+
+it('takes every payment toast down before the app restarts for another profile', async () => {
+  jest.mocked(paymentToasts.dismissAll).mockClear();
+  await teardownAndRestart();
+  expect(paymentToasts.dismissAll).toHaveBeenCalledTimes(1);
 });

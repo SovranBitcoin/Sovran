@@ -117,7 +117,6 @@ jest.mock('@/shared/lib/popup', () => ({
   nfcEcashSharedPopup: jest.fn(),
   nfcSendFailedPopup: jest.fn(),
   paymentCancelledPopup: jest.fn(),
-  paymentStatusPopup: jest.fn(),
   sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),
@@ -148,9 +147,10 @@ jest.mock('@/shared/stores/profile/npcMintStore', () => ({
   useNpcMintStore: { getState: jest.fn(() => ({ getActiveMintUrl: jest.fn() })) },
 }));
 jest.mock('@/shared/lib/cashu/npc', () => ({ getNpcAddress: jest.fn() }));
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: jest.fn(() => ({})) },
-}));
+jest.mock(
+  '@/shared/stores/runtime/paymentStatusStore',
+  () => require('./helpers/fakePaymentToasts').fakePaymentStatusStore
+);
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: { getState: jest.fn(() => ({})) },
 }));

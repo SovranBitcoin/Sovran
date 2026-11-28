@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { BlurView } from 'expo-blur';
 import { useCapabilities } from '@/shared/ui/capability';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   TOAST_DANGER_DARK_BG,
   TOAST_SUCCESS_DARK_BG,
@@ -11,7 +12,7 @@ import {
 
 /**
  * Frosted-glass toast frame shared by every custom toast (CompactToast,
- * PaymentStatusToast, SwapStatusToast). The slab owns the rounded frame, the
+ * PaymentStatusToast). The slab owns the rounded frame, the
  * optional BlurView at the back, and the standard content row container —
  * callers only render the tint layer (animated or static) and the row
  * content. `ToastHost` positions, animates and dismisses it.
@@ -59,10 +60,20 @@ type ToastSlabProps = {
    * surrounding frame, recomposes per frame.
    */
   tint: ReactNode;
+  /** Tapping the toast's body. A control inside the row keeps its own press. */
+  onPress?: () => void;
   children: ReactNode;
 };
 
-export function ToastSlab({ toastProps, tint, children }: ToastSlabProps) {
+const ROW_STYLE = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+  gap: 12,
+} as const;
+
+export function ToastSlab({ toastProps, tint, onPress, children }: ToastSlabProps) {
   const frosted = useToastFrosted();
   return (
     <View
@@ -73,16 +84,14 @@ export function ToastSlab({ toastProps, tint, children }: ToastSlabProps) {
         <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
       )}
       {tint}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          gap: 12,
-        }}>
-        {children}
-      </View>
+      {onPress ? (
+        // No press fade: the toast looks the same whether or not it can be opened.
+        <Pressable accessibilityRole="button" activeOpacity={1} onPress={onPress} style={ROW_STYLE}>
+          {children}
+        </Pressable>
+      ) : (
+        <View style={ROW_STYLE}>{children}</View>
+      )}
     </View>
   );
 }

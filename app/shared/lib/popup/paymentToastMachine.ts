@@ -28,7 +28,7 @@ import type { PaymentPhase } from 'wallet';
 /** Phases a toast can be in. `cancelled` is never drawn: it dismisses. */
 type ToastPhase = Exclude<PaymentPhase, 'cancelled'>;
 
-export interface ToastTiming {
+interface ToastTiming {
   /**
    * A result that arrives within this of the start is shown with no spinner
    * first. The same wait applies to each later step of a spinner.
@@ -66,7 +66,7 @@ export interface ToastView<C> {
 }
 
 /** The transaction screen in front, if any: its toasts stay quiet. */
-export interface ToastFocus {
+interface ToastFocus {
   /** Identifies this focused screen instance. */
   token: string;
   /** Ids (quote, operation, entry) of the transaction it shows. */
@@ -82,6 +82,8 @@ interface ReportOptions {
    * toast's own, and `bind` hands it over.
    */
   holdForGroup?: string;
+  /** When (ms epoch) a spinner should turn `slow`, if sooner than `workingMaxMs`. */
+  slowAt?: number;
 }
 
 interface StartOptions {
@@ -102,6 +104,11 @@ interface MachineOptions<C> {
   onFinished?: (toast: { key: string; phase: ToastPhase; content: C }) => void;
   /** Whether two contents draw the same; defaults to a JSON comparison. */
   sameContent?: (a: C, b: C) => boolean;
+  /**
+   * The content of a toast that `bind` lands an early result on: `own` is what
+   * the toast showed, `early` what the result came with. Defaults to `early`.
+   */
+  merge?: (own: C, early: C) => C;
 }
 
 interface Shown<C> {
@@ -166,8 +173,7 @@ export function createPaymentToastMachine<C>(options: MachineOptions<C>) {
   let lastEmitted = '[]';
 
   const suppressed = (rec: Rec<C>) =>
-    focus !== null &&
-    (rec.focusToken === focus.token || focus.ids.some((id) => rec.ids.has(id)));
+    focus !== null && (rec.focusToken === focus.token || focus.ids.some((id) => rec.ids.has(id)));
 
   function views(): ToastView<C>[] {
     const list: ToastView<C>[] = [];
@@ -365,6 +371,7 @@ export function createPaymentToastMachine<C>(options: MachineOptions<C>) {
       return emit();
     }
     for (const id of opts.ids ?? []) rec.ids.add(id);
+    if (opts.slowAt !== undefined) rec.slowAt = opts.slowAt;
     if (accepts(rec.phase, phase)) {
       if (rec.phase !== phase || !sameContent(rec.content, content)) rec.knownSince = Date.now();
       rec.phase = phase;
@@ -400,7 +407,8 @@ export function createPaymentToastMachine<C>(options: MachineOptions<C>) {
     recs.set(to, rec);
     if (early && accepts(rec.phase, early.phase)) {
       rec.phase = early.phase;
-      rec.content = early.content;
+      rec.content = options.merge ? options.merge(rec.content, early.content) : early.content;
+      rec.knownSince = Date.now();
     }
     settle(rec);
     releaseHeld();
@@ -443,7 +451,31 @@ export function createPaymentToastMachine<C>(options: MachineOptions<C>) {
     emit();
   }
 
-  return { start, report, bind, dismiss, dismissAll, userDismissed, setFocus, views };
-}
+  /** What is known about the payment `key`, on screen or not; undefined when it has no toast. */
+  function get(key: string): { key: string; phase: ToastPhase; content: C } | undefined {
+    const rec = recs.get(key);
+    return rec ? { key: rec.key, phase: rec.phase, content: rec.content } : undefined;
+  }
 
-export type PaymentToastMachine<C> = ReturnType<typeof createPaymentToastMachine<C>>;
+  /** Every payment with a toast, on screen or not, oldest first. */
+  function tracked(): { key: string; phase: ToastPhase; content: C }[] {
+    return [...recs.values()].map((rec) => ({
+      key: rec.key,
+      phase: rec.phase,
+      content: rec.content,
+    }));
+  }
+
+  return {
+    start,
+    report,
+    bind,
+    dismiss,
+    dismissAll,
+    userDismissed,
+    setFocus,
+    views,
+    get,
+    tracked,
+  };
+}

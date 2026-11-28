@@ -3,10 +3,11 @@
  *
  * A swap is a sequence of N legs (mint → melt pairs, possibly chained through
  * middlemen). Without this store each leg's mint-op:* / melt-op:* event would
- * fire its own `paymentStatusPopup` toast, drowning the user in a stack of
+ * get a payment toast of its own, drowning the user in a stack of
  * receive-and-send notifications. The orchestrator declares the legs upfront,
- * the toast component subscribes to this store, and the listener in
- * `usePaymentStatusListener` skips its per-op toasts while a swap is active.
+ * `useSwapStatusListener` turns this store into the swap's one toast, and the
+ * listener in `usePaymentStatusListener` skips its per-op toasts while a swap
+ * is active.
  *
  * The leg state machine lives in `createLegProgressStore`; this module only
  * pins the swap-specific meta (unit/totalAmount/groupId) and the

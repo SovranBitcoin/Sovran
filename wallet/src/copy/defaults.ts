@@ -183,27 +183,40 @@ export const paymentCopyDefaults = {
   "history.refresh.processingWith": "Processing with",
   "history.refresh.mintAlt": "Mint",
 
+  // Toast titles follow the payment's tense: `working` while it is under way,
+  // `message` once it has happened, `failed` when it did not.
+  "toast.receive.working": "Receiving payment",
   "toast.receive.message": "Payment received",
   "toast.receive.processing": "Adding to wallet...",
   "toast.receive.confirmed": "Received",
   "toast.receive.failed": "Payment failed",
+  "toast.send.working": "Sending payment",
   "toast.send.message": "Payment sent",
   "toast.send.processing": "Sending...",
   "toast.send.confirmed": "Sent",
   "toast.send.failed": "Payment failed",
+  "toast.paymentRequest.working": "Sending payment",
   "toast.paymentRequest.message": "Payment request sent",
-  "toast.paymentRequest.processing": "Waiting for recipient",
-  "toast.paymentRequest.delivered": "Sent via Nostr",
+  "toast.paymentRequest.processing": "Sending...",
+  "toast.paymentRequest.handedOff": "Waiting for recipient",
   "toast.paymentRequest.confirmed": "Claimed by recipient",
   "toast.paymentRequest.failed": "Payment failed",
+  "toast.melt.working": "Sending payment",
   "toast.melt.message": "Payment sent",
   "toast.melt.processing": "Sending...",
   "toast.melt.confirmed": "Sent",
   "toast.melt.failed": "Payment failed",
+  "toast.receiveEcash.working": "Receiving payment",
   "toast.receiveEcash.message": "Payment received",
   "toast.receiveEcash.processing": "Redeeming...",
   "toast.receiveEcash.confirmed": "Received",
   "toast.receiveEcash.failed": "Payment failed",
+  // A payment still open after a long while, or whose result is not known.
+  // Never worded as a failure: it may still complete.
+  "toast.slow.title": "Still in progress",
+  "toast.slow.subtitle": "Taking longer than usual",
+  "toast.unconfirmed.title": "Not confirmed yet",
+  "toast.unconfirmed.subtitle": "It may still complete. Check your history.",
 
   // Detected Send-flow destination row (describeDestination). For person-kinds
   // the label is the bare verb and the app appends the resolved recipient name.
