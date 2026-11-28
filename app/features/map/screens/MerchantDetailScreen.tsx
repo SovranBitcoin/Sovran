@@ -17,7 +17,7 @@ import { Section } from '@/shared/ui/composed/Section';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -39,6 +39,15 @@ import { formatDate } from '@/shared/lib/date';
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
 });
+
+/** The place the cache already holds for this route's id, so a revisit paints on frame one. */
+function cachedPlaceFor(
+  placeId: string | undefined,
+  getCachedPlaceDetails: (id: number) => BTCMapPlaceDetails | null
+): BTCMapPlaceDetails | null {
+  const id = placeId ? parseInt(placeId, 10) : NaN;
+  return isNaN(id) ? null : getCachedPlaceDetails(id);
+}
 
 async function loadMerchantDetails(ctx: {
   placeId: string | undefined;
@@ -154,8 +163,10 @@ export function MerchantDetailScreen() {
     }))
   );
 
-  const [place, setPlace] = useState<BTCMapPlaceDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [place, setPlace] = useState<BTCMapPlaceDetails | null>(() =>
+    cachedPlaceFor(placeId, getCachedPlaceDetails)
+  );
+  const [isLoading, setIsLoading] = useState(place === null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -247,15 +258,31 @@ export function MerchantDetailScreen() {
     }
   };
 
+  // The same scroller and header as the loaded page (56pt icon, name over
+  // address), then one list card, so the details land in place.
   if (isLoading) {
     return (
       <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
-        <View style={styles.loadingContainer}>
-          <Spinner size={32} color={BITCOIN_ACCENT} />
-          <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
-            Loading merchant details...
-          </Text>
-        </View>
+        <ScreenScrollView
+          bottomSpacing={32}
+          style={styles.scrollView}
+          scrollEnabled={false}
+          contentContainerStyle={{ paddingTop: headerHeight + 16, paddingHorizontal: 16 }}>
+          <View
+            style={styles.header}
+            testID="merchant-detail-skeleton"
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Loading merchant details"
+            accessibilityState={{ busy: true }}>
+            <Skeleton style={styles.merchantIcon} />
+            <VStack style={{ flex: 1, marginLeft: 16 }} gap={8}>
+              <Skeleton className="h-6 w-48 rounded-md" />
+              <Skeleton className="h-4 w-64 rounded-md" />
+            </VStack>
+          </View>
+          <Skeleton className="h-28 w-full rounded-xl" />
+        </ScreenScrollView>
       </Screen>
     );
   }
