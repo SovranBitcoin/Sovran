@@ -33,7 +33,7 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { useOfflineStatus } from '@/runtime/connectivity';
+import { recheckConnectivity, useOfflineStatus } from '@/runtime/connectivity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
@@ -210,6 +210,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     return (mint?.mintInfo as { nuts?: MintNuts } | undefined)?.nuts;
   }, [trustedMints, mintUrl]);
   const { isOffline: networkOffline } = useOfflineStatus();
+  // Online or offline send is decided here: do not rely on the 5 min poll.
+  useEffect(() => recheckConnectivity(), []);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const sendOffline = mockOffline || networkOffline;
   const sendLock = useSendLock({

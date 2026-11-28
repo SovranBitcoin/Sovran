@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import * as Network from 'expo-network';
 
 import React, { useEffect } from 'react';
-import { startConnectivity, useOfflineStatus } from '@/runtime/connectivity';
+import { recheckConnectivity, startConnectivity, useOfflineStatus } from '@/runtime/connectivity';
 
 /** Runs the connectivity engine while mounted, as the app root does. */
 function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
@@ -59,7 +59,83 @@ async function flush() {
   });
 }
 
-it('checks a healthy idle connection once per minute and still reacts to network changes', async () => {
+it('checks a healthy idle connection once per 5 minutes and still reacts to network changes', async () => {
+  const view = renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(299_000);
+  });
+  // A minute-long poll made 5 checks (up to 25 HTTPS probes) here.
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(1_000);
+  });
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(2);
+  view.unmount();
+});
+
+it('reacts to an OS network change at once, and confirms offline within seconds', async () => {
+  const { result } = renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(1_000);
+  });
+  // Airplane mode: the OS reports the change; the probes then fail.
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'network-disconnected',
+    probes: [],
+  });
+  act(() => jest.mocked(Network.addNetworkStateListener).mock.calls[0][0]({ isConnected: false }));
+  await flush();
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6_000);
+  });
+  expect(result.current).toEqual({ isOffline: true, isDisconnected: true });
+});
+
+it('checks at once when the send flow asks, without waiting for the poll', async () => {
+  const { result } = renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(30_000);
+  });
+  // The uplink died without an OS event (captive portal).
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'probe-unreachable',
+    probes: [],
+  });
+  act(() => recheckConnectivity());
+  await flush();
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6_000);
+  });
+  expect(result.current.isOffline).toBe(true);
+});
+
+it('retries an offline connection with a back-off that still tops out at a minute', async () => {
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'probe-unreachable',
+    probes: [],
+  });
+  renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(10 * 60_000);
+  });
+  const before = jest.mocked(Network.getNetworkStateAsync).mock.calls.length;
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(60_000);
+  });
+  expect(jest.mocked(Network.getNetworkStateAsync).mock.calls.length - before).toBe(1);
+});
+
+it('still reacts to network changes while idle', async () => {
   renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
   await flush();
   await act(async () => {

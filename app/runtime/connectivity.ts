@@ -40,7 +40,15 @@ function setNetwork(next: NetworkVerdict): void {
   listeners.forEach((listener) => listener());
 }
 
-const CONNECTIVITY_POLL_MS = 60_000;
+// While online, the OS network listener and the return to the foreground do
+// the work; the poll only catches a connection that dies without either (a
+// captive portal, a dead uplink), so it runs every 5 min instead of every
+// minute. Each check fires up to five HTTPS probes, and a burst a minute kept
+// the cellular radio from idling. The send flow asks for a check of its own
+// (`recheckConnectivity`), so offline send never waits for the poll.
+const CONNECTIVITY_POLL_MS = 5 * 60_000;
+/** The offline retry back-off still tops out at a minute. */
+const OFFLINE_RETRY_MAX_MS = 60_000;
 const OFFLINE_RETRY_MS = 3000;
 // Offline hysteresis: going offline must be CONFIRMED (consecutive failed
 // evaluations spanning a minimum window) while coming back online is instant.
@@ -75,6 +83,17 @@ function summarizeReachability(result: OfflineReachabilityResult) {
       .map((probe) => `${probe.name}:${probe.status ?? probe.error ?? 'failed'}`)
       .join(','),
   };
+}
+
+let recheck: (() => void) | null = null;
+
+/**
+ * Check reachability now instead of at the next poll, for a screen about to
+ * decide between an online and an offline payment. A no-op in the background
+ * or while the engine is stopped.
+ */
+export function recheckConnectivity(): void {
+  recheck?.();
 }
 
 // The connectivity engine: polls and listens, applying the offline
@@ -195,7 +214,7 @@ function startConnectivityEngine(): () => void {
         if (interval) clearTimeout(interval);
         const delay =
           lastOffline === true
-            ? Math.min(CONNECTIVITY_POLL_MS, OFFLINE_RETRY_MS * 2 ** Math.min(offlineRounds - 1, 5))
+            ? Math.min(OFFLINE_RETRY_MAX_MS, OFFLINE_RETRY_MS * 2 ** Math.min(offlineRounds - 1, 5))
             : CONNECTIVITY_POLL_MS;
         interval = setTimeout(runConnectivityCheck, Math.max(OFFLINE_RETRY_MS, delay));
       }
@@ -233,6 +252,16 @@ function startConnectivityEngine(): () => void {
     void runConnectivityCheck();
   });
 
+  recheck = () => {
+    if (!mounted || !active) return;
+    if (checking) {
+      refreshOnResume = true;
+      return;
+    }
+    lastEvalAt = 0;
+    void runConnectivityCheck();
+  };
+
   const onWebOnline = () => {
     log.info('provider.offline.web_event', { event: 'online' });
     void runConnectivityCheck();
@@ -250,6 +279,7 @@ function startConnectivityEngine(): () => void {
 
   return () => {
     mounted = false;
+    recheck = null;
     if (interval) {
       clearTimeout(interval);
     }

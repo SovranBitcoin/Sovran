@@ -100,6 +100,7 @@ jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
 }));
 jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: [] }) }));
 jest.mock('@/runtime/connectivity', () => ({
+  recheckConnectivity: () => undefined,
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
