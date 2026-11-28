@@ -1,7 +1,7 @@
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import type { BLEPeer } from 'bitchat-module';
 
-/** Account-scoped discovery is owned by useBitchatAccountServices, never a screen. */
+/** Filled by the account's discovery owner while a view holds the nearby radio. */
 export const useBLEPeerDirectory = create<{ peers: BLEPeer[] }>({
   name: 'useBLEPeerDirectory',
   scope: 'session',

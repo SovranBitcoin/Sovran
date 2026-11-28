@@ -31,9 +31,9 @@ const SOVRAN_PROTOCOL_NAMESPACE = 'sovran:';
 /**
  * BitChat for one account: nearby discovery bookkeeping, Nut Drop
  * auto-redeem and the DM listeners. Called by the account scope (inside the
- * wallet core) so everything resets when the profile switches. It never
- * starts BLE: discovery announces to nearby bitchat clients, so the peer
- * list and chat surfaces own startup.
+ * wallet core) so everything resets when the profile switches. Discovery
+ * starts BLE only while a nearby view holds the radio (`useNearbyRadio`) and
+ * the app is in the foreground.
  */
 export function useBitchatAccountServices(): void {
   useInitMount('BitchatBLEProvider');

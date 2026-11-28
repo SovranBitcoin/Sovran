@@ -28,6 +28,7 @@ import { useBitchatDmMessagesStore, type BleDmMessage } from '../stores/bitchatD
 import { useBitchatBLEIdentityMaterial } from './useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '../lib/profileScope';
 import { bitchatLog } from '@/shared/lib/logger';
+import { holdNearbyRadio } from '@/features/nearPay/lib/nearbyRadio';
 import { mintLocalId } from '@/shared/lib/id';
 import { asNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
@@ -228,8 +229,8 @@ function wiringFor(
             })
           ),
         ],
-        // Deliberately never stopBLE on leaving: other explicit BLE consumers
-        // (NetworkSheet, Near Pay, Split Bill) may still be using the mesh.
+        // Never stopBLE here: the discovery owner stops the mesh once no view
+        // holds the nearby radio.
         connect: () =>
           startBLE({ nickname, profileScope, identityMaterial })
             .then(() => {
@@ -252,7 +253,7 @@ function wiringFor(
         listen: () => [],
         connect: () => {
           // Reuse the mesh if it's already running (no-op); otherwise start it.
-          // Never stopBLE on leaving: other screens may still be using it.
+          // Never stopBLE here: the discovery owner stops it with the last holder.
           const started = startBLE({ nickname, profileScope, identityMaterial })
             .then(() => true)
             .catch(startFailed('bitchat.hook.ble_start_failed'));
@@ -329,7 +330,13 @@ export function useBitChat({
 
   useVisualActivityEffect(
     useCallback(() => {
-      if (transport === 'ble' || transport === 'ble-dm') return acquirePublicBLEMesh();
+      if (transport !== 'ble' && transport !== 'ble-dm') return;
+      const releaseMesh = acquirePublicBLEMesh();
+      const releaseRadio = holdNearbyRadio();
+      return () => {
+        releaseRadio();
+        releaseMesh();
+      };
     }, [transport])
   );
 

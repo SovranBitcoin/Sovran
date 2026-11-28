@@ -3,6 +3,15 @@
 Date: 2026-10-03
 Status: Accepted
 
+Amended 2026-11-28 (owner decision): Bluetooth no longer runs from Home or in
+the background. Discovery starts when a nearby view opens (Nut Drop, its peer
+list, the BitChat network sheet or a Bluetooth chat) and stops when the last one
+closes or the app is backgrounded, because the always-on mesh was the app's
+largest constant battery cost. A receiver must therefore have a nearby view
+open to be found; Send lists nearby people only while one is. The paragraph
+below describes the earlier behaviour. Payment identity, the journal and
+delivery over Nostr are unchanged.
+
 Home prepares a directory of nearby wallets and their Nostr profiles. Send and
 NutDrop consume that directory; a receiver need not open a payment screen.
 The directory may start cold, and operating-system suspension still limits

@@ -51,9 +51,9 @@ function NostrClientLifecycle({ accountIndex }: { accountIndex: number }) {
 }
 
 /**
- * BitChat DM listeners and Nut Drop auto-redeem, without starting BLE on app
- * launch: discovery announces to nearby bitchat clients, so explicit
- * peer-list and chat surfaces own startup. Ships only with Nut Drop (ADR 0021).
+ * BitChat DM listeners, Nut Drop auto-redeem and the nearby discovery owner.
+ * BLE is not started on app launch: it runs only while a nearby view is open
+ * (ADR 0023). Ships only with Nut Drop (ADR 0021).
  */
 function BitchatServices() {
   useBitchatAccountServices();

@@ -3,7 +3,7 @@
  *
  * Characterization of `useNearbyDiscovery`, the account's warm nearby
  * directory, against a fake BitChat native module: when Bluetooth discovery is
- * started and stopped, how the public-mesh lease changes the start, which
+ * started and stopped (only while a view holds the radio, in the foreground), how the public-mesh lease changes the start, which
  * peers get a Noise handshake or a signed wallet capability, how a received
  * capability lands in the peer directory, how the nearby payment journal is
  * pumped, and what unmounting tears down. The real bitchat-module JS wrapper,
@@ -98,6 +98,7 @@ const mod = {
     useNearbyDiscovery: () => void;
   }),
   ...(require('bitchat-module') as { acquirePublicBLEMesh: () => () => void }),
+  ...(require('@/features/nearPay/lib/nearbyRadio') as { holdNearbyRadio: () => () => void }),
   ...(require('@/features/bitchat/hooks/useBLEPeers') as {
     useBLEPeerDirectory: {
       getState: () => { peers: { peerID: string; nostrPubkeyHex?: string }[] };
@@ -166,7 +167,11 @@ function privateMessage(peerID: string, content: string, profileScope = mockScop
   };
 }
 
-async function mount() {
+let releaseRadio: (() => void) | null = null;
+
+/** Mounts the discovery owner with a nearby view open, unless told otherwise. */
+async function mount({ viewOpen = true } = {}) {
+  if (viewOpen) releaseRadio = mod.holdNearbyRadio();
   const view = mod.renderHook(() => mod.useNearbyDiscovery());
   await flush();
   return view;
@@ -195,6 +200,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  releaseRadio?.();
+  releaseRadio = null;
   jest.restoreAllMocks();
   jest.useRealTimers();
 });
@@ -235,6 +242,55 @@ describe('starting and stopping Bluetooth', () => {
     expect(mockNative.startBLE).toHaveBeenCalledTimes(1);
 
     emit('onBLEStateChanged', { state: 'poweredOn' });
+    await flush();
+    expect(mockNative.startBLE).toHaveBeenCalledTimes(2);
+    view.unmount();
+  });
+
+  it('starts nothing until a nearby view opens, and stops when the last one closes', async () => {
+    const view = await mount({ viewOpen: false });
+    await flush(30_000);
+    expect(mockNative.startBLE).not.toHaveBeenCalled();
+    expect(mockNative.getBLEPeers).not.toHaveBeenCalled();
+
+    let first!: () => void;
+    let second!: () => void;
+    mod.act(() => {
+      first = mod.holdNearbyRadio();
+      second = mod.holdNearbyRadio();
+    });
+    await flush();
+    expect(mockNative.startBLE).toHaveBeenCalledTimes(1);
+
+    mod.act(() => first());
+    await flush();
+    expect(mockNative.stopBLE).not.toHaveBeenCalled();
+
+    mod.act(() => second());
+    await flush();
+    expect(mockNative.stopBLE).toHaveBeenCalledTimes(1);
+    const polls = mockNative.getBLEPeers.mock.calls.length;
+    await flush(30_000);
+    expect(mockNative.getBLEPeers.mock.calls.length).toBe(polls);
+    view.unmount();
+  });
+
+  it('stops in the background and starts again on return, with a view still open', async () => {
+    mockNative.getBLEPeers.mockReturnValue([peer('ffffffffffffffff')]);
+    const view = await mount();
+    expect(mockNative.startBLE).toHaveBeenCalledTimes(1);
+
+    setAppState('background');
+    mod.act(() => mockAppStateListeners.forEach((listener) => listener('inactive')));
+    await flush();
+    expect(mockNative.stopBLE).not.toHaveBeenCalled();
+    mod.act(() => mockAppStateListeners.forEach((listener) => listener('background')));
+    await flush();
+    expect(mockNative.stopBLE).toHaveBeenCalledTimes(1);
+    expect(mod.useBLEPeerDirectory.getState().peers).toEqual([]);
+
+    setAppState('active');
+    mod.act(() => mockAppStateListeners.forEach((listener) => listener('active')));
     await flush();
     expect(mockNative.startBLE).toHaveBeenCalledTimes(2);
     view.unmount();

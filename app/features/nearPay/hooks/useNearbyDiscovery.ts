@@ -1,6 +1,7 @@
 import { useWarmNip05Profiles } from '@/shared/hooks/useWarmNip05Profiles';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { NEARBY_PAYMENT_PREFIX, nearbyPayments } from '../lib/nearbyPayments';
+import { useNearbyRadioWanted } from '../lib/nearbyRadio';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useBalanceContext, useMints } from '@cashu/coco-react';
@@ -46,8 +47,13 @@ import {
   type VerifiedNearbyCapability,
 } from '../lib/nearbyCapability';
 
-/** One warm directory for the account, independent of Send and NutDrop screens. */
+/**
+ * The account's nearby directory. Bluetooth runs only while a view holds the
+ * radio (`useNearbyRadio`) and the app is in the foreground; the payment
+ * journal is pumped regardless, because it also delivers over Nostr.
+ */
 export function useNearbyDiscovery(): void {
+  const radioWanted = useNearbyRadioWanted();
   const nickname = useBitchatNickname();
   const profileScope = useBitchatProfileScope();
   const identityMaterial = useBitchatBLEIdentityMaterial();
@@ -177,7 +183,7 @@ export function useNearbyDiscovery(): void {
   }, [keys, identityMaterial, nickname]);
 
   useEffect(() => {
-    if (!identityMaterial || !profileScope) return;
+    if (!radioWanted || !identityMaterial || !profileScope) return;
     // A malformed local Noise key declines nearby discovery instead of
     // throwing out of this effect.
     if (!isFixedHex(identityMaterial.noisePrivateKeyHex, 32)) {
@@ -281,6 +287,7 @@ export function useNearbyDiscovery(): void {
     });
     const start = () => {
       if (!current() || AppState.currentState !== 'active') return;
+      running = true;
       void startBLE({
         nickname: nickname || 'sovran',
         profileScope,
@@ -293,8 +300,16 @@ export function useNearbyDiscovery(): void {
     const state = addBLEStateListener((event) => {
       if (event.state === 'poweredOn') start();
     });
+    let running = false;
     const foreground = AppState.addEventListener('change', (state) => {
-      if (state === 'active') start();
+      if (state === 'active') {
+        start();
+      } else if (running && state === 'background') {
+        // Nothing nearby is shown while backgrounded, so do not advertise or scan.
+        running = false;
+        useBLEPeerDirectory.setState({ peers: [] });
+        void stopBLE().catch(report);
+      }
     });
     const updates = addBLEPeerListener(refresh);
     const interval = setInterval(refresh, 3_000);
@@ -309,5 +324,5 @@ export function useNearbyDiscovery(): void {
       useBLEPeerDirectory.setState({ peers: [] });
       void stopBLE().catch(report);
     };
-  }, [identityMaterial, nickname, profileScope]);
+  }, [radioWanted, identityMaterial, nickname, profileScope]);
 }
