@@ -15,7 +15,12 @@
 
 import { MintQuoteState, MeltQuoteState } from "@cashu/cashu-ts";
 
-import { isTerminalFailureState, receiveFailedAsSpent } from "../states";
+import {
+  isTerminalFailureState,
+  meltReversalFailed,
+  mintNothingRestored as mintRestoredNothing,
+  receiveFailedAsSpent,
+} from "../states";
 import {
   EXPIRED_STATE,
   FAILED_STATE,
@@ -82,12 +87,9 @@ const mintPaid = (ctx: TimelineContext) =>
   ctx.mintState === MintQuoteState.ISSUED;
 const mintIssued = (ctx: TimelineContext) =>
   ctx.mintState === MintQuoteState.ISSUED;
-/** coco's own verdict that an issued quote left nothing in the wallet. Matched
- *  on its wording because nothing else marks it, and matched narrowly: a
- *  live entry can still be carrying an error from an attempt that later
- *  succeeded, and any-error-at-all would call that success a failure. */
+/** coco's own verdict that an issued quote left nothing in the wallet. */
 const mintNothingRestored = (ctx: TimelineContext) =>
-  /no proofs could be restored/i.test(entryError(ctx) ?? "");
+  mintRestoredNothing((ctx.entry as { error?: unknown }).error);
 /** Issued AND in the wallet (see `mintUnrestoredOutcome`). */
 const mintCredited = (ctx: TimelineContext) =>
   mintIssued(ctx) && !mintNothingRestored(ctx);
@@ -352,20 +354,10 @@ const meltReversed = (ctx: TimelineContext) =>
   ctx.state !== ROLLING_BACK && isTerminalFailureState(ctx.state);
 
 // A reversed melt returns the ecash to the balance. Whether the user backed
-// out or the payment failed is not in the state; it is in the reason. The
-// wallet writes exactly one reason itself when the user backs out, and coco
-// has several for a payment that did not go through ("Recovered: …",
-// "Rollback requested by handler", whatever a later version adds). So the
-// known thing is the cancellation, and every other reason is a failure:
-// guessing the other way round calls a failed payment a choice the user made.
-// A melt that ended `failed` was never backed out of: coco records the user's
-// cancel as `rolled_back` with the reason above.
-const USER_CANCELLED = /user cancel|rolled back by user/i;
-const meltPaymentFailed = (ctx: TimelineContext) => {
-  if (ctx.state === FAILED_STATE) return true;
-  const reason = entryError(ctx);
-  return reason !== undefined && !USER_CANCELLED.test(reason);
-};
+// out or the payment failed is not in the state; it is in the reason
+// (`meltReversalFailed`, shared with the screen title).
+const meltPaymentFailed = (ctx: TimelineContext) =>
+  meltReversalFailed(ctx.state, (ctx.entry as { error?: unknown }).error);
 
 const meltRolledBackOutcome: OutcomeDef = {
   id: "rolled-back",

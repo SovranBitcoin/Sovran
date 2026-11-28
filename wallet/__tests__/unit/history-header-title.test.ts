@@ -67,6 +67,46 @@ describe('transaction header titles', () => {
     ).toBe('Payment cancelled');
   });
 
+  // The title reads the same resolved facts the timeline does: the reason an
+  // entry ended and the mint's last word, not the raw state alone.
+  it('names an ended entry by what happened, not by its raw state', () => {
+    // I-2: a reversal coco recorded a failure for is a failed payment.
+    expect(
+      transactionHeaderTitle({ type: 'melt', state: 'rolled_back', error: 'Recovered: payment failed' })
+    ).toBe('Lightning send failed');
+    expect(
+      transactionHeaderTitle({ type: 'melt', state: 'rolled_back', error: 'User cancelled' })
+    ).toBe('Cancelled payment');
+    // I-3: the mint turned the token down; nobody cancelled it.
+    expect(
+      transactionHeaderTitle({ type: 'receive', state: 'rolled_back', error: 'Token already spent' })
+    ).toBe('Receive failed');
+    // I-4: issued, and nothing restored.
+    expect(
+      transactionHeaderTitle({
+        type: 'mint',
+        state: 'finalized',
+        error: 'Recovered issued quote but no proofs could be restored',
+      })
+    ).toBe('Receive failed');
+    // The list hands a failed mint over as UNPAID with its verdict beside it.
+    expect(
+      transactionHeaderTitle({ type: 'mint', state: 'UNPAID', operationState: 'failed' })
+    ).toBe('Receive failed');
+  });
+
+  it('names an open entry by how far it has got', () => {
+    // I-4b: the mint has been paid; the wallet is adding it.
+    expect(transactionHeaderTitle({ type: 'mint', state: 'pending', remoteState: 'PAID' })).toBe(
+      'Receiving Lightning'
+    );
+    // I-5: a token read but not redeemed is not received.
+    expect(transactionHeaderTitle({ type: 'receive', state: 'prepared' })).toBe('Receive ecash');
+    // A reversal in flight has not finished.
+    expect(transactionHeaderTitle({ type: 'send', state: 'rolling_back' })).toBe('Cancelling ecash');
+    expect(transactionHeaderTitle({ type: 'melt', state: 'rolling_back' })).toBe('Returning payment');
+  });
+
   it('falls back to the past tense for a state it does not know', () => {
     expect(transactionHeaderTitle({ type: 'melt', state: 'something-new' })).toBe(
       'Sent Lightning'

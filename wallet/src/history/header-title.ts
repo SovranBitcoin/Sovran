@@ -22,9 +22,18 @@ import type { HistoryEntry } from "@cashu/coco-core";
 
 import type { PaymentCopyResolver } from "../copy";
 import { logger } from "../logger";
-import { isOnchainHistoryEntry, isMintExpired } from "./filters";
-import { isTerminalFailureState } from "./states";
-import { DEFAULT_PAYMENT_COPY } from "./timeline/context";
+import { isOnchainHistoryEntry } from "./filters";
+import {
+  isTerminalFailureState,
+  meltReversalFailed,
+  mintNothingRestored,
+} from "./states";
+import {
+  DEFAULT_PAYMENT_COPY,
+  getMintTimelineState,
+  mintHistoryEntryExpired,
+} from "./timeline/context";
+import type { TimelineModel } from "./timeline/types";
 
 /** Which rail carried the money, at the granularity the title names. */
 type TransactionHeaderRail =
@@ -46,22 +55,27 @@ type TransactionHeaderPhase =
   | "settled"
   | "cancelled"
   | "failed"
-  | "expired";
+  | "expired"
+  /** Being reversed: the funds are on their way back, not back yet. */
+  | "reversing";
 
-/**
- * Rollback is not failure: the funds came back, usually because the user asked.
- * `states.ts` groups it with failure for bucketing, but a title that says
- * "Send failed" over a token the user deliberately reclaimed blames the wallet
- * for doing what it was told.
- */
-const CANCELLED_STATES = new Set(["rolledBack", "rolled_back", "rolling_back"]);
-
-/** What a title needs off an entry: its flow, its state, and (for the rail)
- *  the annotations that mark a melt or mint as onchain. */
+/** What a title needs off an entry: its flow, its state, the reason it ended
+ *  (`error`) and the mint's last word (`remoteState`, `operationState`), and
+ *  (for the rail) the annotations that mark a melt or mint as onchain. */
 type EntryLike =
-  | { type?: unknown; state?: unknown; metadata?: unknown }
+  | {
+      type?: unknown;
+      state?: unknown;
+      metadata?: unknown;
+      error?: unknown;
+      remoteState?: unknown;
+      operationState?: unknown;
+    }
   | null
   | undefined;
+
+/** What the timeline concluded about the same entry (`buildTimelineModel`). */
+type TimelineVerdict = Pick<TimelineModel, "outcome" | "steps">;
 
 /**
  * Phase per state, per flow — the same word means different things on either
@@ -97,6 +111,8 @@ const PHASE_BY_STATE: Record<
     finalized: "settled",
   },
   receive: {
+    // A token that has been read but not redeemed: nothing is in the wallet.
+    prepared: "ready",
     pending: "inFlight",
     executing: "inFlight",
     finalized: "settled",
@@ -138,16 +154,57 @@ export function transactionHeaderRail(
   }
 }
 
-export function transactionHeaderPhase(
-  entry: EntryLike,
+/**
+ * Where an ended entry stands, from the entry alone. Rollback is not failure
+ * in itself: the funds came back, usually because the user asked, and a
+ * title that says "Send failed" over a token the user deliberately reclaimed
+ * blames the wallet for doing what it was told. So the reason decides.
+ */
+function endedPhase(
+  type: string,
+  state: string,
+  error: unknown,
 ): TransactionHeaderPhase {
+  if (state === "rolling_back") return "reversing";
+  switch (type) {
+    case "melt":
+      return meltReversalFailed(state, error) ? "failed" : "cancelled";
+    // A receive is only ever rolled back by the mint turning the token down
+    // (spent, inactive keyset): nobody cancelled it.
+    case "receive":
+    case "mint":
+      return "failed";
+    default:
+      return state === "failed" ? "failed" : "cancelled";
+  }
+}
+
+/** A mint quote's phase, from the same resolved state its timeline reads. */
+function mintPhase(entry: EntryLike): TransactionHeaderPhase | undefined {
+  const mint = entry as HistoryEntry;
+  const mintState = getMintTimelineState(mint);
+  if (mintState === "failed") return "failed";
+  if (mintState === "ISSUED") {
+    return mintNothingRestored(entry?.error) ? "failed" : "settled";
+  }
+  if (mintState === "PAID") return "inFlight";
+  if (mintState === "UNPAID") {
+    return mintHistoryEntryExpired(mint as Extract<HistoryEntry, { type: "mint" }>)
+      ? "expired"
+      : "ready";
+  }
+  return undefined;
+}
+
+/** The phase from the entry alone, for a caller that has no timeline. */
+function entryPhase(entry: EntryLike): TransactionHeaderPhase {
   const type = String(entry?.type ?? "");
   const state = String(entry?.state ?? "");
-  if (CANCELLED_STATES.has(state)) return "cancelled";
-  if (isTerminalFailureState(state)) return "failed";
-  // Expiry is a mint-quote fact the entry carries; a melt's expiry lives on the
-  // quote response, which a detail header does not hold.
-  if (type === "mint" && isMintExpired(entry as HistoryEntry)) return "expired";
+  if (isTerminalFailureState(state)) return endedPhase(type, state, entry?.error);
+  if (type === "mint") {
+    const phase = mintPhase(entry);
+    if (phase) return phase;
+  }
   const table = Object.hasOwn(PHASE_BY_STATE, type)
     ? PHASE_BY_STATE[type]
     : undefined;
@@ -157,6 +214,61 @@ export function transactionHeaderPhase(
   // tense is the safer half of the guess: it never tells the user to do
   // something the wallet may already have done.
   return phase ?? "settled";
+}
+
+/**
+ * The phase the timeline's own verdict implies. The timeline has read more
+ * than the entry (the quote's expiry, our explorer's count, a cancel tap), so
+ * where they differ the timeline is what the screen shows and the title
+ * follows it. Only an open timeline still asks the entry whether the user is
+ * about to act or watching it happen.
+ */
+function timelinePhase(
+  timeline: TimelineVerdict,
+  fromEntry: TransactionHeaderPhase,
+): TransactionHeaderPhase {
+  const { steps, outcome } = timeline;
+  switch (outcome.kind) {
+    case "settled":
+      return "settled";
+    case "expired":
+      return "expired";
+    case "failed":
+    case "already-spent":
+      return "failed";
+    case "rolled-back":
+      return steps.some((step) => step.id === "payment-failed")
+        ? "failed"
+        : "cancelled";
+    case "empty":
+      return fromEntry;
+    case "pending":
+      break;
+  }
+  const open = steps[steps.length - 1];
+  // A state the timeline cannot read: it claims nothing, nor does the title.
+  if (!open || open.id === "unknown") return fromEntry;
+  if (steps.some((step) => step.id === "cancelling")) return "reversing";
+  const working = open.stepType === "current" || open.stepType === "waiting";
+  if (fromEntry === "ready") return working ? "inFlight" : "ready";
+  if (fromEntry === "inFlight") return "inFlight";
+  // The entry reads as ended and the rows do not: a mint that has said PAID
+  // before the chain has, or an invoice past expiry by this device's clock
+  // but not by the timeline's. Nothing handed over yet is still to be done.
+  const finished = steps.filter((step) => step.stepType === "complete").length;
+  return !working && finished <= 1 ? "ready" : "inFlight";
+}
+
+/**
+ * Where the transaction is. Pass the entry's timeline when there is one, so
+ * the title and the rows tell one story; without it the entry alone decides.
+ */
+export function transactionHeaderPhase(
+  entry: EntryLike,
+  timeline?: TimelineVerdict | null,
+): TransactionHeaderPhase {
+  const fromEntry = entryPhase(entry);
+  return timeline ? timelinePhase(timeline, fromEntry) : fromEntry;
 }
 
 /**
@@ -184,11 +296,13 @@ export function transactionHeaderTitle(
   options: {
     counterpartyName?: string | null;
     paymentCopy?: PaymentCopyResolver;
+    /** The timeline drawn for this entry, when the caller has one. */
+    timeline?: TimelineVerdict | null;
   } = {},
 ): string {
-  const { counterpartyName, paymentCopy = DEFAULT_PAYMENT_COPY } = options;
+  const { counterpartyName, paymentCopy = DEFAULT_PAYMENT_COPY, timeline } = options;
   const rail = transactionHeaderRail(entry);
-  const phase = transactionHeaderPhase(entry);
+  const phase = transactionHeaderPhase(entry, timeline);
   const name = counterpartyName?.trim();
   const group = name
     ? isReceiveFlow(String(entry?.type ?? ""))
@@ -203,6 +317,7 @@ export function transactionHeaderTitle(
     state: String(entry?.state ?? ""),
     rail: rail ?? null,
     phase,
+    fromTimeline: !!timeline,
     named: !!name,
     title,
   });
