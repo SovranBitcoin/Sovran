@@ -45,7 +45,6 @@ jest.mock('@/shared/lib/logger', () => {
   };
   return new Proxy(named, { get: (target, key: string) => (key in target ? target[key] : log) });
 });
-jest.mock('@/shared/lib/popup', () => ({ swapStatusPopup: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
 }));

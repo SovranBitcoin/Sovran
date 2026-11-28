@@ -62,15 +62,17 @@ function showNamed(
   name: string,
   options: { durationMs?: number | 'persistent'; onHide?: () => void } = {}
 ) {
-  act(() =>
-    showCustomToast({
+  let takeDown: (() => void) | null = null;
+  act(() => {
+    takeDown = showCustomToast({
       ...options,
       component: ({ hide }) => {
         hides.set(name, hide);
         return React.createElement('Toast', { testID: `toast-${name}`, accessibilityLabel: name });
       },
-    })
-  );
+    });
+  });
+  return takeDown as (() => void) | null;
 }
 
 const drawn = (r: TestRenderer.ReactTestRenderer, name: string) =>
@@ -129,6 +131,32 @@ describe('ToastHost', () => {
     act(() => hides.get('first')!());
     expect(firstHidden).toHaveBeenCalledTimes(1);
     expect(drawn(r, 'second')).toBe(1);
+  });
+
+  it('lets whoever showed a toast take it down, once', () => {
+    const r = mountHost();
+    const onHide = jest.fn();
+    const takeDown = showNamed('mine', { durationMs: 'persistent', onHide });
+    showNamed('other', { durationMs: 'persistent' });
+
+    act(() => takeDown!());
+    expect(drawn(r, 'mine')).toBe(0);
+    expect(drawn(r, 'other')).toBe(1);
+    expect(onHide).toHaveBeenCalledTimes(1);
+    act(() => takeDown!());
+    expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  // A toast's own timers depend on `hide`: a new function each time another
+  // toast came or went used to restart them (T4).
+  it('gives a toast the same hide() for its whole life, whatever other toasts do', () => {
+    mountHost();
+    showNamed('steady', { durationMs: 'persistent' });
+    const first = hides.get('steady');
+    showNamed('passing', { durationMs: 'persistent' });
+    act(() => hides.get('passing')!());
+    showNamed('another', { durationMs: 'persistent' });
+    expect(hides.get('steady')).toBe(first);
   });
 
   it('hides a toast after 4 s, and keeps a persistent one', () => {

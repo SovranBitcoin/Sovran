@@ -11,7 +11,6 @@ import Animated, {
 import { blend, withAlpha } from '@/shared/lib/color';
 
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
-import { popupLog } from '@/shared/lib/logger';
 
 import { useToastSurface } from './useToastSurface';
 import {
@@ -28,13 +27,6 @@ const ICON_SIZE = 32;
 const TITLE_FONT_SIZE = 15;
 const SUB_FONT_SIZE = 13;
 const TERMINAL_TINT_DURATION_MS = 800;
-/** The e2e harness cannot screenshot inside the 3s auto-dismiss window (the
- * confirmed AX probe outlives the visible toast by 15s, and per-step evidence
- * capture alone costs ~1s), so its owned Metro slows terminal toasts via env.
- * Unset outside e2e dev sessions. */
-const E2E_DISMISS_MS = __DEV__ ? Number(process.env.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS) : NaN;
-const AUTO_DISMISS_MS =
-  Number.isFinite(E2E_DISMISS_MS) && E2E_DISMISS_MS > 0 ? E2E_DISMISS_MS : 3000;
 
 export type StatusToastStatus = 'pending' | 'delivered' | 'confirmed' | 'failed' | 'warning';
 
@@ -49,6 +41,8 @@ type StatusToastProps = {
   subtitle?: React.ReactNode;
   /** Right-aligned action pill. Hidden when omitted. */
   action?: { label: string; onPress: () => void; testID?: string };
+  /** Tapping anywhere on the toast. Omitted when there is nothing to open. */
+  onPress?: () => void;
   /** Stable marker for the caller's current lifecycle state. */
   statusTestID?: string;
   /**
@@ -64,8 +58,6 @@ type StatusToastProps = {
   ringSuccessColor?: string;
   /** Indicator diameter; defaults to ICON_SIZE (32). */
   indicatorSize?: number;
-  /** Structured lifecycle context for log-doctor toast audits. */
-  debugFields?: Record<string, unknown>;
   /**
    * From `ToastHost` — `hide` (this toast) and its id; `testID` lands on the frame.
    */
@@ -73,16 +65,14 @@ type StatusToastProps = {
 };
 
 /**
- * Animated terminal-state toast shell shared by `PaymentStatusToast` and
- * `SwapStatusToast`.
+ * The animated status toast shell `PaymentStatusToast` draws.
  *
  * Renders the frosted-glass slab with a `<LoadingIndicator>`, title + optional
- * subtitle, and optional action pill. The tint background interpolates from
- * the theme surface to success, warning, or danger when `status` flips to a
- * terminal value (`'confirmed'`, `'warning'`, or `'failed'`); 3 seconds later
- * the toast manager is told to hide. `'pending'` and `'delivered'` are
- * non-terminal and keep the toast visible until the caller flips status or
- * unmounts the component.
+ * subtitle, and optional action pill. `'pending'` spins. `'delivered'` (our
+ * part is done, someone else acts next) stops the spinner on the plain
+ * surface. `'confirmed'`, `'warning'` and `'failed'` also tint the surface
+ * success, warning or danger. The shell only draws: when a toast appears,
+ * changes and closes is its caller's to decide.
  */
 export function StatusToast({
   status,
@@ -94,7 +84,7 @@ export function StatusToast({
   ringColor,
   ringSuccessColor,
   indicatorSize,
-  debugFields,
+  onPress,
   toastProps,
 }: StatusToastProps) {
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
@@ -112,38 +102,20 @@ export function StatusToast({
     ? withAlpha(targetBg, TINT_ALPHA)
     : blend(surfaceBg, targetBg, OPAQUE_TINT_MIX);
 
-  const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';
+  const indicatorPhase: Phase = isTerminal || status === 'delivered' ? 'done' : 'loading';
   const indicatorResult: Result =
     status === 'failed' ? 'error' : status === 'warning' ? 'warning' : 'success';
 
   const confirmedProgress = useSharedValue(isTerminal ? 1 : 0);
 
+  // A failure corrected to a success stays at 1: only the target colour
+  // changes, and the animated style below follows it.
   useEffect(() => {
     if (!isTerminal) return;
     confirmedProgress.set(
       withTiming(1, { duration: TERMINAL_TINT_DURATION_MS, easing: Easing.out(Easing.ease) })
     );
   }, [isTerminal, confirmedProgress]);
-
-  const hide = toastProps.hide;
-  useEffect(() => {
-    if (!isTerminal) return;
-    popupLog.info('popup.status_toast.auto_dismiss_scheduled', {
-      status,
-      title,
-      delayMs: AUTO_DISMISS_MS,
-      ...(debugFields ?? {}),
-    });
-    const timer = setTimeout(() => {
-      popupLog.info('popup.status_toast.auto_dismiss_fired', {
-        status,
-        title,
-        ...(debugFields ?? {}),
-      });
-      hide();
-    }, AUTO_DISMISS_MS);
-    return () => clearTimeout(timer);
-  }, [debugFields, hide, isTerminal, status, title]);
 
   const backgroundStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
@@ -156,6 +128,7 @@ export function StatusToast({
   return (
     <ToastSlab
       toastProps={toastProps}
+      onPress={onPress}
       tint={<Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />}>
       <LoadingIndicator
         size={indicatorSize ?? ICON_SIZE}

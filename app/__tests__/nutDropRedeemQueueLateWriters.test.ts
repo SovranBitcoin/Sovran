@@ -12,8 +12,11 @@ import { Amount, getEncodedToken } from '@cashu/cashu-ts';
 import { meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
+import { describeError } from '@/shared/lib/errors';
 import { intakeDmEcash, type DmEcashQueuePort } from '@/features/payments/lib/dmEcashIntake';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+
+import { resetFakePaymentToasts, toastReports } from './helpers/fakePaymentToasts';
 
 const MINT_URL = 'https://mint.example';
 const TOKEN = getEncodedToken({
@@ -36,11 +39,6 @@ const mockManager = { mint: { isTrustedMint: async () => true } };
 const mockExecuteAutoRedeem = jest.fn();
 const mockSetTransactionAnnotation = jest.fn();
 const mockAppState = { currentState: 'background' };
-const mockToast = {
-  active: null as { id: string } | null,
-  setWaiting: jest.fn(),
-  setFailed: jest.fn(),
-};
 
 jest.mock('wallet/operations', () => ({
   createDefaultOperations: () => ({ executeAutoRedeem: mockExecuteAutoRedeem }),
@@ -57,23 +55,14 @@ jest.mock('@/features/bitchat/hooks/useBLEPeers', () => ({
   useBLEPeerDirectory: { getState: () => ({ peers: [] }) },
 }));
 jest.mock('@/features/nearPay/lib/peerProfile', () => ({ peerNostrPubkey: jest.fn() }));
-jest.mock('@/shared/lib/popup', () => ({ paymentStatusPopup: jest.fn() }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({ readProfileRecord: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: (...args: unknown[]) => mockSetTransactionAnnotation(...args),
 }));
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: {
-    getState: () => ({
-      active: mockToast.active,
-      setActive: (active: { id: string }) => {
-        mockToast.active = active;
-      },
-      setWaiting: mockToast.setWaiting,
-      setFailed: mockToast.setFailed,
-    }),
-  },
-}));
+jest.mock(
+  '@/shared/stores/runtime/paymentStatusStore',
+  () => require('./helpers/fakePaymentToasts').fakePaymentStatusStore
+);
 const mockLifecycle = { restoreStatus: 'complete' };
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
   useWalletLifecycleStore: { getState: () => mockLifecycle },
@@ -125,9 +114,7 @@ beforeEach(() => {
   mockSetTransactionAnnotation.mockReset();
   mockAppState.currentState = 'background';
   mockLifecycle.restoreStatus = 'complete';
-  mockToast.active = null;
-  mockToast.setWaiting.mockReset();
-  mockToast.setFailed.mockReset();
+  resetFakePaymentToasts();
   useNutDropRedeemQueueStore.setState({ byTokenHash: {} });
 });
 
@@ -243,16 +230,23 @@ describe('the toast for a queued token says what the queue recorded', () => {
     queued(1);
     await drainNutDropRedeemQueue();
     expect(current()?.status).toBe('pending');
-    expect(mockToast.setWaiting).toHaveBeenCalledTimes(1);
-    expect(mockToast.setFailed).not.toHaveBeenCalled();
+    // Kept for another attempt: said as a wait, never as a failure.
+    expect(toastReports.map((report) => report.phase)).toEqual(['slow']);
   });
 
   it('fails once the last attempt has run out and the token is held', async () => {
     queued(4);
     await drainNutDropRedeemQueue();
     expect(current()).toMatchObject({ status: 'failed', attempts: 5 });
-    expect(mockToast.setWaiting).not.toHaveBeenCalled();
-    expect(mockToast.setFailed).toHaveBeenCalledWith(HASH, new Error('Redeem failed'));
+    expect(toastReports).toEqual([
+      {
+        key: `receive:${HASH}`,
+        phase: 'failed',
+        content: expect.objectContaining({
+          subtitle: describeError(new Error('Redeem failed'), 'cashu').text,
+        }),
+      },
+    ]);
   });
 });
 

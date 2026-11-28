@@ -1,11 +1,15 @@
 /**
  * @jest-environment node
  *
- * Characterization of `usePaymentStatusListener`: what each Coco wallet event
- * does to the payment status toast, the saved transaction annotations and the
- * standing quotes. The hook runs against the real payment status, swap status,
- * mint and annotation stores; only the Coco manager, the toast popup and the
- * two wallet rotation calls are replaced.
+ * `usePaymentStatusListener`: what each Coco wallet event reports to the
+ * payment toasts, the saved transaction annotations and the standing quotes.
+ * The hook runs against the real payment toasts, swap status, mint and
+ * annotation stores; only the Coco manager and the two wallet rotation calls
+ * are replaced.
+ *
+ * A toast is read here as what is known about its payment (`paymentToasts`),
+ * whether or not it is on screen yet; what is drawn when is the machine's
+ * (`paymentToastMachine.test.ts`) and the stack's (`paymentToastBehaviour.test.tsx`).
  */
 
 import { act, renderHook } from '@testing-library/react-native';
@@ -15,18 +19,17 @@ import { useManagerContext } from '@cashu/coco-react';
 import { decodeAnnotation, rotateReusableMintQuote, rotateStandingPaymentRequest } from 'wallet';
 
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
-import { paymentStatusPopup } from '@/shared/lib/popup';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import {
+  paymentToasts,
+  toastKey,
+  type PaymentToastContent,
+} from '@/shared/stores/runtime/paymentStatusStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useTransactionAnnotationStore } from '@/shared/stores/profile/transactionAnnotationStore';
 
 jest.mock('@cashu/coco-react', () => ({
   useManagerContext: jest.fn(),
-}));
-
-jest.mock('@/shared/lib/popup', () => ({
-  paymentStatusPopup: jest.fn(),
 }));
 
 jest.mock('wallet', () => ({
@@ -36,7 +39,6 @@ jest.mock('wallet', () => ({
 }));
 
 const mockedUseManagerContext = jest.mocked(useManagerContext);
-const mockedPopup = jest.mocked(paymentStatusPopup);
 const mockedRotateQuote = jest.mocked(rotateReusableMintQuote);
 const mockedRotateCreq = jest.mocked(rotateStandingPaymentRequest);
 
@@ -80,9 +82,22 @@ async function flush(): Promise<void> {
   });
 }
 
-function active() {
-  return usePaymentStatusStore.getState().active;
-}
+/** Every payment with a toast, as `key:phase`. */
+const toasts = () => paymentToasts.tracked().map((toast) => `${toast.key}:${toast.phase}`);
+const toast = (key: string) => paymentToasts.get(key);
+
+const payment = (
+  variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request',
+  amount: number,
+  extra: Partial<Extract<PaymentToastContent, { kind: 'payment' }>> = {}
+): PaymentToastContent => ({
+  kind: 'payment',
+  variant,
+  mintUrl: MINT,
+  amount,
+  unit: 'sat',
+  ...extra,
+});
 
 function annotation(key: string) {
   const record = useTransactionAnnotationStore.getState().annotations[key];
@@ -95,13 +110,33 @@ function startSwap() {
     .start({ id: 'swap-1', legs: [{ id: 'leg' }], meta: { unit: 'sat' } });
 }
 
+const sendFinalized = (operationId: string, amount = 5, unit = 'sat') =>
+  act(() =>
+    fake.emit('send:finalized', { mintUrl: MINT, operationId, operation: { amount, unit } })
+  );
+const meltFinalized = (quoteId: string, operationId: string, amount = 300, unit = 'sat') =>
+  act(() =>
+    fake.emit('melt-op:finalized', {
+      mintUrl: MINT,
+      operationId,
+      operation: { quoteId, amount, unit, method: 'bolt11' },
+    })
+  );
+const meltRolledBack = (quoteId: string, amount = 300, error = 'Route failed') =>
+  act(() =>
+    fake.emit('melt-op:rolled-back', {
+      mintUrl: MINT,
+      operation: { id: `mo-${quoteId}`, quoteId, amount, unit: 'sat', error },
+    })
+  );
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'debug').mockImplementation(() => undefined);
   jest.spyOn(console, 'info').mockImplementation(() => undefined);
   jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   jest.spyOn(console, 'error').mockImplementation(() => undefined);
-  usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState());
+  paymentToasts.dismissAll();
   useSwapStatusStore.setState({ active: null });
   useMintStore.setState({ standingQuotes: {} });
   useTransactionAnnotationStore.setState({ annotations: {} });
@@ -109,56 +144,29 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Toasts in flight hold timers: none may outlive its test.
+  paymentToasts.dismissAll();
   jest.restoreAllMocks();
 });
 
 describe('usePaymentStatusListener', () => {
-  it('raises one processing receive toast for a paid bolt11 quote and ignores other methods', () => {
+  it('starts one receive toast for a paid bolt11 quote and ignores other methods', () => {
     const { unmount } = mount();
     const paid = { method: 'bolt11', state: 'PAID', amount: 21, unit: 'sat' };
+    const updated = (quoteId: string, quote: Record<string, unknown>) =>
+      act(() =>
+        fake.emit('mint-quote:updated', { mintUrl: MINT, method: quote.method, quoteId, quote })
+      );
 
-    act(() =>
-      fake.emit('mint-quote:updated', {
-        mintUrl: MINT,
-        method: 'bolt11',
-        quoteId: 'q1',
-        quote: paid,
-      })
-    );
-    act(() =>
-      fake.emit('mint-quote:updated', {
-        mintUrl: MINT,
-        method: 'bolt11',
-        quoteId: 'q1',
-        quote: paid,
-      })
-    );
-    act(() =>
-      fake.emit('mint-quote:updated', {
-        mintUrl: MINT,
-        method: 'bolt12',
-        quoteId: 'q2',
-        quote: { ...paid, method: 'bolt12' },
-      })
-    );
-    act(() =>
-      fake.emit('mint-quote:updated', {
-        mintUrl: MINT,
-        method: 'bolt11',
-        quoteId: 'q3',
-        quote: { ...paid, state: 'UNPAID' },
-      })
-    );
+    updated('q1', paid);
+    updated('q1', paid);
+    updated('q2', { ...paid, method: 'bolt12' });
+    updated('q3', { ...paid, state: 'UNPAID' });
 
-    expect(mockedPopup).toHaveBeenCalledTimes(1);
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'receive',
-      id: 'q1',
-      mintUrl: MINT,
-      amount: 21,
-      unit: 'sat',
-    });
-    expect(active()).toMatchObject({ variant: 'receive', id: 'q1', state: 'processing' });
+    expect(toasts()).toEqual(['mint:q1:working']);
+    expect(toast('mint:q1')?.content).toEqual(
+      payment('receive', 21, { target: { type: 'mint', quoteId: 'q1' } })
+    );
     unmount();
   });
 
@@ -179,7 +187,7 @@ describe('usePaymentStatusListener', () => {
     fake.mintQuoteGet.mockResolvedValueOnce(paidQuote(Date.now() - 6 * 60 * 1000));
     fake.emit('mint-op:pending', pending('op-old', 'q-old'));
     await flush();
-    expect(mockedPopup).not.toHaveBeenCalled();
+    expect(toasts()).toEqual([]);
 
     fake.emit('mint-op:pending', pending('op-12', 'q-12', 'bolt12'));
     await flush();
@@ -189,41 +197,32 @@ describe('usePaymentStatusListener', () => {
     fake.emit('mint-op:pending', pending('op-new', 'q-new'));
     await flush();
     expect(fake.mintQuoteGet).toHaveBeenLastCalledWith({ mintUrl: MINT, quoteId: 'q-new' });
-    expect(mockedPopup).toHaveBeenCalledTimes(1);
-    expect(active()).toMatchObject({
-      variant: 'receive',
-      id: 'q-new',
-      state: 'processing',
-      amount: 50,
-    });
+    expect(toasts()).toEqual(['mint:q-new:working']);
+    expect(toast('mint:q-new')?.content).toMatchObject({ variant: 'receive', amount: 50 });
     unmount();
   });
 
-  it('confirms a matching receive toast when its mint finalizes, without a second popup', () => {
+  it('finishes a receive toast when its mint finalizes, and starts none for a bolt11 mint that had none', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'receive',
-      id: 'q1',
-      mintUrl: MINT,
-      amount: 21,
-      unit: 'sat',
-      state: 'processing',
-    });
+    paymentToasts.start(toastKey.mint('q1'), payment('receive', 21));
+    const finalized = (quoteId: string) =>
+      act(() =>
+        fake.emit('mint-op:finalized', {
+          mintUrl: MINT,
+          operationId: `op-${quoteId}`,
+          operation: { quoteId, method: 'bolt11', unit: 'sat', amount: 21 },
+        })
+      );
 
-    act(() =>
-      fake.emit('mint-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'op1',
-        operation: { quoteId: 'q1', method: 'bolt11', unit: 'sat', amount: 21 },
-      })
-    );
+    finalized('q1');
+    // A bolt11 mint whose paid toast was held back (a stale replay) stays untold.
+    finalized('q-untold');
 
-    expect(active()).toMatchObject({ id: 'q1', state: 'confirmed' });
-    expect(mockedPopup).not.toHaveBeenCalled();
+    expect(toasts()).toEqual(['mint:q1:done']);
     unmount();
   });
 
-  it('raises a confirmed receive for a reusable deposit and rotates only the standing onchain quote', () => {
+  it('tells a reusable deposit as received and rotates only the standing onchain quote', () => {
     const { unmount } = mount();
     useMintStore.getState().setStandingQuote(`${MINT}|onchain|sat`, 'q-standing');
 
@@ -235,14 +234,10 @@ describe('usePaymentStatusListener', () => {
       })
     );
     expect(mockedRotateQuote).not.toHaveBeenCalled();
-    expect(mockedPopup).toHaveBeenLastCalledWith({
-      variant: 'receive',
-      id: 'q-other',
-      mintUrl: MINT,
-      amount: 1000,
-      unit: 'sat',
-    });
-    expect(active()).toMatchObject({ id: 'q-other', state: 'confirmed' });
+    expect(toasts()).toEqual(['mint:q-other:done']);
+    expect(toast('mint:q-other')?.content).toEqual(
+      payment('receive', 1000, { target: { type: 'mint', quoteId: 'q-other' } })
+    );
 
     act(() =>
       fake.emit('mint-op:finalized', {
@@ -258,7 +253,7 @@ describe('usePaymentStatusListener', () => {
       expect.any(Object),
       'deposit_received'
     );
-    expect(mockedPopup).toHaveBeenCalledTimes(2);
+    expect(toasts()).toEqual(['mint:q-other:done', 'mint:q-standing:done']);
     unmount();
   });
 
@@ -287,14 +282,10 @@ describe('usePaymentStatusListener', () => {
       requestId: 'r1',
       transport: 'nostr',
     });
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'receive',
-      id: 'rop-1',
-      mintUrl: MINT,
-      amount: 7,
-      unit: 'sat',
-    });
-    expect(active()).toMatchObject({ variant: 'receive', id: 'rop-1', state: 'confirmed' });
+    expect(toasts()).toEqual(['receive:rop-1:done']);
+    expect(toast('receive:rop-1')?.content).toEqual(
+      payment('receive', 7, { target: { type: 'receive', operationId: 'rop-1' } })
+    );
     expect(mockedRotateCreq).not.toHaveBeenCalled();
 
     act(() => fake.emit('receive-op:finalized', claim('rop-2', 'req-standing')));
@@ -308,16 +299,13 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
-  it('gives a waiting ecash receive a new confirmed toast under the history entry id', () => {
+  it('finishes a waiting ecash receive in its own toast, with the history entry to open', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'receive-ecash',
-      id: 'token-1',
-      mintUrl: MINT,
-      amount: 10,
-      unit: 'sat',
-      state: 'waiting',
-    });
+    paymentToasts.report(
+      toastKey.receive('token-1'),
+      'slow',
+      payment('receive-ecash', 10, { title: 'Ecash ready to redeem', subtitle: 'Later' })
+    );
 
     act(() =>
       fake.emit('history:updated', {
@@ -326,32 +314,17 @@ describe('usePaymentStatusListener', () => {
       })
     );
 
-    expect(active()).toMatchObject({
-      variant: 'receive-ecash',
-      id: 'entry-9',
-      receiveEntryId: 'entry-9',
-      state: 'confirmed',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'receive-ecash',
-        id: 'entry-9',
-        receiveEntryId: 'entry-9',
-      })
+    expect(toasts()).toEqual(['receive:token-1:done']);
+    // The wording of the wait is gone; the entry to open is known.
+    expect(toast('receive:token-1')?.content).toEqual(
+      payment('receive-ecash', 10, { target: { type: 'receive', entryId: 'entry-9' } })
     );
     unmount();
   });
 
-  it('confirms a processing ecash receive in place when the receive finalizes', () => {
+  it('finishes a working ecash receive in place when the receive finalizes, then learns its entry', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'receive-ecash',
-      id: 'token-1',
-      mintUrl: MINT,
-      amount: 10,
-      unit: 'sat',
-      state: 'processing',
-    });
+    paymentToasts.start(toastKey.receive('token-1'), payment('receive-ecash', 10));
 
     act(() =>
       fake.emit('receive-op:finalized', {
@@ -359,183 +332,141 @@ describe('usePaymentStatusListener', () => {
         operation: { id: 'rop-9', amount: 10, unit: 'sat' },
       })
     );
-
-    expect(active()).toMatchObject({ id: 'token-1', state: 'confirmed' });
-    expect(mockedPopup).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('confirms the toast of the send that finished, and no other payment’s', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'send',
-      id: 'send-1',
-      owner: { kind: 'send', operationId: 'send-1' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'processing',
-    });
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'send-1',
-        operation: { amount: 5, unit: 'sat' },
-      })
-    );
-    expect(active()).toMatchObject({ id: 'send-1', state: 'confirmed', operationId: 'send-1' });
-
-    usePaymentStatusStore.getState().setActive({
-      variant: 'payment-request',
-      id: 'pr-toast',
-      owner: { kind: 'send', operationId: 'pr-send' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'delivered',
-    });
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'unrelated-send',
-        operation: { amount: 99, unit: 'sat' },
-      })
-    );
-    // The delivered payment request is not confirmed by another send: that send
-    // gets a toast of its own.
-    expect(active()).toMatchObject({
-      variant: 'send',
-      id: 'unrelated-send',
-      owner: { kind: 'send', operationId: 'unrelated-send' },
-      state: 'confirmed',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith(expect.objectContaining({ id: 'unrelated-send' }));
-    unmount();
-  });
-
-  it('leaves a payment request still being paid alone when another send finishes', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'payment-request',
-      id: 'pr-toast',
-      owner: { kind: 'pending', key: 'pr-toast' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'processing',
-    });
+    expect(toasts()).toEqual(['receive:token-1:done']);
 
     act(() =>
-      fake.emit('send:finalized', {
+      fake.emit('history:updated', {
         mintUrl: MINT,
-        operationId: 'unrelated-send',
-        operation: { amount: 5, unit: 'sat' },
+        entry: { type: 'receive', state: 'finalized', id: 'entry-9', amount: 10 },
       })
     );
-
-    expect(active()).toEqual(expect.objectContaining({ id: 'pr-toast', state: 'processing' }));
-    expect(active()).not.toHaveProperty('operationId');
-    expect(mockedPopup).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('confirms a payment request whose send finished before its flow bound the toast to it', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'payment-request',
-      id: 'pr-toast',
-      owner: { kind: 'pending', key: 'pr-toast' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'processing',
-    });
-    // Delivered over HTTP: the send finishes while the toast is still held under its key.
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'unrelated-send',
-        operation: { amount: 5, unit: 'sat' },
-      })
-    );
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'pr-send',
-        operation: { amount: 5, unit: 'sat' },
-      })
-    );
-    expect(active()).toMatchObject({ id: 'pr-toast', state: 'processing' });
-
-    // The flow then binds its toast to its send and says it was delivered.
-    act(() => {
-      const store = usePaymentStatusStore.getState();
-      store.bindOwner('pr-toast', { kind: 'send', operationId: 'pr-send' });
-      store.setDelivered('pr-toast');
-    });
-
-    // The toast catches up with its send, and only its own.
-    expect(active()).toMatchObject({
-      id: 'pr-toast',
-      owner: { kind: 'send', operationId: 'pr-send' },
-      state: 'confirmed',
-      operationId: 'pr-send',
+    expect(toasts()).toEqual(['receive:token-1:done']);
+    expect(toast('receive:token-1')?.content).toMatchObject({
+      target: { type: 'receive', entryId: 'entry-9' },
     });
     unmount();
   });
 
-  it('confirms a melt whose own melt finished before its flow bound the toast to its quote', () => {
+  it('does not take a receive that finishes for a redeem that already failed', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-toast',
-      owner: { kind: 'pending', key: 'melt-toast' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
-    });
+    paymentToasts.start(toastKey.receive('token-1'), payment('receive-ecash', 10));
+    paymentToasts.report(
+      toastKey.receive('token-1'),
+      'failed',
+      payment('receive-ecash', 10, { subtitle: 'Already spent' })
+    );
+
+    // Another receive of the same amount from the same mint.
     act(() =>
-      fake.emit('melt-op:finalized', {
+      fake.emit('receive-op:finalized', {
         mintUrl: MINT,
-        operationId: 'mo-a',
-        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
+        operation: { id: 'rop-9', amount: 10, unit: 'sat' },
       })
     );
-    expect(active()).toMatchObject({ id: 'melt-toast', state: 'processing' });
-
-    act(() =>
-      usePaymentStatusStore.getState().bindOwner('melt-toast', { kind: 'melt', quoteId: 'mq-a' })
-    );
-
-    expect(active()).toMatchObject({ id: 'melt-toast', state: 'confirmed', operationId: 'mo-a' });
+    expect(toasts()).toEqual(['receive:token-1:failed']);
     unmount();
   });
 
-  it('raises a new confirmed send toast in the unit of a background send', () => {
+  it('leaves ecash receives of another mint or amount alone', () => {
     const { unmount } = mount();
+    paymentToasts.start(toastKey.receive('token-1'), payment('receive-ecash', 10));
 
     act(() =>
-      fake.emit('send:finalized', {
+      fake.emit('receive-op:finalized', {
         mintUrl: MINT,
-        operationId: 'send-usd',
-        operation: { amount: 500, unit: 'usd' },
+        operation: { id: 'rop-9', amount: 11, unit: 'sat' },
       })
     );
+    act(() =>
+      fake.emit('history:updated', {
+        mintUrl: 'https://other.example',
+        entry: { type: 'receive', state: 'finalized', id: 'entry-9', amount: 10 },
+      })
+    );
+    expect(toasts()).toEqual(['receive:token-1:working']);
+    unmount();
+  });
 
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'send',
-      id: 'send-usd',
-      mintUrl: MINT,
-      amount: 500,
-      unit: 'usd',
+  it('finishes the toast of the send that finished, and no other payment’s', () => {
+    const { unmount } = mount();
+    paymentToasts.start(toastKey.send('send-1'), payment('send', 5));
+    paymentToasts.report(toastKey.send('pr-send'), 'handed-off', payment('payment-request', 5));
+
+    sendFinalized('send-1');
+    expect(toasts()).toEqual(['send:send-1:done', 'send:pr-send:handed-off']);
+
+    // The delivered payment request is not finished by another send: that
+    // send gets a toast of its own.
+    sendFinalized('unrelated-send', 99);
+    expect(toasts()).toEqual([
+      'send:send-1:done',
+      'send:pr-send:handed-off',
+      'send:unrelated-send:done',
+    ]);
+    expect(toast('send:unrelated-send')?.content).toEqual(
+      payment('send', 99, { target: { type: 'send', operationId: 'unrelated-send' } })
+    );
+    unmount();
+  });
+
+  it('finishes a delivered payment-request toast when its send finishes, still as a payment request', () => {
+    const { unmount } = mount();
+    paymentToasts.report(toastKey.send('pr-send'), 'handed-off', payment('payment-request', 5));
+
+    sendFinalized('pr-send');
+
+    expect(toasts()).toEqual(['send:pr-send:done']);
+    expect(toast('send:pr-send')?.content).toEqual(
+      payment('payment-request', 5, { target: { type: 'send', operationId: 'pr-send' } })
+    );
+    unmount();
+  });
+
+  it('holds a send that finishes while a payment request has no id yet, and lands it on that toast if it was its own', () => {
+    const { unmount } = mount();
+    paymentToasts.start(toastKey.pending('pr'), payment('payment-request', 5), {
+      unbound: { group: 'send' },
     });
-    expect(active()).toMatchObject({
-      variant: 'send',
-      id: 'send-usd',
-      unit: 'usd',
-      state: 'confirmed',
+
+    // Delivered over HTTP: the send finishes before the flow knows its id.
+    sendFinalized('unrelated-send');
+    sendFinalized('pr-send');
+    expect(toasts()).toEqual(['pending:pr:working']);
+
+    // The flow then binds its toast to its send.
+    act(() => paymentToasts.bind(toastKey.pending('pr'), toastKey.send('pr-send'), ['pr-send']));
+
+    // The toast catches up with its own send; the other gets a toast of its own.
+    expect(toasts()).toEqual(['send:pr-send:done', 'send:unrelated-send:done']);
+    expect(toast('send:pr-send')?.content).toEqual(
+      payment('payment-request', 5, { target: { type: 'send', operationId: 'pr-send' } })
+    );
+    unmount();
+  });
+
+  it('lands a melt that finished before its toast knew its quote on that toast', () => {
+    const { unmount } = mount();
+    paymentToasts.start(toastKey.pending('melt'), payment('melt', 300), {
+      unbound: { group: 'melt' },
     });
+
+    meltFinalized('mq-a', 'mo-a');
+    expect(toasts()).toEqual(['pending:melt:working']);
+
+    act(() => paymentToasts.bind(toastKey.pending('melt'), toastKey.melt('mq-a'), ['mq-a']));
+
+    expect(toasts()).toEqual(['melt:mq-a:done']);
+    expect(toast('melt:mq-a')?.content).toMatchObject({
+      target: { type: 'melt', quoteId: 'mq-a' },
+    });
+    unmount();
+  });
+
+  it('tells a background send as sent, in its unit', () => {
+    const { unmount } = mount();
+    sendFinalized('send-usd', 500, 'usd');
+    expect(toasts()).toEqual(['send:send-usd:done']);
+    expect(toast('send:send-usd')?.content).toMatchObject({ variant: 'send', unit: 'usd' });
     unmount();
   });
 
@@ -577,384 +508,114 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
-  it('gives another melt its own toast instead of the one shown, and a background melt toast says its unit', () => {
+  it('gives two melts in flight a toast each: neither’s result touches the other', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-toast-123',
-      owner: { kind: 'melt', quoteId: 'mq-123' },
-      mintUrl: 'https://other.example',
-      amount: 1,
-      unit: 'sat',
-      state: 'confirmed',
-    });
+    paymentToasts.start(toastKey.melt('mq-a'), payment('melt', 300));
+    paymentToasts.start(toastKey.melt('mq-b'), payment('melt', 300));
 
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'melt-op-x',
-        operation: { quoteId: 'mq-x', amount: 900, unit: 'sat', method: 'bolt11' },
-      })
-    );
-    // The confirmed toast of another melt keeps its own View target; this melt gets
-    // a toast of its own.
-    expect(active()).toMatchObject({
-      id: 'mq-x',
-      owner: { kind: 'melt', quoteId: 'mq-x' },
-      state: 'confirmed',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'mq-x', operationId: 'melt-op-x' })
-    );
-    mockedPopup.mockClear();
+    meltFinalized('mq-b', 'mo-b');
+    expect(toasts()).toEqual(['melt:mq-a:working', 'melt:mq-b:done']);
 
-    usePaymentStatusStore.getState().setActive(null);
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'melt-op-usd',
-        operation: { quoteId: 'mq-usd', amount: 500, unit: 'usd', method: 'bolt11' },
-      })
-    );
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'melt',
-      id: 'mq-usd',
-      mintUrl: MINT,
-      amount: 500,
-      unit: 'usd',
-      operationId: 'melt-op-usd',
-    });
+    meltRolledBack('mq-c');
+    expect(toasts()).toEqual(['melt:mq-a:working', 'melt:mq-b:done', 'melt:mq-c:failed']);
+
+    meltFinalized('mq-a', 'mo-a');
+    expect(toasts()).toEqual(['melt:mq-a:done', 'melt:mq-b:done', 'melt:mq-c:failed']);
     unmount();
   });
 
-  it('leaves a melt in flight alone when another melt finishes or rolls back, then confirms it by its own', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-a',
-      owner: { kind: 'melt', quoteId: 'mq-a' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
-    });
+  it('tells a result once: the same event delivered again changes nothing', () => {
+    jest.useFakeTimers();
+    try {
+      const { unmount } = mount();
+      meltFinalized('mq-b', 'mo-b');
+      expect(toasts()).toEqual(['melt:mq-b:done']);
+      act(() => void jest.advanceTimersByTime(10_000));
+      expect(toasts()).toEqual([]);
 
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'mo-b',
-        operation: { quoteId: 'mq-b', amount: 300, unit: 'sat', method: 'bolt11' },
-      })
-    );
-    expect(active()).toEqual(expect.objectContaining({ id: 'melt-a', state: 'processing' }));
-    expect(active()).not.toHaveProperty('operationId');
-    expect(mockedPopup).not.toHaveBeenCalled();
-
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'mo-a',
-        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
-      })
-    );
-    expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed', operationId: 'mo-a' });
-    expect(mockedPopup).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('shows another melt’s success, left to a melt in flight, once that toast ends', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-a',
-      owner: { kind: 'melt', quoteId: 'mq-a' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
-    });
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'mo-b',
-        operation: { quoteId: 'mq-b', amount: 200, unit: 'sat', method: 'bolt11' },
-      })
-    );
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'mo-a',
-        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
-      })
-    );
-    expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed' });
-    expect(mockedPopup).not.toHaveBeenCalled();
-
-    // Melt A's toast is dismissed: melt B's success is shown, once.
-    act(() => usePaymentStatusStore.getState().clearActive('melt-a'));
-    expect(active()).toMatchObject({
-      variant: 'melt',
-      id: 'mq-b',
-      owner: { kind: 'melt', quoteId: 'mq-b' },
-      amount: 200,
-      state: 'confirmed',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'melt',
-      id: 'mq-b',
-      mintUrl: MINT,
-      amount: 200,
-      unit: 'sat',
-      operationId: 'mo-b',
-    });
-    act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
-    expect(active()).toBeNull();
-    expect(mockedPopup).toHaveBeenCalledTimes(1);
-    unmount();
-  });
-
-  describe('a held success whose event comes again', () => {
-    const meltB = {
-      mintUrl: MINT,
-      operationId: 'mo-b',
-      operation: { quoteId: 'mq-b', amount: 200, unit: 'sat', method: 'bolt11' },
-    };
-    function holdBBesideMeltA() {
-      usePaymentStatusStore.getState().setActive({
-        variant: 'melt',
-        id: 'melt-a',
-        owner: { kind: 'melt', quoteId: 'mq-a' },
-        mintUrl: MINT,
-        amount: 300,
-        unit: 'sat',
-        state: 'processing',
-      });
-      act(() => fake.emit('melt-op:finalized', meltB));
-      act(() =>
-        fake.emit('melt-op:finalized', {
-          mintUrl: MINT,
-          operationId: 'mo-a',
-          operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
-        })
-      );
-      expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed' });
+      meltFinalized('mq-b', 'mo-b');
+      expect(toasts()).toEqual([]);
+      unmount();
+    } finally {
+      jest.useRealTimers();
     }
-    const popupsOfB = () => mockedPopup.mock.calls.filter(([popup]) => popup.id === 'mq-b').length;
-
-    it('is shown once when it comes again after the toast in flight confirmed', () => {
-      const { unmount } = mount();
-      holdBBesideMeltA();
-
-      act(() => fake.emit('melt-op:finalized', meltB));
-      expect(active()).toMatchObject({ id: 'mq-b', state: 'confirmed' });
-      act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
-
-      expect(active()).toBeNull();
-      expect(popupsOfB()).toBe(1);
-      unmount();
-    });
-
-    it('is not shown again when it comes again after it was shown from the hold', () => {
-      const { unmount } = mount();
-      holdBBesideMeltA();
-      act(() => usePaymentStatusStore.getState().clearActive('melt-a'));
-      expect(active()).toMatchObject({ id: 'mq-b', state: 'confirmed' });
-      act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
-
-      act(() => fake.emit('melt-op:finalized', meltB));
-
-      expect(active()).toBeNull();
-      expect(popupsOfB()).toBe(1);
-      unmount();
-    });
   });
 
-  it('shows another send’s success, left to a payment request in flight, once that toast ends', () => {
+  it('fails a melt toast on its rollback, keeps the reason its flow gave, and lets a later success correct it', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'payment-request',
-      id: 'pr-toast',
-      owner: { kind: 'pending', key: 'pr-toast' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'processing',
-    });
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'send-c',
-        operation: { amount: 7, unit: 'sat' },
-      })
-    );
-    expect(mockedPopup).not.toHaveBeenCalled();
+    paymentToasts.start(toastKey.melt('mq-1'), payment('melt', 300));
 
-    // The payment request's flow ends its toast without this send: it was another's.
-    act(() => usePaymentStatusStore.getState().clearActive('pr-toast'));
-    expect(active()).toMatchObject({ variant: 'send', id: 'send-c', state: 'confirmed' });
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'send',
-      id: 'send-c',
-      mintUrl: MINT,
-      amount: 7,
-      unit: 'sat',
-    });
+    meltRolledBack('mq-1');
+    expect(toasts()).toEqual(['melt:mq-1:failed']);
+    expect(toast('melt:mq-1')?.content).toMatchObject({ subtitle: expect.any(String) });
+
+    // The flow failed its own toast first, in its own words: the rollback
+    // event that follows does not reword it.
+    paymentToasts.start(toastKey.melt('mq-2'), payment('melt', 300));
+    paymentToasts.report(
+      toastKey.melt('mq-2'),
+      'failed',
+      payment('melt', 300, { subtitle: 'In the flow’s words' })
+    );
+    meltRolledBack('mq-2');
+    expect(toast('melt:mq-2')?.content).toMatchObject({ subtitle: 'In the flow’s words' });
+    paymentToasts.dismiss(toastKey.melt('mq-2'));
+
+    meltFinalized('mq-1', 'mo-1');
+    expect(toasts()).toEqual(['melt:mq-1:done']);
+    expect(toast('melt:mq-1')?.content).not.toHaveProperty('subtitle');
     unmount();
   });
 
-  it('does not fail a melt in flight for another melt’s rollback of the same amount', () => {
+  it('tells a rollback with no toast of its own as a failed melt', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
+    meltRolledBack('mq-9', 50);
+    expect(toasts()).toEqual(['melt:mq-9:failed']);
+    expect(toast('melt:mq-9')?.content).toMatchObject({
       variant: 'melt',
-      id: 'melt-a',
-      owner: { kind: 'melt', quoteId: 'mq-a' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
+      amount: 50,
+      target: { type: 'melt', quoteId: 'mq-9' },
+      subtitle: expect.any(String),
     });
-
-    act(() =>
-      fake.emit('melt-op:rolled-back', {
-        mintUrl: MINT,
-        operation: { id: 'mo-b', quoteId: 'mq-b', amount: 300, unit: 'sat', error: 'boom' },
-      })
-    );
-
-    // The other melt's failure is shown, as its own toast: funds coming back are never silent.
-    expect(active()).toMatchObject({
-      id: 'mq-b',
-      owner: { kind: 'melt', quoteId: 'mq-b' },
-      state: 'failed',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith(expect.objectContaining({ id: 'mq-b' }));
-    unmount();
-  });
-
-  it('fails a matching processing melt toast on rollback and does not stack a second one', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-toast',
-      owner: { kind: 'melt', quoteId: 'mq-1' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
-    });
-    const rollback = {
-      mintUrl: MINT,
-      operation: { id: 'mo-1', quoteId: 'mq-1', amount: 300, unit: 'sat', error: 'boom' },
-    };
-
-    act(() => fake.emit('melt-op:rolled-back', rollback));
-    expect(active()).toMatchObject({ id: 'melt-toast', state: 'failed' });
-
-    act(() => fake.emit('melt-op:rolled-back', rollback));
-    expect(active()).toMatchObject({ id: 'melt-toast', state: 'failed' });
-    expect(mockedPopup).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('raises a failed melt toast for a rollback with no matching toast', () => {
-    const { unmount } = mount();
-
-    act(() =>
-      fake.emit('melt-op:rolled-back', {
-        mintUrl: MINT,
-        operation: { id: 'mo-2', quoteId: 'mq-2', amount: 40, unit: 'usd' },
-      })
-    );
-
-    expect(active()).toMatchObject({
-      variant: 'melt',
-      id: 'mq-2',
-      unit: 'usd',
-      state: 'failed',
-      errorMessage: 'Payment was rolled back',
-    });
-    expect(mockedPopup).toHaveBeenCalledWith({
-      variant: 'melt',
-      id: 'mq-2',
-      mintUrl: MINT,
-      amount: 40,
-      unit: 'usd',
-    });
-    unmount();
-  });
-
-  it('confirms a processing melt toast in place when its melt finishes, keeping that melt for View', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-toast',
-      owner: { kind: 'melt', quoteId: 'mq-1' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'processing',
-    });
-
-    act(() =>
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'mo-1',
-        operation: { quoteId: 'mq-1', amount: 300, unit: 'sat', method: 'bolt11' },
-      })
-    );
-
-    expect(active()).toMatchObject({ id: 'melt-toast', state: 'confirmed', operationId: 'mo-1' });
-    expect(mockedPopup).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('confirms a delivered payment-request toast when its send finishes', () => {
-    const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'payment-request',
-      id: 'pr-toast',
-      owner: { kind: 'send', operationId: 'pr-send' },
-      mintUrl: MINT,
-      amount: 5,
-      unit: 'sat',
-      state: 'delivered',
-    });
-
-    act(() =>
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 'pr-send',
-        operation: { amount: 5, unit: 'sat' },
-      })
-    );
-
-    expect(active()).toMatchObject({ id: 'pr-toast', state: 'confirmed', operationId: 'pr-send' });
-    expect(mockedPopup).not.toHaveBeenCalled();
     unmount();
   });
 
   it('does not stack a failed toast on one the payment flow already failed for the same rollback', () => {
     const { unmount } = mount();
-    usePaymentStatusStore.getState().setActive({
-      variant: 'melt',
-      id: 'melt-failed-fresh',
-      owner: { kind: 'pending', key: 'melt-failed-fresh' },
-      mintUrl: MINT,
-      amount: 300,
-      unit: 'sat',
-      state: 'failed',
-      errorMessage: 'Route failed',
-    });
-
-    act(() =>
-      fake.emit('melt-op:rolled-back', {
-        mintUrl: MINT,
-        operation: { id: 'mo-1', quoteId: 'mq-1', amount: 300, unit: 'sat', error: 'boom' },
-      })
+    paymentToasts.report(
+      toastKey.pending('melt-failed'),
+      'failed',
+      payment('melt', 300, { subtitle: 'Route failed' })
     );
 
-    expect(active()).toMatchObject({ id: 'melt-failed-fresh', errorMessage: 'Route failed' });
-    expect(mockedPopup).not.toHaveBeenCalled();
+    meltRolledBack('mq-1');
+
+    expect(toasts()).toEqual(['pending:melt-failed:failed']);
+    unmount();
+  });
+
+  // T9: the rollback arrives before the flow has failed its own toast.
+  it('leaves a rollback to the flow whose toast is still waiting to learn its quote', () => {
+    const { unmount } = mount();
+    paymentToasts.start(toastKey.pending('melt'), payment('melt', 300), {
+      unbound: { group: 'melt' },
+    });
+
+    meltRolledBack('mq-1');
+
+    expect(toasts()).toEqual(['pending:melt:working']);
+    unmount();
+  });
+
+  it('does not take another melt’s rollback of a different amount for the waiting flow’s', () => {
+    const { unmount } = mount();
+    paymentToasts.start(toastKey.pending('melt'), payment('melt', 300), {
+      unbound: { group: 'melt' },
+    });
+
+    meltRolledBack('mq-b', 999);
+
+    expect(toasts()).toEqual(['pending:melt:working', 'melt:mq-b:failed']);
     unmount();
   });
 
@@ -962,41 +623,33 @@ describe('usePaymentStatusListener', () => {
     const { unmount } = mount();
     startSwap();
 
-    act(() => {
+    act(() =>
       fake.emit('mint-quote:updated', {
         mintUrl: MINT,
         method: 'bolt11',
         quoteId: 'q1',
-        quote: { method: 'bolt11', state: 'PAID', amount: 1, unit: 'sat' },
-      });
+        quote: { method: 'bolt11', state: 'PAID', amount: 21, unit: 'sat' },
+      })
+    );
+    act(() =>
       fake.emit('mint-op:finalized', {
         mintUrl: MINT,
-        operationId: 'o1',
-        operation: { quoteId: 'q2', method: 'bolt12', unit: 'sat', amount: 1 },
-      });
+        operationId: 'op-1',
+        operation: { quoteId: 'q2', method: 'onchain', unit: 'sat', amount: 5 },
+      })
+    );
+    act(() =>
       fake.emit('receive-op:finalized', {
         mintUrl: MINT,
         operation: { id: 'r1', amount: 1, unit: 'sat', source: { type: 'payment-request' } },
-      });
-      fake.emit('send:finalized', {
-        mintUrl: MINT,
-        operationId: 's1',
-        operation: { amount: 1, unit: 'sat' },
-      });
-      fake.emit('melt-op:finalized', {
-        mintUrl: MINT,
-        operationId: 'm1',
-        operation: { quoteId: 'mq', amount: 1, unit: 'sat', method: 'bolt11' },
-      });
-      fake.emit('melt-op:rolled-back', {
-        mintUrl: MINT,
-        operation: { id: 'm2', quoteId: 'mq2', amount: 1, unit: 'sat' },
-      });
-    });
+      })
+    );
+    sendFinalized('s1');
+    meltFinalized('mq', 'mo');
+    meltRolledBack('mq2');
     await flush();
 
-    expect(mockedPopup).not.toHaveBeenCalled();
-    expect(active()).toBeNull();
+    expect(toasts()).toEqual([]);
     expect(annotation('op:r1')).toBeUndefined();
     unmount();
   });

@@ -42,10 +42,12 @@ import {
   type NfcIOAdapter,
   meltMethodForTarget,
   annotationKey,
+  buildTimelineModel,
   decodePaymentRequestInfo,
   encodeTokenChecked,
   isWellFormedEcashToken,
   rawAnnotationKey,
+  timelinePhase,
 } from 'wallet';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
@@ -75,7 +77,6 @@ import {
   nfcEcashSharedPopup,
   nfcSendFailedPopup,
   paymentCancelledPopup,
-  paymentStatusPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
@@ -94,7 +95,11 @@ import { sendRouteOf } from '@/shared/stores/runtime/sendRoute';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import {
+  paymentToasts,
+  toastKey,
+  type PaymentToastContent,
+} from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   isSensitiveScanInput,
@@ -130,10 +135,9 @@ export function createSovranNotifications(
 ): NotificationHandlerMap {
   paymentLog.debug('payment.notifications.created');
   /**
-   * The processing toast this payment flow opened, under a key only it holds,
-   * and the payment it opened it for. The flow's later callbacks change that
-   * toast only, and only for that payment: another toast on screen, or a late
-   * callback for another payment, is left alone.
+   * The toast this payment flow started, by its key, and the payment it
+   * started it for. The flow's later callbacks change that toast only, and
+   * only for that payment: a late callback for another payment is left alone.
    */
   let started: {
     key: string;
@@ -150,12 +154,14 @@ export function createSovranNotifications(
     started.unit === data.unit
       ? started
       : null;
-  /** The toast this flow opened for this payment, while it is the one on screen. */
+  /** The toast this flow started for this payment, while it still has one. */
   const ownToast = (data: PaymentNotice) => {
     const own = startedFor(data);
-    const active = usePaymentStatusStore.getState().active;
-    return own && active?.id === own.key ? active : null;
+    const toast = own ? paymentToasts.get(own.key) : undefined;
+    return toast?.content.kind === 'payment' ? { key: toast.key, content: toast.content } : null;
   };
+  const toastVariant = (variant: PaymentNotice['variant']) =>
+    variant === 'paymentRequest' ? ('payment-request' as const) : variant;
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
@@ -239,59 +245,51 @@ export function createSovranNotifications(
         });
         return;
       }
-      const store = usePaymentStatusStore.getState();
-      const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const id = mintLocalId(data.variant);
+      // A melt from a preview already has its quote, which every event of the
+      // melt carries: its toast is keyed by it from the start. A payment
+      // request's send gets its id while it runs: until then the toast is held
+      // under a key only this flow knows, and bound once the id is known.
+      const quoteId = data.variant === 'melt' && data.quoteId ? data.quoteId : undefined;
+      const key = quoteId ? toastKey.melt(quoteId) : toastKey.pending(mintLocalId(data.variant));
       paymentLog.info('payment.processing', {
         variant: data.variant,
-        statusVariant: variant,
-        id,
+        key,
         ...mintUrlLogFields(data.mintUrl),
         amount: data.amount,
         unit: data.unit,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
-        expectedNext: 'processing_to_terminal_or_delivered',
       });
-      // A melt from a preview already has its quote, which every event of the
-      // melt carries. A payment request's send gets its id while it runs:
-      // until then the toast is held under a key only this flow knows.
       started = {
-        key: id,
+        key,
         variant: data.variant,
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
       };
-      store.setActive({
-        variant,
-        id,
-        owner:
-          data.variant === 'melt' && data.quoteId
-            ? { kind: 'melt', quoteId: data.quoteId }
-            : { kind: 'pending', key: id },
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-        state: 'processing',
-      });
-      paymentStatusPopup({
-        variant,
-        id,
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-      });
+      paymentToasts.start(
+        key,
+        {
+          kind: 'payment',
+          variant: toastVariant(data.variant),
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+          ...(quoteId ? { target: { type: 'melt' as const, quoteId } } : {}),
+        },
+        {
+          // Started from the screen in front: that screen shows the progress.
+          fromFocus: true,
+          ...(quoteId
+            ? { ids: [quoteId] }
+            : { unbound: { group: data.variant === 'melt' ? 'melt' : 'send' } }),
+        }
+      );
     },
     onPaymentConfirmed: (data) => {
-      const store = usePaymentStatusStore.getState();
       paymentLog.info('payment.confirmed', {
         variant: data.variant,
         ...mintUrlLogFields(data.mintUrl),
         amount: data.amount,
         unit: data.unit,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
         historyEntryLength: data.historyEntry.length,
       });
       // Persist the payment-request linkage onto the transaction. The
@@ -345,80 +343,69 @@ export function createSovranNotifications(
             ? confirmedEntry.id
             : undefined;
       const own = startedFor(data);
+      let target: Extract<PaymentToastContent, { kind: 'payment' }>['target'];
       if (own) {
         if (data.variant === 'paymentRequest' && entryOperationId) {
-          store.bindOwner(own.key, { kind: 'send', operationId: entryOperationId });
+          const key = toastKey.send(entryOperationId);
+          paymentToasts.bind(own.key, key, [entryOperationId]);
+          own.key = key;
+          target = { type: 'send', operationId: entryOperationId };
         } else if (data.variant === 'melt' && typeof confirmedEntry?.quoteId === 'string') {
-          store.bindOwner(own.key, { kind: 'melt', quoteId: confirmedEntry.quoteId });
+          const key = toastKey.melt(confirmedEntry.quoteId);
+          paymentToasts.bind(own.key, key, [
+            confirmedEntry.quoteId,
+            ...(entryOperationId ? [entryOperationId] : []),
+          ]);
+          own.key = key;
+          target = { type: 'melt', quoteId: confirmedEntry.quoteId };
         }
       }
 
-      const active = ownToast(data);
-      if (!active) {
+      const toast = ownToast(data);
+      if (!toast) {
         paymentLog.warn('payment.confirmed.skipped', {
           variant: data.variant,
-          reason: store.active ? 'active_status_not_this_payment' : 'no_active_status_toast',
+          reason: 'no_toast_of_this_payment',
         });
         return;
       }
 
-      if (data.variant === 'paymentRequest') {
-        paymentLog.info('payment.confirmed.route', {
-          variant: data.variant,
-          action: 'set_delivered',
-          activeId: active.id,
-          activeState: active.state,
-          expectedNext: 'delivered_then_later_confirmed',
-        });
-        store.setDelivered(active.id);
-      } else if (data.variant === 'melt' && data.historyEntry) {
-        if (confirmedEntry?.state === 'PENDING') {
-          paymentLog.info('payment.confirmed.skipped', {
-            variant: data.variant,
-            reason: 'melt_history_pending',
-            activeId: active.id,
-            activeState: active.state,
-          });
-          return;
-        }
-        paymentLog.info('payment.confirmed.route', {
-          variant: data.variant,
-          action: 'set_confirmed',
-          activeId: active.id,
-          activeState: active.state,
-        });
-        // The melt for View: its own event may have come while the toast was
-        // still waiting for its quote, and was left to this.
-        store.setConfirmed(
-          active.id,
-          entryOperationId ? { operationId: entryOperationId } : undefined
-        );
-      } else {
-        paymentLog.info('payment.confirmed.route', {
-          variant: data.variant,
-          action: 'set_confirmed',
-          activeId: active.id,
-          activeState: active.state,
-        });
-        store.setConfirmed(active.id);
-      }
+      // The toast says what the payment's timeline says: the same model the
+      // detail screen draws, read off the entry the flow just produced. A
+      // delivered payment request is waiting on its recipient (handed off); a
+      // melt the mint has not settled is still working, and turns slow at the
+      // moment the timeline does.
+      const model = confirmedEntry
+        ? buildTimelineModel({
+            // Schema-checked above; the timeline reads every field defensively.
+            historyEntry: confirmedEntry as unknown as HistoryEntry,
+            currentTime: Date.now(),
+          })
+        : null;
+      const phase =
+        (model ? timelinePhase(model) : null) ??
+        (data.variant === 'paymentRequest' ? 'handed-off' : 'done');
+      paymentLog.info('payment.confirmed.route', { variant: data.variant, key: toast.key, phase });
+      paymentToasts.report(
+        toast.key,
+        phase,
+        { ...toast.content, ...(target ? { target } : {}) },
+        model?.recheckAt !== undefined ? { slowAt: model.recheckAt } : {}
+      );
     },
     onPaymentCancelled: (data) => {
       // Deliberate user cancel (e.g. dismissed the onchain fee sheet):
       // dismiss the processing toast quietly — no failure surface.
-      const store = usePaymentStatusStore.getState();
       paymentLog.info('payment.cancelled', {
         variant: data.variant,
         ...mintUrlLogFields(data.mintUrl),
         amount: data.amount,
         unit: data.unit,
-        activeId: store.active?.id ?? null,
       });
       const own = startedFor(data);
-      if (own) store.clearActive(own.key);
+      if (own) paymentToasts.dismiss(own.key);
     },
     onPaymentFailed: (data) => {
-      const store = usePaymentStatusStore.getState();
       paymentLog.error('payment.failed', {
         variant: data.variant,
         ...mintUrlLogFields(data.mintUrl),
@@ -426,57 +413,38 @@ export function createSovranNotifications(
         unit: data.unit,
         message: data.message,
         rolledBack: data.rolledBack,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
+        outcomeUnknown: data.outcomeUnknown,
       });
+      // This flow's own toast when it has one (onchain melts start none, and
+      // it may have closed); otherwise the failure gets a toast of its own —
+      // never another payment's.
+      const own = ownToast(data);
+      const key = own?.key ?? toastKey.pending(mintLocalId(data.variant));
+      const content: PaymentToastContent = own?.content ?? {
+        kind: 'payment',
+        variant: toastVariant(data.variant),
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      };
+      // The payment left the wallet and its result is not known: it may still
+      // complete, so it is not shown as a failure, and a later success corrects it.
+      if (data.outcomeUnknown) {
+        paymentLog.info('payment.failed.route', { variant: data.variant, action: 'unconfirmed' });
+        paymentToasts.report(key, 'slow', { ...content, unconfirmed: true });
+        return;
+      }
       // `data.message` is the exception's own text. Unless the wallet package
       // wrote it, it reaches the screen only as catalogue copy; the log above
       // keeps the original.
       const reason = describeWalletFailure(data);
       const msg = data.rolledBack ? `${reason}\nYour funds have been returned.` : reason;
-      const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const active = ownToast(data);
-      if (!active) {
-        // No processing toast of this flow's to flip (onchain melts suppress
-        // it, and another payment may currently own the surface). A failure
-        // must still surface as its own terminal toast rather than mutating
-        // an unrelated payment.
-        const id = mintLocalId(data.variant);
-        paymentLog.info('payment.failed.route', {
-          variant: data.variant,
-          action: 'new_failed_toast',
-          id,
-          reason: store.active ? 'active_status_mismatch' : 'no_active_status_toast',
-          rolledBack: data.rolledBack,
-        });
-        store.setActive({
-          variant,
-          id,
-          // Final when shown: nothing is ever matched to it.
-          owner: { kind: 'pending', key: id },
-          mintUrl: data.mintUrl,
-          amount: data.amount,
-          unit: data.unit,
-          state: 'failed',
-          errorMessage: msg,
-        });
-        paymentStatusPopup({
-          variant,
-          id,
-          mintUrl: data.mintUrl,
-          amount: data.amount,
-          unit: data.unit,
-        });
-        return;
-      }
       paymentLog.info('payment.failed.route', {
         variant: data.variant,
-        action: 'set_failed',
-        activeId: active.id,
-        activeState: active.state,
+        action: own ? 'fail_own_toast' : 'new_failed_toast',
         rolledBack: data.rolledBack,
       });
-      store.setFailed(active.id, undefined, msg);
+      paymentToasts.report(key, 'failed', { ...content, subtitle: msg });
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') staticPopup('no-clipboard-address');
@@ -593,89 +561,63 @@ export function createSovranNotifications(
     },
 
     onReceiveProcessing: ({ id, mintUrl, amount, unit }) => {
-      const store = usePaymentStatusStore.getState();
       paymentLog.info('payment.receive.processing', {
         id,
         ...mintUrlLogFields(mintUrl),
         amount,
         unit,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
-        expectedNext: 'processing_to_confirmed_or_waiting_or_failed',
       });
-      if (store.active?.id === id && store.active?.state === 'failed') {
-        store.setActive(null);
-      }
-      store.setActive({
-        variant: 'receive-ecash',
-        id,
-        mintUrl,
-        amount,
-        unit,
-        state: 'processing',
-      });
-      paymentStatusPopup({
-        variant: 'receive-ecash',
-        id,
-        mintUrl,
-        amount,
-        unit,
-      });
+      // A redeem tried again after it failed starts its toast afresh.
+      paymentToasts.start(
+        toastKey.receive(id),
+        { kind: 'payment', variant: 'receive-ecash', mintUrl, amount, unit },
+        { fromFocus: true, ids: [id] }
+      );
     },
 
     onReceivePending: ({ id, mintUrl, amount, unit, operationId, message }) => {
-      const store = usePaymentStatusStore.getState();
-      const wasActive = store.active?.id === id;
       paymentLog.info('payment.receive.pending', {
         id,
         ...mintUrlLogFields(mintUrl),
         amount,
         unit,
         operationId,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
-        wasActive,
-        toastPolicy: 'terminal_warning_then_new_success',
-        expectedNext: 'coco_recovery_then_success_toast',
+        expectedNext: 'coco_recovery_then_success',
       });
-      if (!wasActive) {
-        store.setActive({
+      // Not a failure: the ecash is kept and redeemed once the mint answers.
+      paymentToasts.report(
+        toastKey.receive(id),
+        'slow',
+        {
+          kind: 'payment',
           variant: 'receive-ecash',
-          id,
           mintUrl,
           amount,
           unit,
-          state: 'processing',
-        });
-        paymentStatusPopup({
-          variant: 'receive-ecash',
-          id,
-          mintUrl,
-          amount,
-          unit,
-        });
-      }
-      store.setWaiting(id, {
-        title: RECEIVE_PENDING_TOAST_COPY.title,
-        subtitle: message ?? RECEIVE_PENDING_TOAST_COPY.subtitle,
-      });
+          title: RECEIVE_PENDING_TOAST_COPY.title,
+          subtitle: message ?? RECEIVE_PENDING_TOAST_COPY.subtitle,
+        },
+        { ids: [id] }
+      );
     },
 
     onReceiveConfirmed: async ({ id, historyEntry }) => {
-      const store = usePaymentStatusStore.getState();
-      paymentLog.info('payment.receive.confirmed', {
-        id,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
-        expectedNext:
-          store.active?.state === 'waiting'
-            ? 'listener_mounts_new_success_toast'
-            : 'active_toast_confirmed',
-      });
-      if (store.active?.id === id) {
-        store.setConfirmed(id);
-      }
+      const key = toastKey.receive(id);
+      const toast = paymentToasts.get(key);
+      paymentLog.info('payment.receive.confirmed', { id, phase: toast?.phase ?? null });
       const entry = parseHistoryEntryOnce(historyEntry);
+      if (toast?.content.kind === 'payment') {
+        const { title: _title, subtitle: _subtitle, ...content } = toast.content;
+        paymentToasts.report(
+          key,
+          'done',
+          {
+            ...content,
+            ...(entry?.id ? { target: { type: 'receive' as const, entryId: entry.id } } : {}),
+          },
+          entry?.id ? { ids: [entry.id] } : {}
+        );
+      }
       if (entry?.id) {
         try {
           await captureAndStoreLocation(entry.id);
@@ -686,19 +628,14 @@ export function createSovranNotifications(
     },
 
     onReceiveFailed: ({ id, message }) => {
-      const store = usePaymentStatusStore.getState();
-      paymentLog.error('payment.receive.failed', {
-        id,
-        message,
-        activeId: store.active?.id ?? null,
-        activeState: store.active?.state ?? null,
-        expectedNext:
-          store.active?.id === id && store.active?.state === 'processing'
-            ? 'active_toast_failed'
-            : 'static_receive_failed_popup',
-      });
-      if (store.active?.id === id && store.active?.state === 'processing') {
-        store.setFailed(id, new Error(message));
+      const key = toastKey.receive(id);
+      const toast = paymentToasts.get(key);
+      paymentLog.error('payment.receive.failed', { id, message, phase: toast?.phase ?? null });
+      if (toast?.phase === 'working') {
+        paymentToasts.report(key, 'failed', {
+          ...toast.content,
+          subtitle: describeError(new Error(message), 'cashu').text,
+        });
       } else {
         staticPopup('receive-failed', { failure: { service: 'cashu', error: message } });
       }

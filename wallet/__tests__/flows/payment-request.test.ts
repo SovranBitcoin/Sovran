@@ -354,6 +354,10 @@ describe('payment request — confirm after delivery', () => {
     expect((await tm.machine.confirmPaymentRequest()).kind).toBe('undelivered');
 
     tm.assertStep('navigateToPaymentRequest');
+    // The recipient may still claim it, so it is not reported as a plain failure.
+    expect(tm.notificationCalls.find((c) => c.key === 'onPaymentFailed')?.data).toMatchObject({
+      outcomeUnknown: true,
+    });
   });
 
   it('does not send again, from the same mint or another, once ecash left and could not be taken back', async () => {

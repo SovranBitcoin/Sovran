@@ -9,50 +9,32 @@ import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockPaymentStatus: { active: Record<string, unknown> | null } = {
-  active: { id: 'quote-1', state: 'processing' },
-};
+const mockPaymentStatus: { toasts: Record<string, unknown>[] } = { toasts: [] };
+const mockOpen = jest.fn(async (..._args: unknown[]) => true);
 
-jest.mock('wallet', () => ({
-  createPaymentCopyGroups: jest.fn(() => ({
-    TOAST_COPY: {
-      receive: {
-        message: 'Receiving',
-        processing: 'Processing',
-        confirmed: 'Received',
-        failed: 'Failed',
-      },
-      send: {
-        message: 'Sending',
-        processing: 'Processing',
-        confirmed: 'Sent',
-        failed: 'Failed',
-      },
-      melt: {
-        message: 'Sending',
-        processing: 'Processing',
-        confirmed: 'Sent',
-        failed: 'Failed',
-      },
-      'receive-ecash': {
-        message: 'Receiving',
-        processing: 'Processing',
-        confirmed: 'Received',
-        failed: 'Failed',
-      },
-      'payment-request': {
-        message: 'Sending request',
-        processing: 'Processing',
-        delivered: 'Delivered',
-        confirmed: 'Confirmed',
-        failed: 'Failed',
+function show(phase: string, content: Record<string, unknown> = {}): void {
+  mockPaymentStatus.toasts = [
+    {
+      id: 'toast-1',
+      key: 'mint:quote-1',
+      phase,
+      content: {
+        kind: 'payment',
+        variant: 'receive',
+        mintUrl: 'https://mint.sovran.money',
+        amount: 33,
+        unit: 'sat',
+        ...content,
       },
     },
-  })),
-}));
-jest.mock('@/shared/hooks/usePaymentCopyResolver', () => ({
-  usePaymentCopyResolver: jest.fn(() => jest.fn()),
-}));
+  ];
+}
+
+jest.mock('@/shared/hooks/usePaymentCopyResolver', () => {
+  const { createPaymentCopyResolver } = jest.requireActual('wallet');
+  const resolver = createPaymentCopyResolver();
+  return { usePaymentCopyResolver: () => resolver };
+});
 jest.mock('@/shared/ui/primitives/View/View', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
@@ -77,22 +59,12 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { displayBtc: number }) => unknown) =>
     selector({ displayBtc: 0 }),
 }));
-jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: {
-    isInitialized: jest.fn(() => true),
-    getInstance: jest.fn(() => ({
-      history: { getPaginatedHistory: jest.fn(async () => []) },
-    })),
-  },
-}));
-jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { navigate: jest.fn() } }));
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { push: jest.fn() } }));
 jest.mock('@/shared/hooks/useSingleFlight', () => ({
   useSingleFlight: (callback: (...args: unknown[]) => unknown) => callback,
 }));
-jest.mock('@/shared/lib/cashu/syntheticHistory', () => ({ asHistoryEntry: jest.fn() }));
-jest.mock('@/shared/lib/nav/transactionDetailRoutes', () => ({
-  getMeltDetailPathname: jest.fn(),
-  getMintDetailPathname: jest.fn(),
+jest.mock('@/shared/lib/popup/paymentToastTarget', () => ({
+  openToastTransaction: (...args: unknown[]) => mockOpen(...args),
 }));
 jest.mock('@/shared/lib/logger', () => ({
   popupLog: { info: jest.fn(), warn: jest.fn() },
@@ -110,59 +82,91 @@ jest.mock('@/shared/lib/popup/StatusToast', () => {
   };
 });
 
+function render(hide = jest.fn()) {
+  const element = () => (
+    <>
+      <PaymentStatusToast paymentToastId="toast-1" hide={hide} />
+      <E2EToastProbe />
+    </>
+  );
+  let renderer: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(element());
+  });
+  const rerender = () => act(() => renderer.update(element()));
+  const toast = renderer!.root.find((node) => (node.type as unknown) === 'MockStatusToast');
+  return { renderer: renderer!, toast, hide, rerender };
+}
+
 describe('PaymentStatusToast selectors', () => {
   beforeEach(() => {
-    mockPaymentStatus.active = { id: 'quote-1', state: 'processing' };
+    mockOpen.mockClear();
+    mockOpen.mockResolvedValue(true);
   });
 
-  it('names the root and receive processing stage', async () => {
-    let renderer: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      renderer = TestRenderer.create(
-        <PaymentStatusToast
-          variant="receive"
-          paymentId="quote-1"
-          mintUrl="https://mint.sovran.money"
-          amount={33}
-          unit="sat"
-          hide={jest.fn()}
-        />
-      );
-    });
-
-    const toast = renderer!.root.find((node) => (node.type as unknown) === 'MockStatusToast');
+  it('names the root and the receive processing stage', () => {
+    show('working');
+    const { toast } = render();
     expect(toast.props.toastProps.testID).toBe('payment-status-toast');
     expect(toast.props.statusTestID).toBe('payment-status-receive-processing');
   });
 
-  it('names the receive confirmation stage and View action', async () => {
-    mockPaymentStatus.active = { id: 'quote-1', state: 'confirmed' };
-    const hide = jest.fn();
-    let renderer: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      renderer = TestRenderer.create(
-        <>
-          <PaymentStatusToast
-            variant="receive"
-            paymentId="quote-1"
-            mintUrl="https://mint.sovran.money"
-            amount={33}
-            unit="sat"
-            hide={hide}
-          />
-          <E2EToastProbe />
-        </>
-      );
-    });
+  it.each([
+    ['handed-off', 'delivered'],
+    ['slow', 'warning'],
+    ['done', 'confirmed'],
+    ['failed', 'failed'],
+  ])('names the %s phase as the %s stage', (phase, stage) => {
+    show(phase);
+    expect(render().toast.props.statusTestID).toBe(`payment-status-receive-${stage}`);
+  });
 
-    const toast = renderer!.root.find((node) => (node.type as unknown) === 'MockStatusToast');
-    expect(toast.props.statusTestID).toBe('payment-status-receive-confirmed');
+  it('names the receive confirmation stage and View action, which opens the transaction and hides', async () => {
+    const target = { type: 'mint', quoteId: 'quote-1' };
+    show('done', { target });
+    const { renderer, toast, hide } = render();
+
     expect(toast.props.action.testID).toBe('payment-status-view');
-    expect(
-      renderer!.root.findByProps({ testID: 'payment-status-receive-confirmed' })
-    ).toBeDefined();
-    const viewProxy = renderer!.root.findByProps({ testID: 'payment-status-view' });
+    expect(renderer.root.findByProps({ testID: 'payment-status-receive-confirmed' })).toBeDefined();
+    const viewProxy = renderer.root.findByProps({ testID: 'payment-status-view' });
     await act(async () => viewProxy.props.onPress());
+    expect(mockOpen).toHaveBeenCalledWith(target, 'https://mint.sovran.money');
     expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the transaction from a tap anywhere on the toast, in any phase', async () => {
+    const target = { type: 'mint', quoteId: 'quote-1' };
+    show('working', { target });
+    const { toast, hide } = render();
+
+    // No pill while it works; the body is the way in.
+    expect(toast.props.action).toBeUndefined();
+    await act(async () => toast.props.onPress());
+    expect(mockOpen).toHaveBeenCalledWith(target, 'https://mint.sovran.money');
+    expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays up when the transaction could not be opened', async () => {
+    mockOpen.mockResolvedValue(false);
+    show('done', { target: { type: 'mint', quoteId: 'quote-1' } });
+    const { toast, hide } = render();
+    await act(async () => toast.props.onPress());
+    expect(hide).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing to tap while the payment has no id the wallet issued', () => {
+    show('done');
+    const { toast } = render();
+    expect(toast.props.onPress).toBeUndefined();
+    expect(toast.props.action).toBeUndefined();
+  });
+
+  it('keeps drawing what it last showed once the machine has dropped it (the exit animation)', () => {
+    show('done');
+    const { renderer, rerender } = render();
+    mockPaymentStatus.toasts = [];
+    rerender();
+    const toast = renderer.root.find((node) => (node.type as unknown) === 'MockStatusToast');
+    expect(toast.props.statusTestID).toBe('payment-status-receive-confirmed');
   });
 });

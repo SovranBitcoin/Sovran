@@ -13,15 +13,16 @@
 import { meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
+import { describeError } from '@/shared/lib/errors';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+
+import { resetFakePaymentToasts, toastReports } from './helpers/fakePaymentToasts';
 
 const MINT_URL = 'https://mint.example';
 const TOKEN = 'cashuBinterrupted';
 const mockManager = { mint: { isTrustedMint: async () => true } };
 const mockExecuteAutoRedeem = jest.fn();
-const mockSetFailed = jest.fn();
 const mockSetTransactionAnnotation = jest.fn();
-const mockPaymentStatus: { active: { id: string } | null } = { active: null };
 
 jest.mock('wallet/operations', () => ({
   createDefaultOperations: () => ({ executeAutoRedeem: mockExecuteAutoRedeem }),
@@ -38,23 +39,14 @@ jest.mock('@/features/bitchat/hooks/useBLEPeers', () => ({
   useBLEPeerDirectory: { getState: () => ({ peers: [] }) },
 }));
 jest.mock('@/features/nearPay/lib/peerProfile', () => ({ peerNostrPubkey: jest.fn() }));
-jest.mock('@/shared/lib/popup', () => ({ paymentStatusPopup: jest.fn() }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({ readProfileRecord: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: (...args: unknown[]) => mockSetTransactionAnnotation(...args),
 }));
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: {
-    getState: () => ({
-      active: mockPaymentStatus.active,
-      setActive: (active: { id: string } | null) => {
-        mockPaymentStatus.active = active;
-      },
-      setWaiting: jest.fn(),
-      setFailed: (...args: unknown[]) => mockSetFailed(...args),
-    }),
-  },
-}));
+jest.mock(
+  '@/shared/stores/runtime/paymentStatusStore',
+  () => require('./helpers/fakePaymentToasts').fakePaymentStatusStore
+);
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
   useWalletLifecycleStore: { getState: () => ({ restoreStatus: 'complete' }) },
 }));
@@ -82,9 +74,8 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 const HASH = meshTokenDedupeKey(TOKEN);
 
 beforeEach(() => {
-  mockPaymentStatus.active = null;
+  resetFakePaymentToasts();
   mockExecuteAutoRedeem.mockReset().mockRejectedValue(new Error('Token already spent'));
-  mockSetFailed.mockReset();
   mockSetTransactionAnnotation.mockReset();
   useNutDropRedeemQueueStore.setState({
     byTokenHash: {
@@ -116,8 +107,15 @@ describe('a drop the app was killed in the middle of redeeming (F213, quirk)', (
 
   it('shows a red "already redeemed" toast for money that arrived', async () => {
     await drainNutDropRedeemQueue();
-    expect(mockSetFailed).toHaveBeenCalledTimes(1);
-    expect(mockSetFailed).toHaveBeenCalledWith(HASH, new Error('Token was already redeemed'));
+    expect(toastReports).toEqual([
+      {
+        key: `receive:${HASH}`,
+        phase: 'failed',
+        content: expect.objectContaining({
+          subtitle: describeError(new Error('Token was already redeemed'), 'cashu').text,
+        }),
+      },
+    ]);
   });
 
   it('gives the history row no sender or Bluetooth badge', async () => {

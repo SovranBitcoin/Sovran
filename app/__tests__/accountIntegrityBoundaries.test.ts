@@ -86,7 +86,7 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
   },
 }));
 jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: () => ({ setActive: jest.fn() }) },
+  paymentToasts: { dismissAll: jest.fn() },
 }));
 jest.mock('@/shared/stores/runtime/popupStore', () => ({
   usePopupStore: { getState: () => ({ destroySheet: jest.fn(), close: jest.fn() }) },

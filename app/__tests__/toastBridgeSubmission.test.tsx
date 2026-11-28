@@ -70,6 +70,7 @@ describe('with a toast host', () => {
         shown.push(options as unknown as Options);
         return `manager-${shown.length}`;
       },
+      hide: () => undefined,
     });
   });
 

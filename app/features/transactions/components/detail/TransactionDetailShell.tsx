@@ -26,6 +26,7 @@ import {
 import { CounterpartyTransactions } from '@/features/transactions/components/CounterpartyTransactions';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
+import { useFocusedTransaction } from '@/features/transactions/lib/useFocusedTransaction';
 
 type DetailEntry = React.ComponentProps<typeof HistoryEntryTimeline>['historyEntry'];
 type MintInfo = React.ComponentProps<typeof HistoryEntryRefresh>['mintInfo'];
@@ -135,6 +136,8 @@ export function TransactionDetailShell({
   children,
 }: TransactionDetailShellProps): React.ReactElement {
   const style = useAppStyle();
+  // This screen already shows the payment's progress: its toast stays quiet.
+  useFocusedTransaction(entry);
   const entryIdentity = useTransactionIdentity(entry);
   const namedIdentity = headerIdentity ?? entryIdentity;
   // One phrase names the screen and the person: the collapsed bar shows the

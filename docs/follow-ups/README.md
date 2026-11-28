@@ -158,7 +158,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F183](F183.md) | medium | decision | BitChat drops a failed public or geohash send without telling the person |
 | [F185](F185.md) | medium | fix | Feed: refresh can latch, and failed replies and poll votes are silent |
 | [F186](F186.md) | medium | fix | Mint screens show sat balances under another unit, and stale validation results |
-| [F187](F187.md) | low | investigation | The swap toast can latch as mounted when no toast host is registered |
 | [F188](F188.md) | medium | fix | The logger still prints unredacted text when a transport throws or an error message is a bare hex key |
 | [F189](F189.md) | low | decision | Applying a theme saves a wallpaper whose download failed |
 | [F191](F191.md) | high | decision | A long name or picture cached from a Nostr profile makes the whole account list load empty |

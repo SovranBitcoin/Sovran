@@ -66,6 +66,7 @@ export {
   groupAiRequests,
   isAiRequestLeg,
   isSettledStepType,
+  timelinePhase,
   isPendingPaymentRequestEntry,
   normalizeHistoryEntry,
   entryStateRank,
@@ -93,6 +94,7 @@ export {
 export type {
   AiRequestGroup,
   AiRequestState,
+  PaymentPhase,
   TimelineFlowVariant,
   TimelineStep,
   TimelineStepType,

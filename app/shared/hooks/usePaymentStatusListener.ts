@@ -1,14 +1,14 @@
 /**
- * Subscribes to coco events for payment status.
+ * Subscribes to coco events and reports each payment's progress to its toast.
  * Receive (mint): mint-quote:updated (PAID) or mint-op:pending (quote PAID) → mint-op:finalized.
- * Receive (ecash): toast shown on redeem button → receive:created updates to confirmed.
- * Send: send:finalized confirms the send/payment-request toast of that send,
- * otherwise shows the standard send confirmation toast.
- * Melt: toast shown on confirm button → melt-op:finalized of that melt updates it to confirmed.
+ * Receive (ecash): toast started on redeem → receive-op:finalized / history:updated finish it.
+ * Send: send:finalized finishes the send / payment-request toast of that send.
+ * Melt: toast started on confirm → melt-op:finalized / melt-op:rolled-back of that melt end it.
  *
- * A send, melt or payment-request toast is changed only by an event for the
- * payment it belongs to (its owner), and is not replaced by another payment's
- * event while its own is still processing.
+ * Every toast is keyed by its payment (`toastKey`): an event only ever reaches
+ * the toast of the payment it is about, and two payments in flight together
+ * have a toast each. What a toast shows, and for how long, is the payment
+ * toast machine's (`paymentToastMachine`).
  */
 
 import { useEffect } from 'react';
@@ -23,9 +23,12 @@ import {
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
 } from 'wallet';
-import { paymentStatusPopup } from '@/shared/lib/popup';
 import { describeError } from '@/shared/lib/errors';
-import { ownsMelt, usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import {
+  paymentToasts,
+  toastKey,
+  type PaymentToastContent,
+} from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
@@ -137,10 +140,23 @@ async function persistOnchainMeltAnnotation(
   }
 }
 
-function activeMintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+type PaymentContent = Extract<PaymentToastContent, { kind: 'payment' }>;
+
+/**
+ * The content of a payment's toast once it has a result: what it already
+ * showed (so a payment request stays one), without wording that only
+ * described the wait, or `fresh` when the payment had no toast.
+ */
+function resultContent(key: string, fresh: PaymentContent): PaymentContent {
+  const current = paymentToasts.get(key)?.content;
+  if (current?.kind !== 'payment') return fresh;
   return {
-    activeHasMintUrl: !!mintUrl,
-    activeMintUrlLength: mintUrl?.length ?? 0,
+    kind: 'payment',
+    variant: current.variant,
+    mintUrl: current.mintUrl,
+    amount: current.amount,
+    unit: current.unit,
+    ...((fresh.target ?? current.target) ? { target: fresh.target ?? current.target } : {}),
   };
 }
 
@@ -166,49 +182,33 @@ function shouldShowNpcReceivePopup(
   return nowMs - observedAtMs <= NPC_RECEIVE_POPUP_MAX_AGE_MS;
 }
 
-function showConfirmedReceiveEcashToast(input: {
-  id: string;
-  mintUrl: string;
-  amount: number;
-  unit: string;
-  receiveEntryId?: string;
-  source: 'history_updated_waiting' | 'receive_finalized_waiting';
-}): void {
-  const { id, mintUrl, amount, unit, receiveEntryId, source } = input;
-  const active = usePaymentStatusStore.getState().active;
-  paymentLog.info('hook.payment_status.receive_waiting_finalized_new_toast', {
-    id,
-    ...mintUrlLogFields(mintUrl),
-    amount,
-    unit,
-    receiveEntryId: receiveEntryId ?? null,
-    source,
-    previousActiveId: active?.id ?? null,
-    previousActiveState: active?.state ?? null,
-    toastPolicy: 'mount_new_success_toast_after_waiting_warning',
+/**
+ * The ecash receive toast an event for `mintUrl` + `amount` is about. Coco's
+ * receive events carry no id the redeem flow knows, so it is matched by mint
+ * and amount: one still in flight first, else one that ended without its
+ * history entry yet.
+ */
+function receiveEcashToast(
+  mintUrl: string,
+  amount: number
+): { key: string; content: PaymentContent } | null {
+  const candidates = paymentToasts.tracked().flatMap((toast) => {
+    const { content } = toast;
+    return content.kind === 'payment' &&
+      content.variant === 'receive-ecash' &&
+      content.mintUrl === mintUrl &&
+      content.amount === amount &&
+      toast.phase !== 'failed' &&
+      !(content.target?.type === 'receive' && content.target.entryId)
+      ? [{ key: toast.key, phase: toast.phase, content }]
+      : [];
   });
-  usePaymentStatusStore.getState().setActive({
-    variant: 'receive-ecash',
-    id,
-    mintUrl,
-    amount,
-    unit,
-    state: 'confirmed',
-    ...(receiveEntryId ? { receiveEntryId } : {}),
-  });
-  paymentStatusPopup({
-    variant: 'receive-ecash',
-    id,
-    mintUrl,
-    amount,
-    unit,
-    ...(receiveEntryId ? { receiveEntryId } : {}),
-  });
+  return candidates.find((toast) => toast.phase !== 'done') ?? candidates[0] ?? null;
 }
 
 /**
- * Mark a receive quote as processing and raise its status popup, unless the
- * same quote is already the active status (then only the store is refreshed).
+ * Start the receive toast of a paid quote. A quote already being shown (or
+ * already shown as received) is not started twice.
  * The caller supplies its existing source-specific processing log event.
  */
 function activateReceiveProcessing({
@@ -225,35 +225,25 @@ function activateReceiveProcessing({
   amount: number;
   unit: string;
 }): void {
-  const existingActive = usePaymentStatusStore.getState().active;
-  const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
-
   paymentLog.info(processingLogEvent, {
     quoteId,
     ...mintUrlLogFields(mintUrl),
     amount,
     unit,
-    isDuplicate,
+    isDuplicate: !!paymentToasts.get(toastKey.mint(quoteId)),
   });
-  usePaymentStatusStore.getState().setActive({
-    variant: 'receive',
-    id: quoteId,
-    mintUrl,
-    amount,
-    unit,
-    state: 'processing',
-  });
-
-  if (isDuplicate) {
-    paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-      quoteId,
-      ...mintUrlLogFields(mintUrl),
-      reason: 'already_active',
-    });
-    return;
-  }
-
-  paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+  paymentToasts.start(
+    toastKey.mint(quoteId),
+    {
+      kind: 'payment',
+      variant: 'receive',
+      mintUrl,
+      amount,
+      unit,
+      target: { type: 'mint', quoteId },
+    },
+    { ids: [quoteId] }
+  );
 }
 
 type CocoManager = NonNullable<ReturnType<typeof useManagerContext>['manager']>;
@@ -391,7 +381,7 @@ export function usePaymentStatusListener(): void {
         if (remoteState !== 'PAID') return;
 
         // Suppress per-leg toasts while a swap is running — the unified
-        // SwapStatusToast owns the user-facing surface for the duration.
+        // swap toast owns the user-facing surface for the duration.
         if (isSwapStatusActive()) {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
             quoteId,
@@ -453,9 +443,18 @@ export function usePaymentStatusListener(): void {
       // always carries quoteId — no init-state defense needed anymore.
       const quoteId = operation.quoteId;
       paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
-      const store = usePaymentStatusStore.getState();
-      const hadMatchingActive = store.active?.id === quoteId;
-      store.setConfirmed(quoteId);
+      const key = toastKey.mint(quoteId);
+      const hadToast = !!paymentToasts.get(key);
+      const received = (): PaymentContent =>
+        resultContent(key, {
+          kind: 'payment',
+          variant: 'receive',
+          mintUrl,
+          amount: amountToNumber(operation.amount),
+          unit: operation.unit,
+          target: { type: 'mint', quoteId },
+        });
+      if (hadToast) paymentToasts.report(key, 'done', received(), { ids: [quoteId, operationId] });
 
       // Onchain address-reuse policy (mirrors P2PK rotation-on-receive): a
       // deposit that lands on the STANDING onchain address retires it — the
@@ -496,26 +495,16 @@ export function usePaymentStatusListener(): void {
       // Standing-quote deposits (bolt12 offer / onchain address) auto-mint
       // with no prior toast — surface a confirmed receive so the deposit
       // isn't silent. bolt11 mints already ran the PAID-processing toast.
-      if (!hadMatchingActive && operation.method !== 'bolt11') {
+      if (!hadToast && operation.method !== 'bolt11') {
         if (isSwapStatusActive()) return;
-        const amount = amountToNumber(operation.amount);
-        const unit = operation.unit;
         paymentLog.info('hook.payment_status.reusable_deposit_confirmed', {
           quoteId,
           method: operation.method,
           ...mintUrlLogFields(mintUrl),
-          amount,
-          unit,
+          amount: amountToNumber(operation.amount),
+          unit: operation.unit,
         });
-        usePaymentStatusStore.getState().setActive({
-          variant: 'receive',
-          id: quoteId,
-          mintUrl,
-          amount,
-          unit,
-          state: 'confirmed',
-        });
-        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+        paymentToasts.report(key, 'done', received(), { ids: [quoteId, operationId] });
       }
     });
 
@@ -554,15 +543,19 @@ export function usePaymentStatusListener(): void {
             : {}),
         },
       });
-      usePaymentStatusStore.getState().setActive({
-        variant: 'receive',
-        id: op.id,
-        mintUrl,
-        amount,
-        unit: op.unit,
-        state: 'confirmed',
-      });
-      paymentStatusPopup({ variant: 'receive', id: op.id, mintUrl, amount, unit: op.unit });
+      paymentToasts.report(
+        toastKey.receive(op.id),
+        'done',
+        {
+          kind: 'payment',
+          variant: 'receive',
+          mintUrl,
+          amount,
+          unit: op.unit,
+          target: { type: 'receive', operationId: op.id },
+        },
+        { ids: [op.id] }
+      );
 
       // If this payment landed on the STANDING reusable request (the "QR Display"
       // Cashu rail), rotate to a fresh one — same chokepoint + identity-store
@@ -590,38 +583,14 @@ export function usePaymentStatusListener(): void {
     // confirm the toast prematurely.
     const offHistoryUpdated = manager.on('history:updated', ({ mintUrl, entry }) => {
       if (entry.type !== 'receive' || entry.state !== 'finalized') return;
-      const store = usePaymentStatusStore.getState();
-      const active = store.active;
       const amount = amountToNumber(entry.amount);
-      if (
-        !active ||
-        active.variant !== 'receive-ecash' ||
-        active.mintUrl !== mintUrl ||
-        active.amount !== amount ||
-        active.receiveEntryId ||
-        !entry.id
-      ) {
+      const toast = entry.id ? receiveEcashToast(mintUrl, amount) : null;
+      if (!toast) {
         paymentLog.debug('hook.payment_status.receive_entry_link_skipped', {
           ...mintUrlLogFields(mintUrl),
           amount,
           entryId: entry.id ?? null,
-          activeId: active?.id ?? null,
-          activeVariant: active?.variant ?? null,
-          ...activeMintUrlLogFields(active?.mintUrl),
-          activeAmount: active?.amount ?? null,
-          activeState: active?.state ?? null,
-          hasReceiveEntryId: !!active?.receiveEntryId,
-          reason: !active
-            ? 'no_active'
-            : active.variant !== 'receive-ecash'
-              ? 'active_variant_mismatch'
-              : active.mintUrl !== mintUrl
-                ? 'mint_mismatch'
-                : active.amount !== amount
-                  ? 'amount_mismatch'
-                  : active.receiveEntryId
-                    ? 'already_linked'
-                    : 'entry_missing_id',
+          reason: entry.id ? 'no_receive_toast_without_entry' : 'entry_missing_id',
         });
         return;
       }
@@ -629,29 +598,16 @@ export function usePaymentStatusListener(): void {
         ...mintUrlLogFields(mintUrl),
         amount,
         entryId: entry.id,
-        from: active.state,
       });
-
-      if (active.state === 'waiting') {
-        showConfirmedReceiveEcashToast({
-          id: entry.id,
-          mintUrl,
-          amount,
-          unit: active.unit,
-          receiveEntryId: entry.id,
-          source: 'history_updated_waiting',
-        });
-        return;
-      }
-
-      paymentLog.info('hook.payment_status.receive_entry_confirm_same_toast', {
-        id: active.id,
-        ...mintUrlLogFields(mintUrl),
-        amount,
-        receiveEntryId: entry.id,
-        from: active.state,
-      });
-      store.setConfirmed(active.id, { receiveEntryId: entry.id });
+      paymentToasts.report(
+        toast.key,
+        'done',
+        resultContent(toast.key, {
+          ...toast.content,
+          target: { type: 'receive', entryId: entry.id },
+        }),
+        { ids: [entry.id] }
+      );
     });
 
     const offReceiveCreated = manager.on('receive-op:finalized', ({ mintUrl, operation }) => {
@@ -661,52 +617,32 @@ export function usePaymentStatusListener(): void {
         amount,
         operationId: operation.id,
       });
-      // Transition the toast to 'confirmed' even if history:updated
-      // hasn't fired yet — receiveEntryId may arrive a tick later.
-      const store = usePaymentStatusStore.getState();
-      const active = store.active;
-      if (
-        active?.variant === 'receive-ecash' &&
-        active.mintUrl === mintUrl &&
-        active.amount === amount
-      ) {
-        if (active.state === 'waiting') {
-          showConfirmedReceiveEcashToast({
-            id: operation.id,
-            mintUrl,
-            amount,
-            unit: operation.unit,
-            source: 'receive_finalized_waiting',
-          });
-          return;
-        }
-        paymentLog.info('hook.payment_status.receive_created_confirm_same_toast', {
-          id: active.id,
-          ...mintUrlLogFields(mintUrl),
-          amount,
-          from: active.state,
-          operationId: operation.id,
-        });
-        store.setConfirmed(active.id);
-      } else {
+      // Finish the toast even if history:updated has not fired yet — the
+      // entry id for View may arrive a tick later.
+      const toast = receiveEcashToast(mintUrl, amount);
+      if (!toast) {
         paymentLog.debug('hook.payment_status.receive_created_skipped', {
           ...mintUrlLogFields(mintUrl),
           amount,
           operationId: operation.id,
-          activeId: active?.id ?? null,
-          activeVariant: active?.variant ?? null,
-          ...activeMintUrlLogFields(active?.mintUrl),
-          activeAmount: active?.amount ?? null,
-          activeState: active?.state ?? null,
-          reason: !active
-            ? 'no_active'
-            : active.variant !== 'receive-ecash'
-              ? 'active_variant_mismatch'
-              : active.mintUrl !== mintUrl
-                ? 'mint_mismatch'
-                : 'amount_mismatch',
+          reason: 'no_receive_toast_for_mint_and_amount',
         });
+        return;
       }
+      paymentLog.info('hook.payment_status.receive_created_confirm_same_toast', {
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        operationId: operation.id,
+      });
+      paymentToasts.report(
+        toast.key,
+        'done',
+        resultContent(toast.key, {
+          ...toast.content,
+          target: { type: 'receive', operationId: operation.id },
+        }),
+        { ids: [operation.id] }
+      );
     });
 
     const offSendFinalized = manager.on('send:finalized', ({ mintUrl, operationId, operation }) => {
@@ -725,56 +661,22 @@ export function usePaymentStatusListener(): void {
         });
         return;
       }
-      const owner = { kind: 'send' as const, operationId };
-      const toast = {
-        variant: 'send' as const,
-        id: operationId,
-        owner,
-        mintUrl,
-        amount,
-        unit,
-        state: 'confirmed' as const,
-      };
-      const active = usePaymentStatusStore.getState().active;
-      // A send still being paid keeps the surface, and this may be its own
-      // send: the result is held, for that toast once its flow binds it.
-      const delivery = usePaymentStatusStore
-        .getState()
-        .deliverResult({ owner, operationId, toast }, ['send', 'payment-request']);
-      switch (delivery) {
-        case 'confirmed':
-          paymentLog.info('hook.payment_status.send_confirm_same_toast', {
-            operationId,
-            activeId: active?.id ?? null,
-            activeVariant: active?.variant ?? null,
-            activeState: active?.state ?? null,
-          });
-          return;
-        case 'held':
-          paymentLog.info('hook.payment_status.send_left_to_payment_in_flight', {
-            operationId,
-            activeId: active?.id ?? null,
-            activeVariant: active?.variant ?? null,
-          });
-          return;
-        case 'alreadyShown':
-          paymentLog.info('hook.payment_status.send_already_shown', { operationId });
-          return;
-        case 'shown':
-          paymentLog.info('hook.payment_status.send_new_success_toast', {
-            operationId,
-            ...mintUrlLogFields(mintUrl),
-            amount,
-            unit,
-            reason: 'no_matching_active_toast',
-          });
-          paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
-          return;
-        default: {
-          const exhaustive: never = delivery;
-          return exhaustive;
-        }
-      }
+      // A payment request still being sent has no id yet, and this may be its
+      // own send: the result is held for that toast until its flow binds it.
+      const key = toastKey.send(operationId);
+      paymentToasts.report(
+        key,
+        'done',
+        resultContent(key, {
+          kind: 'payment',
+          variant: 'send',
+          mintUrl,
+          amount,
+          unit,
+          target: { type: 'send', operationId },
+        }),
+        { ids: [operationId], holdForGroup: 'send' }
+      );
     });
 
     const offMeltRolledBack = manager.on('melt-op:rolled-back', ({ mintUrl, operation }) => {
@@ -785,74 +687,72 @@ export function usePaymentStatusListener(): void {
         });
         return;
       }
-      const store = usePaymentStatusStore.getState();
-      const active = store.active;
       const amount = amountToNumber(operation.amount);
       const unit = operation.unit;
       const quoteId =
         'quoteId' in operation && typeof operation.quoteId === 'string' ? operation.quoteId : null;
-      if (active && quoteId && ownsMelt(active, quoteId)) {
-        if (active.state === 'processing') {
-          paymentLog.error('hook.payment_status.melt_failed', {
-            id: active.id,
-            error: operation.error,
-          });
-          store.setFailed(active.id, new Error(operation.error ?? 'Payment was rolled back'));
-        } else {
-          paymentLog.info('hook.payment_status.melt_rolled_back_deduped', {
-            activeId: active.id,
-            activeState: active.state,
-          });
+      const reason = operation.error
+        ? describeError({ message: operation.error }, 'cashu').text
+        : 'Payment was rolled back';
+      const failed: PaymentContent = {
+        kind: 'payment',
+        variant: 'melt',
+        mintUrl,
+        amount,
+        unit,
+        ...(quoteId ? { target: { type: 'melt' as const, quoteId } } : {}),
+      };
+      const own = quoteId ? paymentToasts.get(toastKey.melt(quoteId)) : undefined;
+      if (quoteId && own) {
+        // Still open → it failed. Already ended → its flow said so first.
+        if (own.phase === 'failed' || own.phase === 'done') {
+          paymentLog.info('hook.payment_status.melt_rolled_back_deduped', { phase: own.phase });
+          return;
         }
-        return;
-      }
-      // A failed toast for a melt like this one is already shown (e.g. the
-      // fresh failed toast onPaymentFailed just created for this same
-      // rollback) — don't stack a duplicate. Nothing about it changes.
-      if (
-        active?.variant === 'melt' &&
-        active.state === 'failed' &&
-        active.mintUrl === mintUrl &&
-        active.amount === amount &&
-        active.unit === unit
-      ) {
-        paymentLog.info('hook.payment_status.melt_rolled_back_deduped', {
-          activeId: active.id,
-          activeState: active.state,
+        paymentLog.error('hook.payment_status.melt_failed', { error: operation.error });
+        paymentToasts.report(toastKey.melt(quoteId), 'failed', {
+          ...resultContent(toastKey.melt(quoteId), failed),
+          subtitle: reason,
         });
         return;
       }
-      // No active processing toast (onchain melts suppress it; the rollback
-      // may also land after the toast dismissed). A rollback returns funds
-      // silently otherwise — surface a fresh failed toast. Swap legs are
-      // melts too: while the unified swap toast owns the surface, stay quiet.
+      // A melt like this one already has a toast its own flow ends: the failed
+      // toast `onPaymentFailed` just showed for this rollback, or a toast still
+      // waiting to learn its quote. Do not stack a second toast beside it.
+      const flowsOwn = paymentToasts.tracked().some(({ key, phase, content }) => {
+        if (content.kind !== 'payment' || content.variant !== 'melt') return false;
+        if (content.mintUrl !== mintUrl || content.amount !== amount || content.unit !== unit) {
+          return false;
+        }
+        return phase === 'failed' || key.startsWith(toastKey.pending(''));
+      });
+      if (flowsOwn) {
+        paymentLog.info('hook.payment_status.melt_rolled_back_deduped', { phase: 'flow_owned' });
+        return;
+      }
+      // No toast of its own (onchain melts have none while they settle; the
+      // rollback may also land after the toast closed). A rollback returns
+      // funds silently otherwise — tell it. Swap legs are melts too: while the
+      // unified swap toast owns the surface, stay quiet.
       if (isSwapStatusActive()) {
         paymentLog.info('hook.payment_status.suppressed_for_swap', {
           phase: 'melt_rolled_back',
         });
         return;
       }
-      const id = quoteId ?? `melt-rolled-back-${Date.now()}`;
       paymentLog.error('hook.payment_status.melt_new_failed_toast', {
         quoteId,
         ...mintUrlLogFields(mintUrl),
         amount,
         error: operation.error,
-        reason: 'no_matching_active_toast',
+        reason: 'no_matching_toast',
       });
-      store.setActive({
-        variant: 'melt',
-        id,
-        owner: quoteId ? { kind: 'melt', quoteId } : { kind: 'pending', key: id },
-        mintUrl,
-        amount,
-        unit,
-        state: 'failed',
-        errorMessage: operation.error
-          ? describeError({ message: operation.error }, 'cashu').text
-          : 'Payment was rolled back',
-      });
-      paymentStatusPopup({ variant: 'melt', id, mintUrl, amount, unit });
+      paymentToasts.report(
+        toastKey.melt(quoteId ?? `rolled-back-${Date.now()}`),
+        'failed',
+        { ...failed, subtitle: reason },
+        quoteId ? { ids: [quoteId, operation.id] } : {}
+      );
     });
 
     const offMeltFinalized = manager.on(
@@ -881,96 +781,29 @@ export function usePaymentStatusListener(): void {
           });
           return;
         }
-        const amount = amountToNumber(operation.amount);
-        const unit = operation.unit;
-        const owner = { kind: 'melt' as const, quoteId: operation.quoteId };
-        const toast = {
-          variant: 'melt' as const,
-          id: operation.quoteId,
-          owner,
-          mintUrl,
-          amount,
-          unit,
-          state: 'confirmed' as const,
-        };
-        const active = usePaymentStatusStore.getState().active;
-        // Another melt still in flight keeps the surface, and this may be its
-        // own before its flow has reported its quote: the result is held, and
-        // that flow confirms it with its melt for View.
-        const delivery = usePaymentStatusStore
-          .getState()
-          .deliverResult({ owner, operationId, toast }, ['melt']);
-        switch (delivery) {
-          case 'confirmed':
-            // Still processing → confirm. Already confirmed → just merge operationId for View button.
-            paymentLog.info('hook.payment_status.melt_confirm_same_toast', {
-              operationId,
-              quoteId: operation.quoteId,
-              activeId: active?.id ?? null,
-              activeState: active?.state ?? null,
-            });
-            return;
-          case 'held':
-            paymentLog.info('hook.payment_status.melt_left_to_payment_in_flight', {
-              operationId,
-              quoteId: operation.quoteId,
-              activeId: active?.id ?? null,
-            });
-            return;
-          case 'alreadyShown':
-            paymentLog.info('hook.payment_status.melt_already_shown', {
-              operationId,
-              quoteId: operation.quoteId,
-            });
-            return;
-          case 'shown':
-            // Background melt (no toast of its own on screen): a new confirmed toast.
-            paymentLog.info('hook.payment_status.melt_new_success_toast', {
-              operationId,
-              quoteId: operation.quoteId,
-              ...mintUrlLogFields(mintUrl),
-              amount,
-              unit,
-              reason: 'no_matching_active_toast',
-            });
-            paymentStatusPopup({
-              variant: 'melt',
-              id: operation.quoteId,
-              mintUrl,
-              amount,
-              unit,
-              operationId,
-            });
-            return;
-          default: {
-            const exhaustive: never = delivery;
-            return exhaustive;
-          }
-        }
+        // A melt started without its quote has a toast that does not know it
+        // yet, and this may be its own: the result is held for that toast
+        // until its flow binds it.
+        const key = toastKey.melt(operation.quoteId);
+        paymentToasts.report(
+          key,
+          'done',
+          resultContent(key, {
+            kind: 'payment',
+            variant: 'melt',
+            mintUrl,
+            amount: amountToNumber(operation.amount),
+            unit: operation.unit,
+            target: { type: 'melt', quoteId: operation.quoteId },
+          }),
+          { ids: [operation.quoteId, operationId], holdForGroup: 'melt' }
+        );
       }
     );
-
-    // A result held for a toast in flight that was not that toast's own is
-    // shown once the toast on screen ends, oldest first.
-    const offHeld = usePaymentStatusStore.subscribe((state) => {
-      if (state.active || state.held.length === 0) return;
-      const held = state.takeHeld();
-      if (!held) return;
-      const { toast } = held;
-      paymentStatusPopup({
-        variant: toast.variant,
-        id: toast.id,
-        mintUrl: toast.mintUrl,
-        amount: toast.amount,
-        unit: toast.unit,
-        ...(toast.variant === 'melt' ? { operationId: held.operationId } : {}),
-      });
-    });
 
     return () => {
       disposed = true;
       paymentLog.debug('hook.payment_status.unsubscribing');
-      offHeld();
       offStateChanged();
       offAdded();
       offRedeemed();

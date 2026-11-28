@@ -50,7 +50,6 @@ jest.mock('react-native', () => ({
 
 jest.mock('bitchat-module', () => ({ getBLEPeers: jest.fn(() => []) }));
 jest.mock('@/features/nearPay/lib/peerProfile', () => ({ peerNostrPubkey: jest.fn() }));
-jest.mock('@/shared/lib/popup', () => ({ paymentStatusPopup: jest.fn() }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({ readProfileRecord: jest.fn() }));
 // What the queue holds for the token under test; a test sets its source.
 const mockQueueEntries: Record<string, { source?: 'ble' | 'nostr' }> = {};
@@ -67,9 +66,10 @@ jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
 }));
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: { getState: jest.fn(() => ({})) },
-}));
+jest.mock(
+  '@/shared/stores/runtime/paymentStatusStore',
+  () => require('./helpers/fakePaymentToasts').fakePaymentStatusStore
+);
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
   useWalletLifecycleStore: { getState: jest.fn(() => ({ restoreStatus: 'complete' })) },
 }));

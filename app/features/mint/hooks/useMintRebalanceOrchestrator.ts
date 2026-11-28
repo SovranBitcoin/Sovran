@@ -13,7 +13,6 @@ import {
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog } from '@/shared/lib/logger';
-import { swapStatusPopup } from '@/shared/lib/popup';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { activePubkey } from '@/shared/stores/global/profileStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
@@ -101,7 +100,10 @@ function toastFor(groupId: string | null) {
 
 type ToastStart = Parameters<ReturnType<typeof useSwapStatusStore.getState>['start']>[0];
 
-/** Show the Swap status toast from `start`, with each leg as the screen has it now. */
+/**
+ * Start the Swap status from `start`, with each leg as the screen has it now.
+ * `useSwapStatusListener` shows its toast.
+ */
 function showToast(start: ToastStart, stepStates: Record<string, StepState>) {
   const toast = useSwapStatusStore.getState();
   toast.start(start);
@@ -115,7 +117,6 @@ function showToast(start: ToastStart, stepStates: Record<string, StepState>) {
       toast.setActiveLeg(id);
     }
   }
-  swapStatusPopup();
 }
 
 /** Report a settled transfer on the unified Swap status toast. */
@@ -252,7 +253,7 @@ export function useMintRebalanceOrchestrator({
   }, [stepStates]);
 
   // No unmount-abort: the run is a closure-bound async loop, and
-  // `useSwapStatusStore` + the unified SwapStatusToast both live outside the
+  // `useSwapStatusStore` + the unified swap toast both live outside the
   // React tree. The user can back out mid-swap and the swap finishes in the
   // background — the toast keeps reporting progress, and its "View" button
   // opens SwapTransactionScreen. `setStepStates` after unmount is a silent
@@ -550,7 +551,7 @@ export function useMintRebalanceOrchestrator({
     if (run) giveUpRun(run);
     const groupId = run?.groupId ?? swapGroupRef.current?.id ?? null;
     closeCancelled(groupId, run ? run.account : swapGroupRef.current?.account);
-    // Flip the SwapStatusToast to its terminal 'cancelled' state; the runner
+    // Flip the swap toast to its terminal 'cancelled' state; the runner
     // returns early on abort, so its complete()/fail() never fires.
     toastFor(groupId)?.cancel();
   }, [closeCancelled, giveUpRun, isCurrentSession]);

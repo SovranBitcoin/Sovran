@@ -15,6 +15,8 @@ export {
   getHistoryEntryOnchainMintAddress,
   mintHistoryEntryExpired,
 } from "./context";
+export { timelinePhase } from "./phase";
+export type { PaymentPhase } from "./phase";
 export type {
   BuildTimelineInput,
   TimelineFlowVariant,

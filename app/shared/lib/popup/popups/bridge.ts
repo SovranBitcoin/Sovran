@@ -35,7 +35,11 @@ function describeSubmessage(value: unknown): string | undefined {
 
 type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
 
-type ToastManager = { show: (options: Record<string, unknown>) => string };
+type ToastManager = {
+  show: (options: Record<string, unknown>) => string;
+  /** Hides the toast `show` returned this id for; a no-op once it is gone. */
+  hide: (id: string) => void;
+};
 
 let toastManagerRef: ToastManager | null = null;
 let toastSequence = 0;
@@ -45,9 +49,18 @@ function nextToastId(): string {
   return `toast-${Date.now().toString(36)}-${toastSequence.toString(36)}`;
 }
 
+const toastStackListeners = new Set<() => void>();
+
 /** Connects the toast stack; pass `null` when it unmounts so later toasts warn instead of vanishing. */
 export function registerToast(manager: ToastManager | null) {
   toastManagerRef = manager;
+  if (manager) for (const listener of [...toastStackListeners]) listener();
+}
+
+/** Called each time a toast stack connects: a toast dropped while there was none can be shown. */
+export function onToastStackConnected(listener: () => void): () => void {
+  toastStackListeners.add(listener);
+  return () => void toastStackListeners.delete(listener);
 }
 
 export type ToastConfig = {
@@ -94,7 +107,8 @@ export type SheetConfig = {
 /**
  * Hands a toast to the registered host and logs `shown`/`hidden` with the ids,
  * `fields` and the caller's debug fields; with no host, warns with
- * `refusalFields` and drops it.
+ * `refusalFields` and drops it. Returns a function that hides the toast, or
+ * null when it was dropped.
  */
 function submitToast(
   config: Pick<CustomToastConfig, 'durationMs' | 'onShow' | 'onHide' | 'debugFields'>,
@@ -103,10 +117,11 @@ function submitToast(
   [shown, hidden]: [string, string],
   fields: Record<string, unknown>,
   refusalFields: Record<string, unknown>
-): void {
-  if (!toastManagerRef) {
+): (() => void) | null {
+  const manager = toastManagerRef;
+  if (!manager) {
     popupLog.warn('popup.toast.manager_not_registered', refusalFields);
-    return;
+    return null;
   }
 
   let managerToastId: string | undefined;
@@ -114,12 +129,14 @@ function submitToast(
     popupLog.info(event, { toastId, managerToastId, ...fields, ...(config.debugFields ?? {}) });
     callback?.();
   };
-  managerToastId = toastManagerRef.show({
+  managerToastId = manager.show({
     component,
     duration: config.durationMs,
     onShow: lifecycle(shown, config.onShow),
     onHide: lifecycle(hidden, config.onHide),
   });
+  const shownId = managerToastId;
+  return () => manager.hide(shownId);
 }
 
 export function showToast(config: ToastConfig) {
@@ -160,7 +177,8 @@ export function showToast(config: ToastConfig) {
   );
 }
 
-export function showCustomToast(config: CustomToastConfig) {
+/** Shows a custom toast; the returned function hides it (null when no host took it). */
+export function showCustomToast(config: CustomToastConfig): (() => void) | null {
   const caller = getCallerFrame();
   const toastId = nextToastId();
   const componentName =
@@ -176,7 +194,7 @@ export function showCustomToast(config: CustomToastConfig) {
     ...(config.debugFields ?? {}),
   });
 
-  submitToast(
+  return submitToast(
     config,
     toastId,
     (props: Record<string, unknown>) =>

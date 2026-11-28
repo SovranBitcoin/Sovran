@@ -22,12 +22,19 @@ type ToastRequest = {
   onShow?: () => void;
   onHide?: () => void;
 };
-type Entry = ToastRequest & { id: string };
+type Entry = ToastRequest & {
+  id: string;
+  /** Hides this toast. One function for the toast's whole life, so a toast's
+   *  own effects never re-run because another toast came or went. */
+  hide: Hide;
+};
 
 const DEFAULT_DURATION_MS = 4000;
 const MAX_VISIBLE = 3;
 /** How long the overlay outlives its last toast, so the exit animation can play. */
 const EXIT_MS = 150;
+// Reanimated 4's default spring (stiffness 900, damping 120) with this mass is
+// overdamped (ratio ~1.15): it lands in about 0.4 s and cannot bounce.
 const ENTERING = FadeInUp.springify()
   .withInitialValues({ opacity: 1, transform: [{ translateY: -100 }] })
   .mass(3);
@@ -45,16 +52,16 @@ let sequence = 0;
 /**
  * The app's toasts: stacked at the top of the screen above everything (route
  * modals and sheets included), newest in front, the last three kept. Each
- * hides after its duration (4 s unless `persistent`), on a swipe up, or when
- * its own component calls `hide()`. Every toast is drawn once — there is no
- * measuring copy for a screen reader to find twice.
+ * hides after its duration (4 s unless `persistent`), on a swipe up, when its
+ * own component calls `hide()`, or when whoever showed it hides it by id.
+ * Every toast is drawn once — there is no measuring copy for a screen reader
+ * to find twice.
  */
 export function ToastHost() {
   const insets = useSafeAreaInsets();
   const [toasts, setToasts] = useState<Entry[]>([]);
   const [lingering, setLingering] = useState(false);
   const live = useRef(new Map<string, { entry: Entry; timer?: ReturnType<typeof setTimeout> }>());
-  const removeRef = useRef<(id: string) => void>(() => undefined);
 
   useEffect(() => {
     const remove = (id: string) => {
@@ -68,7 +75,8 @@ export function ToastHost() {
     };
     const show = (request: Record<string, unknown>): string => {
       sequence += 1;
-      const entry = { ...(request as ToastRequest), id: `host-toast-${sequence}` };
+      const id = `host-toast-${sequence}`;
+      const entry = { ...(request as ToastRequest), id, hide: () => remove(id) };
       const duration = entry.duration ?? DEFAULT_DURATION_MS;
       const timer =
         duration === 'persistent' ? undefined : setTimeout(() => remove(entry.id), duration);
@@ -78,8 +86,7 @@ export function ToastHost() {
       entry.onShow?.();
       return entry.id;
     };
-    removeRef.current = remove;
-    registerToast({ show });
+    registerToast({ show, hide: remove });
     const records = live.current;
     return () => {
       registerToast(null);
@@ -109,20 +116,16 @@ export function ToastHost() {
           right: insets.right + 12,
         }}>
         {toasts.map((entry, index) => (
-          <ToastItem
-            key={entry.id}
-            entry={entry}
-            front={index === toasts.length - 1}
-            // A toast's own `hide()` hides that toast, wherever it sits in the stack.
-            hide={() => removeRef.current(entry.id)}
-          />
+          // A toast's own `hide()` hides that toast, wherever it sits in the stack.
+          <ToastItem key={entry.id} entry={entry} front={index === toasts.length - 1} />
         ))}
       </View>
     </OverlayWindow>
   );
 }
 
-function ToastItem({ entry, front, hide }: { entry: Entry; front: boolean; hide: Hide }) {
+function ToastItem({ entry, front }: { entry: Entry; front: boolean }) {
+  const { hide } = entry;
   const offset = useSharedValue(0);
   const swipe = Gesture.Pan()
     .onUpdate((event) => {

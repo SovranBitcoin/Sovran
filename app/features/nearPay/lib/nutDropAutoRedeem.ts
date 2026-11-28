@@ -11,14 +11,14 @@ import { meshRedeemPhase } from 'wallet/redeemEntry';
 import { useBLEPeerDirectory } from '@/features/bitchat/hooks/useBLEPeers';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { describeError } from '@/shared/lib/errors';
 import { requireOfflineTokenDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
-import { paymentStatusPopup } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { paymentToasts, toastKey } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -94,9 +94,8 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         appState: AppState.currentState,
         visibleToast: AppState.currentState === 'active',
       });
-      // Same toast pipeline as a manually redeemed token (processing →
-      // green confirmed): coco's receive-op:finalized / history:updated
-      // events flip it to confirmed through usePaymentStatusListener.
+      // Same toast as a manually redeemed token: coco's receive-op:finalized /
+      // history:updated events finish it through usePaymentStatusListener.
       // Only when the user can see it; backgrounded redeems surface through
       // the transaction history.
       if (AppState.currentState !== 'active') {
@@ -107,21 +106,17 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         });
         return;
       }
-      usePaymentStatusStore.getState().setActive({
-        variant: 'receive-ecash',
-        id: tokenHash,
-        mintUrl: entry.mintUrl,
-        amount: entry.amount,
-        unit: entry.unit,
-        state: 'processing',
-      });
-      paymentStatusPopup({
-        variant: 'receive-ecash',
-        id: tokenHash,
-        mintUrl: entry.mintUrl,
-        amount: entry.amount,
-        unit: entry.unit,
-      });
+      paymentToasts.start(
+        toastKey.receive(tokenHash),
+        {
+          kind: 'payment',
+          variant: 'receive-ecash',
+          mintUrl: entry.mintUrl,
+          amount: entry.amount,
+          unit: entry.unit,
+        },
+        { ids: [tokenHash] }
+      );
     },
     onFailed: (tokenHash, entry, recorded) => {
       paymentLog.warn('near_pay.redeem.queue.failed', {
@@ -130,35 +125,37 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         amount: entry.amount,
         unit: entry.unit,
         recorded,
-        activeId: usePaymentStatusStore.getState().active?.id ?? null,
-        activeState: usePaymentStatusStore.getState().active?.state ?? null,
       });
-      if (usePaymentStatusStore.getState().active?.id !== tokenHash) {
+      const key = toastKey.receive(tokenHash);
+      const toast = paymentToasts.get(key);
+      if (!toast) {
         paymentLog.info('near_pay.redeem.toast_update_suppressed', {
           tokenHash: tokenHash.slice(0, 12),
           recorded,
-          reason: 'active_id_mismatch',
+          reason: 'no_toast_for_token',
         });
         return;
       }
-      // Back in line for another attempt, so keep the visible toast pending
-      // instead of presenting a terminal error.
+      // Back in line for another attempt: say it is kept for later instead of
+      // presenting an error. The toast closes itself; the redeem's result is
+      // still told when it comes.
       if (recorded === 'retrying') {
         paymentLog.info('near_pay.redeem.toast_waiting', {
           tokenHash: tokenHash.slice(0, 12),
           expectedNext: 'retry_when_online_or_backoff_elapsed',
         });
-        usePaymentStatusStore.getState().setWaiting(tokenHash, RECEIVE_PENDING_TOAST_COPY);
+        paymentToasts.report(key, 'slow', { ...toast.content, ...RECEIVE_PENDING_TOAST_COPY });
         return;
       }
-      usePaymentStatusStore
-        .getState()
-        .setFailed(
-          tokenHash,
+      paymentToasts.report(key, 'failed', {
+        ...toast.content,
+        subtitle: describeError(
           recorded === 'spent'
             ? new Error('Token was already redeemed')
-            : new Error('Redeem failed')
-        );
+            : new Error('Redeem failed'),
+          'cashu'
+        ).text,
+      });
     },
     onRedeemed: (tokenHash, entry, historyEntryId) => {
       if (!historyEntryId) return;

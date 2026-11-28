@@ -12,9 +12,6 @@ export { sendMemoPopup } from './sendMemoSheet';
 export { copyTokenAsEmoji } from './emojiPicker';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export {
-  paymentStatusPopup,
-  swapStatusPopup,
-  isSwapStatusToastMounted,
   paymentCancelledPopup,
   nfcEcashSharedPopup,
   nfcConnectionLostPopup,

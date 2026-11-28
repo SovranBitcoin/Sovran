@@ -30,7 +30,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { cleanup: jest.fn() } }));
 jest.mock('@/shared/lib/profile/appRestart', () => ({ restartApp: jest.fn() }));
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({ usePaymentStatusStore: {} }));
+jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({ paymentToasts: {} }));
 jest.mock('@/shared/stores/runtime/popupStore', () => ({ usePopupStore: {} }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   PROFILE_STORE_PERSIST_VERSION: 1,

@@ -86,7 +86,10 @@ jest.mock('@/features/transactions/lib/transactionIdentity', () => ({
   transactionIdentitySnapshot: () => mockCounterparty ?? undefined,
   useTransactionIdentity: () => undefined,
 }));
-jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: jest.fn() }) }));
+jest.mock('expo-router', () => ({
+  useNavigation: () => ({ setOptions: jest.fn() }),
+  useFocusEffect: jest.fn(),
+}));
 jest.mock('expo-router/react-navigation', () => ({
   NavigationContext: jest.requireActual<typeof import('react')>('react').createContext(null),
   HeaderHeightContext: jest.requireActual<typeof import('react')>('react').createContext(80),

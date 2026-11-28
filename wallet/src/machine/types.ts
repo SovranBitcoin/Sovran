@@ -783,6 +783,13 @@ export type NotificationHandlerMap = {
     message: string;
     authored?: boolean;
     rolledBack?: boolean;
+    /**
+     * The payment was not seen to fail: it left the wallet and its result is
+     * not known (a melt whose reply was lost, ecash that could not be taken
+     * back). It may still complete, so the wallet must not present it as a
+     * failure.
+     */
+    outcomeUnknown?: boolean;
   }) => MaybeAsync;
   /**
    * Called during NFC POS payment to report progress phases.
