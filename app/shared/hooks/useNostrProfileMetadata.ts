@@ -11,11 +11,15 @@ import {
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
 import {
+  isProfileMissed,
   useCachedNostrProfile,
   useProfileRecordsMany,
   useProfileFetchSettlements,
 } from '@/shared/lib/nostr/useEntityCache';
-import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
+import {
+  ensureProfilesViaFacade,
+  fetchProfilesViaFacade,
+} from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { useQueryResultLogger } from '@/shared/lib/logger';
 
@@ -46,7 +50,7 @@ async function fetchProfilesLogged(
     gen: 0,
   });
   try {
-    const profiles = await fetchProfilesViaFacade(pubkeys, { readId });
+    const profiles = await fetchProfilesViaFacade(pubkeys);
     const count = Object.keys(profiles).length;
     readEvents.done({
       readId,
@@ -79,23 +83,30 @@ interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
   isLoading: boolean;
   /** True while a real kind-0 fetch is still needed or in flight — including
-   *  the first render (before the fetch effect has run), retry backoff
-   *  windows, and revalidation of a stale/seeded record. Surfaces that render
-   *  a generative fallback (e.g. the clay avatar) should hold their loading
-   *  placeholder while this is true, so users see placeholder → final and
-   *  never a fallback that an in-flight fetch is about to replace. `isLoading`
-   *  alone misses the seeded-record case: a feed-seeded name-only record is
-   *  "stale, not missing", so `isLoading` stays false while the fetch that
-   *  will deliver the picture is still running. */
+   *  the first render (before the fetch effect has run) and revalidation of
+   *  a stale/seeded record. Surfaces that render a generative fallback (e.g.
+   *  the clay avatar) should hold their loading placeholder while this is
+   *  true, so users see placeholder → final and never a fallback that an
+   *  in-flight fetch is about to replace. `isLoading` alone misses the
+   *  seeded-record case: a feed-seeded name-only record is "stale, not
+   *  missing", so `isLoading` stays false while the fetch that will deliver
+   *  the picture is still running. */
   isResolving: boolean;
 }
 
-const MAX_FETCH_ATTEMPTS = 3;
-const RETRY_BACKOFF_MS = 4_000;
-
+/**
+ * One person's kind-0, for a row.
+ *
+ * The hook holds no fetch state of its own. It reads the profile and its fetch
+ * state from the entity cache through one subscription keyed by the pubkey,
+ * and asks the data layer to make sure the profile is loaded. That request is
+ * batched: every row that mounts in the same frame joins ONE fetch per source
+ * (a list of fifty used to make fifty), a pubkey already being fetched is not
+ * asked for again, and a profile no source has is not asked for again until
+ * its miss expires (1 min, 10 min, 1 h). A row therefore renders when its own
+ * profile arrives and when its own fetch finishes, and not otherwise.
+ */
 export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
-  // Reads the single owner (entity cache) via useCachedNostrProfile; a fetch
-  // write-throughs there (getProfiles), so no explicit cache write here.
   const mockMode = useSettingsStore((state) => state.mockMode);
   const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
   const cached = useCachedNostrProfile(pubkey ?? '');
@@ -113,76 +124,18 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
         ...(optimistic.about !== undefined ? { about: optimistic.about ?? undefined } : {}),
       }
     : baseMetadata;
-  const isStale = !fixture && cached.isStale;
   const isMissing = !fixture && cached.isMissing;
-  const [isFetching, setIsFetching] = useState(false);
-
-  // Per-pubkey attempt counter, capped at MAX_FETCH_ATTEMPTS. A facade fetch can
-  // come back empty for a TRANSIENT reason (a tier was momentarily down / the
-  // cache hadn't warmed). The old code marked the pubkey done after ONE such miss
-  // and never retried, so kind-0 could stay missing forever. We now retry on a
-  // short backoff a bounded number of times; a genuine not-found still settles
-  // after the cap without looping.
-  const attempts = useRef<Map<string, number>>(new Map());
-  const inFlight = useRef(0);
-  const [retryNonce, setRetryNonce] = useState(0);
-  const attemptCount = pubkey ? (attempts.current.get(pubkey) ?? 0) : MAX_FETCH_ATTEMPTS;
-  const needsFetch = !!pubkey && (isMissing || isStale) && attemptCount < MAX_FETCH_ATTEMPTS;
-  // Log inputs only: read through a ref so they are not effect dependencies.
-  const logCtxRef = useRef({ isMissing, isStale, attemptCount });
-  logCtxRef.current = { isMissing, isStale, attemptCount };
+  const needsFetch = !!pubkey && !fixture && cached.needsFetch;
 
   useEffect(() => {
-    if (!pubkey || !needsFetch) return;
-    attempts.current.set(pubkey, (attempts.current.get(pubkey) ?? 0) + 1);
-    let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    // Ref-counted rather than gated on `cancelled`: bumping the attempt counter
-    // to the cap flips `needsFetch` during this effect's own lifetime, which
-    // runs this cleanup (cancelled=true) while the fetch is still in flight — a
-    // cancel-guarded `setIsFetching(false)` then never fires and isFetching
-    // sticks true forever for a profile-less pubkey. The counter also keeps an
-    // overlapping newer fetch from being clobbered back to false.
-    inFlight.current += 1;
-    setIsFetching(true);
-    // refresh:true so a stale/boot-seeded record is revalidated, not served back.
-    void fetchProfilesLogged(
-      [pubkey],
-      logCtxRef.current.isMissing ? 0 : 1,
-      logCtxRef.current.isStale ? 1 : 0,
-      logCtxRef.current.attemptCount > 0 ? 'poll' : 'mount'
-    )
-      .then((profiles) => {
-        if (cancelled) return;
-        // getProfiles already ingested any resolved profile into the entity cache
-        // (the single owner), so the reactive read updates itself — we only track
-        // resolution here to stop / schedule retries.
-        if (profiles[pubkey]) {
-          attempts.current.set(pubkey, MAX_FETCH_ATTEMPTS); // resolved → stop retrying
-          return;
-        }
-        // Nothing resolved this round — schedule a bounded retry.
-        retryTimer = setTimeout(() => {
-          if (!cancelled) setRetryNonce((n) => n + 1);
-        }, RETRY_BACKOFF_MS);
-      })
-      .finally(() => {
-        inFlight.current -= 1;
-        if (inFlight.current === 0) setIsFetching(false);
-      });
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-    // retryNonce drives the bounded retry: bumping it re-runs the effect, which
-    // re-reads the (now-incremented) attempt count through `needsFetch`.
-  }, [pubkey, needsFetch, retryNonce]);
+    if (pubkey && needsFetch) ensureProfilesViaFacade([pubkey]);
+  }, [pubkey, needsFetch]);
 
-  const isLoading = isMissing && isFetching;
-  // `needsFetch` covers the pre-effect first render and retry backoffs;
-  // `isFetching` covers the in-flight window (needsFetch can flip false the
-  // moment attempts are bumped). Settles false once resolved or attempts cap.
-  const isResolving = isFetching || needsFetch;
+  // Covers the pre-effect first render (a fetch is owed), the frame the
+  // request waits for its batch, and the fetch itself. Settles false once the
+  // profile is in, or every source has answered without it.
+  const isResolving = !!pubkey && !fixture && cached.isResolving;
+  const isLoading = isMissing && isResolving;
 
   // Logged in the hook, not per screen: ~30 call sites consume this, and each
   // one re-renders when a kind-0 lands. `source` is the same for all of them, so
@@ -300,7 +253,9 @@ export function useNostrProfileMetadataMany(
   }, [records, mockMode, pubkeysKey]);
 
   // Pubkeys missing or stale in the cache and not attempted within the retry
-  // window: a miss is retried after RETRY_ATTEMPT_WINDOW_MS, not never.
+  // window: a miss is retried after RETRY_ATTEMPT_WINDOW_MS, not never. The
+  // fetch itself is batched in the facade with every other row's and list's
+  // (`fetchProfilesViaFacade`), so two lists naming the same people ask once.
   const attempted = useRef<Map<string, number>>(new Map());
   const toFetch = useMemo(() => {
     if (pubkeys.length === 0) return [];
@@ -310,6 +265,8 @@ export function useNostrProfileMetadataMany(
       const attemptedAt = attempted.current.get(pk);
       if (attemptedAt !== undefined && now - attemptedAt < RETRY_ATTEMPT_WINDOW_MS) continue;
       if (mockMode && getMockProfileMetadata(pk)) continue;
+      // A fetch, by this list or any other surface, recently found nothing.
+      if (isProfileMissed(pk)) continue;
       const record = records.get(pk);
       if (!record || now - (record.fetchedAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS) out.push(pk);
     }

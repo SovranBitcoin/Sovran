@@ -12,7 +12,6 @@ import { accountHolders } from '@/shared/lib/account/accountRegistry';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 
-const ACCOUNT = 'a'.repeat(64);
 const SAVED = Array.from({ length: 50 }, (_, index) => index.toString(16).padStart(64, '0'));
 const NEW_CONTACT = 'f'.repeat(64);
 const NOW = 1_800_000_000_000;

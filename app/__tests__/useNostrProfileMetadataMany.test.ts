@@ -11,6 +11,7 @@ jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
 }));
 jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
   fetchProfilesViaFacade: (...args: unknown[]) => mockFetchProfiles(...args),
+  ensureProfilesViaFacade: jest.fn(),
 }));
 
 beforeEach(() => {
@@ -143,4 +144,14 @@ it('keeps a previously settled miss out of grey on a new consumer', () => {
   mockCache.pendingProfiles.end(['stranger']);
   const { result } = renderHook(() => useNostrProfileMetadataMany(['stranger']));
   expect(result.current.loadingPubkeys.has('stranger')).toBe(false);
+});
+
+it('does not ask again for a profile a recent fetch could not find', () => {
+  const cache = facade.createNostrEntityCache();
+  mockCache = cache;
+  mockStore = cache.profiles;
+  cache.recordProfileMisses(['absent'], 'answered');
+  const { result } = renderHook(() => useNostrProfileMetadataMany(['absent']));
+  expect(mockFetchProfiles).not.toHaveBeenCalled();
+  expect(result.current.isLoading).toBe(false);
 });

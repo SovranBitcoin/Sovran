@@ -29,6 +29,7 @@ jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
   useProfileFetchSettlements: () => new Set(),
   useProfileRecordsMany: () => mockRecords,
   useCachedNostrProfile: () => undefined,
+  isProfileMissed: () => false,
 }));
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({

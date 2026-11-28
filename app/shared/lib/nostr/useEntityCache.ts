@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from 'nostr';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
-
-import type { ProfileInfo } from '@/shared/lib/nostr/nostrEventTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
-import { backfillProfile } from '@/shared/lib/nostr/fetchProfiles';
 import { peekNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
@@ -29,84 +24,84 @@ export type ProfileStatus = 'cached' | 'loading' | 'absent';
 
 const NOOP_UNSUB = () => {};
 
+/**
+ * One key of one store. `peek`, not `get`: a snapshot is read on every render
+ * of every row, and `get` re-inserts the key into the LRU map each time.
+ * Subscribing is what marks the record as in use.
+ */
 function useCachedRecord<T>(
   store: facade.NormalizingStore<T> | undefined,
   key: string | undefined
 ): T | undefined {
   const subscribe = useCallback(
-    (onChange: () => void) => (store && key ? store.subscribeKey(key, onChange) : NOOP_UNSUB),
+    (onChange: () => void) => {
+      if (!store || !key) return NOOP_UNSUB;
+      store.get(key);
+      return store.subscribeKey(key, onChange);
+    },
     [store, key]
   );
-  const getSnapshot = useCallback(() => (store && key ? store.get(key) : undefined), [store, key]);
+  const getSnapshot = useCallback(() => (store && key ? store.peek(key) : undefined), [store, key]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-function usePendingProfile(
-  pending: facade.PendingSet | undefined,
-  key: string | undefined
-): boolean {
-  const subscribe = useCallback(
-    (onChange: () => void) => (pending && key ? pending.subscribeKey(key, onChange) : NOOP_UNSUB),
-    [pending, key]
-  );
-  const getSnapshot = useCallback(
-    () => (pending && key ? pending.has(key) : false),
-    [pending, key]
-  );
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
+/** What one row needs to know about one profile, from one subscription. */
+type ProfileEntry = {
+  record: facade.CachedProfile | undefined;
+  /** No usable record, or one past the staleness window, and no recent miss says not to ask. */
+  needsFetch: boolean;
+  /** The record is missing or stale and a fetch for it is owed or in flight: hold the placeholder rather than show a fallback. */
+  isResolving: boolean;
+};
+
+const NO_ENTRY: ProfileEntry = { record: undefined, needsFetch: false, isResolving: false };
 
 /**
- * The author profile for a pubkey, plus a status that distinguishes a real
- * cached record from a fetch-in-flight (skeleton) and a genuinely-absent profile
- * (fallback). Reads the per-active-profile singleton cache.
+ * A row's whole view of one pubkey: the record, and whether a fetch is still
+ * owed or running. One `useSyncExternalStore` keyed by the pubkey, so a row
+ * re-renders only when ITS profile or ITS fetch state changes, and the
+ * snapshot keeps its identity while neither has: a fetch that starts and ends
+ * without changing what the row shows costs it no render.
  */
-export function useProfile(pubkey: string | undefined): {
-  profile: ProfileInfo | undefined;
-  status: ProfileStatus;
-} {
-  const layer = buildNostrDataLayer();
-  const cache = layer?.cache;
-  const mockMode = useSettingsStore((state) => state.mockMode);
-  const demoProfile = mockMode && pubkey ? DEMO_PROFILES.get(pubkey) : undefined;
-  const record = useCachedRecord(cache?.profiles, pubkey);
-  const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
-  const settled = useCachedRecord(cache?.settledProfiles, pubkey);
-  const needsFetch =
-    !!layer &&
-    !!pubkey &&
-    !mockMode &&
-    !settled &&
-    (!record || (record.seenAt === 0 && !record.picture));
-  useEffect(() => {
-    if (layer && pubkey && needsFetch && !pending) backfillProfile(layer, pubkey);
-  }, [layer, pubkey, needsFetch, pending]);
-  return useMemo(() => {
-    if (demoProfile) return { profile: demoProfile, status: 'cached' as const };
-    const profile: ProfileInfo | undefined = record
-      ? { name: record.name ?? '', ...(record.picture ? { picture: record.picture } : {}) }
-      : undefined;
-    const status: ProfileStatus = pending
-      ? 'loading'
-      : record && (record.picture || record.seenAt > 0 || settled)
-        ? 'cached'
-        : needsFetch
-          ? 'loading'
-          : 'absent';
-    return { profile, status };
-  }, [record, pending, settled, needsFetch, demoProfile]);
-}
-
-/**
- * The FULL cached profile record (name/displayName/picture/banner/nip05/lud16/
- * website/about) for a pubkey, read reactively from the single owner (the
- * `nostr` package's entity cache). This is the seam the non-feed profile hooks
- * (`useCachedNostrProfile`, `useNostrProfileMetadata*`) read through, so every
- * surface — feed rows and DMs/contacts/signer alike — renders the same record.
- */
-function useProfileRecord(pubkey: string | undefined): facade.CachedProfile | undefined {
+function useProfileEntry(pubkey: string | undefined): ProfileEntry {
   const cache = buildNostrDataLayer()?.cache;
-  return useCachedRecord(cache?.profiles, pubkey);
+  const last = useRef<ProfileEntry>(NO_ENTRY);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!cache || !pubkey) return NOOP_UNSUB;
+      cache.profiles.get(pubkey);
+      const stops = [
+        cache.profiles.subscribeKey(pubkey, onChange),
+        cache.pendingProfiles.subscribeKey(pubkey, onChange),
+        cache.profileMisses.subscribeKey(pubkey, onChange),
+      ];
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
+    [cache, pubkey]
+  );
+  const getSnapshot = useCallback(() => {
+    if (!cache || !pubkey) return NO_ENTRY;
+    const now = Date.now();
+    const record = cache.profiles.peek(pubkey);
+    const stale = !record || now - (record.fetchedAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS;
+    const needsFetch = stale && !cache.isProfileMissed(pubkey, now);
+    // A refresh of a profile that is already fetched and fresh is not
+    // "resolving": nothing the row shows is waiting on it.
+    const isResolving = needsFetch || (stale && cache.pendingProfiles.has(pubkey));
+    const previous = last.current;
+    if (
+      previous.record === record &&
+      previous.needsFetch === needsFetch &&
+      previous.isResolving === isResolving
+    ) {
+      return previous;
+    }
+    last.current = { record, needsFetch, isResolving };
+    return last.current;
+  }, [cache, pubkey]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 /**
@@ -213,20 +208,41 @@ export function readProfileRecord(pubkey: string): facade.CachedProfile | undefi
 
 /**
  * Counterparty kind-0 for a pubkey, read from the single owner (entity cache)
- * and mapped to NostrProfileMetadata, with SWR staleness flags. The hub
- * `useNostrProfileMetadata` reads through this; a `seenAt: 0` (feed-seeded or
- * boot-seeded) record is "stale" so a real kind-0 fetch still runs.
+ * and mapped to NostrProfileMetadata, with the fetch state a row needs. The
+ * hub `useNostrProfileMetadata` reads through this.
+ *
+ * - `isStale`: the record was never fetched (a seed) or is past the 24 h
+ *   window; `isMissing`: there is no record at all.
+ * - `needsFetch`: a fetch is owed for it (missing or stale, and no recent
+ *   fetch already came back empty).
+ * - `isResolving`: that fetch is owed or in flight.
  */
 export function useCachedNostrProfile(pubkey: string): {
   metadata: NostrProfileMetadata | undefined;
   isStale: boolean;
   isMissing: boolean;
+  needsFetch: boolean;
+  isResolving: boolean;
 } {
-  const record = useProfileRecord(pubkey || undefined);
-  const metadata = useMemo(() => cachedProfileToMetadata(record), [record]);
-  const isMissing = !metadata;
-  const isStale = !!metadata && Date.now() - metadata.fetchedAt > NOSTR_METADATA_STALE_TTL_MS;
-  return { metadata, isStale, isMissing };
+  const entry = useProfileEntry(pubkey || undefined);
+  // Keyed on the record alone: a fetch starting or finishing without changing
+  // the profile must not hand the row a new metadata object.
+  const metadata = useMemo(() => cachedProfileToMetadata(entry.record), [entry.record]);
+  return useMemo(
+    () => ({
+      metadata,
+      isMissing: !metadata,
+      isStale: !!metadata && Date.now() - metadata.fetchedAt > NOSTR_METADATA_STALE_TTL_MS,
+      needsFetch: entry.needsFetch,
+      isResolving: entry.isResolving,
+    }),
+    [metadata, entry]
+  );
+}
+
+/** True while a recent fetch that found nothing says not to ask for this profile again yet. */
+export function isProfileMissed(pubkey: string): boolean {
+  return buildNostrDataLayer()?.cache.isProfileMissed(pubkey) ?? false;
 }
 
 /**
