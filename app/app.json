@@ -105,7 +105,6 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/MonaSans/MonaSans-Light.ttf",
             "./assets/fonts/MonaSans/MonaSans-Regular.ttf",
             "./assets/fonts/MonaSans/MonaSans-Medium.ttf",
             "./assets/fonts/MonaSans/MonaSans-SemiBold.ttf",
@@ -116,7 +115,6 @@
         }
       ],
       "expo-router",
-      "expo-video",
       "expo-secure-store",
       "expo-sqlite",
       "expo-image",

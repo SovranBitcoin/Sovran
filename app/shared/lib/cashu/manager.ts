@@ -45,12 +45,7 @@ import {
   deriveCashuMnemonic,
   deriveCashuMnemonicForImported,
 } from '@/shared/lib/nostr/keyDerivation';
-import {
-  getInflightProofs,
-  openLocalCocoManager,
-  restoreProofsToReady,
-  startCocoOperationRecovery,
-} from './managerInternals';
+import { openLocalCocoManager, startCocoOperationRecovery } from './managerInternals';
 import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
 import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFaults/webSocketFactory';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -59,7 +54,7 @@ import { AccountIntegrityError } from '@/shared/lib/nostr/derivationIntegrity';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
-import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
+import { cashuLog, initLog, initPhase, redactError } from '../logger';
 import { withCallTiming } from '../loggerCallTiming';
 import { resolveOutputDataCreator } from './outputDataCreator';
 import { drainSqlite } from './drainSqlite';
@@ -1757,40 +1752,6 @@ export class CocoManager {
     } catch (error) {
       cashuLog.error('cashu.manager.db_export_failed', { error });
       throw error;
-    }
-  }
-
-  /**
-   * Restore inflight proofs to "ready" state for a specific mint.
-   *
-   * Call this after a melt operation fails (e.g. no_route, timeout) to ensure
-   * proofs don't remain stuck in "inflight" state. This is the application-level
-   * equivalent of the "Restore Inflight" button in the debug panel, scoped to a
-   * single mint.
-   *
-   * Safe to call even when no inflight proofs exist — it's a no-op.
-   */
-  static async restoreInflightProofsForMint(mintUrl: string): Promise<number> {
-    const manager = this.getInstance();
-
-    try {
-      cashuLog.info('cashu.manager.proofs_restore_start', { ...mintUrlLogFields(mintUrl) });
-      const inflight = await getInflightProofs(manager, [mintUrl]);
-      if (inflight.length === 0) {
-        cashuLog.debug('cashu.manager.proofs_restore_noop', { ...mintUrlLogFields(mintUrl) });
-        return 0;
-      }
-
-      const secrets = inflight.map((p) => p.secret);
-      await restoreProofsToReady(manager, mintUrl, secrets);
-      cashuLog.info('cashu.manager.proofs_restored', {
-        count: secrets.length,
-        ...mintUrlLogFields(mintUrl),
-      });
-      return secrets.length;
-    } catch (err) {
-      cashuLog.warn('cashu.manager.proofs_restore_failed', { error: err });
-      return 0;
     }
   }
 }

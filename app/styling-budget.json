@@ -39,9 +39,8 @@
     "inline-style": 1,
     "stack-layout-props": 2
   },
-  "features/mint/components/mintChanges/MintChangeRow.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 3
+  "features/mint/components/mintChanges/MintChangeGlyph.tsx": {
+    "stylesheet-create": 1
   },
   "features/mint/components/rebalance/RebalanceChainCard.tsx": {
     "stack-layout-props": 2
@@ -89,11 +88,6 @@
   },
   "features/nearPay/screens/NearPayScreen.tsx": {
     "stylesheet-create": 1,
-    "stack-layout-props": 4
-  },
-  "features/onboarding/screens/ClaimUsernameScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 21,
     "stack-layout-props": 4
   },
   "features/payments/components/NoResultsFound.tsx": {
@@ -629,9 +623,6 @@
   "shared/ui/composed/GlassSearchBar/GlassSearchBar.ios.tsx": {
     "stylesheet-create": 1,
     "inline-style": 1
-  },
-  "shared/ui/composed/GradientCardFrame.tsx": {
-    "inline-style": 2
   },
   "shared/ui/composed/GroupedTable.tsx": {
     "inline-style": 10

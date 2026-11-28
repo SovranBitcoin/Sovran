@@ -332,10 +332,6 @@
       "policy": "Keep source SVGs and existing generated icon registry; see icons/internal/README.md."
     },
     {
-      "path": "patterns/",
-      "policy": "Keep the scalable SVG pattern; do not rasterize the wallpaper."
-    },
-    {
       "path": "brand/",
       "policy": "Canonical brand sources and explicit-dimension exports; owned by scripts/brand-assets.mjs and brand/generated/manifest.json."
     }

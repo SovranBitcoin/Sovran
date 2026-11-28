@@ -50,11 +50,6 @@ const PAYMENT_REQUEST_OPTIONS = {
   title: 'Payment request',
   headerBackButtonMenuEnabled: false,
 };
-const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };
-const CAMERA_OPTIONS = {
-  title: 'Scan QR',
-  headerStyle: CAMERA_HEADER_STYLE,
-};
 
 export default function SendFlowLayout() {
   return (
@@ -68,7 +63,6 @@ export default function SendFlowLayout() {
       <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
       <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
       <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
-      <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
     </FlowStack>
   );
 }

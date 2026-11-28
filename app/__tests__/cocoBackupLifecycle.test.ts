@@ -50,10 +50,7 @@ jest.mock('@/shared/lib/cashu/cocoRepositories', () => ({
   createSovranCocoRepositories: jest.fn(),
 }));
 
-jest.mock('@/shared/lib/cashu/managerInternals', () => ({
-  getInflightProofs: jest.fn(),
-  restoreProofsToReady: jest.fn(),
-}));
+jest.mock('@/shared/lib/cashu/managerInternals', () => ({}));
 
 jest.mock('@/shared/lib/cashu/npc', () => ({
   NPC_BASE_URL: 'https://npub.cash',

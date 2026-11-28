@@ -7,23 +7,20 @@ import { MintListScreen } from '@/features/mint/screens/MintListScreen';
 // eslint-disable-next-line no-restricted-syntax -- parseable theme fixture color
 const mockColor = '#ffffff';
 
-// The list hands `extraData` to `renderItem`, the way FlashList does. Rows are
-// keyed by `keyExtractor`, so the key each row gets is part of what is pinned.
+// Rows are keyed by `keyExtractor`, so the key each row gets is part of what is pinned.
 jest.mock('@/shared/ui/composed/List', () => ({
   List: ({
     data,
     renderItem,
     keyExtractor,
-    extraData,
   }: {
     data: unknown[];
-    renderItem: (info: { item: unknown; index: number; extraData: unknown }) => ReactElement;
+    renderItem: (info: { item: unknown; index: number }) => ReactElement;
     keyExtractor: (item: unknown) => string;
-    extraData: unknown;
   }) => {
     const { Fragment, createElement } = jest.requireActual('react');
     return data.map((item, index) =>
-      createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index, extraData }))
+      createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
     );
   },
 }));
@@ -146,9 +143,7 @@ function mount(props: Partial<Parameters<typeof MintListScreen>[0]> = {}) {
     renderer.root
       .findAllByType('ContactRow' as never)
       .map((node): Row => ({ props: node.props as Row['props'] }));
-  const update = (over: Partial<Parameters<typeof MintListScreen>[0]>) =>
-    act(() => renderer.update(element(over)));
-  return { rows, update, onMintSelect, onInspectMint };
+  return { rows, onMintSelect, onInspectMint };
 }
 
 describe('MintListScreen rows', () => {
@@ -175,20 +170,6 @@ describe('MintListScreen rows', () => {
     act(() => rows()[2]!.props.onPress());
     expect(onMintSelect).toHaveBeenCalledTimes(1);
     expect(onMintSelect).toHaveBeenCalledWith(ITEMS[2]);
-  });
-
-  it('disables every row and blocks selection while a flow is executing, then recovers', () => {
-    const { rows, update, onMintSelect } = mount();
-
-    update({ isExecuting: true });
-    expect(rows().map((row) => row.props.disabled)).toEqual([true, true, true]);
-    act(() => rows()[0]!.props.onPress());
-    expect(onMintSelect).not.toHaveBeenCalled();
-
-    update({ isExecuting: false });
-    expect(rows().map((row) => row.props.disabled)).toEqual([false, true, false]);
-    act(() => rows()[0]!.props.onPress());
-    expect(onMintSelect).toHaveBeenCalledWith(ITEMS[0]);
   });
 
   it('opens the pressed mint from its inspect button', () => {

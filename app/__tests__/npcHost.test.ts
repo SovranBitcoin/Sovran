@@ -43,10 +43,6 @@ describe('npub.cash host', () => {
     ]) {
       expect(read(file)).not.toContain('/api/v1/');
     }
-    // The claim screen may still *describe* v1 in the comment explaining why
-    // the pre-check is gone, but must not build a URL from it.
-    const claimScreen = read('features/onboarding/screens/ClaimUsernameScreen.tsx');
-    expect(claimScreen).not.toContain('${NPC_BASE_URL}/api/v1/');
   });
 
   it('disables server-side quote locking during account setup', () => {

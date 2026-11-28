@@ -34,7 +34,7 @@ type FontWeight = 'light' | 'regular' | 'medium' | 'bold' | 'heavy';
 // shifts the rendered height because each font has its own intrinsic
 // line-box.
 export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
-  light: 'MonaSans-Light',
+  light: 'MonaSans-Regular',
   regular: 'MonaSans-Regular',
   medium: 'MonaSans-Medium',
   bold: 'MonaSans-Bold',

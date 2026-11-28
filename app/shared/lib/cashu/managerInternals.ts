@@ -51,7 +51,6 @@ interface ManagerInternals {
   mintSwapOperationProcessor?: BackgroundOwner;
   proofRepository: {
     getReservedProofs(): Promise<CoreProof[]>;
-    getInflightProofs(mintUrls?: string[]): Promise<CoreProof[]>;
     getProofsBySecrets(mintUrl: string, secrets: string[]): Promise<CoreProof[]>;
   };
   proofService: {
@@ -61,7 +60,6 @@ interface ManagerInternals {
       secrets: string[],
       state: 'inflight' | 'ready' | 'spent'
     ): Promise<void>;
-    restoreProofsToReady(mintUrl: string, secrets: string[]): Promise<void>;
   };
   walletService: {
     getWallet(mintUrl: string, unit: string): Promise<Wallet>;
@@ -275,62 +273,6 @@ export async function getWallet(manager: Manager, mintUrl: string, unit: string)
   } catch (error) {
     cashuLog.warn('cashu.manager_internals.wallet.failed', {
       ...mintUrlLogFields(mintUrl),
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/**
- * Inflight proofs (transient state during mint/melt), optionally filtered by mint.
- * Used by the per-mint rebalance recovery to clear leftovers after a melt failure.
- */
-export async function getInflightProofs(
-  manager: Manager,
-  mintUrls?: string[]
-): Promise<CoreProof[]> {
-  cashuLog.debug('cashu.manager_internals.inflight_proofs.start', {
-    mintCount: mintUrls?.length ?? null,
-  });
-  try {
-    const proofs = await internals(manager).proofRepository.getInflightProofs(mintUrls);
-    cashuLog.debug('cashu.manager_internals.inflight_proofs.done', {
-      mintCount: mintUrls?.length ?? null,
-      count: proofs.length,
-    });
-    return proofs;
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.inflight_proofs.failed', {
-      mintCount: mintUrls?.length ?? null,
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/**
- * Move proofs from `inflight` back to `ready` and clear their operation tag.
- * Application-level equivalent of the "Restore Inflight" debug button.
- */
-export async function restoreProofsToReady(
-  manager: Manager,
-  mintUrl: string,
-  secrets: string[]
-): Promise<void> {
-  cashuLog.info('cashu.manager_internals.restore_proofs.start', {
-    ...mintUrlLogFields(mintUrl),
-    count: secrets.length,
-  });
-  try {
-    await internals(manager).proofService.restoreProofsToReady(mintUrl, secrets);
-    cashuLog.info('cashu.manager_internals.restore_proofs.done', {
-      ...mintUrlLogFields(mintUrl),
-      count: secrets.length,
-    });
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.restore_proofs.failed', {
-      ...mintUrlLogFields(mintUrl),
-      count: secrets.length,
       error: errorMessage(error),
     });
     throw error;

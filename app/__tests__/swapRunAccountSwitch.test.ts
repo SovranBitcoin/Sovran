@@ -23,7 +23,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 jest.mock('@cashu/coco-react', () => ({ useManager: () => mockManager }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: { restoreInflightProofsForMint: async () => undefined },
+  CocoManager: {},
 }));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   getReadyProofs: async () => [],

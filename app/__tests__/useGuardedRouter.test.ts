@@ -70,8 +70,8 @@ describe('guardedRouter', () => {
   });
 
   it('treats push and navigate to the same href as distinct gates', () => {
-    guardedRouter.push('/claimUsername');
-    guardedRouter.navigate('/claimUsername');
+    guardedRouter.push('/share');
+    guardedRouter.navigate('/share');
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });

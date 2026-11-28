@@ -11,7 +11,7 @@
 import { StyleSheet } from 'react-native';
 import { z } from 'zod';
 
-import { MintChangeGlyph } from '@/features/mint/components/mintChanges/MintChangeRow';
+import { MintChangeGlyph } from '@/features/mint/components/mintChanges/MintChangeGlyph';
 import { useMintChangeRevisions } from '@/features/mint/hooks/useMintChanges';
 import type { MintChangeRevision } from '@/features/mint/lib/mintChanges/groupEntries';
 import { capitalize, type MintChangePhrase } from '@/features/mint/lib/mintChanges/phrase';

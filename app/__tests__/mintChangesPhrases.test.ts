@@ -4,7 +4,7 @@
  * exact sentence each one produces, so a change to the interpreter or the
  * phrasing has to be argued for in the diff rather than slipping through.
  */
-import { decodeFeed, type RawFeed } from '@/features/mint/lib/mintChanges/decode';
+import { decodeFeed, type RawFeed } from './helpers/mintChangesFeed';
 import {
   buildMintChangeListItems,
   flattenMintChangeUpdates,

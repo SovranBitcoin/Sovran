@@ -155,15 +155,15 @@ interface CustomTextProps extends TextProps {
 const BOOLEAN_WEIGHTS = ['medium', 'semibold', 'bold', 'heavy'] as const;
 
 /**
- * Resolve weight props to one of the three Oxygen font families.
- * Oxygen only ships Light, Regular, and Bold, so every one of the boolean
- * weights above resolves to Bold here; `weight="light"` reaches OxygenLight.
+ * Resolve weight props to one of the two Oxygen font families.
+ * Oxygen only ships Regular and Bold, so every one of the boolean
+ * weights above resolves to Bold here and `light`/`thin` resolve to Regular.
  */
 function getOxygenFamily(props: CustomTextProps): string {
   if (props.weight) {
     const w = props.weight;
-    if (w === 'thin' || w === 'extralight' || w === 'light') return 'OxygenLight';
-    if (w === 'regular') return 'OxygenRegular';
+    if (w === 'thin' || w === 'extralight' || w === 'light' || w === 'regular')
+      return 'OxygenRegular';
     return 'OxygenBold';
   }
   if (props.bold || props.semibold || props.medium || props.heavy) return 'OxygenBold';
@@ -176,14 +176,14 @@ function getOxygenFamily(props: CustomTextProps): string {
  */
 function getOverpassFamily(props: CustomTextProps): string {
   const WEIGHT_MAP: Record<FontWeight, string> = {
-    thin: 'OverpassLight',
-    extralight: 'OverpassLight',
-    light: 'OverpassLight',
+    thin: 'OverpassRegular',
+    extralight: 'OverpassRegular',
+    light: 'OverpassRegular',
     regular: 'OverpassRegular',
     medium: 'OverpassSemibold',
     semibold: 'OverpassSemibold',
     bold: 'OverpassBold',
-    extrabold: 'OverpassExtrabold',
+    extrabold: 'OverpassHeavy',
     heavy: 'OverpassHeavy',
     black: 'OverpassHeavy',
   };
@@ -202,9 +202,9 @@ function getOverpassFamily(props: CustomTextProps): string {
  */
 function getMonaFamily(props: CustomTextProps): string {
   const WEIGHT_MAP: Record<FontWeight, string> = {
-    thin: 'MonaSans-Light',
-    extralight: 'MonaSans-Light',
-    light: 'MonaSans-Light',
+    thin: 'MonaSans-Regular',
+    extralight: 'MonaSans-Regular',
+    light: 'MonaSans-Regular',
     regular: 'MonaSans-Regular',
     medium: 'MonaSans-Medium',
     semibold: 'MonaSans-SemiBold',

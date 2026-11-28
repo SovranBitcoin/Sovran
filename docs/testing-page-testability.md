@@ -26,7 +26,7 @@ Generated from the route catalog and authored screenshot scenarios. These are ca
 | mint-reviews | `(mint-flow)/reviews.tsx` | mint.info.reviews | mint.info.reviews |
 | profile | `profile.tsx` | dm.send.nostr, mint.info.send-message, profile.other.view, profile.own.view, send.search.npub, store.screenshots | dm.send.nostr, mint.info.send-message, profile.other.view, profile.own.view, send.search.npub, store.screenshots |
 | dm-chat | `(mint-flow)/userMessages.tsx`<br>`userMessages.tsx` | contacts.groups.mesh-chat, dm.send.nostr, mint.info.send-message, send.cashu.dm-contact | contacts.groups.mesh-chat, dm.send.nostr, mint.info.send-message, send.cashu.dm-contact |
-| camera | `(receive-flow)/camera.tsx`<br>`(send-flow)/camera.tsx`<br>`camera.tsx` | wallet.deeplink.camera-permission, wallet.scan.camera-permission | wallet.deeplink.camera-permission, wallet.scan.camera-permission |
+| camera | `(receive-flow)/camera.tsx`<br>`camera.tsx` | wallet.deeplink.camera-permission, wallet.scan.camera-permission | wallet.deeplink.camera-permission, wallet.scan.camera-permission |
 | search | Non-route surface | dm.send.nostr, profile.other.view, send.search.npub, wallet.search.no-results | dm.send.nostr, profile.other.view, send.search.npub, wallet.search.no-results |
 | settings | `(settings-flow)/index.tsx` | settings.design-system.showcase, settings.keyring.generate, settings.legal.navigate, settings.notification-policy.relaunch, settings.notification-policy, settings.routing.navigate, settings.seed.reveal | settings.design-system.showcase, settings.keyring.generate, settings.legal.navigate, settings.notification-policy.relaunch, settings.notification-policy, settings.routing.navigate, settings.seed.reveal, wallet.offline.banner |
 | feed | `(drawer)/(tabs)/feed/index.tsx` | drawer.navigation, feed.following.empty, feed.thread.backnav, store.screenshots | drawer.navigation, feed.following.empty, feed.thread.backnav, store.screenshots, wallet.offline.nostr |
@@ -46,7 +46,6 @@ Generated from the route catalog and authored screenshot scenarios. These are ca
 | map | `map.tsx` | **Gap** | **Gap** |
 | bitchat-dm | `bitchatDM.tsx` | **Gap** | **Gap** |
 | bitchat-network | `bitchatNetwork.tsx` | **Gap** | **Gap** |
-| claim-username | `claimUsername.tsx` | **Gap** | **Gap** |
 | composer | `composer.tsx` | **Gap** | **Gap** |
 | geohash-chat | `geohashChat.tsx` | **Gap** | **Gap** |
 | map-detail | `detail.tsx` | **Gap** | **Gap** |

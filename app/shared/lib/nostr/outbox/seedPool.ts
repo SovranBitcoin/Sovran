@@ -6,8 +6,8 @@
  * (∪ the defaults) are present in the pool so reads reach the user's chosen
  * relays.
  *
- * Additive only: it never removes relays. Writes target explicit relay sets
- * via `resolveWriteRelays` anyway, so a lingering read relay is harmless.
+ * Additive only: it never removes relays. Writes target explicit relay sets,
+ * so a lingering read relay is harmless.
  */
 import type { NostrClient } from 'nostr/client';
 

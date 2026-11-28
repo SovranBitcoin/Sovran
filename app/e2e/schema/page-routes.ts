@@ -32,7 +32,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'note-picker': ['notes.tsx'],
   picker: ['picker.tsx'],
   'emoji-picker': ['emojiPicker.tsx'],
-  camera: ['(receive-flow)/camera.tsx', '(send-flow)/camera.tsx', 'camera.tsx'],
+  camera: ['(receive-flow)/camera.tsx', 'camera.tsx'],
   'lightning-receive': ['(receive-flow)/lightningReceive.tsx', 'lightningReceive.tsx'],
   'mint-select': ['(receive-flow)/mintSelect.tsx', '(send-flow)/mintSelect.tsx'],
   'onchain-receive': ['(receive-flow)/onchainReceive.tsx', 'onchainReceive.tsx'],
@@ -90,5 +90,4 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   transactions: ['transactions.tsx'],
   'geohash-chat': ['geohashChat.tsx'],
   'not-found': ['+not-found.tsx'],
-  'claim-username': ['claimUsername.tsx'],
 };

@@ -22,23 +22,6 @@ export type PatchOp = {
   value?: unknown;
 };
 
-export type RawChange = {
-  mintUrl: string;
-  name?: string;
-  at: number;
-  previousLastSeenAt?: number;
-  hash: string;
-  summary?: string[];
-  patch?: PatchOp[];
-};
-
-export type RawFeed = {
-  trackedMints: number;
-  reachableMints: number;
-  totalChanges: number;
-  changes: RawChange[];
-};
-
 /* ── decoded shapes ──────────────────────────────────────────────────── */
 
 /** One revision of one mint's info document. */
@@ -58,13 +41,6 @@ export type Entry = {
   summary: string[];
   /** The change was seen, but its details were too large to keep on this phone. */
   oversized?: boolean;
-};
-
-type Feed = {
-  tracked: number;
-  reachable: number;
-  total: number;
-  entries: Entry[];
 };
 
 /* ── pointer decoding ────────────────────────────────────────────────── */
@@ -179,40 +155,4 @@ export function pairPatchOps(patch: readonly PatchOp[]): PairedOp[] {
     });
   }
   return out;
-}
-
-/* ── feed ────────────────────────────────────────────────────────────── */
-
-const hostOf = (url: string) => {
-  try {
-    const u = new URL(url);
-    return u.host + (u.pathname === '/' ? '' : u.pathname);
-  } catch {
-    return url.replace(/^https?:\/\//, '');
-  }
-};
-
-export function decodeFeed(raw: RawFeed): Feed {
-  const entries: Entry[] = (raw.changes ?? [])
-    .map((c) => ({
-      mintUrl: c.mintUrl,
-      host: hostOf(c.mintUrl),
-      name: c.name?.trim() || hostOf(c.mintUrl),
-      at: c.at,
-      ...(typeof c.previousLastSeenAt === 'number' && c.previousLastSeenAt > 0
-        ? { sincePrevious: c.at - c.previousLastSeenAt }
-        : {}),
-      hash: c.hash,
-      patch: c.patch ?? [],
-      summary: c.summary ?? [],
-    }))
-    // Upstream already sends newest first; do not depend on it.
-    .sort((a, b) => b.at - a.at);
-
-  return {
-    tracked: raw.trackedMints ?? 0,
-    reachable: raw.reachableMints ?? 0,
-    total: raw.totalChanges ?? entries.length,
-    entries,
-  };
 }

@@ -28,7 +28,6 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   bitchatNetwork: 'nutDrop',
   geohashChat: 'nutDrop',
   profile: 'nostr',
-  claimUsername: 'nostr',
 };
 
 const EXEMPT_GROUPS = new Set(['(settings-flow)']);

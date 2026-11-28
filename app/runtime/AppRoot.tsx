@@ -22,7 +22,6 @@ import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
 import { CapabilityProvider } from '@/shared/ui/capability';
 import { LayoutGuides } from '@/shared/ui/composed/LayoutGuides';
 import { TouchIndicatorEnabled, TouchIndicatorLayer } from '@/shared/ui/composed/TouchIndicator';
-import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { appRuntime } from './AppRuntime';
 import { useThemeApplier } from './theme';
@@ -52,7 +51,7 @@ function ProcessChrome({ children }: { children: React.ReactNode }) {
                 (`pb-safe-offset-5` and friends). The SafeAreaProvider is
                 expo-router's. */}
             <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
-              <HeroTransitionProvider>{children}</HeroTransitionProvider>
+              {children}
             </SafeAreaListener>
           </TouchIndicatorLayer>
         </TouchIndicatorEnabled.Provider>

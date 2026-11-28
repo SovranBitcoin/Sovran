@@ -26,7 +26,7 @@ type MintChangeListItem = {
 };
 
 /** One row on the Mints tab: one thing one mint did, at one moment. */
-export type MintChangeUpdate = {
+type MintChangeUpdate = {
   id: string;
   mintUrl: string;
   name: string;

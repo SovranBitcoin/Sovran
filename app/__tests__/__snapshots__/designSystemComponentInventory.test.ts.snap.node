@@ -71,8 +71,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/mint/components/RatingBarChart.tsx",
     "features/mint/components/RatingStars.tsx",
     "features/mint/components/distribution/MintDistributionCards.tsx",
-    "features/mint/components/mintChanges/MintChangeRow.tsx",
-    "features/mint/components/mintChanges/NotificationRowPressable.tsx",
+    "features/mint/components/mintChanges/MintChangeGlyph.tsx",
     "features/mint/components/rebalance/RebalanceActionPill.tsx",
     "features/mint/components/rebalance/RebalanceChainCard.tsx",
     "features/mint/components/rebalance/RebalanceStepRow.tsx",
@@ -154,7 +153,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/PaymentInfo.tsx",
     "shared/blocks/PullToAiRefreshControl.tsx",
     "shared/blocks/StartupFailedScreen.tsx",
-    "shared/blocks/claim/ClaimUsernameCardFrame.tsx",
     "shared/blocks/popup/ActionMenuHost.tsx",
     "shared/blocks/popup/PopupHost.tsx",
     "shared/blocks/transfer/TransferCard.tsx",
@@ -183,7 +181,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/EmojiPickerSheet.tsx",
     "shared/ui/composed/FollowBadge.tsx",
     "shared/ui/composed/FormSheetChrome.tsx",
-    "shared/ui/composed/GradientCardFrame.tsx",
     "shared/ui/composed/GroupedTable.tsx",
     "shared/ui/composed/HeaderGlassCircle.ios.tsx",
     "shared/ui/composed/HeaderGlassCircle.tsx",
@@ -248,6 +245,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 242,
+  "total": 239,
 }
 `;

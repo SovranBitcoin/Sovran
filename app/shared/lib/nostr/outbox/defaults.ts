@@ -19,9 +19,6 @@ export const DEFAULT_RELAYS: readonly string[] = [
   'wss://relay.nostr.band',
 ];
 
-/** Hard cap on a publish fan-out, so mention routing can't balloon. */
-export const MAX_WRITE_RELAYS = 8;
-
 /**
  * Normalizes a ws(s) relay url (lowercases host, applies canonical trailing
  * slash). Returns null for unparseable input so callers can drop it.
