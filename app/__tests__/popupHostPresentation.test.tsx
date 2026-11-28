@@ -264,6 +264,30 @@ describe('PopupHost presentation', () => {
     expect(shownText(r)).toEqual(['Network fee']);
   });
 
+  it('closes the sheet as soon as a button is pressed, while its action is still running', async () => {
+    const r = mountHost();
+    let finish!: () => void;
+    const running = new Promise<void>((done) => (finish = done));
+    const onPress = jest.fn(() => running);
+    // Popups reach the store through the bridge's sheet config, which carries testIDs.
+    const redeem = { text: 'Redeem', testID: 'slow-action', onPress };
+    act(() => usePopupStore.getState().open({ message: 'Redeem', buttons: [redeem] }));
+    const button = r.root.findAll(
+      (node) => node.props.testID === 'slow-action' && typeof node.props.onPress === 'function'
+    )[0]!;
+    let pressed!: Promise<unknown>;
+    act(() => {
+      pressed = button.props.onPress();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(usePopupStore.getState().isOpen).toBe(false);
+    await act(async () => {
+      finish();
+      await pressed;
+    });
+    expect(usePopupStore.getState().isOpen).toBe(false);
+  });
+
   it('dismisses from the scrim, and ignores it when the sheet is not dismissable', () => {
     const onClose = jest.fn();
     const r = mountHost();

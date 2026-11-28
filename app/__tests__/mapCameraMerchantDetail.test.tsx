@@ -75,7 +75,13 @@ jest.mock('@/shared/ui/primitives/Text', () => ({ Text: mockHost('Text') }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: mockHost('View') }));
 jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: mockHost('VStack') }));
 jest.mock('@/shared/ui/primitives/View/HStack', () => ({ HStack: mockHost('HStack') }));
-jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: mockHost('Spinner') }));
+const mockSkeletonRender = jest.fn();
+jest.mock('@/shared/ui/primitives/Skeleton', () => ({
+  Skeleton: (props: Record<string, unknown>) => {
+    mockSkeletonRender();
+    return mockHost('Skeleton')(props);
+  },
+}));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: mockHost('Button') }));
 jest.mock('assets/icons', () => mockHost('Icon'));
 jest.mock('@/shared/ui/composed/ListGroup', () => {
@@ -359,6 +365,14 @@ describe('the merchant detail', () => {
     TestRenderer.act(() => renderer?.unmount());
   });
 
+  it('a cached place is on the first frame, with no loading frame before it', async () => {
+    mockStore.getCachedPlaceDetails.mockReturnValue(place());
+    mockSkeletonRender.mockClear();
+    await renderDetail();
+    expect(mockSkeletonRender).not.toHaveBeenCalled();
+    expect(texts()).toContain('Corner Cafe');
+  });
+
   it('a cached place shows at once without a fetch and titles the screen', async () => {
     mockStore.getCachedPlaceDetails.mockReturnValue(place({ verified_at: '2026-09-01' }));
 
@@ -385,7 +399,10 @@ describe('the merchant detail', () => {
     mockStore.fetchPlaceDetails.mockReturnValue(new Promise((r) => (resolve = r)));
 
     await renderDetail();
-    expect(renderer.root.findAllByType('Spinner' as never)).toHaveLength(1);
+    expect(
+      renderer.root.findAllByProps({ testID: 'merchant-detail-skeleton' }).length
+    ).toBeGreaterThan(0);
+    expect(renderer.root.findAllByType('Section' as never)).toHaveLength(0);
     expect(mockStore.fetchPlaceDetails).toHaveBeenCalledWith(42, false, {
       signal: expect.any(AbortSignal),
     });

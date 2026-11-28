@@ -94,7 +94,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
 
   const handleNewRequest = useCallback(async () => {
     paymentLog.info('receive.creq.rotate_requested', { source: 'button' });
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await rotate();
   }, [rotate]);
 

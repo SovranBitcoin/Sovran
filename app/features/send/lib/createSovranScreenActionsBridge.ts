@@ -325,7 +325,6 @@ function getSourceLabel(entry: EntryRecord | null): string | null {
 
 interface CreateSovranScreenActionsBridgeConfig {
   manager: Manager;
-  requestCameraPermission: () => Promise<boolean>;
   /**
    * Register for p2pk-keypair regeneration; returns an unsubscribe.
    *
@@ -365,7 +364,6 @@ export function retryMintInfoFetch(): boolean {
 
 export function createSovranScreenActionsBridge({
   manager,
-  requestCameraPermission,
   subscribeP2pkKeyRefreshed,
   subscribeOfflineChanged,
 }: CreateSovranScreenActionsBridgeConfig): ScreenActionsBridge {
@@ -373,10 +371,7 @@ export function createSovranScreenActionsBridge({
   let mintInfoFetchingUrl: string | null = null;
 
   return {
-    getExtraContext: () => ({
-      manager,
-      requestCameraPermission,
-    }),
+    getExtraContext: () => ({ manager }),
     bindSubscriptionBus: (bus) => {
       const unsubscribes: (() => void)[] = [];
 

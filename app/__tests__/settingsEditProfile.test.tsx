@@ -3,7 +3,7 @@ import { useNip05Verification } from '@/shared/hooks/useNip05Verification';
 import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { errAsync, okAsync } from 'neverthrow';
+import { err, errAsync, okAsync, ResultAsync } from 'neverthrow';
 import { SettingsEditProfileScreen } from '@/features/settings/screens/SettingsEditProfileScreen';
 import {
   loadOwnProfileMetadata,
@@ -190,6 +190,44 @@ it('shows save-time base failure inline and retries the shared loader without lo
     })
   );
   expect(guardedRouter.back).toHaveBeenCalledTimes(1);
+});
+
+it('closes as soon as the edit is committed and reports a later publish failure with the popup', async () => {
+  let fail!: () => void;
+  jest.mocked(publishOwnProfileMetadata).mockImplementation(({ onCommitted }) => {
+    onCommitted?.();
+    return new ResultAsync(
+      new Promise((resolve) => {
+        fail = () => resolve(err({ type: 'all-failed', relayResults: [] }));
+      })
+    );
+  });
+  const snapshot = { content: { name: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) };
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  jest.mocked(loadOwnProfileMetadata).mockResolvedValue({ status: 'found', snapshot });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  await act(async () => {
+    control('edit-profile-name').props.onChangeText('Renamed');
+  });
+  let saving!: Promise<unknown>;
+  act(() => {
+    saving = control('edit-profile-save').props.onPress();
+  });
+  await act(async () => Promise.resolve());
+  expect(guardedRouter.back).toHaveBeenCalledTimes(1);
+  expect(paramPopup).not.toHaveBeenCalled();
+
+  act(() => renderer.unmount());
+  await act(async () => {
+    fail();
+    await saving;
+  });
+  expect(guardedRouter.back).toHaveBeenCalledTimes(1);
+  expect(paramPopup).toHaveBeenCalledWith('engagement-update-failed', 'profile', {
+    failure: { service: 'nostr', error: { type: 'all-failed', relayResults: [] } },
+  });
 });
 
 it('validates the addresses, fills npub.cash in one tap, and publishes normalised values', async () => {

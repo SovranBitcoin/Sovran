@@ -66,9 +66,11 @@ jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContext: () => mockWalletContext,
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
+jest.mock('@/features/transactions/components/detail/TransactionDetailSkeleton', () => ({
+  TransactionDetailSkeleton: () => null,
+}));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
-  ScreenLoadingState: () => null,
 }));
 jest.mock('@/shared/lib/logger', () => {
   const channel = () => ({ info: jest.fn(), warn: jest.fn(), debug: jest.fn() });

@@ -28,6 +28,7 @@ import {
   quoteIdDetailItem,
   mintDetailItem,
   entryDetailItems,
+  TransactionDetailSkeleton,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -35,7 +36,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
@@ -90,7 +91,9 @@ export function LightningReceiveScreen({
   }
 
   if (!entry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
+    return (
+      <TransactionDetailSkeleton screenName="LightningReceiveScreen" label="Loading transaction" />
+    );
   }
 
   const bottomButtons = (

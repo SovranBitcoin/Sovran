@@ -165,14 +165,14 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   }, [settled, uriRef]);
 
   const handleCopyUri = useCallback(async (value: string) => {
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await setStringAsync(value);
     copyPopup('bip321');
     paymentLog.info('receive.bip321.copied', { uriLength: value.length });
   }, []);
 
   const handleCopyRail = useCallback(async (id: Bip321RailId, value: string) => {
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await setStringAsync(value);
     copyPopup(RAIL_COPY_TARGET[id]);
     paymentLog.info('receive.unified.rail_copied', { rail: id, valueLength: value.length });

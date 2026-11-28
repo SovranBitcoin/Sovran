@@ -425,13 +425,28 @@ function ProfileEditor({
       nip05: nip05 === base.nip05 ? nip05 : checks.nip05.ok ? checks.nip05.value : nip05,
       about: checks.about.ok ? checks.about.value : about,
     };
+    // Close once signed and shown; inline (base, identity) errors come before
+    // that, and a later publish failure takes the same popup.
+    let closed = false;
     const result = await publishOwnProfileMetadata({
       client,
       pubkey,
       accountIndex,
       initialLoad,
       patch: patchBetween(base, normalized),
+      onCommitted: () => {
+        if (!isOwner()) return;
+        closed = true;
+        router.back();
+      },
     });
+    if (closed) {
+      if (result.isErr() && activePubkey() === pubkey)
+        paramPopup('engagement-update-failed', 'profile', {
+          failure: { service: 'nostr', error: result.error },
+        });
+      return;
+    }
     if (!isOwner()) return;
     setSaving(false);
     if (result.isOk()) router.back();

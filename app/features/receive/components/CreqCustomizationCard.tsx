@@ -91,7 +91,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   }, [mintSelection, onMintToggle, onResetExclusions]);
 
   const handleCopy = useCallback(async () => {
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await setStringAsync(encodedRequest);
     copyPopup('paymentRequest');
     paymentLog.info('receive.creq.copied', { requestLength: encodedRequest.length });

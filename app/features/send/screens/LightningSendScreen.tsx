@@ -32,11 +32,12 @@ import {
   quoteIdDetailItem,
   mintDetailItem,
   entryDetailItems,
+  TransactionDetailSkeleton,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from 'wallet/amount';
@@ -185,7 +186,9 @@ export function LightningSendScreen({
   }
 
   if (!entry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
+    return (
+      <TransactionDetailSkeleton screenName="LightningSendScreen" label="Loading transaction" />
+    );
   }
 
   const isPreview = !entry.quoteId;

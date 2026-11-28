@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { usePaymentFlowMachine } from 'wallet/react';
-import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
+import { useCameraPermissionGate } from '../../hooks/useHandleCameraPermission';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/runtime/WalletProjection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -70,8 +70,7 @@ export function CameraScreen() {
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const { permission, handlePermission } = useHandleCameraPermission();
-  const hasPermission = !!permission?.granted;
+  const { view: permissionView, requestPermission } = useCameraPermissionGate();
   const [isFocused, setIsFocused] = useState(true);
   const appStateRef = useRef(AppState.currentState);
   const isProcessingRef = useRef(false);
@@ -190,17 +189,13 @@ export function CameraScreen() {
     setFlashlightOn((p) => !p);
   };
 
-  const requestPermission = () => {
-    void handlePermission();
-  };
-
   const shared = {
     foreground,
     insets,
     progress,
     flashlightOn,
     loading,
-    hasPermission,
+    permissionView,
     requestPermission,
     handleScan: handleBarcodeScanned,
     handleCameraReady,

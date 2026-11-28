@@ -74,7 +74,7 @@ jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({ handlePermission: async () => true }),
+  useCameraPermissionGate: () => ({ view: 'camera', requestPermission: jest.fn() }),
 }));
 jest.mock('@/shared/lib/nfc', () => ({
   createNfcAdapter: () => undefined,
@@ -147,7 +147,6 @@ jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => 
 jest.mock('@/shared/ui/composed/CopyableValue', () => ({ CopyableValue: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => 'error state',
-  ScreenLoadingState: () => 'loading state',
 }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({
   BottomButtons: ({ children }: React.PropsWithChildren) => <>{children}</>,

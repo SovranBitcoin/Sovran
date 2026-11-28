@@ -1,11 +1,11 @@
-import { useCameraPermissions } from 'expo-camera';
+import { useEffect, useRef, useState } from 'react';
+import { useCameraPermissions, type PermissionResponse } from 'expo-camera';
 
 import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
-export function useHandleCameraPermission() {
+function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
-  const isChecking = permission === null;
 
   const handlePermission = async (): Promise<boolean> => {
     if (!permission) {
@@ -39,5 +39,36 @@ export function useHandleCameraPermission() {
     return false;
   };
 
-  return { permission, isChecking, handlePermission };
+  return { permission, handlePermission };
+}
+
+export type CameraPermissionView = 'starting' | 'camera' | 'required';
+
+/** Black until the permission is known and the one ask on open has settled:
+ *  the hook starts at `null` on every mount, so `!granted` flashed "required". */
+export function cameraPermissionView(
+  permission: Pick<PermissionResponse, 'granted'> | null,
+  askSettled: boolean
+): CameraPermissionView {
+  if (permission?.granted) return 'camera';
+  if (!permission || !askSettled) return 'starting';
+  return 'required';
+}
+
+/** Callers open the camera at once; the screen asks once when it opens. */
+export function useCameraPermissionGate() {
+  const { permission, handlePermission } = useHandleCameraPermission();
+  const asked = useRef(false);
+  const [askSettled, setAskSettled] = useState(false);
+
+  useEffect(() => {
+    if (!permission || permission.granted || asked.current) return;
+    asked.current = true;
+    void handlePermission().finally(() => setAskSettled(true));
+  }, [permission, handlePermission]);
+
+  return {
+    view: cameraPermissionView(permission, askSettled),
+    requestPermission: () => void handlePermission(),
+  };
 }

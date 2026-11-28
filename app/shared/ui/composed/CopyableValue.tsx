@@ -37,7 +37,7 @@ export function CopyableValue({ value, display, copyTarget, testID }: CopyableVa
 
   const handleCopyPress = useCallback(async () => {
     paymentLog.info('ui.copyable_value.copy', { copyTarget, valueLength: value.length });
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(value);
     copyPopup(copyTarget);
   }, [value, copyTarget]);

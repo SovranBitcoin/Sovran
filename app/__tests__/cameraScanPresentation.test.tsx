@@ -46,7 +46,7 @@ jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContextWithOverride: () => ({ trustedMintUrls: [], mintBalances: {} }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({ permission: { granted: true }, handlePermission: jest.fn() }),
+  useCameraPermissionGate: () => ({ view: 'camera', requestPermission: jest.fn() }),
 }));
 jest.mock('@/features/camera/screens/CameraScreen/CameraLayout', () => ({
   CameraLayout: ({ children, ...props }: { children: React.ReactNode }) => {

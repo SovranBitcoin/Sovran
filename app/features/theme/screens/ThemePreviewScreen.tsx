@@ -120,10 +120,11 @@ export function ThemePreviewScreen() {
     router.back();
   }, [discard]);
 
-  const handleApply = useCallback(async () => {
+  // Close at once; the commit still waits for the primary wallpaper first.
+  const handleApply = useCallback(() => {
     log.info('theme.preview.apply', { albumSlug: activeAlbumSlug });
-    // A Cancel during the download already closed the editor.
-    if (await commit()) router.back();
+    router.back();
+    void commit();
   }, [commit, activeAlbumSlug]);
 
   const handleUnitPress = useCallback((unitId: string) => {

@@ -187,6 +187,43 @@ it('all-failed rolls back the overlay without a profile or cache write', async (
   expect(mockIngest).not.toHaveBeenCalled();
   expect(mockDelete).not.toHaveBeenCalled();
 });
+it('reports the edit committed once signed and shown, before any relay answers', async () => {
+  const order: string[] = [];
+  jest.mocked(publishEvent).mockImplementation(() => {
+    order.push('publish');
+    return okAsync(accepted);
+  });
+  const result = await publishOwnProfileMetadata({
+    client: makeClient(),
+    pubkey,
+    accountIndex: 0,
+    patch: { name: 'New', picture: null },
+    initialLoad: { status: 'absent' },
+    onCommitted: () => {
+      order.push(`committed:${useOwnProfileMetadataStore.getState().optimistic?.name}`);
+    },
+  });
+  expect(result.isOk()).toBe(true);
+  expect(order).toEqual(['committed:New', 'publish']);
+});
+
+it('does not report a commit for an edit the editor must show inline', async () => {
+  jest
+    .mocked(verifyNip05)
+    .mockResolvedValue({ status: 'mismatch', identifier: 'alice@example.com' });
+  const onCommitted = jest.fn();
+  const result = await publishOwnProfileMetadata({
+    client: makeClient(),
+    pubkey,
+    accountIndex: 0,
+    patch: { nip05: 'alice@example.com' },
+    initialLoad: { status: 'absent' },
+    onCommitted,
+  });
+  expect(result.isErr() && result.error.type).toBe('nip05-unverified');
+  expect(onCommitted).not.toHaveBeenCalled();
+});
+
 it('no signer returns a typed error without an overlay', async () => {
   const client = makeClient(null);
   expect((await publish(client))._unsafeUnwrapErr()).toEqual({ type: 'no-signer' });

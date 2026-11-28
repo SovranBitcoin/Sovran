@@ -20,7 +20,7 @@ export function CameraLayout({
   progress,
   flashlightOn,
   loading,
-  hasPermission,
+  permissionView,
   requestPermission,
   handleScan,
   handleCameraReady,
@@ -30,7 +30,11 @@ export function CameraLayout({
   const { width } = useWindowDimensions();
   const scanBoxSize = width * 0.8;
 
-  if (!hasPermission) {
+  if (permissionView === 'starting') {
+    return <View className="flex-1 bg-black" testID="camera-starting" />;
+  }
+
+  if (permissionView === 'required') {
     return (
       <View className="flex-1 items-center justify-center bg-black px-8">
         {/* Grant access on a blocked permission fires the camera-permission

@@ -159,12 +159,16 @@ export function publishOwnProfileMetadata({
   accountIndex,
   patch,
   initialLoad,
+  onCommitted,
 }: {
   client: NostrClient;
   pubkey: string;
   accountIndex: number;
   patch: OwnProfilePatch;
   initialLoad: OwnProfileLoadResult;
+  /** After read, verify, sign and the optimistic overlay, before the relay
+   *  publish; only the publish can fail after it. Not called when joining. */
+  onCommitted?: () => void;
 }): ResultAsync<PublishResult, OwnProfilePublishError> {
   const existing = inFlight.get(pubkey);
   if (existing) return existing;
@@ -255,6 +259,7 @@ export function publishOwnProfileMetadata({
     useOwnProfileMetadataStore
       .getState()
       .setOptimistic({ ...patch, createdAt: event.created_at, eventId });
+    onCommitted?.();
     nostrLog.info('nostr.profile.publish.start', {
       hasPicture: !!content.picture,
       nameChanged:

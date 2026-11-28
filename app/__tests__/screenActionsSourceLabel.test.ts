@@ -36,7 +36,6 @@ const quietManager: unknown = { on: () => () => {} };
 function createBridge() {
   return createSovranScreenActionsBridge({
     manager: quietManager as Manager,
-    requestCameraPermission: async () => false,
     subscribeP2pkKeyRefreshed: () => () => {},
     subscribeOfflineChanged: () => () => {},
   });

@@ -27,7 +27,10 @@ interface ActionMenuSheetContentProps extends CustomSheetSharedProps {
 
 type ActionMenuSheetButton = ActionSheetPayloads['action-menu']['buttons'][number];
 
+/** Close first, like the menu lane, so a slow action never holds the sheet up;
+ *  the pick is already recorded, so this is no dismiss. */
 async function runSheetAction(button: ActionMenuSheetButton, close: () => void): Promise<void> {
+  if (button.keepOpen !== true) close();
   try {
     await button.onPress?.(close);
   } catch (error) {
@@ -35,10 +38,6 @@ async function runSheetAction(button: ActionMenuSheetButton, close: () => void):
       testID: button.testID,
       error: error instanceof Error ? error.message : String(error),
     });
-  } finally {
-    // Mirror the menu-lane host: auto-dismiss unless the item
-    // deliberately keeps the surface open to swap content.
-    if (button.keepOpen !== true) close();
   }
 }
 

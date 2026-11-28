@@ -28,7 +28,6 @@ const mockBridge = { kind: 'screen actions bridge' };
 let mockUrl: string | null = null;
 let mockKeys: { pubkey: string } | null = { pubkey: 'ab'.repeat(32) };
 let mockOffline = false;
-let mockPermission = true;
 
 jest.mock('@react-native-async-storage/async-storage', () => {
   const disk: Record<string, string> = {};
@@ -68,9 +67,6 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 }));
 jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
-}));
-jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({ handlePermission: async () => mockPermission }),
 }));
 jest.mock('@/shared/lib/nfc', () => ({ createNfcAdapter: () => mockNfcAdapter }));
 jest.mock('@/shared/lib/migrations/dataMigrations', () => ({
@@ -190,7 +186,6 @@ beforeEach(() => {
   mockUrl = null;
   mockKeys = { pubkey: 'ab'.repeat(32) };
   mockOffline = false;
-  mockPermission = true;
   useSettingsStore.setState({ mockOffline: false });
   useMintStore.setState({ activeUnit: 'sat' });
 });
@@ -390,27 +385,12 @@ describe('navigation callbacks', () => {
   it.each([
     ['receive', '/(receive-flow)/camera'],
     ['send', '/camera'],
-  ] as const)('opens the %s camera after permission is granted', async (context, pathname) => {
+  ] as const)('opens the %s camera in the same tick as the tap', async (context, pathname) => {
     await mount();
 
     props().navigation.scanQr!(loose({ unit: 'sat', context }));
-    await act(async () => {
-      await Promise.resolve();
-    });
 
     expect(mockRouter.navigate).toHaveBeenCalledWith({ pathname, params: { unit: 'sat' } });
-  });
-
-  it('opens no camera when permission is refused', async () => {
-    mockPermission = false;
-    await mount();
-
-    props().navigation.scanQr!(loose({ unit: 'sat', context: 'receive' }));
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(mockRouter.navigate).not.toHaveBeenCalled();
   });
 
   it('opens nearby, mint info, add mint and back', async () => {

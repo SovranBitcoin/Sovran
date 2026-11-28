@@ -105,7 +105,6 @@ jest.mock('@/shared/ui/primitives/Text', () => ({
 jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
-  ScreenLoadingState: () => null,
 }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({
   BottomButtons: ({ children }: React.PropsWithChildren) => <>{children}</>,
