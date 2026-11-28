@@ -10,7 +10,6 @@ import { appSourceFingerprint } from '../../scripts/lib/app-source.mjs';
 import { sha256 } from './source-catalog.mjs';
 import { websiteRecipes, websiteScenes } from './website-config.mjs';
 import { generateWebsiteAssets, websiteAssetStatus } from './website-assets.mjs';
-import { websiteCaptures } from './website-captures.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const sharp = createRequire(import.meta.url)('sharp');
@@ -80,29 +79,6 @@ test('current sources produce one raster, matching provenance and hashes; check 
   await generateWebsiteAssets({ repoRoot });
   assert.notDeepEqual(await readFile(join(repoRoot, 'site/public/social/manifest.json')), before);
   assert.equal((await websiteAssetStatus(repoRoot)).outputs[0].current, true);
-});
-
-test('public image imports follow only the declared recipe, including screenshot replacements', async t => {
-  const { repoRoot, put, registry } = await fixture(t);
-  const selected = structuredClone(config);
-  selected.scenes = { hero: selected.scenes.hero };
-  await put('press/website.json', selected);
-  registry['ios/backup-words'] = { ...registry['ios/wallet'], file: 'source/screenshots/ios/backup-words.png', context: 'backup-words' };
-  await put('press/artwork/source/screenshots/ios/backup-words.png', await readFile(join(repoRoot, 'press/artwork/source/screenshots/ios/wallet.png')));
-  await put('press/artwork/source/screenshots.json', registry);
-  const plugin = websiteCaptures({ repoRoot });
-  const load = () => plugin.load.call({ addWatchFile() {} }, plugin.resolveId('virtual:sovran-website-captures'));
-  const original = await load();
-  assert.equal(original.match(/^import image/gm).length, 2);
-  assert(!original.includes('backup-words'));
-  selected.phones.feed.captureId = 'ios/backup-words';
-  await put('press/website.json', selected);
-  const changed = await load();
-  assert(changed.includes('screenshots/ios/backup-words.png'));
-  assert(!changed.includes('screenshots/ios/feed.png'));
-  registry['ios/backup-words'].availability = 'unavailable';
-  await put('press/artwork/source/screenshots.json', registry);
-  await assert.rejects(load(), /missing or unapproved/);
 });
 
 test('unrelated capture updates do not invalidate or rewrite the selected output', async t => {

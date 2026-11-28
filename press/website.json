@@ -2,18 +2,10 @@
   "version": 1,
   "phones": {
     "wallet": { "captureId": "ios/wallet" },
-    "receive": { "captureId": "ios/receive-qr" },
-    "send": { "captureId": "ios/send" },
-    "contacts": { "captureId": "ios/contacts" },
-    "mints": { "captureId": "ios/mint-info" },
-    "reviews": { "captureId": "ios/mint-reviews" }
+    "receive": { "captureId": "ios/receive-qr" }
   },
   "scenes": {
-    "hero": { "preset": "duo-depth", "phones": ["receive", "wallet"] },
-    "wallet": { "preset": "duo-overlap", "phones": ["wallet", "send"] },
-    "contacts": { "preset": "duo-depth", "phones": ["contacts", "receive"] },
-    "mints": { "preset": "duo-overlap", "phones": ["mints", "reviews"] },
-    "offline": { "preset": "duo-overlap", "phones": ["contacts", "send"] }
+    "hero": { "preset": "duo-depth", "phones": ["receive", "wallet"] }
   },
   "recipes": [
     {

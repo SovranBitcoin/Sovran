@@ -12,7 +12,6 @@ site/src/pages/screenshots.astro
 site/src/pages/logos.astro
 site/src/pages/social.astro
 site/src/pages/mockups.astro
-site/src/pages/scenes*
 site/src/layouts/Dev.astro
 site/src/styles/dev.css
 site/src/styles/artwork-gallery.css
@@ -22,7 +21,6 @@ site/src/styles/artwork-gallery.css
 !site/scripts/production-boundary.mjs
 !site/scripts/website-config.mjs
 !site/scripts/composition-recipe.mjs
-!site/scripts/website-captures.mjs
 !site/scripts/source-catalog.mjs
 !site/scripts/website-assets.mjs
 !site/scripts/composition.mjs
