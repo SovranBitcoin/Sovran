@@ -153,7 +153,7 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
         parts={[{ value: npcAddress, kind: 'lightningAddress' }]}
         muted={muted}
         onPress={async () => {
-          await EnhancedHaptics.copyHaptic();
+          void EnhancedHaptics.copyHaptic();
           await actions.copy.execute({ source: 'npc' });
         }}
       />
@@ -170,7 +170,7 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
           isNpcMintUpdating || !actions.changeNpcMint.available
             ? undefined
             : async () => {
-                await EnhancedHaptics.copyHaptic();
+                void EnhancedHaptics.copyHaptic();
                 await actions.changeNpcMint.execute();
               }
         }
@@ -429,7 +429,7 @@ function ReceiveScreenForUnit({
 
   const handleFooterCopy = useCallback(async () => {
     if (!activePayload) return;
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await setStringAsync(activePayload.value);
     copyPopup(activePayload.copyTarget);
     paymentLog.info('receive.qr.footer_copied', {

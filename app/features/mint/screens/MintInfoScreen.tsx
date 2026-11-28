@@ -321,7 +321,7 @@ export function MintInfoScreen() {
       case 'nostr': {
         const npubToCopy = getMintInfoNostrCopyValue(info, pubkey);
         if (npubToCopy) {
-          await EnhancedHaptics.copyHaptic();
+          void EnhancedHaptics.copyHaptic();
           await Clipboard.setStringAsync(npubToCopy);
           copyPopup('npub');
         }

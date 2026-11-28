@@ -106,7 +106,7 @@ export function PaymentInfo({
       copyTarget,
       valueLength: selectedValue.length,
     });
-    await EnhancedHaptics.copyHaptic();
+    void EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(selectedValue);
     copyPopup(copyTarget);
   }, [selectedValue, copyTarget]);

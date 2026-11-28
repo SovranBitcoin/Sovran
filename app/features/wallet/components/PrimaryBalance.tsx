@@ -244,11 +244,11 @@ export function PrimaryBalance({
   const btcPrice = useBtcPrice(displayCurrency);
   const isSatUnit = realUnit === 'sat';
 
-  const toggleUnit = async () => {
+  const toggleUnit = () => {
     // displayBtc cycling re-formats a SAT balance (sat/BTC/⚡ modes); it has
     // no meaning for a fiat-denominated wallet unit.
     if (!isSatUnit) return;
-    await EnhancedHaptics.successHaptic();
+    void EnhancedHaptics.successHaptic();
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   };
 
