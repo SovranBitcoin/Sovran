@@ -50,6 +50,7 @@ const KNOWN_BIP321_KEYS = new Set([
   "bcrt",
 ]);
 
+const FORM_ENCODED_BIP321_KEYS = new Set(["label", "message"]);
 const UNSUPPORTED_REQUIRED_BIP321_KEYS = new Set(["req-pop", "req-pj"]);
 const ONCHAIN_ADDRESS_PARAM_KEYS = new Set(["bc", "tb", "bcrt"]);
 const ONCHAIN_INSTRUCTION_PARAM_KEYS = new Set(["pay", "sp"]);
@@ -343,12 +344,23 @@ function parseBip321Container(input: string): Bip321Container | null {
   >;
 
   try {
-    const url = new URL(trimmed.replace(/^bitcoin:/i, "bitcoin://x/"));
+    // A BIP-321 query is RFC 3986, not a web form: `+` is a plus. Reading it
+    // as a space (what `searchParams` does) breaks a standard-base64 creqA or
+    // a BOLT12 offer written into the URI unescaped. Only the free-text
+    // fields keep the form reading, for wallets that write spaces that way.
+    const [head, ...query] = trimmed.split("?");
+    const literalPlus = [head, query.join("?").replace(/\+/g, "%2B")]
+      .filter((part, index) => index === 0 || part.length > 0)
+      .join("?");
+    const url = new URL(literalPlus.replace(/^bitcoin:/i, "bitcoin://x/"));
     const path = url.pathname.replace(/^\/+/, "");
     address = path && path !== "x" ? path : null;
 
-    for (const [rawKey, value] of url.searchParams.entries()) {
+    for (const [rawKey, rawValue] of url.searchParams.entries()) {
       const key = rawKey.toLowerCase();
+      const value = FORM_ENCODED_BIP321_KEYS.has(key)
+        ? rawValue.replace(/\+/g, " ")
+        : rawValue;
       if (!params[key]) params[key] = [];
       params[key].push(value);
     }
