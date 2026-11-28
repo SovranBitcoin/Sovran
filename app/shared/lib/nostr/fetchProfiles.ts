@@ -81,8 +81,12 @@ export async function fetchFollowingCountViaFacade(
 ): Promise<number | undefined> {
   const layer = buildNostrDataLayer();
   if (!layer) return undefined;
+  // The lists alone: only the count is wanted. Asking for everyone followed
+  // with their profiles pulled thousands of kind-0s for one number and pushed
+  // them through the cache the viewer's own contacts live in.
   const result = await layer.getSocialGraph({
     pubkey,
+    withProfiles: false,
     ...(options.signal ? { signal: options.signal } : {}),
     ...(options.readId ? { readId: options.readId } : {}),
   });
