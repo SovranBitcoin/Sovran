@@ -48,7 +48,6 @@ for capture commands, evidence classes, retention and editing.
   every preset and every per-subject combination is reachable without hand
   editing a recipe.
 - `/mockups`: the website's explicitly selected compositions and output status.
-- `/scenes`: advanced geometry reference and explicit legacy scene exports.
 
 Composition layout is measured, not assumed. The renderer tries the copy above
 the stage and beside it, and keeps whichever renders the phones larger, so a
@@ -77,11 +76,13 @@ alone would not prevent private images from being emitted into `/_astro`.
 
 ## Website Assets
 
-`press/website.json` owns named phones, scene arrangements and saved outputs.
-The public image import list is generated from that file, not maintained separately.
-The homepage renders its selected scenes directly using Astro-optimized native
-captures. Only the OG raster is currently consumed, so it is the only approved
-saved website composition: `site/public/social/og.png`.
+The home page shows one phone: `public/hero/wallet-{600,900}.{avif,webp}`,
+exported by `node site/scripts/hero-image.mjs` from `press/screenshots/ios/wallet.png`
+and cropped above the capture's tab bar, so the shipped bytes never contain it.
+Rerun the script after replacing that capture and commit the four files.
+
+`press/website.json` owns the OG scene and its saved output. It is the only
+approved saved website composition: `site/public/social/og.png`.
 
 `site:assets` validates sources, stages the PNG and manifest, verifies dimensions
 and provenance, and replaces only unchanged owned outputs. Failed rendering,
@@ -110,26 +111,15 @@ Mona Sans retains its OFL notice. The repository license remains MPL-2.0, not th
 licenses of those individual components. Trademark rights are not granted by
 those notices.
 
-The explicit legacy geometry exporter remains available for specialized evidence:
-
-```sh
-# Run inside site/; never defaults to every preset.
-bun scripts/visual.mjs --export /absolute/output --preset duo-depth --screenshots ios/feed,ios/wallet --format landscape
-```
-
-Its internal build lives in `.astro/internal-dist/`, not public `dist/`. Browser
-profiles/staging are temporary; unowned destinations are never erased wholesale.
-
 ## Content And Downloads
 
-`copy/src/site.ts` owns plain homepage, benefit, release and roadmap copy.
+`copy/src/site.ts` owns plain homepage, FAQ, release and roadmap copy.
 `copy/legal/documents.json` owns canonical policies; builds validate and publish
 their exact revisions. Roadmap items and source implementation do not establish
 store availability. Releases remain dated, newest-first, with source links.
 
 `scripts/site-brand.mjs` derives the site mark and download-QR logo from the same
-brand master used by the native app. Builds verify it with `--check`. Third-party
-stack/supporter logos identify those projects, not blanket endorsements. The
+brand master used by the native app. Builds verify it with `--check`. The
 public Nostr well-known JSON preserves the reviewed public name mappings.
 
 The download client validates all five release channels, version/build identity
