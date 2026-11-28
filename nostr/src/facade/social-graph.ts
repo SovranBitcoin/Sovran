@@ -32,6 +32,12 @@ export type SocialGraph = {
 export type SocialGraphRequest = RequestControls & {
   pubkey: string;
   refresh?: boolean;
+  /**
+   * `false` asks for the lists alone: a tier that can bundle the profile of
+   * everyone followed (Primal) is told not to, and none are written to the
+   * entity cache. For callers that want a count, not thousands of profiles.
+   */
+  withProfiles?: boolean;
   /** Aggregate reads: a later tier with a newer kind-3 (or more profiles) is delivered here. */
   onUpdate?: (resolved: ResolvedSocialGraph) => void;
 };

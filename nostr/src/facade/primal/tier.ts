@@ -57,7 +57,10 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       // `contact_list` (extended_response) returns the kind-3 plus the bundled
       // kind-0 of everyone followed — the same shape nagg's social-graph seed has.
       const result = await config.connection.request(
-        { verb: 'contact_list', params: { pubkey: request.pubkey, extended_response: true } },
+        {
+          verb: 'contact_list',
+          params: { pubkey: request.pubkey, extended_response: request.withProfiles !== false },
+        },
         { signal: request.signal, timeoutMs: request.timeoutMs },
       );
       return result.match<TierOutcome<SocialGraph>>(

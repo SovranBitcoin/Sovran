@@ -302,8 +302,10 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
               gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.socialGraph },
               count: (graph) => graph.follows.length,
               merge: (acc, next, tier) => {
-                // Every answer's profiles are cached under their own tier's rank.
-                ingestSocialGraph(cache, { tier, ...next });
+                // Every answer's profiles are cached under their own tier's rank,
+                // unless the caller asked for the lists alone: a stranger's
+                // followees must not crowd the viewer's contacts out of the LRU.
+                if (request.withProfiles !== false) ingestSocialGraph(cache, { tier, ...next });
                 return mergeSocialGraph(acc, next, tier);
               },
               onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
