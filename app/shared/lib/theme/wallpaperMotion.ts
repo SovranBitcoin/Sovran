@@ -13,8 +13,14 @@
 import { Animated } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import { log } from '@/shared/lib/logger';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 
 export const wallpaperMotion = new Animated.ValueXY({ x: 0, y: 0 });
+
+/** 1 px of travel is about 5.7° of tilt (`rotation * 10`). */
+const MOTION_DEADBAND_PX = 1;
+/** Fast but barely bouncing, so a step settles instead of ringing. */
+const MOTION_SPRING = { bounciness: 4, speed: 40 } as const;
 
 let subscribers = 0;
 let subscription: { remove(): void } | null = null;
@@ -29,14 +35,19 @@ export function retainWallpaperMotion(): () => void {
       if (!rotation) return;
       const { beta = 0, gamma = 0 } = rotation;
       const target = { x: gamma * 10, y: beta * 10 };
-      // Stationary sensor noise must not continuously restart native springs.
-      if (lastTarget && Math.hypot(target.x - lastTarget.x, target.y - lastTarget.y) < 0.25) return;
+      // Sensor noise and hand tremor (a few degrees) must not keep restarting
+      // native springs: follow only moves of at least MOTION_DEADBAND_PX.
+      if (
+        lastTarget &&
+        Math.hypot(target.x - lastTarget.x, target.y - lastTarget.y) < MOTION_DEADBAND_PX
+      )
+        return;
       lastTarget = target;
+      countIdleWork('wallpaper.spring');
       Animated.spring(wallpaperMotion, {
         toValue: target,
         useNativeDriver: true,
-        bounciness: 100,
-        speed: 200,
+        ...MOTION_SPRING,
       }).start();
     });
   }

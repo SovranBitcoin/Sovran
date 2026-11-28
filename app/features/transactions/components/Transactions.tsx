@@ -62,7 +62,7 @@ import {
   type TransactionPaymentType,
   toRealUnit,
 } from 'wallet';
-import { log, Log, timedDerive } from '@/shared/lib/logger';
+import { log, Log, SHOW_LOGS, timedDerive } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
@@ -590,6 +590,8 @@ export const Transactions = React.memo(
     // per change. Types + dates only — no amounts, mints, or tokens.
     const lastRenderSignatureRef = useRef('');
     useEffect(() => {
+      // Release builds drop the log: do not stringify every row for it.
+      if (!SHOW_LOGS) return;
       const rows: string[] = [];
       for (const section of sectionsToDisplay) {
         for (const item of section.data) {

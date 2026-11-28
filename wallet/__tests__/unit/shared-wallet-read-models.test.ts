@@ -408,8 +408,41 @@ test("shared balance bursts discard invalidated results and run exactly one trai
   expect(mounted.values.map((v) => v.total)).toEqual([
     300, 300, 300, 300, 300, 300, 300,
   ]);
-  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(2);
+  // New proofs cannot change the pending-send total: the 100-row history page
+  // is not read again for them.
+  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(1);
   expect(fixture.manager.ops.receive.listInFlight).toHaveBeenCalledTimes(2);
+});
+
+test("one coco change read once, only what it can change, and published only when it differs", async () => {
+  const mounted = await mount(() => useColadaBalance(), 3);
+  const first = mounted.values[0];
+  const reads = () => [
+    fixture.manager.wallet.balances.byMint.mock.calls.length,
+    fixture.manager.history.getPaginatedHistory.mock.calls.length,
+    fixture.manager.ops.receive.listInFlight.mock.calls.length,
+  ];
+  expect(reads()).toEqual([1, 1, 1]);
+  // A receive emits all of these in one turn: before, 2 full reads (3 + 3 queries).
+  await act(async () => {
+    fixture.emit("receive-op:finalized");
+    fixture.emit("proofs:saved");
+    fixture.emit("history:updated");
+  });
+  expect(reads()).toEqual([2, 2, 2]);
+  // Nothing changed: every consumer keeps the same object.
+  expect(mounted.values.every((value) => value === first)).toBe(true);
+  // A prepared receive can only change the redeeming figure.
+  await act(async () => fixture.emit("receive-op:prepared"));
+  expect(reads()).toEqual([2, 2, 3]);
+  fixture.manager.wallet.balances.byMint.mockResolvedValueOnce({
+    "https://one.example": balance(150, 20),
+    "https://two.example": balance(200, 30),
+  });
+  await act(async () => fixture.emit("proofs:saved"));
+  expect(mounted.values[0]).not.toBe(first);
+  expect(mounted.values[0].total).toBe(400);
+  expect(mounted.values[1]).toBe(mounted.values[0]);
 });
 
 test("shared pagination keeps one trailing history refresh and preserves loaded pages", async () => {
@@ -591,4 +624,38 @@ test("receive bursts share independent supplements and retire the payment-reques
   await mounted.unmount();
   await act(async () => emitPaymentRequestCreated());
   expect(fixture.manager.ops.receive.listInFlight).toHaveBeenCalledTimes(3);
+});
+
+test("a burst of history projections refreshes the head page once", async () => {
+  await mount(() => useColadaTransactions().history.length, 3);
+  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(1);
+  // A melt projects pending, then finalized, in one turn.
+  await act(async () => {
+    fixture.emit("history:updated");
+    fixture.emit("history:updated");
+    fixture.emit("history:updated");
+  });
+  // Before: one refresh plus a trailing one.
+  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(2);
+});
+
+test("history diagnostics are not built when the host drops info logs", async () => {
+  const { setLogger } = await import("../../src/logger");
+  const info = vi.fn();
+  const toISOString = vi.spyOn(Date.prototype, "toISOString");
+  setLogger({
+    debug: vi.fn(),
+    info,
+    warn: vi.fn(),
+    error: vi.fn(),
+    isLevelEnabled: () => false,
+  });
+  try {
+    await mount(() => useColadaTransactions().history.length);
+    expect(info).not.toHaveBeenCalled();
+    expect(toISOString).not.toHaveBeenCalled();
+  } finally {
+    setLogger(null);
+    toISOString.mockRestore();
+  }
 });

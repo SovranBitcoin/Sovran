@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   BlurMask,
   Canvas,
@@ -28,6 +28,7 @@ import {
 } from '@/features/nearPay/lib/boltGeometry';
 import type { StrikeStatus } from '@/features/nearPay/lib/nutDropStrikeState';
 import { withAlpha } from '@/shared/lib/color';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { variantToSkPath } from '@/features/nearPay/lib/boltSkiaPath';
 
 import {
@@ -222,12 +223,20 @@ export function LightningStrike({
     ]
   );
 
-  useEffect(() => {
-    for (const value of allValues) cancelAnimation(value);
+  // When the current active session began (JS clock), so a strike that was
+  // paused off screen resumes its loops without replaying the entrance.
+  const activeSinceRef = useRef<number | null>(null);
 
-    if (status === 'active') {
+  // The active state's endless rim and bolt loops run only while the screen is
+  // focused and the app is in the foreground.
+  useVisualActivityEffect(
+    useCallback(() => {
+      for (const value of allValues) cancelAnimation(value);
+      const resumed = activeSinceRef.current !== null;
+      const activeFor = resumed ? Date.now() - activeSinceRef.current! : 0;
+      if (!resumed) activeSinceRef.current = Date.now();
       rootOpacity.set(1);
-      const strike = entrance === 'strike';
+      const strike = entrance === 'strike' && !resumed;
 
       if (strike) {
         haloOpacity.set(
@@ -245,6 +254,12 @@ export function LightningStrike({
             rimAmbientLoop()
           )
         );
+      } else if (resumed) {
+        // Back where the entrance settled: straight into the ambient loops.
+        haloOpacity.set(op(entrance === 'strike' ? 0.35 : 0.3));
+        pulseScale.set(1);
+        rimOpacity.set(op(0.35));
+        rimOpacity.set(rimAmbientLoop());
       } else {
         haloOpacity.set(withTiming(op(0.3), { duration: 300 }));
         pulseScale.set(1);
@@ -270,21 +285,44 @@ export function LightningStrike({
             )
           );
         } else {
+          if (resumed) boltOpacity.set(0);
           boltOpacity.set(ambient);
         }
       });
 
       // Long-redemption decay: after STUCK_DECAY_MS the crackle energy drops
-      // so a backoff-stuck redeem reads as "still working", not a rave.
-      crackleEnergy.set(1);
-      crackleEnergy.set(
-        withDelay(
-          STUCK_DECAY_MS,
-          withTiming(0.25, { duration: 1200, easing: Easing.out(Easing.quad) })
-        )
-      );
-      return;
-    }
+      // so a backoff-stuck redeem reads as "still working", not a rave. Time
+      // spent off screen counts towards it.
+      if (activeFor >= STUCK_DECAY_MS) crackleEnergy.set(0.25);
+      else {
+        crackleEnergy.set(1);
+        crackleEnergy.set(
+          withDelay(
+            STUCK_DECAY_MS - activeFor,
+            withTiming(0.25, { duration: 1200, easing: Easing.out(Easing.quad) })
+          )
+        );
+      }
+      return () => {
+        for (const value of allValues) cancelAnimation(value);
+      };
+    }, [
+      allValues,
+      boltOpacities,
+      crackleEnergy,
+      entrance,
+      haloOpacity,
+      pulseScale,
+      rimOpacity,
+      rootOpacity,
+    ]),
+    status === 'active'
+  );
+
+  useEffect(() => {
+    if (status === 'active') return;
+    activeSinceRef.current = null;
+    for (const value of allValues) cancelAnimation(value);
 
     if (status === 'success' || status === 'waiting') {
       crackleEnergy.set(1);

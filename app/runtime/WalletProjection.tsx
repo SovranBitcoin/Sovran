@@ -36,8 +36,10 @@ import {
 } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
+const versionOf = (versions: Map<string, number>, url: string) => versions.get(url) ?? 0;
 const EMPTY_PROOF_AMOUNTS: Record<string, number[]> = {};
 
 type ProofAmountsScope = {
@@ -275,16 +277,42 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
     isTestnutMint,
   ]);
 
+  // Per-mint proof denominations from the last reads, so a change at one mint
+  // re-reads that mint only. An entry is reused only for the same manager and
+  // unit, an unchanged balance at that mint, and no proof event for that mint
+  // since it was read (a reservation can leave the balance unchanged).
+  const proofReadsRef = useRef<{
+    manager: ProofAmountsScope['manager'];
+    unit: string;
+    byMint: Map<string, { balance: number | undefined; version: number; amounts: number[] }>;
+    versions: Map<string, number>;
+  } | null>(null);
+
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {
       mintCount: stableMintUrls.length,
     });
+    let reads = proofReadsRef.current;
+    if (!reads || reads.manager !== manager || reads.unit !== activeUnit) {
+      reads = { manager, unit: activeUnit, byMint: new Map(), versions: new Map() };
+      proofReadsRef.current = reads;
+    }
+    const cache = reads;
     const next: Record<string, number[]> = {};
     let totalReady = 0;
     // Per-mint reads are independent — run them concurrently.
     await Promise.all(
       stableMintUrls.map(async (url) => {
+        const balance = mintBalancesOnly[url];
+        const version = versionOf(cache.versions, url);
+        const cached = cache.byMint.get(url);
+        if (cached && cached.balance === balance && cached.version === version) {
+          next[url] = cached.amounts;
+          totalReady += cached.amounts.reduce((sum, n) => sum + n, 0);
+          return;
+        }
         try {
+          countIdleWork('wallet_projection.query');
           const proofs = await getReadyProofs(manager, url);
           const amounts = proofs
             .filter((p) => (p.unit ?? 'sat') === activeUnit && p.usedByOperationId == null)
@@ -293,6 +321,9 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
           const proofTotal = amounts.reduce((sum, n) => sum + n, 0);
           next[url] = amounts;
           totalReady += proofTotal;
+          // A proof event during the read makes it stale: do not keep it.
+          if (versionOf(cache.versions, url) === version)
+            cache.byMint.set(url, { balance, version, amounts });
           walletLog.debug('provider.wallet_context.proof_fetch_done', {
             ...mintUrlLogFields(url),
             proofCount: amounts.length,
@@ -303,6 +334,7 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
             ...mintUrlLogFields(url),
             error: err instanceof Error ? err : new Error(String(err)),
           });
+          cache.byMint.delete(url);
           next[url] = [];
         }
       })
@@ -312,7 +344,7 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
       totalReady,
     });
     return next;
-  }, [manager, stableMintUrls, activeUnit]);
+  }, [manager, stableMintUrls, activeUnit, mintBalancesOnly]);
 
   useEffect(() => {
     let current = true;
@@ -334,6 +366,8 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
     // trailing refresh; never publish denominations from an invalidated read.
     const onProofChange = ({ mintUrl }: { mintUrl: string }) => {
       if (!current || !stableMintUrls.includes(mintUrl)) return;
+      const reads = proofReadsRef.current;
+      if (reads) reads.versions.set(mintUrl, versionOf(reads.versions, mintUrl) + 1);
       setProofSnapshot(null);
       void reload();
     };

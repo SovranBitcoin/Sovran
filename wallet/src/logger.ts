@@ -17,6 +17,8 @@ export interface CocoLogger {
   info(event: string, fields?: Record<string, unknown>): void;
   warn(event: string, fields?: Record<string, unknown>): void;
   error(event: string, fields?: Record<string, unknown>): void;
+  /** False when calls at `level` are dropped (a release build), so callers can skip building fields. */
+  isLevelEnabled?(level: 'debug' | 'info' | 'warn' | 'error'): boolean;
 }
 
 const noopLogger: CocoLogger = {
@@ -62,6 +64,11 @@ export const logger: CocoLogger = {
   warn: (event, fields) => current.warn(event, fields),
   error: (event, fields) => current.error(event, fields),
 };
+
+/** Whether a call at `level` is recorded; guard costly log fields with it. */
+export function isLogLevelEnabled(level: 'debug' | 'info' | 'warn' | 'error'): boolean {
+  return current !== noopLogger && (current.isLevelEnabled?.(level) ?? true);
+}
 
 /**
  * Normalize an unknown thrown value into a logger field. Errors keep

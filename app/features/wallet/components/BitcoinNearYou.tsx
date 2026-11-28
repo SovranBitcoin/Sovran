@@ -159,7 +159,11 @@ function MapPreview({
 // Module-scope because the try/catch (value blocks inside it) would bail the
 // React Compiler if it stayed in the effect's render-scoped closure. Verbatim
 // former effect IIFE body; `cancelled` reads go through the getter.
-async function resolveNearbyCoords(ctx: {
+/** A fix this recent is reused on a return to the wallet instead of asking the OS again. */
+const NEARBY_FIX_REUSE_MS = 10 * 60 * 1000;
+let recentNearbyFix: { coords: { latitude: number; longitude: number }; at: number } | null = null;
+
+export async function resolveNearbyCoords(ctx: {
   isCancelled: () => boolean;
   setPermStatus: (status: 'granted' | 'denied') => void;
   setCoords: (coords: { latitude: number; longitude: number }) => void;
@@ -176,6 +180,13 @@ async function resolveNearbyCoords(ctx: {
     if (!isCancelled()) setPermStatus(status === 'granted' ? 'granted' : 'denied');
     if (status !== 'granted') return;
 
+    // Every focus re-checks permission (above), but a fix from the last few
+    // minutes is reused: the card shows a neighbourhood, not a live position.
+    if (recentNearbyFix && Date.now() - recentNearbyFix.at < NEARBY_FIX_REUSE_MS) {
+      if (!isCancelled()) setCoords(recentNearbyFix.coords);
+      return;
+    }
+
     // Last-known gives an instant first paint, but returns null when the OS
     // has no cached fix (fresh boot, no recent location use) — which was the
     // other path into the London fallback. Fall back to a live fix.
@@ -185,9 +196,10 @@ async function resolveNearbyCoords(ctx: {
         accuracy: Location.Accuracy.Balanced,
       });
     }
-    if (loc && !isCancelled()) {
+    if (loc) {
       const safe = applySafetyOffset(loc.coords);
-      setCoords(safe);
+      recentNearbyFix = { coords: safe, at: Date.now() };
+      if (!isCancelled()) setCoords(safe);
     }
   } catch {
     // keep default

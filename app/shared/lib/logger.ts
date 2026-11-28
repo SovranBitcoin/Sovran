@@ -26,6 +26,7 @@ import './loggerJsThread';
 import './loggerUiThread';
 import './loggerGlobalErrors';
 import './loggerRunnerLink';
+import './loggerIdleCounters';
 
 export type { Logger, RedactedError } from './loggerCore';
 

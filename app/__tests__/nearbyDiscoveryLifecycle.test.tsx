@@ -32,7 +32,21 @@ const mockNative = {
   }),
   removeListeners: jest.fn(),
 };
-const mockPayments = { drain: jest.fn(async () => undefined), ingest: jest.fn(async () => true) };
+const mockJournalListeners = new Set<() => void>();
+let mockPendingWork = true;
+const mockPayments = {
+  drain: jest.fn(async () => undefined),
+  ingest: jest.fn(async () => true),
+  hasPendingWork: () => mockPendingWork,
+  subscribe: (listener: () => void) => {
+    mockJournalListeners.add(listener);
+    return () => mockJournalListeners.delete(listener);
+  },
+};
+function setPendingWork(pending: boolean) {
+  mockPendingWork = pending;
+  mod.act(() => mockJournalListeners.forEach((listener) => listener()));
+}
 const mockAppStateListeners = new Set<(state: string) => void>();
 let mockScope = 'scope-a';
 let mockCocoReady = true;
@@ -179,6 +193,8 @@ beforeEach(() => {
   }
   jest.clearAllMocks();
   mockScope = 'scope-a';
+  mockPendingWork = true;
+  mockJournalListeners.clear();
   mockCocoReady = true;
   mockIdentity = IDENTITY;
   mockKeys = { privateKey: new Uint8Array(32).fill(1) };
@@ -430,6 +446,42 @@ describe('the nearby payment journal', () => {
     expect(mockPayments.drain).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps retrying every 5 s for as long as the journal holds work', async () => {
+    const view = await mount();
+    await flush(60_000);
+    // Mount, then one pass per 5 s: a pending delivery's 30 s back-off is
+    // checked on exactly the same ticks as before.
+    expect(mockPayments.drain).toHaveBeenCalledTimes(13);
+    view.unmount();
+  });
+
+  it('stops the 5 s pump while the journal is empty, and restarts it when work arrives', async () => {
+    mockPendingWork = false;
+    const view = await mount();
+    expect(mockPayments.drain).toHaveBeenCalledTimes(1);
+    await flush(60_000);
+    expect(mockPayments.drain).toHaveBeenCalledTimes(1);
+
+    // A send binds a delivery: the pump runs again within 5 s.
+    setPendingWork(true);
+    await flush(5_000);
+    expect(mockPayments.drain).toHaveBeenCalledTimes(2);
+    await flush(5_000);
+    expect(mockPayments.drain).toHaveBeenCalledTimes(3);
+
+    // Delivered and settled: quiet again, but foreground still drains.
+    setPendingWork(false);
+    await flush(60_000);
+    expect(mockPayments.drain).toHaveBeenCalledTimes(3);
+    mod.act(() => mockAppStateListeners.forEach((listener) => listener('active')));
+    expect(mockPayments.drain).toHaveBeenCalledTimes(4);
+
+    view.unmount();
+    setPendingWork(true);
+    await flush(20_000);
+    expect(mockPayments.drain).toHaveBeenCalledTimes(4);
+  });
+
   it('does not run before the wallet is open', async () => {
     mockCocoReady = false;
     const view = await mount();
@@ -440,6 +492,7 @@ describe('the nearby payment journal', () => {
   });
 
   it('hands an incoming nearby payment to the journal, then drains', async () => {
+    mockPendingWork = false;
     mockNative.getBLEPeers.mockReturnValue([peer('abcdefabcdefabcd')]);
     const view = await mount();
     mockPayments.drain.mockClear();

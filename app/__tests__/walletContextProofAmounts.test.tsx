@@ -263,3 +263,32 @@ it.each([
     expect(result.current.unitBalances).toEqual(unitBalances);
   }
 );
+
+it('re-reads only the mint whose balance or proofs changed', async () => {
+  mockMints = [{ mintUrl: 'a' }, { mintUrl: 'b' }, { mintUrl: 'c' }];
+  mockBalances = {
+    byMintAndUnit: { a: { sat: { total: 1 } }, b: { sat: { total: 2 } }, c: { sat: { total: 4 } } },
+  };
+  mockGetReadyProofs.mockImplementation(async (_manager: unknown, url: string) => [
+    { amount: mockBalances.byMintAndUnit[url].sat.total, unit: 'sat' },
+  ]);
+  const { result, rerender } = renderHook(useWalletContext, { wrapper });
+  await act(async () => {});
+  expect(mockGetReadyProofs).toHaveBeenCalledTimes(3);
+  mockGetReadyProofs.mockClear();
+  // A receive at mint b: proofs saved there, and its balance moves.
+  mockBalances = {
+    byMintAndUnit: { a: { sat: { total: 1 } }, b: { sat: { total: 8 } }, c: { sat: { total: 4 } } },
+  };
+  await act(async () => mockManager.emit('proofs:saved', 'b'));
+  rerender(undefined);
+  await act(async () => {});
+  // Mint b once for the event and once for its new balance; before, every
+  // mint was read for each (6 reads).
+  expect(mockGetReadyProofs.mock.calls.map(([, url]) => url)).toEqual(['b', 'b']);
+  expect(result.current.proofAmounts).toEqual({ a: [1], b: [8], c: [4] });
+  // A reservation at mint c leaves its balance unchanged but is still re-read.
+  mockGetReadyProofs.mockClear();
+  await act(async () => mockManager.emit('proofs:reserved', 'c'));
+  expect(mockGetReadyProofs.mock.calls.map(([, url]) => url)).toEqual(['c']);
+});

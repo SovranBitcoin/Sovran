@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { HistoryEntry, Manager } from "@cashu/coco-core";
 
-import { logger } from "../logger";
+import { isLogLevelEnabled, logger } from "../logger";
 import {
   listInFlightReceiveEntries,
   listPendingPaymentRequestEntries,
@@ -106,7 +106,7 @@ async function readHistoryPage(
     const normalized = normalizeHistoryEntries(raw);
     // Render-order diagnostics: exactly what coco returned for this window,
     // in coco's order. Dates only — no amounts, mints, tokens.
-    logger.info("history.page.fetched", {
+    if (isLogLevelEnabled("info")) logger.info("history.page.fetched", {
       offset,
       count: normalized.length,
       first: normalized[0]
@@ -269,7 +269,7 @@ function createTransactionStore(
     const applyHistory = (next: HistoryEntry[], reason: string) => {
       const previous = cocoHistory;
       cocoHistory = keepIfSame(previous, next);
-      if (cocoHistory !== previous) {
+      if (cocoHistory !== previous && isLogLevelEnabled("info")) {
         logger.info("history.state.applied", {
           reason, offset, ...summarizeEntries(cocoHistory),
         });
@@ -351,7 +351,17 @@ function createTransactionStore(
       };
       await run().finally(() => { if (!cancelled) setFetching(false); });
     };
-    const onHistory = () => void refresh();
+    // One coco change can project several history entries in the same turn:
+    // refresh the head page once for all of them.
+    let refreshScheduled = false;
+    const onHistory = () => {
+      if (refreshScheduled) return;
+      refreshScheduled = true;
+      queueMicrotask(() => {
+        refreshScheduled = false;
+        void refresh();
+      });
+    };
     const onReceive = () => void fetchSupplements();
     manager.on("history:updated", onHistory);
     const receiveEvents = [

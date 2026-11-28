@@ -17,6 +17,9 @@ const mockNostr = jest.fn();
 const mockBle = jest.fn();
 const mockComplete = jest.fn();
 const mockAnnotations = new Map<string, unknown>();
+/** A partial fixture where only the read fields matter. */
+const loose = (value: unknown): never => value as never;
+
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: (id: string, annotation: unknown) =>
     mockAnnotations.set(id, annotation),
@@ -26,9 +29,13 @@ jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
 }));
 let mockListener: ((event: { messageID: string; status: string }) => void) | undefined;
 let mockFailWrite = false;
+let mockVaultReads = 0;
 jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: (owner: string, name: string) => ({
-    read: async () => mockStorage.get(`${owner}:${name}`) ?? null,
+    read: async () => {
+      mockVaultReads += 1;
+      return mockStorage.get(`${owner}:${name}`) ?? null;
+    },
     write: async (value: string) => {
       if (mockFailWrite) {
         mockFailWrite = false;
@@ -129,6 +136,7 @@ beforeEach(() => {
   mockStorage.clear();
   mockAnnotations.clear();
   mockFailWrite = false;
+  mockVaultReads = 0;
   mockPrepareNostr.mockReset();
   mockPrepareNostr.mockImplementation(async ({ message }) => ({
     event: {
@@ -393,3 +401,103 @@ it.each(['inband', 'nostr'])(
     expect(journal.inbound).toEqual({});
   }
 );
+
+describe('idle cost', () => {
+  const drain = () =>
+    nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice');
+
+  it('reads the vault once, then serves a minute of idle 5 s drains from memory', async () => {
+    await drain();
+    const afterFirst = mockVaultReads;
+    expect(afterFirst).toBeLessThanOrEqual(2);
+    for (let tick = 0; tick < 12; tick++) await drain();
+    // Each drain used to read the vault twice (receive + deliver): 24 a minute.
+    expect(mockVaultReads - afterFirst).toBe(0);
+    expect(nearbyPayments(mockManager).hasPendingWork()).toBe(false);
+  });
+
+  it('reports work while a delivery is pending and retries it after the same 30 s back-off', async () => {
+    const service = nearbyPayments(mockManager);
+    const changes = jest.fn();
+    service.subscribe(changes);
+    await drain();
+    expect(service.hasPendingWork()).toBe(false);
+    await captureNearbyDelivery({
+      manager: mockManager,
+      mintUrl: mint,
+      lockPubkey: `02${pubkey}`,
+    })!('send-a');
+    expect(changes).toHaveBeenCalled();
+    expect(service.hasPendingWork()).toBe(true);
+    mockBle.mockRejectedValue(new Error('offline'));
+    mockNostr.mockRejectedValue(new Error('offline'));
+    const start = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(start);
+    try {
+      await drain();
+      expect(mockNostr).toHaveBeenCalledTimes(1);
+      // The 5 s pump keeps running while the delivery is pending ...
+      for (let elapsed = 5_000; elapsed < 30_000; elapsed += 5_000) {
+        clock.mockReturnValue(start + elapsed);
+        expect(service.hasPendingWork()).toBe(true);
+        await drain();
+      }
+      expect(mockNostr).toHaveBeenCalledTimes(1);
+      // ... and the tick at 30 s retries.
+      clock.mockReturnValue(start + 30_000);
+      await drain();
+      expect(mockNostr).toHaveBeenCalledTimes(2);
+      // Settled by the recipient: the journal empties and the pump may stop.
+      jest
+        .mocked(mockManager.ops.send.get)
+        .mockResolvedValue(loose({ id: 'send-a', state: 'finalized', token }));
+      await drain();
+      expect(service.hasPendingWork()).toBe(false);
+      expect(JSON.parse(mockStorage.get('profile-a:nearby-payment-journal')!).outbound).toEqual({});
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('counts an unclaimed payment as work, but not one Coco rejected', async () => {
+    const service = nearbyPayments(mockManager);
+    jest
+      .mocked(mockManager.paymentRequests.incoming.ingestPayload)
+      .mockRejectedValueOnce(new Error('mint offline'));
+    await service.ingest(incomingPayload(), pubkey);
+    await drain();
+    expect(service.hasPendingWork()).toBe(true);
+    jest
+      .mocked(mockManager.paymentRequests.incoming.ingestPayload)
+      .mockResolvedValue(loose({ attempt: { id: 'attempt-a', state: 'rejected' } }));
+    await drain();
+    expect(service.hasPendingWork()).toBe(false);
+  });
+
+  it('reads the vault again after a write fails', async () => {
+    await drain();
+    mockFailWrite = true;
+    await expect(nearbyPayments(mockManager).ingest(incomingPayload(), pubkey)).rejects.toThrow(
+      'storage unavailable'
+    );
+    const before = mockVaultReads;
+    await drain();
+    expect(mockVaultReads).toBeGreaterThan(before);
+    const reread = mockVaultReads;
+    await drain();
+    expect(mockVaultReads).toBe(reread);
+  });
+});
+
+it('reads an unreadable journal again on the next drain instead of caching the failure', async () => {
+  mockStorage.set('profile-a:nearby-payment-journal', '{not json');
+  await expect(
+    nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice')
+  ).rejects.toThrow();
+  expect(nearbyPayments(mockManager).hasPendingWork()).toBe(true);
+  mockStorage.delete('profile-a:nearby-payment-journal');
+  const before = mockVaultReads;
+  await nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice');
+  expect(mockVaultReads).toBeGreaterThan(before);
+  expect(nearbyPayments(mockManager).hasPendingWork()).toBe(false);
+});

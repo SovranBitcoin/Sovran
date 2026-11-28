@@ -2,7 +2,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MeshGradientView } from 'expo-mesh-gradient';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { getBackgroundValues } from '@/shared/lib/theme/backgroundBlur';
+import {
+  getBackgroundValues,
+  isFullBlurShown,
+  subscribeFullBlurShown,
+} from '@/shared/lib/theme/backgroundBlur';
 import { ReactNode, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, {
@@ -299,6 +303,7 @@ export function AnimatedBackgroundView({
   // Layer opacities derive from carouselX / overlayProgress in worklets, so
   // drags and transitions touch zero React state.
   const carouselPages = useSyncExternalStore(subscribeWallpaperLayers, getCarouselPages);
+  const fullBlurShown = useSyncExternalStore(subscribeFullBlurShown, isFullBlurShown);
   const overlayTheme = useSyncExternalStore(subscribeWallpaperLayers, getWallpaperOverlayTheme);
 
   // ONE shared DeviceMotion subscription drives every layer's parallax
@@ -388,7 +393,7 @@ export function AnimatedBackgroundView({
           )}
         </Animated.View>
 
-        {blurSupported && (
+        {blurSupported && fullBlurShown && (
           <Animated.View
             style={[StyleSheet.absoluteFill, fullBlurAnimatedStyle]}
             pointerEvents="none">
