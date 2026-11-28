@@ -1104,6 +1104,10 @@ export interface MachineOperations {
    * Execute a payment request send. Called when the user confirms from the
    * payment request screen via `confirmPaymentRequest()`. The machine routes
    * to the result handler on success or BIP321 fallback / error on failure.
+   *
+   * `handOver` is set for a request that names no transport: nothing carried
+   * the ecash to the payee, so `historyEntry` is the send holding its token
+   * and the machine shows it for the payer to hand over.
    */
   executePaymentRequest?: (request: {
     mintUrl: string;
@@ -1114,6 +1118,7 @@ export interface MachineOperations {
     historyEntry: string;
     rolledBack?: boolean;
     errorMessage?: string;
+    handOver?: boolean;
   }>;
   /**
    * Link a scanned input string to a transaction ID for history provenance.
@@ -1371,6 +1376,8 @@ export interface CreateMachineConfig {
 /**
  * How one `confirmPaymentRequest()` call ended.
  * - `delivered`: the transport took the ecash.
+ * - `handOver`: the request names no transport; the ecash was created and
+ *   the machine moved on to show its token for the payer to hand over.
  * - `rolledBack`: delivery failed and the ecash was taken back.
  * - `failed`: it failed before any ecash existed; Pay can be tried again.
  * - `undelivered`: ecash was created, delivery failed and taking it back
@@ -1380,6 +1387,7 @@ export interface CreateMachineConfig {
  */
 export type PaymentRequestConfirmOutcome =
   | { kind: "delivered" }
+  | { kind: "handOver" }
   | { kind: "rolledBack" }
   | { kind: "failed" }
   | { kind: "undelivered"; operationId: string }

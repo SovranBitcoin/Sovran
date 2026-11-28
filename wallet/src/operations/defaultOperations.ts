@@ -480,7 +480,7 @@ async function sendEntryWithToken(
   mgr: Manager,
   operation: SendOperationLike,
   token: CoreToken,
-  logPrefix: "executeSend" | "executeOfflineSend",
+  logPrefix: "executeSend" | "executeOfflineSend" | "executePaymentRequest",
 ): Promise<{ historyEntry: string }> {
   const historyEntry = await findSendHistoryEntryByOperationId(
     mgr,
@@ -1838,6 +1838,10 @@ export function createDefaultOperations(
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
 
       let operationId: string;
+      let handOver: Extract<
+        Awaited<ReturnType<Manager["paymentRequests"]["execute"]>>,
+        { type: "inband" }
+      > | null = null;
 
       if (nostrTransport && !httpTransport) {
         // Sovran creates plain permanent P2PK requests. Reject conditions we
@@ -2023,10 +2027,13 @@ export function createDefaultOperations(
           if (mockFailEnabled("paymentRequest")) {
             throw new Error("Mock delivery failure (dev)");
           }
-          await mgr.paymentRequests.execute(transaction);
+          const executed = await mgr.paymentRequests.execute(transaction);
           logger.info("operations.executePaymentRequest.http.executed", {
             operationId,
           });
+          if (!httpTransport && executed.type === "inband") {
+            handOver = executed;
+          }
         } catch (deliveryErr) {
           logger.warn("operations.executePaymentRequest.http.deliveryFailed", {
             operationId,
@@ -2050,6 +2057,34 @@ export function createDefaultOperations(
           }
           throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
+      }
+
+      // No transport at all: Coco created the token and sent it nowhere. It
+      // is the payer's to hand over, so it goes back with the send instead of
+      // being dropped behind a "delivered" payment. The ecash is out of the
+      // balance by now, so a history read that fails must not hide the token.
+      if (handOver) {
+        const { operation, token } = handOver;
+        logger.info("operations.executePaymentRequest.handOver", {
+          operationId,
+        });
+        const entry = await sendEntryWithToken(
+          mgr,
+          operation,
+          token,
+          "executePaymentRequest",
+        ).catch((err: unknown) => {
+          logger.warn("operations.executePaymentRequest.historyLookupFailed", {
+            operationId,
+            error: errField(err),
+          });
+          return {
+            historyEntry: JSON.stringify(
+              buildSyntheticSendEntry(operation, token),
+            ),
+          };
+        });
+        return { ...entry, handOver: true };
       }
 
       // The payment is delivered by now. A history read that fails must not

@@ -646,7 +646,16 @@ describe("executePaymentRequest — HTTP transport", () => {
 describe("executePaymentRequest — inband fallback", () => {
   it("executes through paymentRequests API when no explicit transport matches", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
-    const mockManager = createMockManager();
+    // What Coco's `execute` resolves with for a request without a transport.
+    const mockManager = createMockManager({
+      paymentRequests: {
+        execute: vi.fn().mockResolvedValue({
+          type: "inband",
+          token: { mint: MINT1, unit: "sat", proofs: [] },
+          operation: { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 },
+        }),
+      },
+    });
 
     mockGetPRInfo.mockReturnValue({
       mints: [MINT1],
@@ -1978,5 +1987,71 @@ describe("rollbackSend", () => {
       reason: "notInvalidated",
     });
     expect(stateListeners.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No transport — the token exists only in the payer's wallet
+// ---------------------------------------------------------------------------
+
+describe("executePaymentRequest — request without a transport", () => {
+  // nutshell `cashu request` and cocod emit these: the payee expects the
+  // token handed over in person (cashubtc/nutshell cashu/wallet/cli/cli.py,
+  // coco PaymentRequestService.execute `inband`).
+  it("returns the created token for the payer to hand over", async () => {
+    const sendNostrDM = vi.fn();
+    const token = {
+      mint: MINT1,
+      unit: "sat",
+      proofs: [{ id: "proof-1", amount: Amount.from(100), C: "abc", secret: "def" }],
+    };
+    const operation = { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 };
+    const execute = vi.fn().mockResolvedValue({ type: "inband", token, operation });
+    const mockManager = createMockManager({ paymentRequests: { execute } });
+    mockGetPRInfo.mockReturnValue({ mints: [MINT1], amount: 100, unit: "sat" });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqInband",
+      amount: 100,
+      unit: "sat",
+    });
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+    expect(result.handOver).toBe(true);
+    const entry = JSON.parse(result.historyEntry);
+    expect(entry.type).toBe("send");
+    expect(entry.token.proofs).toHaveLength(1);
+    // Not reported as delivered over a transport it never used.
+    expect(entry.metadata?.transportType).toBeUndefined();
+    expect(entry.metadata?.phase).toBeUndefined();
+  });
+
+  it("keeps reporting an HTTP request as delivered, with no token to hand over", async () => {
+    const mockManager = createMockManager({
+      paymentRequests: { execute: vi.fn().mockResolvedValue({ type: "http" }) },
+    });
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "post", target: "https://receiver.example.com/pay" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqHTTP",
+      amount: 100,
+      unit: "sat",
+    });
+    expect(result.handOver).toBeUndefined();
+    expect(JSON.parse(result.historyEntry).metadata.transportType).toBe("http");
   });
 });
