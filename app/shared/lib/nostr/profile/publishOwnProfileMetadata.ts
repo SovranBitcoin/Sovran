@@ -159,12 +159,21 @@ export function publishOwnProfileMetadata({
   accountIndex,
   patch,
   initialLoad,
+  onCommitted,
 }: {
   client: NostrClient;
   pubkey: string;
   accountIndex: number;
   patch: OwnProfilePatch;
   initialLoad: OwnProfileLoadResult;
+  /**
+   * Fires once the edit is read, verified, signed and shown optimistically —
+   * everything but the relay publish — so an editor can close while relays
+   * answer. Every failure the editor shows inline comes before it; after it
+   * only the publish (or an account switch) can still fail. Not called for a
+   * caller that joined a save already in flight.
+   */
+  onCommitted?: () => void;
 }): ResultAsync<PublishResult, OwnProfilePublishError> {
   const existing = inFlight.get(pubkey);
   if (existing) return existing;
@@ -255,6 +264,7 @@ export function publishOwnProfileMetadata({
     useOwnProfileMetadataStore
       .getState()
       .setOptimistic({ ...patch, createdAt: event.created_at, eventId });
+    onCommitted?.();
     nostrLog.info('nostr.profile.publish.start', {
       hasPicture: !!content.picture,
       nameChanged:
