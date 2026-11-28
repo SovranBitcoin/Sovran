@@ -14,7 +14,7 @@ import { cashuLog } from '@/shared/lib/logger';
 
 jest.mock('@cashu/coco-react', () => ({ useManager: () => mockManager }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: { restoreInflightProofsForMint: (...args: unknown[]) => mockRestore(...args) },
+  CocoManager: {},
 }));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   getReadyProofs: async () => [],
@@ -58,7 +58,6 @@ jest.mock('@/features/mint/components/rebalance', () => ({
 
 const SOURCE = 'https://source.example';
 const DESTINATION = 'https://destination.example';
-const mockRestore = jest.fn().mockResolvedValue(undefined);
 const mockReleaseTrust = jest.fn().mockResolvedValue({ stranded: [], untrustErrors: [] });
 let mockLocalCandidates: string[] = [];
 const mockTransactions = {
