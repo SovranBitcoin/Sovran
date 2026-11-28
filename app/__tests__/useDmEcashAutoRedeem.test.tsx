@@ -322,6 +322,87 @@ describe('reading the message inbox for ecash', () => {
     expect(mockIntake.mock.calls.flat()).toContain('backdated');
   });
 
+  // Audit D7: a foreground used to make every relay send the whole inbox again.
+  describe('how much of the inbox a pass reads', () => {
+    const WINDOW = 2 * 24 * 60 * 60 + 60 * 60;
+    const requestedSince = () =>
+      mockFetch.mock.calls.map(([params]) => (params as { since?: number }).since);
+
+    it('reads the whole inbox on mount, then only the backdating window behind the newest wrap read', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      mockFetch.mockResolvedValue(page(['a', 'b'], nowSec - 500, false));
+      await mount();
+      expect(requestedSince()).toEqual([undefined]);
+      await returnToForeground();
+      await returnToForeground();
+      expect(requestedSince()).toEqual([undefined, nowSec - 500 - WINDOW, nowSec - 500 - WINDOW]);
+    });
+
+    it('covers the two days NIP-59 backdates a wrap by', () => {
+      expect(WINDOW).toBeGreaterThanOrEqual(2 * 24 * 60 * 60);
+    });
+
+    it('keeps reading the whole inbox until one pass has read it to its end', async () => {
+      mockFetch
+        .mockResolvedValueOnce(page(['a'], 1000, true))
+        .mockRejectedValueOnce(new Error('relay down'));
+      await mount();
+      mockFetch.mockResolvedValue(page(['a'], 1000, false));
+      await returnToForeground();
+      // The first pass failed partway: nothing may be skipped on the strength of it.
+      expect(requestedSince()).toEqual([undefined, undefined, undefined]);
+    });
+
+    it('moves the window forward as newer wraps are read, on a pass that finished', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      mockFetch.mockResolvedValueOnce(page(['a'], nowSec - 5000, false));
+      await mount();
+      mockFetch.mockResolvedValueOnce(page(['b'], nowSec - 100, false));
+      await returnToForeground();
+      mockFetch.mockResolvedValueOnce(page([], 0, false));
+      await returnToForeground();
+      expect(requestedSince()).toEqual([undefined, nowSec - 5000 - WINDOW, nowSec - 100 - WINDOW]);
+    });
+
+    it('a wrap dated in the future does not move the window past the clock', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      mockFetch.mockResolvedValue(page(['future'], nowSec + 10 * 365 * 86_400, false));
+      await mount();
+      await returnToForeground();
+      const since = requestedSince()[1]!;
+      expect(since).toBeLessThanOrEqual(Math.floor(Date.now() / 1000) - WINDOW);
+      expect(since).toBeGreaterThanOrEqual(nowSec - WINDOW);
+    });
+
+    it('an empty inbox gives no window: later passes still ask for everything', async () => {
+      mockFetch.mockResolvedValue(page([], 0, false));
+      await mount();
+      await returnToForeground();
+      expect(requestedSince()).toEqual([undefined, undefined]);
+    });
+
+    it('reads the whole inbox again once six hours have passed since the last full read', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      mockFetch.mockResolvedValue(page(['a'], nowSec - 500, false));
+      await mount();
+      await returnToForeground();
+      const clock = jest.spyOn(Date, 'now').mockReturnValue((nowSec + 6 * 60 * 60 + 1) * 1000);
+      await returnToForeground();
+      clock.mockRestore();
+      expect(requestedSince()).toEqual([undefined, nowSec - 500 - WINDOW, undefined]);
+    });
+
+    it('a windowed pass still hands every wrap it is given to intake, known or not', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      mockFetch.mockResolvedValueOnce(page(['a'], nowSec - 500, false));
+      await mount();
+      // Dated a day and a half before the newest read, delivered just now.
+      mockFetch.mockResolvedValueOnce(page(['a', 'backdated'], nowSec - 500, false));
+      await returnToForeground();
+      expect(mockIntake.mock.calls.flat()).toContain('backdated');
+    });
+  });
+
   it('reads on past a message whose token cannot be handled', async () => {
     // For example a token naming a mint URL the wallet refuses to parse.
     mockIntake.mockRejectedValueOnce(new Error('Invalid mint URL')).mockResolvedValueOnce('queued');

@@ -13,7 +13,9 @@
  *      inbox for NUT-18 payloads via TWO paths sharing one unwrap→ingest body
  *      (`handleEnvelope`): a LIVE relay subscription (`subscribeDmEnvelopes`) so
  *      a paid request is claimed the instant the wrap arrives, plus a 15s poll
- *      (nagg DM index → relay floor) as the offline/reconnect backstop. The
+ *      of the same relays as the offline/reconnect backstop. Both read the
+ *      payment inbox (`paymentInbox.ts`), which does not depend on the tier
+ *      switches in Settings → Network. The
  *      poll stops while the app is backgrounded and runs once immediately on
  *      return to the foreground. Each
  *      kind-1059 envelope is unwrapped and NUT-18-looking rumor contents fed to
@@ -41,6 +43,7 @@ import type { PaymentRequestReceiveOperation } from '@cashu/coco-core';
 import { paymentRequestEncodingsHandedOut, paymentRequestEncodingsVersion } from 'wallet';
 
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { getPaymentInbox, type PaymentInbox } from '@/shared/lib/nostr/paymentInbox';
 import { PAYMENT_RELAYS } from '@/shared/lib/nostr/sendDirectMessage';
 import { cashuLog, monotonicNow } from '@/shared/lib/logger';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
@@ -59,14 +62,15 @@ const POLL_TIER_TIMEOUT_MS = 6_000;
 const POLL_DEADLINE_MS = 13_000;
 const POLL_LIMIT = 50;
 const GIFT_WRAP_OVERLAP_SEC = 2 * 24 * 60 * 60;
+/**
+ * How long windowed polls may stand in for a read of the whole inbox. A wrap
+ * built offline and published days later is dated before the window; only a
+ * full read finds one that arrived while no relay socket was open.
+ */
+const FULL_POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const GIFT_WRAP_KIND = 1059;
 
-type InboxLayer = Pick<
-  NonNullable<
-    ReturnType<(typeof import('@/shared/lib/nostr/buildNostrDataLayer'))['buildNostrDataLayer']>
-  >,
-  'getDmEnvelopes' | 'subscribeDmEnvelopes'
->;
+type InboxLayer = PaymentInbox;
 interface NostrTransportPluginConfig {
   loadDataLayer?: () => Promise<InboxLayer | null>;
   /** Profile Nostr secret key (same key the P2PK import uses); captured per
@@ -160,12 +164,9 @@ export function createPaymentRequestNostrTransportPlugin(
     required: ['paymentRequestReceiveService', 'logger'] as const,
     onInit(ctx) {
       const service = ctx.services.paymentRequestReceiveService;
-      const loadDataLayer =
-        config.loadDataLayer ??
-        (async () => {
-          const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
-          return buildNostrDataLayer();
-        });
+      // The payment inbox, not the social data layer: a relay tier switched off
+      // in Settings → Network must not stop a paid request being claimed.
+      const loadDataLayer = config.loadDataLayer ?? (async () => getPaymentInbox());
 
       const activeOps = new Map<
         string,
@@ -194,6 +195,8 @@ export function createPaymentRequestNostrTransportPlugin(
       type InboxSession = {
         viewerPubkey: string;
         newestCreatedAtSec: number | undefined;
+        /** When the whole inbox was last read (ms); a full read is due again after `FULL_POLL_INTERVAL_MS`. */
+        lastFullPollAt: number | undefined;
         seenWraps: Set<string>;
         inFlightWraps: Set<string>;
         /** Wraps naming a payment request this wallet does not hold, with the
@@ -205,6 +208,7 @@ export function createPaymentRequestNostrTransportPlugin(
       const newSession = (viewerPubkey: string): InboxSession => ({
         viewerPubkey,
         newestCreatedAtSec: undefined,
+        lastFullPollAt: undefined,
         seenWraps: new Set<string>(),
         inFlightWraps: new Set<string>(),
         unclaimableWraps: new Map<string, { version: number; envelope: SetAsideEnvelope }>(),
@@ -329,9 +333,6 @@ export function createPaymentRequestNostrTransportPlugin(
         if (!secretKey) return;
         const viewerPubkey = getPublicKey(secretKey);
         const session = sessionFor(viewerPubkey);
-        // Lazy import: the data-layer chain pulls native-only modules
-        // that must not load at manager-module import time
-        // (node-side tests import the manager).
         const layer = await loadDataLayer();
         if (!layer) {
           cashuLog.debug('cashu.creq.transport.poll_no_tiers');
@@ -371,31 +372,41 @@ export function createPaymentRequestNostrTransportPlugin(
           await giftWrapCache.cache.hydrate(viewerPubkey);
           const deadline = new AbortController();
           const deadlineTimer = setTimeout(() => deadline.abort(), POLL_DEADLINE_MS);
+          const polledAt = Date.now();
+          const windowed =
+            session.newestCreatedAtSec !== undefined &&
+            session.lastFullPollAt !== undefined &&
+            polledAt - session.lastFullPollAt < FULL_POLL_INTERVAL_MS;
           const outcome = await layer
             .getDmEnvelopes({
               viewerPubkey,
               limit: POLL_LIMIT,
-              ...(session.newestCreatedAtSec !== undefined
-                ? { since: session.newestCreatedAtSec - GIFT_WRAP_OVERLAP_SEC }
-                : {}),
+              ...(windowed ? { since: session.newestCreatedAtSec! - GIFT_WRAP_OVERLAP_SEC } : {}),
               refresh: true,
               timeoutMs: POLL_TIER_TIMEOUT_MS,
               signal: deadline.signal,
             })
             .finally(() => clearTimeout(deadlineTimer));
           const envelopes = outcome.match(
-            (resolved) => resolved.envelopes,
+            (resolved) => {
+              if (!windowed) session.lastFullPollAt = polledAt;
+              return resolved.envelopes;
+            },
             () => []
           );
+          const nowSec = Math.floor(polledAt / 1000);
           const currentKey = config.getSignerKey();
           if (disposed || !currentKey || getPublicKey(currentKey) !== viewerPubkey) return;
           let ingested = 0;
           for (const envelope of envelopes) {
             if (disposed || activeOps.size === 0 || inboxSession !== session) break;
             // Never advance from the clock: late wraps may be two days older.
+            // Never advance PAST it either: one wrap dated in the future would
+            // move every later read beyond the wraps still to come.
+            const createdAtSec = Math.min(envelope.createdAtSec, nowSec);
             session.newestCreatedAtSec = Math.max(
-              session.newestCreatedAtSec ?? envelope.createdAtSec,
-              envelope.createdAtSec
+              session.newestCreatedAtSec ?? createdAtSec,
+              createdAtSec
             );
             if (isSettled(session, envelope.id)) continue;
             if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
@@ -506,8 +517,9 @@ export function createPaymentRequestNostrTransportPlugin(
 
       // Live push: a persistent relay REQ for the viewer's gift wraps, so a paid
       // request is claimed the instant the wrap arrives instead of on the next
-      // 15s poll tick. The subscription has no auto-reconnect (relay socket drop
-      // just stops feeding), so the poll above stays as the offline/reconnect
+      // 15s poll tick. A dropped relay socket is re-attached with backoff and
+      // resumes from what that relay last sent (less the backdating overlap)
+      // rather than replaying the inbox; the poll above stays as the offline
       // backstop — never remove it. Same unwrap→ingest path as the poll.
       const startLive = () => {
         if (liveUnsub || liveStarting || disposed) return;

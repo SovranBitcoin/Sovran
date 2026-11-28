@@ -1,10 +1,12 @@
 import { isLegacyMockProfile } from '@/shared/stores/runtime/legacyMockProfiles';
-import { setNostrLogger, facade, type NostrLogger } from 'nostr';
+import { facade } from 'nostr';
 
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { log } from '@/shared/lib/logger';
 import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { bridgeNostrLoggerOnce } from '@/shared/lib/nostr/nostrLogBridge';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
+import { sharedRelayConnection } from '@/shared/lib/nostr/relayConnection';
 import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
@@ -35,22 +37,13 @@ const WRITE_BEHIND_DEBOUNCE_MS = 5_000;
 // built again after the dispose) drops the old snapshot instead of writing it,
 // because the profile-scoped mirror is by then the new account's. One account
 // never serves or stores another's cached data (ADR-0002). Tier toggles (Settings → Network) likewise
-// rebuild, so a disabled tier drops out of the nagg → Primal → relay chain.
+// rebuild, so a disabled tier drops out of the Primal → relay chain.
+//
+// This layer serves SOCIAL data (profiles, contacts, search, reviews). Payment
+// ingress (ecash DMs, NUT-18 replies) does not read through it: it has its own
+// always-on inbox (`paymentInbox.ts`), so switching a tier off here cannot stop
+// money arriving.
 // ---------------------------------------------------------------------------
-
-let loggerBridged = false;
-
-/** Route the `nostr` package's structured logs into the app logger so the tier trace is visible. */
-function bridgeNostrLoggerOnce(): void {
-  if (loggerBridged) return;
-  loggerBridged = true;
-  const bridge: NostrLogger = {
-    debug: (event, data) => log.debug(event, data),
-    info: (event, data) => log.info(event, data),
-    warn: (event, data) => log.warn(event, data),
-  };
-  setNostrLogger(bridge);
-}
 
 type TierConfig = ReturnType<typeof getNostrTierConfig>;
 
@@ -66,7 +59,8 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
   }
 
   if (config.relay.enabled) {
-    const connection = facade.relay.createRelayPoolConnection({ relays: [...config.relay.relays] });
+    // The connection the payment inbox uses too: one socket per relay.
+    const connection = sharedRelayConnection(config.relay.relays);
     tiers.push(facade.relay.createRelayTier({ connection }));
   }
 
