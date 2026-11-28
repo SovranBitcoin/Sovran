@@ -114,7 +114,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
-jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHaptic: jest.fn() } }));
+jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
+  EnhancedHaptics: { copyHaptic: jest.fn() },
+}));
 jest.mock('@/shared/ui/primitives/View/View', () => ({
   View: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
     <view {...props}>{children}</view>

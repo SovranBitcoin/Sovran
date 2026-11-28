@@ -10,6 +10,9 @@ import { SearchTabIcon, SovranTabBar } from '@/shared/blocks/SovranTabBar';
 
 const mockHaptic = jest.fn();
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: { navigateHaptic: () => mockHaptic() },
 }));
 jest.mock('@/shared/hooks/useScreenInsets', () => ({ useReportTabBarHeight: () => undefined }));

@@ -1,5 +1,6 @@
 import { accountMismatchCopy as copy } from 'copy/onboarding';
 import * as Clipboard from 'expo-clipboard';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useState } from 'react';
 
 import { SettingsProfileRecoveryScreen } from '@/features/settings/screens/SettingsProfileRecoveryScreen';
@@ -73,6 +74,7 @@ export function AccountMismatchScreen({
         onViewRecovery={() => setShowRecovery(true)}
         onCopyCode={async () => {
           await Clipboard.setStringAsync(code);
+          void EnhancedHaptics.copyHaptic();
           setCopied(true);
         }}
         onSwitch={(accountIndex) => void switchTo(accountIndex)}

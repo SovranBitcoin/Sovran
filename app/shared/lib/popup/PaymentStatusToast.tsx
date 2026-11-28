@@ -407,6 +407,9 @@ export function PaymentStatusToast({
         action={action}
         statusTestID={`payment-status-${selectorVariant}-${selectorStage}`}
         debugFields={statusToastDebugFields}
+        // On the radar the Nut Drop ceremony owns the receive haptic (synced
+        // to its impact frame); a second one from the toast would double it.
+        outcomeHaptics={!onNutDropRadar}
         toastProps={{ ...toastProps, hide, testID: 'payment-status-toast' }}
       />
     </>

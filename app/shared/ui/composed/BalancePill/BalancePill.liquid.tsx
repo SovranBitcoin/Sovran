@@ -4,6 +4,7 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
 import { useBalancePillDimensions } from './useBalancePillDimensions';
@@ -30,6 +31,7 @@ const HORIZONTAL_PADDING = spacing.md;
 export default function BalancePillLiquid({
   testID,
   onPress,
+  haptics,
   width,
   height,
   // Liquid derives the row width from the button width; an explicit one is ignored.
@@ -68,7 +70,18 @@ export default function BalancePillLiquid({
       <Host
         style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }}
         matchContents>
-        <SwiftUIButton testID={testID} modifiers={buttonModifiers} onPress={onPress}>
+        <SwiftUIButton
+          testID={testID}
+          modifiers={buttonModifiers}
+          onPress={
+            onPress
+              ? () => {
+                  // SwiftUI reports only the tap; the haptic lands with it.
+                  firePressHaptic(haptics);
+                  onPress();
+                }
+              : undefined
+          }>
           {/*
            * RN wrapper owns the layout: a fixed-size box matching the
            * SwiftUI frame, with paddingHorizontal mirroring the flat

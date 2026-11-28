@@ -1,10 +1,13 @@
 import type { BalanceDisplayProps } from './BalanceDisplay';
+import type { PressHaptics } from '@/shared/ui/primitives/Haptics';
 
 export interface BalancePillProps extends BalanceDisplayProps {
   /** Stable identifier forwarded to the platform-native interactive control. */
   testID?: string;
   /** Tap handler — opens whatever picker / flow the host wants. */
   onPress?: () => void;
+  /** Press haptic, as on `Pressable`. */
+  haptics?: PressHaptics;
   /**
    * Override pill width. Defaults to the standard wallet-header title width
    * (`getHeaderTitleWidthFromWidth(window.width)`), so dropping this in

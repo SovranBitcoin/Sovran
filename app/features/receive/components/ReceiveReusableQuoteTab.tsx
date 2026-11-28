@@ -28,7 +28,6 @@ import { isExpiryElapsed } from '@/features/receive/lib/receiveRailItems';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { standingQuoteIdentityStore } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { Button } from '@/shared/ui/primitives/Button';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -104,7 +103,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
       available: changeMintAction.available,
     });
     if (!changeMintAction.available) return;
-    await EnhancedHaptics.copyHaptic();
     await changeMintAction.execute();
   }, [method, changeMintAction]);
 
@@ -168,7 +166,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     // Re-render when the window closes so the label un-greys.
     cooldownTimerRef.current = setTimeout(() => setCooldownUntil(0), ROTATE_COOLDOWN_MS);
     paymentLog.info('receive.onchain.rotate_requested', { source: 'button' });
-    await EnhancedHaptics.copyHaptic();
     await rotate();
   }, [cooldownUntil, rotate]);
 
@@ -182,7 +179,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
     cooldownTimerRef.current = setTimeout(() => setCooldownUntil(0), ROTATE_COOLDOWN_MS);
     paymentLog.info(`receive.${method}.generate_new_requested`, { source: 'expired_quote' });
-    await EnhancedHaptics.copyHaptic();
     await rotate('manual');
   }, [cooldownUntil, method, rotate]);
 
@@ -227,7 +223,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   const handleCopy = useCallback(async () => {
     if (!request) return;
-    await EnhancedHaptics.copyHaptic();
     await setStringAsync(request);
     copyPopup(copy.copyTarget);
     paymentLog.info(`receive.${method}.copied`, { requestLength: request.length });

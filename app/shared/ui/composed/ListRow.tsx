@@ -22,6 +22,7 @@
 import { ReactNode, useState } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
+import { ROW_HAPTICS, type PressHaptics } from '@/shared/ui/primitives/Haptics';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -109,6 +110,9 @@ interface ListRowProps {
   trailingInteractive?: boolean;
 
   onPress?: () => void;
+  /** Press haptic. Default: a light tap on release (`ROW_HAPTICS`), so a
+   *  scroll that starts on the row stays silent. `false` opts out. */
+  haptics?: PressHaptics;
   disabled?: boolean;
   /** The row is the current choice in a list of choices. Announced only; the
    *  caller draws the mark (a check in `trailing`). */
@@ -165,6 +169,7 @@ export function ListRow({
   trailing,
   trailingInteractive = false,
   onPress,
+  haptics = ROW_HAPTICS,
   disabled = false,
   selected,
   loading = false,
@@ -353,6 +358,7 @@ export function ListRow({
           testID={testID}
           animation={false}
           onPress={guardedPress}
+          haptics={haptics}
           isDisabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={a11yLabel}
@@ -381,6 +387,7 @@ export function ListRow({
       testID={testID}
       animation={false}
       onPress={guardedPress}
+      haptics={haptics}
       isDisabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}

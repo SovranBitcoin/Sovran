@@ -14,6 +14,7 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/runtime/WalletProjection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { CameraActionButtons } from './CameraActionButtons';
@@ -153,6 +154,9 @@ export function CameraScreen() {
     if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
     lastScanRef.current = { data: data.data, t: now };
 
+    // One "got it" tap when a code is recognised; a multi-frame UR taps on its
+    // first frame only (later frames arrive while it is still processing).
+    if (!isProcessingRef.current) void EnhancedHaptics.actionHaptic();
     log.info('camera.scan.detected', {
       type: data.type ?? 'qr',
       isUr,

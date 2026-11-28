@@ -21,7 +21,12 @@ jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
 jest.mock('@/shared/lib/logger', () => ({ paymentLog: { info: jest.fn(), warn: jest.fn() } }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn(), paramPopup: jest.fn() }));
-jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHaptic: jest.fn() } }));
+jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
+  EnhancedHaptics: { copyHaptic: jest.fn() },
+}));
 jest.mock('@/shared/lib/strings', () => ({ truncateMiddle: (value: string) => value }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>

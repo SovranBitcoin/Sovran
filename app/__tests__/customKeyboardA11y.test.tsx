@@ -15,6 +15,9 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
 jest.mock('@/shared/styles/appStyle', () => ({ useControlChrome: () => ({}) }));
 
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: {
     actionHaptic: jest.fn(() => Promise.resolve()),
     buttonHaptic: jest.fn(() => Promise.resolve()),

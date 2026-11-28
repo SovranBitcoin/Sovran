@@ -6,6 +6,7 @@ import { cn } from '@/shared/lib/classNames';
 import { injectParts } from '@/shared/lib/injectParts';
 import { Pressable } from './Pressable';
 import { Switch } from './Switch';
+import { SELECTION_HAPTICS } from './Haptics';
 
 /**
  * Form parts: `TextField` stacks a `Label`, an `Input` and a `Description`
@@ -163,6 +164,7 @@ function ControlFieldRoot({
     <Pressable
       activeOpacity={1}
       className={cn('flex-row items-center gap-3', className)}
+      haptics={SELECTION_HAPTICS}
       onPress={() => onSelectedChange?.(!isSelected)}
       {...rest}>
       {injectParts(children, [ControlFieldIndicator], { isSelected, onSelectedChange })}
@@ -222,6 +224,7 @@ function RadioGroupItem({
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       className="flex-row items-center justify-between gap-3"
+      haptics={SELECTION_HAPTICS}
       onPress={() => onValueChange?.(value)}>
       {typeof children === 'string' ? <LabelText>{children}</LabelText> : children}
       <RNView

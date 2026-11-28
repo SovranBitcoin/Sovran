@@ -5,10 +5,12 @@ import {
   ColorValue,
   Platform,
   View,
+  type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
+import { firePressHaptic } from './Haptics';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -247,11 +249,23 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
     ...(italic ? { fontStyle: 'italic' } : undefined),
   };
 
+  // A tappable Text (an inline "Paste"/"Cancel" link) bypasses Pressable, so
+  // it fires the same light press-in haptic.
+  const { onPress, onPressIn, disabled } = otherProps;
+  const pressInWithHaptic =
+    onPress && !disabled
+      ? (event: GestureResponderEvent) => {
+          firePressHaptic();
+          onPressIn?.(event);
+        }
+      : onPressIn;
+
   return (
     <DefaultText
       testID={props.testID}
       style={[baseStyle, style, ...(props?.color ? [{ color: props?.color }] : [])]}
-      {...otherProps}>
+      {...otherProps}
+      onPressIn={pressInWithHaptic}>
       {children}
     </DefaultText>
   );

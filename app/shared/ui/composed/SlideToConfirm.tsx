@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
@@ -20,6 +21,10 @@ const SCREEN_PADDING_X = 48;
 const COMPLETE_THRESHOLD = 0.9;
 const SPRING = { damping: 20, stiffness: 200 } as const;
 const ACTIVATE_ACTIONS = [{ name: 'activate' }] as const;
+
+const startHaptic = () => {
+  void EnhancedHaptics.navigateHaptic();
+};
 
 interface SlideToConfirmProps {
   onConfirm: () => void;
@@ -52,6 +57,8 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   const [confirmed, setConfirmed] = useState(false);
 
   const handleComplete = useCallback(() => {
+    // The one success haptic for the confirmation; fired, not awaited.
+    void EnhancedHaptics.successHaptic();
     setConfirmed(true);
     onConfirm();
   }, [onConfirm]);
@@ -66,6 +73,9 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   };
 
   const panGesture = Gesture.Pan()
+    .onStart(() => {
+      if (!isComplete.value) runOnJS(startHaptic)();
+    })
     .onUpdate((event) => {
       if (isComplete.value) return;
       translateX.value = Math.max(0, Math.min(event.translationX, maxTranslate));

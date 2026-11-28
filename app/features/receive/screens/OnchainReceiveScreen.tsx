@@ -317,7 +317,6 @@ function OpenInExplorerLink({ url }: { url: string }) {
   }, [url]);
   return (
     <Pressable
-      haptics
       accessibilityRole="link"
       accessibilityLabel="Open in explorer"
       testID="receive-onchain-explorer"

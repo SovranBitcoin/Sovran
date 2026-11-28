@@ -15,6 +15,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { cn } from '@/shared/lib/classNames';
 import { injectParts } from '@/shared/lib/injectParts';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -58,6 +59,7 @@ export function MenuItem({
       activeOpacity={1}
       onPressIn={() => pressed.set(true)}
       onPressOut={() => pressed.set(false)}
+      haptics={SELECTION_HAPTICS}
       onPress={onPress}
       className={cn(
         'flex-row items-center gap-2.5 rounded-2xl px-2.5 py-2',

@@ -29,9 +29,8 @@
  * // Loading button
  * <Button text="Processing" onPress={handleProcess} loading />
  *
- * // Button with haptic feedback
- * <Button text="Haptic" onPress={handleHaptic} haptics />
- *
+ * // Haptics come from the variant (primary → medium impact, dangerous →
+ * // warning, others → light); `haptics={false}` opts out.
  * // Custom haptic configuration
  * <Button
  *   text="Impact"
@@ -51,7 +50,7 @@ import type { SharedValue } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { controlHeight, fontSize } from '@/shared/styles/tokens';
-import { Pressable, type HapticConfig } from './Pressable';
+import { Pressable, type HapticConfig, type PressHaptics } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -82,6 +81,21 @@ const PRESS_OPACITY = 0.88;
  * - 'underline': Text action with no background and an underline
  */
 type ButtonVariant = 'primary' | 'secondary' | 'dangerous' | 'underline';
+
+// The press haptic scales with what the button does: the primary CTA lands a
+// medium impact, a dangerous action warns, everything else taps lightly.
+const VARIANT_HAPTICS: Record<ButtonVariant, HapticConfig> = {
+  primary: { type: 'impact', impactStyle: 'medium' },
+  dangerous: { type: 'notification', notificationType: 'warning' },
+  secondary: { type: 'impact', impactStyle: 'light' },
+  underline: { type: 'impact', impactStyle: 'light' },
+};
+
+/** The `haptics` a Button hands its Pressable: the variant default, overridden. */
+export function buttonHaptics(variant: ButtonVariant, haptics?: PressHaptics): PressHaptics {
+  if (haptics === false) return false;
+  return { ...VARIANT_HAPTICS[variant], ...(typeof haptics === 'object' ? haptics : {}) };
+}
 
 /**
  * Button size variant.
@@ -176,8 +190,9 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   /** Blur effect configuration (boolean or config object) */
   blur?: boolean | BlurConfig;
-  /** Haptic feedback configuration (boolean or config object) */
-  haptics?: boolean | HapticConfig;
+  /** Haptic feedback. Defaults from `variant`; `false` opts out; an object
+   *  overrides fields of the variant default. */
+  haptics?: PressHaptics;
   /** Label and spinner colour override, for a button seated on a coloured panel. */
   contentColor?: string;
   /** VoiceOver/TalkBack label. Defaults to `text` when `text` is a string;
@@ -227,7 +242,7 @@ export const Button = ({
   style,
   testID,
   blur = false,
-  haptics = false,
+  haptics,
   contentColor,
   accessibilityLabel,
   accessibilityHint,
@@ -392,7 +407,7 @@ export const Button = ({
         testID={testID}
         disabled={disabled || loading}
         onPress={onPress}
-        haptics={haptics}
+        haptics={buttonHaptics(variant, haptics)}
         activeOpacity={PRESS_OPACITY}
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
@@ -432,7 +447,7 @@ export const Button = ({
       testID={testID}
       disabled={disabled || loading}
       onPress={onPress}
-      haptics={haptics}
+      haptics={buttonHaptics(variant, haptics)}
       activeOpacity={PRESS_OPACITY}
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>

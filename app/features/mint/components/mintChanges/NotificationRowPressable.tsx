@@ -28,7 +28,6 @@ export function NotificationRowPressable({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      haptics
       activeOpacity={1}
       onPress={onPress}
       className="px-5 py-3.5"

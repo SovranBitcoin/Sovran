@@ -8,6 +8,7 @@ import Animated, {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Pressable } from './Pressable';
+import { SELECTION_HAPTICS, type PressHaptics } from './Haptics';
 
 const TIMING = { duration: 175, easing: Easing.bezier(0.25, 0.1, 0.25, 1) };
 const SPRING = { damping: 120, stiffness: 1600, mass: 2 };
@@ -18,6 +19,8 @@ type SwitchProps = {
   isSelected?: boolean;
   onSelectedChange?: (next: boolean) => void;
   isDisabled?: boolean;
+  /** Default: a selection tick on press-in. */
+  haptics?: PressHaptics;
   testID?: string;
   accessibilityLabel?: string;
   'aria-label'?: string;
@@ -35,6 +38,7 @@ export function Switch({
   isSelected = false,
   onSelectedChange,
   isDisabled = false,
+  haptics = SELECTION_HAPTICS,
   testID,
   accessibilityLabel,
   'aria-label': ariaLabel,
@@ -56,6 +60,7 @@ export function Switch({
       disabled={isDisabled}
       activeOpacity={1}
       hitSlop={{ top: 10, bottom: 10 }}
+      haptics={haptics}
       onPress={() => onSelectedChange?.(!isSelected)}
       style={{ opacity: isDisabled ? 0.5 : 1 }}>
       <Animated.View

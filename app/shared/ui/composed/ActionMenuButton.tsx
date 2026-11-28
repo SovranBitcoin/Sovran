@@ -396,6 +396,8 @@ function MenuPopover({
           accessibilityLabel="Dismiss menu"
           activeOpacity={1}
           style={StyleSheet.absoluteFill}
+          // Tapping the scrim away is not an action; it stays silent.
+          haptics={false}
           onPress={onClose}
         />
       </Animated.View>

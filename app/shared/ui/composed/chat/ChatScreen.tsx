@@ -320,6 +320,7 @@ export function ChatScreen({
       emptyContent ? (
         <Pressable
           onPress={Keyboard.dismiss}
+          haptics={false}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}
           accessible={false}
           importantForAccessibility="no">

@@ -4,6 +4,7 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { firePressHaptic, type PressHaptics } from '@/shared/ui/primitives/Haptics';
 import { headerButtonSize, zIndex } from '@/shared/styles/tokens';
 
 /**
@@ -30,16 +31,25 @@ export function HeaderGlassCircle({
   children,
   testID,
   accessibilityLabel,
+  haptics,
 }: {
   onPress?: () => void;
   disabled?: boolean;
   children: React.ReactNode;
   testID?: string;
   accessibilityLabel?: string;
+  /** Press haptic, as on `Pressable`. */
+  haptics?: PressHaptics;
 }) {
   const colorScheme = useColorScheme();
   const size = headerButtonSize;
   const interactive = !!onPress && !disabled;
+  // SwiftUI's Button reports only the tap, not a press-in, so the haptic
+  // lands with the action.
+  const handlePress = () => {
+    firePressHaptic(haptics);
+    onPress?.();
+  };
   const containerStyle = React.useMemo(
     () => [styles.box, { opacity: disabled ? 0.4 : 1 }],
     [disabled]
@@ -70,7 +80,7 @@ export function HeaderGlassCircle({
           fractional widths that nudge UIKit's bar-item math; the host is
           a fixed headerButtonSize square. */}
       <Host style={styles.host}>
-        <SwiftUIButton modifiers={buttonModifiers} onPress={interactive ? onPress : undefined}>
+        <SwiftUIButton modifiers={buttonModifiers} onPress={interactive ? handlePress : undefined}>
           <View style={styles.content}>{children}</View>
         </SwiftUIButton>
       </Host>

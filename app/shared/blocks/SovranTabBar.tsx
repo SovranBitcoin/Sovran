@@ -124,6 +124,8 @@ function TabButton({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       testID={testID}
+      // The bar fires its own selection tick, only when the tap changes tab.
+      haptics={false}
       onPress={onPress}
       onLongPress={onLongPress}
       className="flex-1 items-center justify-center self-stretch py-1"

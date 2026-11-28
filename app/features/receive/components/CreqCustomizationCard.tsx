@@ -25,7 +25,6 @@ import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection
 import { Surface } from '@/shared/ui/composed/Surface';
 import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { Section } from '@/shared/ui/composed/Section';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { copyPopup } from '@/shared/lib/popup';
@@ -91,7 +90,6 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   }, [mintSelection, onMintToggle, onResetExclusions]);
 
   const handleCopy = useCallback(async () => {
-    await EnhancedHaptics.copyHaptic();
     await setStringAsync(encodedRequest);
     copyPopup('paymentRequest');
     paymentLog.info('receive.creq.copied', { requestLength: encodedRequest.length });

@@ -3,7 +3,7 @@ import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router/react-navigation';
-import * as Haptics from 'expo-haptics';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { ListGroup, Separator } from '@/shared/ui/composed/ListGroup';
 import { PressableFeedback } from '@/shared/ui/primitives/PressableFeedback';
 import Animated, {
@@ -80,7 +80,7 @@ export function BackupVerifyScreen() {
     if (result.outcome === 'wrong') {
       setProgress(result.state);
       log.info('backup.flow.verify_wrong', { position: question.position });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      void EnhancedHaptics.errorHaptic();
       offset.set(
         withSequence(
           ReduceMotion.System,
@@ -93,6 +93,7 @@ export function BackupVerifyScreen() {
     }
     locked.current = true;
     setAccepted(true);
+    if (result.outcome === 'complete') void EnhancedHaptics.successHaptic();
     timer.current = setTimeout(() => {
       setProgress(result.state);
       setAccepted(false);

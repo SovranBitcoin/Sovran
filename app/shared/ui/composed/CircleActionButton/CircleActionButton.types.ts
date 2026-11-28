@@ -1,3 +1,5 @@
+import type { PressHaptics } from '@/shared/ui/primitives/Haptics';
+
 export interface CircleActionButtonProps {
   /** Monicon name used on Android and the pre-liquid-glass iOS fallback. */
   icon: string;
@@ -9,6 +11,8 @@ export interface CircleActionButtonProps {
   onPress?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
+  /** Press haptic, as on `Pressable`: light impact on press-in by default. */
+  haptics?: PressHaptics;
   disabled?: boolean;
   /** Override for the icon tint. Defaults to `foreground`. */
   color?: string;

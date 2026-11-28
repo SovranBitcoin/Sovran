@@ -254,7 +254,6 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
             accessibilityRole="button"
             accessibilityLabel="Send memo"
             testID="send-memo-add"
-            haptics
             disabled={!canSubmit}
             onPress={submit}
             style={sendButtonStyle}>
@@ -275,7 +274,6 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
           size="compact"
           testID="send-memo-skip"
           accessibilityLabel="Skip memo"
-          haptics
           onPress={skip}
           style={styles.skipButton}
         />

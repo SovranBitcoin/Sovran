@@ -23,7 +23,6 @@ export function RebalanceActionPill({
   return (
     <Pressable
       onPress={onPress}
-      haptics
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={testID ?? `rebalance-hop-${ACTION_BY_ICON[icon]}`}

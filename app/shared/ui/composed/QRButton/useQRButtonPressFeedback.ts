@@ -9,7 +9,6 @@ import {
 } from 'react-native-reanimated';
 
 import { duration } from '@/shared/styles/tokens';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 
 const REST_SCALE = 1;
 const PRESSED_SCALE = 1.06;
@@ -28,7 +27,6 @@ export function useQRButtonPressFeedback() {
 
   const onPressIn = useCallback(
     (_event: GestureResponderEvent) => {
-      void EnhancedHaptics.buttonHaptic();
       scale.set(
         withTiming(PRESSED_SCALE, {
           duration: duration.instant,

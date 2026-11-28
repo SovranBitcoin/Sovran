@@ -57,6 +57,9 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({
 }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: { copyHaptic: jest.fn() },
 }));
 jest.mock('@/shared/lib/logger', () => ({

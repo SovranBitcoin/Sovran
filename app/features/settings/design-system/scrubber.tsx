@@ -55,7 +55,7 @@ export interface ScrubTransition {
 function ButtonPressFrame({ progress }: FrameProps) {
   return (
     <View className="w-full">
-      <Button text="Send" onPress={noop} pressProgress={progress} />
+      <Button text="Send" haptics={false} onPress={noop} pressProgress={progress} />
     </View>
   );
 }

@@ -8,7 +8,7 @@ import { approximateFiatText } from '@/shared/lib/currency';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -244,11 +244,10 @@ export function PrimaryBalance({
   const btcPrice = useBtcPrice(displayCurrency);
   const isSatUnit = realUnit === 'sat';
 
-  const toggleUnit = async () => {
+  const toggleUnit = () => {
     // displayBtc cycling re-formats a SAT balance (sat/BTC/⚡ modes); it has
     // no meaning for a fiat-denominated wallet unit.
     if (!isSatUnit) return;
-    await EnhancedHaptics.successHaptic();
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   };
 
@@ -347,6 +346,7 @@ export function PrimaryBalance({
         />
         <Pressable
           onPress={toggleUnit}
+          haptics={isSatUnit ? SELECTION_HAPTICS : false}
           testID={`wallet-balance-toggle-${account.unit}`}
           accessibilityRole="button"
           accessibilityLabel={`Balance, ${balance.toLocaleString()} ${accountUnitLabel(account.unit)}`}

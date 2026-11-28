@@ -11,7 +11,7 @@ import { CircleActionButtonShell } from './CircleActionButtonShell';
 export function CircleActionButtonFlat(props: CircleActionButtonProps): React.ReactElement {
   const foreground = useThemeColor('foreground');
   const chrome = useControlChrome();
-  const { icon, onPress, onPressIn, onPressOut, disabled = false, color } = props;
+  const { icon, onPress, onPressIn, onPressOut, haptics, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
   return (
@@ -21,6 +21,7 @@ export function CircleActionButtonFlat(props: CircleActionButtonProps): React.Re
       <Pressable
         accessible={false}
         onPress={interactive ? onPress : undefined}
+        haptics={haptics}
         onPressIn={interactive ? onPressIn : undefined}
         onPressOut={interactive ? onPressOut : undefined}
         disabled={!interactive}

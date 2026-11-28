@@ -15,7 +15,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { paymentLog } from '@/shared/lib/logger';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -37,7 +36,6 @@ export function CopyableValue({ value, display, copyTarget, testID }: CopyableVa
 
   const handleCopyPress = useCallback(async () => {
     paymentLog.info('ui.copyable_value.copy', { copyTarget, valueLength: value.length });
-    await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(value);
     copyPopup(copyTarget);
   }, [value, copyTarget]);

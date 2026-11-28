@@ -4,6 +4,7 @@ import { Log, log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { pickOption } from '@/shared/lib/picker/openPicker';
 import { MORE_BUTTON_WIDTH, partitionTabs } from '@/shared/ui/composed/underlineTabsLayout';
@@ -120,6 +121,7 @@ export function UnderlineTabs({
               accessibilityRole="tab"
               accessibilityLabel={tab}
               accessibilityState={{ selected: isActive }}
+              haptics={SELECTION_HAPTICS}
               onPress={() => handleTabPress(tab, tabs.indexOf(tab))}
               style={[
                 styles.tab,

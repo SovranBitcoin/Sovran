@@ -299,6 +299,7 @@ export function MintInfoScreen() {
     if (!mintUrl) return;
     log.info('mint.info.address.copy');
     await Clipboard.setStringAsync(mintUrl);
+    void EnhancedHaptics.copyHaptic();
   };
 
   const handleContactPress = async (method: string, info: string, pubkey?: string) => {
@@ -308,6 +309,7 @@ export function MintInfoScreen() {
       if (result.isErr()) {
         log.warn('mint.info.contact.open_failed', { method, reason: result.error.type });
         await Clipboard.setStringAsync(info);
+        void EnhancedHaptics.copyHaptic();
       }
     };
     switch (method.toLowerCase()) {
@@ -321,7 +323,6 @@ export function MintInfoScreen() {
       case 'nostr': {
         const npubToCopy = getMintInfoNostrCopyValue(info, pubkey);
         if (npubToCopy) {
-          await EnhancedHaptics.copyHaptic();
           await Clipboard.setStringAsync(npubToCopy);
           copyPopup('npub');
         }
@@ -329,6 +330,7 @@ export function MintInfoScreen() {
       }
       default:
         await Clipboard.setStringAsync(info);
+        void EnhancedHaptics.copyHaptic();
     }
   };
 

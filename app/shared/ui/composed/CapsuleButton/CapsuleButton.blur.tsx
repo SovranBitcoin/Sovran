@@ -26,6 +26,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
 
   const {
     onPress,
+    haptics,
     label,
     accessibilityLabel,
     accessibilityRole = 'button',
@@ -68,6 +69,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
         <PressableFeedback
           animation={false}
           onPress={onPress}
+          haptics={haptics}
           isDisabled={disabled || busy}
           testID={testID}
           accessible

@@ -75,6 +75,9 @@ jest.mock('@/shared/ui/composed/GroupedTable', () => {
   };
 });
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: { copyHaptic: jest.fn() },
 }));
 jest.mock('@/shared/ui/composed/CopyableValue', () => ({ CopyableValue: 'CopyableValue' }));
