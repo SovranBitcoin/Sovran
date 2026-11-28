@@ -41,6 +41,7 @@ jest.mock('wallet', () => ({
         : mockSupported
       : ['sat'],
   pickHighestBalanceUnit: (units: string[]) => units[0],
+  pickPreferredCandidate: jest.requireActual('../../wallet/src/mint-selection').pickPreferredCandidate,
   toAccountUnit: (unit: string) => unit,
 }));
 jest.mock('@/shared/stores/global/mintTestnutStore', () => ({

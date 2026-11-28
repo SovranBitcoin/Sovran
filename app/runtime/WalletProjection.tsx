@@ -21,6 +21,7 @@ import {
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
   pickHighestBalanceUnit,
+  pickPreferredCandidate,
   toAccountUnit,
   type WalletContext,
 } from 'wallet';
@@ -138,18 +139,12 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
     if (typeof setSelectedMint !== 'function') return;
     const inAccount = rawTrustedMints.filter((m) => inActiveAccount(m.mintUrl));
     const pool = inAccount.length > 0 ? inAccount : rawTrustedMints;
-    let best = pool[0].mintUrl;
-    let bestBalance = amountToNumber(rawBalanceCtx.byMintAndUnit?.[best]?.[activeUnit]?.total);
-    for (let i = 1; i < pool.length; i += 1) {
-      const candidate = pool[i].mintUrl;
-      const candidateBalance = amountToNumber(
-        rawBalanceCtx.byMintAndUnit?.[candidate]?.[activeUnit]?.total
-      );
-      if (candidateBalance > bestBalance) {
-        best = candidate;
-        bestBalance = candidateBalance;
-      }
-    }
+    const best = pickPreferredCandidate(
+      pool.map((m) => ({
+        mintUrl: m.mintUrl,
+        balance: amountToNumber(rawBalanceCtx.byMintAndUnit?.[m.mintUrl]?.[activeUnit]?.total),
+      }))
+    )!.mintUrl;
     walletLog.info('wallet.mint.auto_selected', {
       hadPreferred: !!preferredMintUrl,
       trustedCount: rawTrustedMints.length,

@@ -204,6 +204,7 @@ export {
   pickMintForUnit,
   resolveReceiveMethodMint,
 } from "./mint-capabilities";
+export { pickPreferredCandidate } from "./mint-selection";
 export { FIAT_UNITS, SWITCHABLE_UNITS } from "./units/registry";
 export {
   ACCOUNT_UNITS,

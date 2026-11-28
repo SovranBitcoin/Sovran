@@ -7,7 +7,7 @@ import { useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from 'wallet/amount';
-import { toRealUnit } from 'wallet';
+import { pickPreferredCandidate, toRealUnit } from 'wallet';
 import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useDefaultMintSetupStore } from '@/shared/stores/runtime/defaultMintSetupStore';
@@ -79,21 +79,14 @@ export function useMintSelector({
   const fallbackMintUrl = useMemo(() => {
     if (selectedMintUrl || mints.length === 0) return undefined;
     if (storedSelectedMint && mints.some((m) => m.mintUrl === storedSelectedMint)) return undefined;
-    let best = mints[0].mintUrl;
-    let bestBalance = mockMode
-      ? getMockMintBalance(best, unit)
-      : amountToNumber(liveBalances.byMintAndUnit?.[best]?.[realUnit]?.total);
-    for (let i = 1; i < mints.length; i += 1) {
-      const candidate = mints[i].mintUrl;
-      const candidateBalance = mockMode
-        ? getMockMintBalance(candidate, unit)
-        : amountToNumber(liveBalances.byMintAndUnit?.[candidate]?.[realUnit]?.total);
-      if (candidateBalance > bestBalance) {
-        best = candidate;
-        bestBalance = candidateBalance;
-      }
-    }
-    return best;
+    return pickPreferredCandidate(
+      mints.map((m) => ({
+        mintUrl: m.mintUrl,
+        balance: mockMode
+          ? getMockMintBalance(m.mintUrl, unit)
+          : amountToNumber(liveBalances.byMintAndUnit?.[m.mintUrl]?.[realUnit]?.total),
+      }))
+    )?.mintUrl;
   }, [selectedMintUrl, mints, storedSelectedMint, mockMode, unit, liveBalances, realUnit]);
 
   const mintUrl = selectedMintUrl ?? fallbackMintUrl ?? storedSelectedMint;
