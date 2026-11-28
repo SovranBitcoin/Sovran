@@ -237,8 +237,8 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
             gate: { minItems: toFetch.length, capMs: AGGREGATE_CAP_MS.profiles },
             count: (bundle) => Object.keys(bundle.profiles).length,
             merge: (acc, next, tier) => {
-              // Cache each answer under ITS tier's rank (srcRank merge keeps the best fields).
-              ingestProfiles(cache, { tier, profiles: next.profiles });
+              // Each answer is cached with its own event times: the cache keeps the newest kind-0.
+              ingestProfiles(cache, { tier, profiles: next.profiles, createdAt: next.createdAt });
               return mergeProfileBundles(acc, next, tier);
             },
             onUpdate: (agg) => {
@@ -437,7 +437,11 @@ function describeProvenance(provenance: ReadProvenance | undefined): NostrLogDat
   };
 }
 
-/** Union by pubkey; a better-ranked tier's metadata replaces a worse one's in place. */
+/**
+ * Union by pubkey, newest kind-0 wins: an answer replaces what is held for a
+ * pubkey only when its event is newer, or as new and from a better-ranked
+ * tier. An answer that does not know its event time ranks below any that does.
+ */
 function mergeProfileBundles(
   acc: ProfilesBundle | undefined,
   next: ProfilesBundle,
@@ -445,20 +449,27 @@ function mergeProfileBundles(
 ): ProfilesBundle {
   if (!acc) {
     for (const metadata of Object.values(next.profiles)) rankOwners.set(metadata, tier);
-    return { profiles: { ...next.profiles } };
+    return { profiles: { ...next.profiles }, createdAt: { ...next.createdAt } };
   }
   const profiles = { ...acc.profiles };
+  const createdAt = { ...acc.createdAt };
   for (const [pubkey, metadata] of Object.entries(next.profiles)) {
     const existing = profiles[pubkey];
-    if (!existing || tierRank(tier) <= tierRank(rankOwner(existing))) {
-      profiles[pubkey] = metadata;
-      rankOwners.set(metadata, tier);
-    }
+    const nextAt = next.createdAt?.[pubkey] ?? 0;
+    const heldAt = createdAt[pubkey] ?? 0;
+    const wins =
+      !existing ||
+      nextAt > heldAt ||
+      (nextAt === heldAt && tierRank(tier) <= tierRank(rankOwner(existing)));
+    if (!wins) continue;
+    profiles[pubkey] = metadata;
+    if (nextAt > 0) createdAt[pubkey] = nextAt;
+    rankOwners.set(metadata, tier);
   }
-  return { profiles };
+  return { profiles, createdAt };
 }
-// Which tier supplied a metadata object, so a later worse-ranked answer cannot
-// overwrite it. Keyed weakly on the object itself: no ids, no leaks.
+// Which tier supplied a metadata object, to break a tie between two answers
+// for the same event. Keyed weakly on the object itself: no ids, no leaks.
 const rankOwners = new WeakMap<object, NostrTier>();
 function rankOwner(metadata: object): NostrTier {
   return rankOwners.get(metadata) ?? 'relay';
@@ -470,7 +481,8 @@ function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): P
   if (!acc) return { ...next };
   return {
     pubkey: acc.pubkey,
-    metadata: acc.metadata ?? next.metadata,
+    // The kind-0 is a replaceable event: the newer one is the header's.
+    ...newerMetadata(acc, next),
     followersCount: acc.followersCount ?? next.followersCount,
     followingCount: acc.followingCount ?? next.followingCount,
     noteCount: acc.noteCount ?? next.noteCount,
@@ -481,6 +493,17 @@ function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): P
     operatesMints: acc.operatesMints ?? next.operatesMints,
     operatesAiProviders: acc.operatesAiProviders ?? next.operatesAiProviders,
   };
+}
+
+function newerMetadata(
+  acc: ProfileStats,
+  next: ProfileStats,
+): Pick<ProfileStats, 'metadata' | 'metadataCreatedAt'> {
+  const from =
+    next.metadata && (!acc.metadata || (next.metadataCreatedAt ?? 0) > (acc.metadataCreatedAt ?? 0))
+      ? next
+      : acc;
+  return { metadata: from.metadata, metadataCreatedAt: from.metadataCreatedAt };
 }
 
 /**

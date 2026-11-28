@@ -24,29 +24,56 @@ export type ProfilesRequest = RequestControls & {
 export type ProfilesBundle = {
   /** pubkey → metadata (only pubkeys a tier actually resolved). */
   profiles: Record<string, ProfileMetadata>;
+  /** pubkey → `created_at` (unix seconds) of the kind-0 the metadata came from, where the tier knows it. */
+  createdAt?: Record<string, number>;
 };
 
 export type ResolvedProfiles = {
   tier: NostrTier;
   profiles: Record<string, ProfileMetadata>;
+  createdAt?: Record<string, number>;
   /** Aggregate reads: which tiers contributed, and whether every tier has settled. */
   provenance?: ReadProvenance;
 };
 
-/** Reduce raw kind-0 events to the latest metadata per pubkey. */
-export function profilesFromKind0(
-  events: ReadonlyArray<{ pubkey?: string; kind: number; content?: string; created_at?: number }>,
-): Record<string, ProfileMetadata> {
-  const latestAt: Record<string, number> = {};
-  const out: Record<string, ProfileMetadata> = {};
+type Kind0Like = { pubkey?: string; kind: number; content?: string; created_at?: number };
+
+/**
+ * Reduce raw kind-0 events to the newest per pubkey, keeping its `created_at`
+ * so a merge across sources can let the newest event win.
+ *
+ * A newest event whose content is an empty JSON object is kept as empty
+ * metadata: the person cleared their profile, and that has to reach the cache
+ * to remove what an older event said. Content that is not a JSON object is
+ * skipped as before, so a corrupt event never hides a good older one.
+ */
+export function latestKind0(events: ReadonlyArray<Kind0Like>): Required<ProfilesBundle> {
+  const createdAt: Record<string, number> = {};
+  const profiles: Record<string, ProfileMetadata> = {};
   for (const event of events) {
     if (event.kind !== 0 || typeof event.pubkey !== 'string') continue;
     const at = typeof event.created_at === 'number' ? event.created_at : 0;
-    if (event.pubkey in latestAt && at <= latestAt[event.pubkey]) continue;
-    const metadata = parseProfileMetadata(typeof event.content === 'string' ? event.content : '');
+    if (event.pubkey in profiles && at <= (createdAt[event.pubkey] ?? 0)) continue;
+    const content = typeof event.content === 'string' ? event.content : '';
+    const metadata = parseProfileMetadata(content) ?? (isEmptyJsonObject(content) ? {} : null);
     if (!metadata) continue;
-    latestAt[event.pubkey] = at;
-    out[event.pubkey] = metadata;
+    if (at > 0) createdAt[event.pubkey] = at;
+    else delete createdAt[event.pubkey];
+    profiles[event.pubkey] = metadata;
   }
-  return out;
+  return { profiles, createdAt };
+}
+
+function isEmptyJsonObject(content: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(content);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/** Reduce raw kind-0 events to the latest metadata per pubkey. */
+export function profilesFromKind0(events: ReadonlyArray<Kind0Like>): Record<string, ProfileMetadata> {
+  return latestKind0(events).profiles;
 }

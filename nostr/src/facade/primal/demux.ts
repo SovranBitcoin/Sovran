@@ -1,6 +1,6 @@
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import { toFeedEvent } from '../event';
-import { profilesFromKind0, type ProfileMetadata } from '../profiles';
+import { latestKind0, profilesFromKind0, type ProfileMetadata } from '../profiles';
 import type { ProfileStatsBundle } from '../profile-stats';
 import { socialGraphFromEvents, type SocialGraph } from '../social-graph';
 import { PRIMAL_KIND, type RawPrimalEvent } from './protocol';
@@ -24,7 +24,9 @@ export function demuxPrimalProfileStats(
   events: ReadonlyArray<RawPrimalEvent>,
   pubkey: string,
 ): ProfileStatsBundle {
-  const metadata: ProfileMetadata | undefined = profilesFromKind0(events)[pubkey];
+  const kind0 = latestKind0(events);
+  const metadata: ProfileMetadata | undefined = kind0.profiles[pubkey];
+  const metadataCreatedAt = kind0.createdAt[pubkey];
   let followersCount: number | undefined;
   let followingCount: number | undefined;
   let noteCount: number | undefined;
@@ -43,6 +45,7 @@ export function demuxPrimalProfileStats(
   return {
     pubkey,
     ...(metadata ? { metadata } : {}),
+    ...(metadata && metadataCreatedAt !== undefined ? { metadataCreatedAt } : {}),
     ...(followersCount !== undefined ? { followersCount } : {}),
     ...(followingCount !== undefined ? { followingCount } : {}),
     ...(noteCount !== undefined ? { noteCount } : {}),

@@ -20,7 +20,7 @@ import {
   type DmEnvelopesBundle,
   type DmEnvelopesRequest,
 } from '../dm';
-import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
+import { latestKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import {
   profileSearchHitsFromKind0,
   type ProfileSearchBundle,
@@ -182,7 +182,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<ProfilesBundle>>(
-        (events) => answered({ profiles: profilesFromKind0(events) }),
+        (events) => answered(latestKind0(events)),
         (error) => failed(error),
       );
     },

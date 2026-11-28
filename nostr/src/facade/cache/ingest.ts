@@ -16,9 +16,9 @@ import type { NostrEntityCache } from "./entity-cache";
 // ---------------------------------------------------------------------------
 
 /**
- * Full kind-0 metadata fetched directly (profiles/profile-stats surfaces) beats
- * a low-confidence seed (`seenAt: 0`) but stays below any real kind-0
- * `created_at` (unix seconds), so a genuinely newer profile event still wins.
+ * Merge order for a kind-0 a tier fetched without saying when the event was
+ * created: above a seed (`seenAt: 0`), below any real `created_at` (unix
+ * seconds), so an answer that does carry its event time always wins.
  */
 const DIRECT_METADATA_SEEN_AT = 1;
 
@@ -37,6 +37,7 @@ export function ingestProfiles(
     resolved.profiles,
     DIRECT_METADATA_SEEN_AT,
     resolved.tier,
+    { createdAt: resolved.createdAt },
   );
 }
 
@@ -49,11 +50,13 @@ export function ingestProfileStats(
       { [resolved.pubkey]: resolved.metadata },
       DIRECT_METADATA_SEEN_AT,
       resolved.tier,
+      { createdAt: { [resolved.pubkey]: resolved.metadataCreatedAt } },
     );
   }
   cache.ingestProfileStats({
     pubkey: resolved.pubkey,
     metadata: resolved.metadata,
+    metadataCreatedAt: resolved.metadataCreatedAt,
     followersCount: resolved.followersCount,
     followingCount: resolved.followingCount,
     noteCount: resolved.noteCount,
@@ -80,10 +83,18 @@ export function ingestSearchHits(
   hits: readonly ProfileSearchHit[],
   source: CacheSource,
 ): void {
-  const metadata: Record<string, ProfileSearchHit["metadata"]> = {};
+  const seeds: Record<string, ProfileSearchHit["metadata"]> = {};
+  const events: Record<string, ProfileSearchHit["metadata"]> = {};
+  const createdAt: Record<string, number> = {};
   for (const hit of hits) {
-    if (Object.keys(hit.metadata).length > 0)
-      metadata[hit.pubkey] = hit.metadata;
+    if (Object.keys(hit.metadata).length > 0) {
+      if (hit.metadataCreatedAt !== undefined && hit.metadataCreatedAt > 0) {
+        events[hit.pubkey] = hit.metadata;
+        createdAt[hit.pubkey] = hit.metadataCreatedAt;
+      } else {
+        seeds[hit.pubkey] = hit.metadata;
+      }
+    }
     const stats = {
       pubkey: hit.pubkey,
       followersCount: numberOrUndefined(hit.followers),
@@ -106,10 +117,16 @@ export function ingestSearchHits(
     }
     cache.ingestProfileStats(stats);
   }
-  if (Object.keys(metadata).length > 0) {
-    // Search metadata is a kind-0 whose `created_at` the hit does not carry:
-    // seed it at zero confidence so it fills gaps and never outranks a fetch.
-    cache.ingestProfileMetadata(metadata, 0, source);
+  if (Object.keys(events).length > 0) {
+    // The tier returned the kind-0 itself (Primal, relays). That IS the
+    // profile fetch: ingested as one, with its event time, so the result rows
+    // do not ask every tier for the same event again.
+    cache.ingestProfileMetadata(events, DIRECT_METADATA_SEEN_AT, source, { createdAt });
+  }
+  if (Object.keys(seeds).length > 0) {
+    // An index entry with no event behind it: seeded at zero confidence, so
+    // it fills gaps and never outranks a fetch.
+    cache.ingestProfileMetadata(seeds, 0, source);
   }
 }
 

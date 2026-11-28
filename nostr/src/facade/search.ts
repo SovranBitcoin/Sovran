@@ -29,6 +29,12 @@ export type ProfileSearchHit = {
   /** Present from nagg; the relay floor leaves it for the caller to derive. */
   npub?: string;
   metadata: ProfileMetadata;
+  /**
+   * `created_at` (unix seconds) of the kind-0 `metadata` was parsed from.
+   * Present when the tier returned the event itself (Primal, relays): the hit
+   * is then a real profile answer, not a seed to be fetched again.
+   */
+  metadataCreatedAt?: number;
   /** Vertex / app-view ranking; null on the relay floor (no global rank). */
   vertexFetchedAt?: number | null;
   vertexFresh?: boolean | null;
@@ -127,7 +133,11 @@ export function profileSearchHitsFromKind0(
     const metadata = parseProfileMetadata(typeof event.content === 'string' ? event.content : '');
     if (!metadata) continue;
     latestAt[event.pubkey] = at;
-    byPubkey[event.pubkey] = { pubkey: event.pubkey, metadata };
+    byPubkey[event.pubkey] = {
+      pubkey: event.pubkey,
+      metadata,
+      ...(at > 0 ? { metadataCreatedAt: at } : {}),
+    };
   }
   return Object.values(byPubkey);
 }

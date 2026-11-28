@@ -25,6 +25,8 @@ export type ProfileStatsRequest = RequestControls & {
 export type ProfileStats = {
   pubkey: string;
   metadata?: ProfileMetadata;
+  /** `created_at` (unix seconds) of the kind-0 `metadata` came from, where the tier knows it. */
+  metadataCreatedAt?: number;
   followersCount?: number;
   followingCount?: number;
   noteCount?: number;

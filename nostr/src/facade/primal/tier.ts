@@ -1,5 +1,5 @@
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
-import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
+import { latestKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import {
   profileStatsIsEmpty,
   type ProfileStatsBundle,
@@ -73,7 +73,7 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
         { signal: request.signal, timeoutMs: request.timeoutMs },
       );
       return result.match<TierOutcome<ProfilesBundle>>(
-        (events) => answered({ profiles: profilesFromKind0(events) }),
+        (events) => answered(latestKind0(events)),
         (error) => failed(error),
       );
     },
