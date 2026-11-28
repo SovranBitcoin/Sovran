@@ -184,7 +184,10 @@ const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
 export type ProfileIngestTimes = {
   /** Kind-0 `created_at` (unix seconds) per pubkey; replaces the call's `seenAt` where present. */
   createdAt?: Readonly<Record<string, number | undefined>>;
-  /** When each entry was fetched (epoch ms); defaults to now for a real event, absent for a seed. */
+  /**
+   * When each entry was fetched (epoch ms); 0 for "never". Without it a real
+   * event is stamped now and a seed gets no stamp.
+   */
   fetchedAt?: Readonly<Record<string, number | undefined>>;
 };
 
@@ -304,7 +307,10 @@ export function createNostrEntityCache(
         Object.entries(metadata).map(([pubkey, m]) => {
           const createdAt = times?.createdAt?.[pubkey];
           const at = typeof createdAt === 'number' && createdAt > 0 ? createdAt : seenAt;
-          const fetchedAt = times?.fetchedAt?.[pubkey] ?? (at > 0 ? now : undefined);
+          // A given stamp is used as is; 0 means "never fetched" and leaves none.
+          const given = times?.fetchedAt?.[pubkey];
+          const fetchedAt =
+            given !== undefined ? (given > 0 ? given : undefined) : at > 0 ? now : undefined;
           return [
             pubkey,
             { ...m, pubkey, seenAt: at, srcRank, ...(fetchedAt !== undefined ? { fetchedAt } : {}) },

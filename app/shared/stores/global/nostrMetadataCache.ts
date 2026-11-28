@@ -7,8 +7,9 @@
  * Not read for rendering: it is the durable, write-behind mirror of the
  * nagg-ts entity cache, which screens read (`useCachedNostrProfile`,
  * `useProfileRecordsMany`). `buildNostrDataLayer` boot-seeds that cache from
- * here and writes its snapshot back. Entries older than
- * `NOSTR_METADATA_STALE_TTL_MS` are refetched by `useNostrProfileMetadata`.
+ * here, keeping each entry's fetch time and event time, and writes its
+ * snapshot back. Entries older than `NOSTR_METADATA_STALE_TTL_MS` are
+ * revalidated by `useNostrProfileMetadata`; fresher ones are not refetched.
  *
  * Persisted blob is profile-scoped via `createProfileScopedStorage` so
  * profile-A's contact metadata doesn't leak into profile-B's view.
@@ -34,6 +35,13 @@ export interface NostrProfileMetadata {
   about?: string;
   /** ms since epoch. `0` marks an entry as immediately stale (search seeds). */
   fetchedAt: number;
+  /**
+   * `created_at` (unix seconds) of the kind-0 these fields came from, when
+   * known. Saved so a cold start restores the profile at its real merge order:
+   * a relay's older copy then cannot replace it. Absent on entries saved
+   * before it was kept, and on seeds.
+   */
+  createdAt?: number;
 }
 
 export const NOSTR_METADATA_STALE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -111,6 +119,7 @@ export const Kind0MetadataSchema = z.looseObject({
 const PersistedNostrMetadataEntry = z.looseObject({
   ...NOSTR_PROFILE_FIELDS,
   fetchedAt: z.number().int().nonnegative(),
+  createdAt: z.number().int().positive().optional().catch(undefined),
 });
 
 const PersistedNostrMetadataCache = z.object({
@@ -159,6 +168,8 @@ export function cachedProfileToMetadata(
     website: record.website,
     about: record.about,
     fetchedAt: record.fetchedAt ?? 0,
+    // 0 is a seed and 1 a fetch whose event time is unknown: neither is a time.
+    ...(record.seenAt > 1 ? { createdAt: record.seenAt } : {}),
   };
 }
 

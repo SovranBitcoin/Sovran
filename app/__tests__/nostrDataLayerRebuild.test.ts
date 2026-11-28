@@ -44,6 +44,12 @@ jest.mock('@/shared/stores/global/nostrMetadataCache', () => ({
   cachedProfileToMetadata: (record: facade.CachedProfile) => ({ name: record.name }),
   useNostrMetadataCache: {
     getState: () => ({ byPubkey: {}, persistOwnerSnapshot: mockPersistOwnerSnapshot }),
+    // The saved mirror has been read: the layer may seed from it and write to it.
+    persist: {
+      hasHydrated: () => true,
+      onFinishHydration: () => () => {},
+      getOptions: () => ({ name: 'nostr-metadata-cache' }),
+    },
   },
 }));
 
