@@ -303,9 +303,7 @@ describe('receive rail presentation', () => {
         );
       });
       expect(mockMempoolCalls.at(-1)).toEqual(['bc1qstanding', { enabled: false }]);
-      act(() =>
-        renderer.update(<ReceiveReusableQuoteTab {...props} method="onchain" active />)
-      );
+      act(() => renderer.update(<ReceiveReusableQuoteTab {...props} method="onchain" active />));
       expect(mockMempoolCalls.at(-1)).toEqual(['bc1qstanding', { enabled: true }]);
       // Unified shows the address while this tab is hidden.
       act(() =>

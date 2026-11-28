@@ -107,7 +107,7 @@ describe('useOnchainMeltQuote', () => {
     expect(listeners.get('melt-quote:updated')?.size).toBe(0);
   });
 
-  it("ignores Coco updates for another quote or another mint", async () => {
+  it('ignores Coco updates for another quote or another mint', async () => {
     const refresh = jest.fn().mockResolvedValue({ state: 'PENDING' });
     installRefresh(refresh);
 
@@ -135,7 +135,7 @@ describe('useOnchainMeltQuote', () => {
     unmount();
   });
 
-  it("does not count the event its own refresh causes as a second read", async () => {
+  it('does not count the event its own refresh causes as a second read', async () => {
     // Coco emits melt-quote:updated from inside refresh when the row changes.
     // Counting it would confirm the off-chain verdict without the re-check.
     const refresh = jest.fn(async () => {
