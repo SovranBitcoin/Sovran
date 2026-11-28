@@ -34,6 +34,7 @@ import {
   getOnchainMintAddress,
   getOnchainMintQuoteRequiredConfirmations,
   isOnchainMintRequirementFromMint,
+  isOnchainReceiveSettled,
 } from '@/shared/lib/cashu/onchainMint';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -81,12 +82,12 @@ export function OnchainReceiveScreen({
     entry.unit ?? 'sat'
   );
   const isFocused = useIsFocused();
-  // Stop asking mempool.space once the mint credited the deposit and it has
-  // the confirmations the mint wants: nothing on this page changes after that.
+  // Stop asking mempool.space once the mint operation is finalized (ecash
+  // credited) and the deposit has the confirmations the mint wants: nothing
+  // on this page changes after that.
   const mempool = useMempoolAddressSummary(onchainAddress, {
     enabled: isFocused,
-    isSettled: (summary) =>
-      isPaid && !!getOnchainConfirmationProgress(summary, requiredConfirmations)?.isSatisfied,
+    isSettled: (summary) => isOnchainReceiveSettled(entry, summary, requiredConfirmations),
   });
   const bip321 = useBip321Info(entry.id);
   const [detailsOpen, setDetailsOpen] = useState(false);
