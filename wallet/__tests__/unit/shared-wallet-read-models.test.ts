@@ -625,3 +625,37 @@ test("receive bursts share independent supplements and retire the payment-reques
   await act(async () => emitPaymentRequestCreated());
   expect(fixture.manager.ops.receive.listInFlight).toHaveBeenCalledTimes(3);
 });
+
+test("a burst of history projections refreshes the head page once", async () => {
+  await mount(() => useColadaTransactions().history.length, 3);
+  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(1);
+  // A melt projects pending, then finalized, in one turn.
+  await act(async () => {
+    fixture.emit("history:updated");
+    fixture.emit("history:updated");
+    fixture.emit("history:updated");
+  });
+  // Before: one refresh plus a trailing one.
+  expect(fixture.manager.history.getPaginatedHistory).toHaveBeenCalledTimes(2);
+});
+
+test("history diagnostics are not built when the host drops info logs", async () => {
+  const { setLogger } = await import("../../src/logger");
+  const info = vi.fn();
+  const toISOString = vi.spyOn(Date.prototype, "toISOString");
+  setLogger({
+    debug: vi.fn(),
+    info,
+    warn: vi.fn(),
+    error: vi.fn(),
+    isLevelEnabled: () => false,
+  });
+  try {
+    await mount(() => useColadaTransactions().history.length);
+    expect(info).not.toHaveBeenCalled();
+    expect(toISOString).not.toHaveBeenCalled();
+  } finally {
+    setLogger(null);
+    toISOString.mockRestore();
+  }
+});
