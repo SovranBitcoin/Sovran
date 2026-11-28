@@ -1297,8 +1297,6 @@ exports[`timeline scenario pins (redesign acceptance surface) locked-claimed-ear
   "texts": [
     "Send • Complete",
     "CLAIMED",
-    "•",
-    "unlocks in 24h 0m 0s",
     "Created",
     "2026-05-22",
     "Claimed",

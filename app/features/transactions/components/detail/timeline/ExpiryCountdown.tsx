@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 
 import type { HistoryEntry } from '@cashu/coco-core';
+import { isTerminalFailureState } from 'wallet';
 
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
@@ -40,6 +41,9 @@ export function getExpiryBadgeText(
   // the user is waiting for — so it rides the badge that already ticks,
   // rather than adding a second one.
   if (historyEntry.type === 'send') {
+    // A send that was claimed or taken back has nothing left to unlock.
+    const state = String(historyEntry.state);
+    if (state === 'finalized' || isTerminalFailureState(state)) return null;
     return getTimeUntilUnlock(unlockAtMs, currentTime);
   }
   if (historyEntry.type === 'melt' && meltQuote && !meltQuoteExpired(meltQuote, currentTime)) {
