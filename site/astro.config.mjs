@@ -2,7 +2,6 @@ import { defineConfig } from 'astro/config';
 import { fileURLToPath } from 'node:url';
 import { localReleases } from './scripts/local-releases.mjs';
 import { productionBoundary } from './scripts/production-boundary.mjs';
-import { websiteCaptures } from './scripts/website-captures.mjs';
 
 export default defineConfig({
   site: 'https://sovran.money',
@@ -17,7 +16,7 @@ export default defineConfig({
       }
     },
   } }],
-  vite: { envDir: './.no-env', plugins: [localReleases(), websiteCaptures()], define: {
+  vite: { envDir: './.no-env', plugins: [localReleases()], define: {
     'import.meta.env.SOVRAN_REPO_ROOT': JSON.stringify(fileURLToPath(new URL('../', import.meta.url))),
   } },
 });

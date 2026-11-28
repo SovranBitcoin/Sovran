@@ -10,7 +10,6 @@ import { appSourceFingerprint } from '../../scripts/lib/app-source.mjs';
 import { sha256 } from './source-catalog.mjs';
 import { websiteRecipes, websiteScenes } from './website-config.mjs';
 import { generateWebsiteAssets, websiteAssetStatus } from './website-assets.mjs';
-import { websiteCaptures } from './website-captures.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const sharp = createRequire(import.meta.url)('sharp');
@@ -19,7 +18,7 @@ const config = JSON.parse(await readFile(join(root, 'press/website.json'), 'utf8
 test('website selection is only OG, and named scene edits feed both consumers', () => {
   assert.deepEqual(websiteRecipes(config).map(entry => entry.output), ['social/og.png']);
   const edited = structuredClone(config);
-  edited.phones.feed.pose = { rotateZ: 8 };
+  edited.phones.receive.pose = { rotateZ: 8 };
   assert.deepEqual(websiteRecipes(edited)[0].recipe.phones, websiteScenes(edited).hero.phones);
   for (const update of [{ draft: true }, { output: '../secret.png' }, { scene: 'absent' }, { width: 1000 }]) {
     const invalid = structuredClone(config); Object.assign(invalid.recipes[0], update);
@@ -52,7 +51,7 @@ async function fixture(t) {
   await mkdir(join(repoRoot, 'site/public'), { recursive: true });
   const registry = {};
   const bytes = await sharp({ create: { width: 402, height: 874, channels: 4, background: '#54885b' } }).png().toBuffer();
-  for (const id of ['ios/wallet', 'ios/feed']) {
+  for (const id of ['ios/wallet', 'ios/receive-qr']) {
     registry[id] = { file: `source/screenshots/${id}.png`, context: id.slice(4), run: 'run-fixture', sha256: sha256(bytes),
       appSource: { fingerprint: appSourceFingerprint(repoRoot) } };
     await put(`press/artwork/${registry[id].file}`, bytes);
@@ -80,29 +79,6 @@ test('current sources produce one raster, matching provenance and hashes; check 
   await generateWebsiteAssets({ repoRoot });
   assert.notDeepEqual(await readFile(join(repoRoot, 'site/public/social/manifest.json')), before);
   assert.equal((await websiteAssetStatus(repoRoot)).outputs[0].current, true);
-});
-
-test('public image imports follow only the declared recipe, including screenshot replacements', async t => {
-  const { repoRoot, put, registry } = await fixture(t);
-  const selected = structuredClone(config);
-  selected.scenes = { hero: selected.scenes.hero };
-  await put('press/website.json', selected);
-  registry['ios/backup-words'] = { ...registry['ios/wallet'], file: 'source/screenshots/ios/backup-words.png', context: 'backup-words' };
-  await put('press/artwork/source/screenshots/ios/backup-words.png', await readFile(join(repoRoot, 'press/artwork/source/screenshots/ios/wallet.png')));
-  await put('press/artwork/source/screenshots.json', registry);
-  const plugin = websiteCaptures({ repoRoot });
-  const load = () => plugin.load.call({ addWatchFile() {} }, plugin.resolveId('virtual:sovran-website-captures'));
-  const original = await load();
-  assert.equal(original.match(/^import image/gm).length, 2);
-  assert(!original.includes('backup-words'));
-  selected.phones.feed.captureId = 'ios/backup-words';
-  await put('press/website.json', selected);
-  const changed = await load();
-  assert(changed.includes('screenshots/ios/backup-words.png'));
-  assert(!changed.includes('screenshots/ios/feed.png'));
-  registry['ios/backup-words'].availability = 'unavailable';
-  await put('press/artwork/source/screenshots.json', registry);
-  await assert.rejects(load(), /missing or unapproved/);
 });
 
 test('unrelated capture updates do not invalidate or rewrite the selected output', async t => {

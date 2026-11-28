@@ -28,9 +28,10 @@ Astro's generated asset directory. `noindex` is not the security boundary.
   compositions. Wallpapers and their provenance remain source inputs.
 - Social previews and PNG downloads are rendered in memory. Browsing does not
   save a poster inventory, contact sheets or every orientation combination.
-- `press/website.json` selects named website scenes and the public OG output.
-  `site/public/social/` is the single raster destination. The homepage's remaining
-  phone scenes render directly from its selected native captures.
+- `press/website.json` selects the OG scene and its public output.
+  `site/public/social/` is the single raster destination. The home page's one
+  phone is exported from `press/screenshots/ios/wallet.png` by
+  `site/scripts/hero-image.mjs`.
 
 The old selected-poster and duplicate full-mockup inventories are retired. The
 legacy poster renderer remains an explicit tool for its specialized wallpaper
@@ -51,8 +52,8 @@ selected website outputs and the public site. It never runs the entire functiona
 suite implicitly. A simulator lane alone does not authorize publishing or spending.
 
 Run the full campaign whenever a release is decided, before the version bump is
-merged: the website's phone scenes and its social/OG rasters build from this
-library, and a public `site:build` fails when a selected capture is not `current`.
+merged: the website's home phone and its social/OG raster build from this
+library; rerun `site/scripts/hero-image.mjs` after refreshing the wallet capture.
 See [the release runbook](../release/README.md#day-to-day-operation).
 
 ```sh

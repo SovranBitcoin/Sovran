@@ -64,24 +64,7 @@
 .dev-capture dt, .dev-missing dt { font-weight: 700; margin-top: 12px; }
 .dev-capture dd, .dev-missing dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .dev-missing { padding-block: 20px; }
-.dev-preview { width: 100%; min-width: 0; background: var(--surface); }
-.dev-preview iframe { display: block; width: 100%; height: auto; max-height: 75svh; border: 0; }
-.dev-composer { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 32px; align-items: start; }
-.dev-composer .dev-form { display: grid; align-items: stretch; }
-.dev-screen-slots { display: grid; gap: 16px; }
-.dev-scene { width: min(100%, calc(75svh * var(--canvas-width, 1) / var(--canvas-height, 1))); margin-inline: auto; aspect-ratio: var(--canvas-ratio, 1); background: var(--surface); }
-.dev-scene svg { display: block; width: 100%; height: 100%; }
-.dev-scene .phone-scene { width: 100%; height: 100%; }
-.dev-export .dev-header, .dev-export .skip, .dev-export .scene-controls { display: none; }
-.dev-export, .dev-export body { margin: 0; padding: 0; background: transparent; }
-.dev-export .dev-main { width: 100%; margin: 0; padding: 0; }
-.dev-export .dev-composer { display: block; }
-.dev-export .export-scene { background: transparent; max-width: none; aspect-ratio: auto; }
-.dev-export:not([data-export-ready]) .export-scene { visibility: hidden; }
-.dev-embed .dev-main, .dev-embed .dev-composer { width: 100vw; height: 100svh; display: grid; place-items: center; }
-.dev-embed .export-scene { width: min(100vw, calc(100svh * var(--canvas-width) / var(--canvas-height))) !important; height: min(100svh, calc(100vw * var(--canvas-height) / var(--canvas-width))) !important; background: var(--bg); }
 @media (max-width: 740px) {
-  .dev-composer { grid-template-columns: 1fr; }
   .dev-capture { grid-template-columns: 1fr; }
   .dev-capture img { max-width: 240px; }
 }

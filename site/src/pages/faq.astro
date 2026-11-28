@@ -1,0 +1,15 @@
+---
+import Page from '../layouts/Page.astro';
+import { siteCopy } from '../../../copy/src/site';
+---
+<Page title="FAQ - Sovran" description="Plain answers about custody, backups, identity, offline payments and source code.">
+  <div class="prose-page wrap section">
+    <h1>Plain answers.</h1>
+    {siteCopy.faq.map((item, index) => <section id={`q${index + 1}`} aria-labelledby={`q${index + 1}-title`}>
+      <h2 id={`q${index + 1}-title`}>{item.question}</h2>
+      <p>{item.answer}</p>
+      {'links' in item && <p class="faq-links">{item.links.map(link => <a href={link.href}>{link.label}</a>)}</p>}
+    </section>)}
+    <aside class="risk"><h2>Before adding money</h2><p>{siteCopy.risk}</p></aside>
+  </div>
+</Page>

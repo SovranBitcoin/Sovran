@@ -14,7 +14,7 @@ COPY site/public ./public
 COPY site/scripts/verify-inputs.mjs ./scripts/verify-inputs.mjs
 COPY site/scripts/local-releases.mjs ./scripts/local-releases.mjs
 COPY site/scripts/production-boundary.mjs site/scripts/website-config.mjs site/scripts/composition-recipe.mjs ./scripts/
-COPY site/scripts/website-captures.mjs site/scripts/source-catalog.mjs ./scripts/
+COPY site/scripts/source-catalog.mjs ./scripts/
 COPY site/scripts/website-assets.mjs site/scripts/composition.mjs ./scripts/
 COPY scripts/site-brand.mjs /build/scripts/site-brand.mjs
 COPY app/assets/brand/source/symbol.svg /build/app/assets/brand/source/symbol.svg
@@ -23,8 +23,8 @@ COPY scripts/lib/phone-frame.mjs /build/scripts/lib/phone-frame.mjs
 COPY scripts/lib/app-source.mjs /build/scripts/lib/app-source.mjs
 COPY copy/src/site.ts /build/copy/src/site.ts
 COPY copy/legal/documents.json /build/copy/legal/documents.json
-# Capture sources exist only in the build stage. The recipe plugin emits imports
-# for selected public scenes; the runtime receives only the resulting dist tree.
+# Capture sources exist only in the build stage, for input verification and
+# the OG freshness check; the runtime receives only the resulting dist tree.
 COPY press/ /build/press/
 COPY app/e2e/schema/pages.ts /build/app/e2e/schema/pages.ts
 RUN node ../scripts/site-brand.mjs --check && node scripts/verify-inputs.mjs && node node_modules/astro/astro.js build
