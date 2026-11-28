@@ -1177,7 +1177,7 @@ describe("an NFC request that offers a nostr transport", () => {
   });
 });
 
-// macadamia (Wallet/RequestView.swift:367-377, amount optional) and
+// macadamia (Wallet/RequestView.swift:367,381, amount optional) and
 // cashu-wallet (Core/PaymentRequestBuilder.kt:18-25, `a: null`) put requests
 // without an amount on their tags. The payer is asked for it on the existing
 // amount step; the tag is let go, and the flow carries on from the screen.
@@ -1223,7 +1223,7 @@ describe("an NFC request without an amount", () => {
 });
 
 // macadamia can lock its NFC request to a key (Wallet/RequestView.swift:
-// 236-245). The token written to the tag must carry the request's NUT-10
+// 370-377). The token written to the tag must carry the request's NUT-10
 // option, so the operation is told which request it answers.
 describe("an NFC request locked to a P2PK key", () => {
   const key = `02${"a".repeat(64)}`;
