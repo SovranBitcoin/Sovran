@@ -36,6 +36,7 @@ import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { E2EReadyProofProbe } from '@/features/wallet/components/E2EReadyProofProbe';
 import { WalletSelectedMintProbe } from '@/features/wallet/components/WalletSelectedMintProbe';
 import { WalletWallpaperProbe } from '@/features/wallet/components/WalletWallpaperProbe';
+import { E2E_PROBES_ENABLED } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import {
   useContentHeightStore,
   WalletGradientOverlay,
@@ -234,11 +235,15 @@ export function WalletScreen() {
         refreshControl={pullToAi.refreshControl}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
-          <E2EReadyProofProbe />
-          <E2EHerouiMenuProbe />
-          <E2EToastProbe />
-          <WalletSelectedMintProbe />
-          <WalletWallpaperProbe />
+          {E2E_PROBES_ENABLED && (
+            <>
+              <E2EReadyProofProbe />
+              <E2EHerouiMenuProbe />
+              <E2EToastProbe />
+              <WalletSelectedMintProbe />
+              <WalletWallpaperProbe />
+            </>
+          )}
           <WalletGradientOverlay store={contentHeight} />
 
           <View style={styles.topArea}>
