@@ -59,6 +59,27 @@ describe('timeline state space', () => {
     expect([...lines]).toMatchInlineSnapshot(`[]`);
   });
 
+  // The card's label against the timeline under it, by the same rule.
+  it('lists every state whose card label and timeline disagree', () => {
+    const lines = new Set<string>();
+    for (const space of TIMELINE_SPACES) {
+      for (const frame of walkTimelineSpace(space)) {
+        const surfaces = describeTimelineSurfaces(frame);
+        if (!surfaces.cardDisagreement) continue;
+        lines.add(`${space.flow}: "${surfaces.cardLabel}" over "${surfaces.statusHeader}"`);
+      }
+    }
+    expect([...lines]).toMatchInlineSnapshot(`
+      [
+        "lightning-mint: "Receive • Failed" over "INVOICE EXPIRED"",
+        "lightning-melt: "Send • Failed" over "QUOTE EXPIRED"",
+        "send: "Send • Ready" over "CREATING TOKEN"",
+        "payment-request-send: "Payment • Ready" over "CREATING TOKEN"",
+        "payment-request-send: "Payment • Ready" over "DELIVERING"",
+      ]
+    `);
+  });
+
   // The same check for the title read off the entry alone (a caller with no
   // timeline, or the first frame before the timeline reports). Each line is
   // a fact only the timeline's other inputs carry.

@@ -13,6 +13,7 @@
 import type { PaymentCopyResolver } from '../../copy';
 import { transactionHeaderPhase, transactionHeaderTitle } from '../header-title';
 import { getCardLabel, getStatusColorType, getStatusHeader } from './classify';
+import { DEFAULT_PAYMENT_COPY } from './context';
 import { buildTimelineModel } from './engine';
 import type { BuildTimelineInput, TimelineModel } from './types';
 
@@ -106,6 +107,8 @@ interface TimelineSurfaces {
    * count or a cancel tap.
    */
   entryOnlyDisagreement: string | null;
+  /** Set when the card's label and the timeline under it disagree. */
+  cardDisagreement: string | null;
 }
 
 // The title's phases for each way a timeline can end. An open timeline is
@@ -137,6 +140,40 @@ function titleDisagreement(phase: string, model: TimelineModel): string | null {
     : null;
 }
 
+// Which endings each card status may sit over. "Ready" is the one open
+// status with a claim about the open row: nothing is under way yet.
+const CARD_STATUS_OUTCOMES: Record<string, readonly TimelineModel['outcome']['kind'][]> = {
+  complete: ['settled'],
+  failed: ['failed', 'already-spent'],
+  expired: ['expired'],
+  cancelled: ['rolled-back'],
+  alreadySpent: ['already-spent'],
+  notAdded: ['already-spent'],
+  ready: ['pending'],
+  inProgress: ['pending'],
+  waiting: ['pending'],
+  awaitingPayment: ['pending'],
+  pending: ['pending'],
+};
+
+function cardDisagreement(cardLabel: string, model: TimelineModel): string | null {
+  const status = cardLabel.split(' • ')[1];
+  if (status === undefined) return null;
+  const key = Object.keys(CARD_STATUS_OUTCOMES).find(
+    (candidate) => DEFAULT_PAYMENT_COPY.text(`timeline.status.${candidate}` as never) === status
+  );
+  if (!key) return `card says ${status}, which no ending explains`;
+  const { steps, outcome } = model;
+  const paymentFailed = steps.some((step) => step.id === 'payment-failed');
+  const kind = paymentFailed ? 'failed' : outcome.kind;
+  if (!CARD_STATUS_OUTCOMES[key].includes(kind)) return `card says ${key}, timeline says ${kind}`;
+  const open = steps[steps.length - 1];
+  if (key === 'ready' && (open?.stepType === 'current' || open?.stepType === 'waiting')) {
+    return 'card says ready, timeline is working';
+  }
+  return null;
+}
+
 export function describeTimelineSurfaces(
   frame: Pick<TimelineFrame, 'node' | 'model'>,
   paymentCopy?: PaymentCopyResolver
@@ -149,8 +186,9 @@ export function describeTimelineSurfaces(
   // The entry decides a mint invoice's expiry by the device clock, the fixture
   // by its own; an open timeline under an "expired" title is that difference.
   const clockArtefact = entryPhase === 'expired' && outcome.kind === 'pending';
+  const cardLabel = getCardLabel(historyEntry, steps, tokenCreated, nostrSent, paymentCopy);
   return {
-    cardLabel: getCardLabel(historyEntry, steps, tokenCreated, nostrSent, paymentCopy),
+    cardLabel,
     statusHeader: getStatusHeader(steps),
     statusColor: getStatusColorType(steps),
     headerTitle: transactionHeaderTitle(historyEntry, {
@@ -160,6 +198,8 @@ export function describeTimelineSurfaces(
     headerPhase,
     disagreement: titleDisagreement(headerPhase, model),
     entryOnlyDisagreement: clockArtefact ? null : titleDisagreement(entryPhase, model),
+    // Only with the default wording: the check matches the label's words.
+    cardDisagreement: paymentCopy ? null : cardDisagreement(cardLabel, model),
   };
 }
 
