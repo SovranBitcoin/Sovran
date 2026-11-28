@@ -168,6 +168,7 @@ export {
   type SingleUseReencodeOptions,
 } from "./payment-request-receive";
 export {
+  isQuoteExpiryElapsed,
   rotateReusableMintQuote,
   reusableQuoteKey,
   type ReusableQuoteIdentityStore,

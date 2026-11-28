@@ -55,9 +55,21 @@ function isUnexpired(expiry: number | null, nowSeconds: number): boolean {
   // with the same meaning for reusable offers (observed in the field:
   // bolt12 quotes with expiry 0) — treating 0 as a 1970 timestamp made the
   // standing offer "eternally expired" and rotated the QR on every open.
-  // NOTE: coco's own isMintQuoteExpired treats 0 as expired too — flagged
-  // for upstream via the zero_expiry warn below.
+  // Coco (58abfae) watches and claims a pending mint quote whatever its
+  // expiry, so this rule only decides what the wallet shows and keeps.
   return expiry === null || expiry <= 0 || expiry > nowSeconds;
+}
+
+/**
+ * Whether a mint quote's absolute-seconds `expiry` has passed, by the same
+ * rule the wallet keeps a standing quote by: null, missing, 0 or negative
+ * means it does not expire.
+ */
+export function isQuoteExpiryElapsed(
+  expiry: number | null | undefined,
+  nowSeconds: number,
+): boolean {
+  return !isUnexpired(expiry ?? null, nowSeconds);
 }
 
 /**
@@ -235,9 +247,8 @@ async function resolveReusableMintQuote(
         createReason = "expired";
       else {
         if (recorded.expiry === 0) {
-          // Upstream-relevant: mint sent expiry 0 for a reusable quote; coco
-          // core's expiry checks treat 0 as already-expired, which may stop
-          // its watcher from tracking this quote.
+          // The mint sent expiry 0 for a reusable quote (read as "no
+          // expiry"); logged to see which mints do it.
           logger.warn("quotes.reusable.zero_expiry", {
             ...mintUrlFields(mintUrl),
             method,

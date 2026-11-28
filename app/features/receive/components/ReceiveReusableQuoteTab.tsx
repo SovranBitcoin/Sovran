@@ -128,15 +128,12 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // amounts belong to the fixed-amount flow (fresh address per request).
   const qrData = request && method === 'onchain' ? buildBip321OnchainUri(request) : request;
 
-  // Match coco's OWN watch gate (`isExpiryElapsed`, incl. `expiry: 0`): a quote
-  // coco treats as expired is not being watched, so deposits to it won't be
-  // received. Don't show that QR — offer a fresh one instead. bolt12 offers
-  // arrive with `expiry: 0`, so this surfaces coco's not-watched state rather
-  // than presenting an address that silently won't collect.
+  // A quote past its expiry is not shown — offer a fresh one instead.
+  // `expiry: 0` (how mints send bolt12 offers) means no expiry.
   const quoteExpired = !!quote && isExpiryElapsed(quote.expiry, Math.floor(Date.now() / 1000));
 
   // Footer Copy copies the same bare value the in-card copy row does — but never
-  // an expired quote (coco isn't listening to it).
+  // an expired quote.
   React.useEffect(() => {
     onQrPayload?.(
       request && !quoteExpired ? { value: request, copyTarget: copy.copyTarget } : null

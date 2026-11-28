@@ -201,10 +201,9 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
             <HStack align="center" gap={8}>
               {item.isCurrent ? <Icon name="mdi:check" size={18} color={accent} /> : null}
               {/* Reusable rails (onchain/bolt12) show the live "Listening" pill
-                  only when coco is actually watching. Not-watched rows fall to
-                  their status badge: "Expired" (e.g. bolt12 `expiry: 0`, which
-                  coco treats as expired) or "Paid" + tap-through. Payment
-                  requests keep their status badge (different transport). */}
+                  while the quote is live. Other rows fall to their status
+                  badge: "Expired" (a past expiry) or "Paid" + tap-through.
+                  Payment requests keep their status badge (different transport). */}
               {item.listening === true && item.status !== 'paid' ? (
                 <ListeningPill green={green} />
               ) : (
