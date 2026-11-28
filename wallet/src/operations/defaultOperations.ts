@@ -848,10 +848,15 @@ export function createDefaultOperations(
         amount,
         hadMemo: !!normalizeMemo(memo),
       });
-      // Unmodified upstream Coco prepares exact-match sends without a mint swap.
+      // Prepared from stored proofs without contacting the mint (coco patch,
+      // cashubtc/coco#533). Coco refuses with `OfflineSendError`, before
+      // reserving anything, when no exact match exists. Without the option
+      // coco refreshes mint data older than five minutes and throws when the
+      // mint is unreachable.
       const prepared = await mgr.ops.send.prepare({
         mintUrl,
         amount,
+        offline: true,
       });
       logger.info("operations.executeOfflineSend.prepared", {
         operationId: prepared.id,

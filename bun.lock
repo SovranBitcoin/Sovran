@@ -202,6 +202,7 @@
   "patchedDependencies": {
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
     "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
+    "@cashu/coco-core@0.0.0-nightly-20261120132306-58abfae": "app/patches/@cashu+coco-core+0.0.0-nightly-20261120132306-58abfae.patch",
   },
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",

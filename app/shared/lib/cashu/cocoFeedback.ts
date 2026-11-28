@@ -47,6 +47,7 @@ const COCO_ERROR_NAMES = new Set([
   'UnitValidationError',
   'ProofValidationError',
   'ProofOperationError',
+  'OfflineSendError',
   'MintOperationError',
   'OperationInProgressError',
   'MintFetchError',

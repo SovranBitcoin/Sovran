@@ -1,0 +1,833 @@
+From 48f0cb6e7ac5b46a6a4e64fef9c059ac322c8e26 Mon Sep 17 00:00:00 2001
+From: Kelbie <kevin@kelbie.me>
+Date: Tue, 10 Nov 2026 21:30:32 +0000
+Subject: [PATCH] feat(core): prepare exact sends without contacting the mint
+
+Preparing a send refreshes mint metadata older than five minutes and fails
+when the mint is unreachable, although sending stored proofs as they are
+creates no outputs and needs nothing from the mint.
+
+Add an `offline` option to `ops.send.prepare`. It selects and reserves from
+stored proofs and keysets in one transaction, without a refresh, active
+keyset or seed. A request that would need the mint is refused with the new
+`OfflineSendError` before anything is reserved.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ .changeset/offline-exact-sends.md             |   9 +
+ packages/adapter-tests/src/integration.ts     |  39 ++
+ packages/core/api/SendOpsApi.ts               |   1 +
+ packages/core/models/Error.ts                 |  18 +
+ .../operations/send/SendOperationService.ts   |  91 +++--
+ .../operations/send/SendTransitionTypes.ts    |   7 +
+ .../core/operations/send/SendTransitions.ts   |  25 +-
+ packages/core/proofs/ProofSelection.ts        |  45 ++-
+ packages/core/test/unit/OfflineSend.test.ts   | 356 ++++++++++++++++++
+ .../core/transactions/proofs/ScopedProofs.ts  |   2 +
+ packages/docs/pages/send-operations.md        |  21 ++
+ 11 files changed, 569 insertions(+), 45 deletions(-)
+ create mode 100644 .changeset/offline-exact-sends.md
+ create mode 100644 packages/core/test/unit/OfflineSend.test.ts
+
+diff --git a/.changeset/offline-exact-sends.md b/.changeset/offline-exact-sends.md
+new file mode 100644
+index 00000000..9cb771a7
+--- /dev/null
++++ b/.changeset/offline-exact-sends.md
+@@ -0,0 +1,9 @@
++---
++'@cashu/coco-core': minor
++---
++
++Add `offline` to `ops.send.prepare`. It prepares a send from stored proofs and keysets without a
++mint request, and succeeds only when those proofs add up to the amount as they are. Otherwise it
++throws the new `OfflineSendError`, whose `reason` is `no_exact_match` or `unsupported_option`,
++and reserves nothing. Ordinary input, balance and trust validation errors are unchanged. No
++storage change.
+diff --git a/packages/adapter-tests/src/integration.ts b/packages/adapter-tests/src/integration.ts
+index 0b6b6fae..e0db8486 100644
+--- a/packages/adapter-tests/src/integration.ts
++++ b/packages/adapter-tests/src/integration.ts
+@@ -1806,6 +1806,45 @@ export async function runIntegrationTests<TRepositories extends Repositories = R
+         expect(operation?.mintUrl).toBe(mintUrl);
+       });
+ 
++      it('should send held proofs with mint requests failing and redeem them once they succeed', async () => {
++        const balanceBefore = await getMintSpendableBalance(mgr!, mintUrl, testUnit);
++        const originalFetch = globalThis.fetch;
++        globalThis.fetch = Object.assign(async () => {
++          throw new Error('network is offline');
++        }, originalFetch);
++        let prepared;
++        let token;
++        try {
++          // 200 was minted as 128 + 64 + 8, so 3 would need a swap and 64 does not.
++          const refused = await mgr!.ops.send
++            .prepare({ mintUrl, amount: testAmount(3), offline: true })
++            .catch((error: unknown) => error as { name?: string; reason?: string });
++          expect((refused as { name?: string }).name).toBe('OfflineSendError');
++          expect((refused as { reason?: string }).reason).toBe('no_exact_match');
++          expect(await getMintSpendableBalance(mgr!, mintUrl, testUnit)).toBe(balanceBefore);
++
++          prepared = await mgr!.ops.send.prepare({
++            mintUrl,
++            amount: testAmount(64),
++            offline: true,
++          });
++          expect(prepared.needsSwap).toBe(false);
++          ({ token } = await mgr!.ops.send.execute(prepared.id));
++        } finally {
++          globalThis.fetch = originalFetch;
++        }
++        expectAmountEquals(
++          expect,
++          token.proofs.reduce((total, proof) => total.add(proof.amount), Amount.zero()),
++          64,
++        );
++
++        // The mint accepts the proofs: they were real, and sending them needed no HTTP request.
++        await mgr!.wallet.receive(token);
++        const refreshed = await mgr!.ops.send.refresh(prepared.id);
++        expect(refreshed.state).toBe('finalized');
++      });
++
+       it('should get operation by ID', async () => {
+         let operationId: string | undefined;
+ 
+diff --git a/packages/core/api/SendOpsApi.ts b/packages/core/api/SendOpsApi.ts
+index 92933e8d..dd7a1043 100644
+--- a/packages/core/api/SendOpsApi.ts
++++ b/packages/core/api/SendOpsApi.ts
+@@ -82,6 +82,7 @@ export class SendOpsApi {
+     );
+     return this.sendOperationService.prepare(initOp, {
+       coverReceiverFees: input.coverReceiverFees,
++      offline: input.offline,
+     });
+   }
+ 
+diff --git a/packages/core/models/Error.ts b/packages/core/models/Error.ts
+index a6429980..6d98c59c 100644
+--- a/packages/core/models/Error.ts
++++ b/packages/core/models/Error.ts
+@@ -47,6 +47,24 @@ export class ProofValidationError extends Error {
+   }
+ }
+ 
++/** Why an offline Send could not be prepared from stored proofs and keysets. */
++export type OfflineSendReason =
++  /** The balance covers the amount, but selection found no stored proofs adding up to it. */
++  | 'no_exact_match'
++  /** `offline` was combined with a send target, `forceSwap` or `coverReceiverFees`. */
++  | 'unsupported_option';
++
++/** An offline Send was refused locally; nothing was reserved and the mint was not contacted. */
++export class OfflineSendError extends Error {
++  constructor(
++    readonly reason: OfflineSendReason,
++    message: string,
++  ) {
++    super(message);
++    this.name = 'OfflineSendError';
++  }
++}
++
+ export class MintQuoteValidationError extends Error {
+   constructor(message: string, cause?: unknown) {
+     super(message);
+diff --git a/packages/core/operations/send/SendOperationService.ts b/packages/core/operations/send/SendOperationService.ts
+index 13fc68e5..6e412655 100644
+--- a/packages/core/operations/send/SendOperationService.ts
++++ b/packages/core/operations/send/SendOperationService.ts
+@@ -68,6 +68,7 @@ import {
+ import {
+   MintOperationError,
+   UnknownMintError,
++  OfflineSendError,
+   ProofValidationError,
+   OperationInProgressError,
+   SendOperationConflictError,
+@@ -147,6 +148,12 @@ export interface PrepareSendOptions {
+    * remains the separate payer-side preparation cost. Applies to unlocked and P2PK sends.
+    */
+   coverReceiverFees?: boolean;
++  /**
++   * Prepare from stored proofs and keysets without a mint request. Succeeds only when stored
++   * proofs add up to the amount as they are; otherwise rejects with `OfflineSendError` and
++   * reserves nothing. Cannot be combined with a send target, `forceSwap` or `coverReceiverFees`.
++   */
++  offline?: boolean;
+ }
+ 
+ /**
+@@ -277,39 +284,59 @@ export class SendOperationService {
+         if (!(await this.mintQueries.isTrustedMint(operation.mintUrl))) {
+           throw new UnknownMintError(`Mint ${operation.mintUrl} is not trusted`);
+         }
+-        const metadata = await this.mintMetadataRefresh.refreshAndCommitIfStale(operation.mintUrl);
+-        const keys = this.activeKeys(metadata, operation.unit);
+-        const seed = await this.loadSeed();
+-        const receiverAmount = options.coverReceiverFees ? operation.amount : undefined;
+-        // P2PK outputs are randomized in preflight. Unlocked Sends defer fee planning until
+-        // authoritative selection determines that existing proofs cannot be sent directly.
+-        const plannedOperation =
+-          receiverAmount && operation.method === 'p2pk'
+-            ? {
+-                ...operation,
+-                amount: feeCoveredSendAmount(
+-                  receiverAmount,
+-                  keys,
+-                  createKeyChain(operation.mintUrl, operation.unit, metadata.keysets),
+-                ),
+-              }
+-            : operation;
+-        const plan = handler.prepare({
+-          operation: plannedOperation,
+-          activeKeys: keys,
+-          mintInfo: metadata.mint.mintInfo,
+-          outputDataCreator: this.outputDataCreator,
+-        });
+-        const updatedAt = Date.now();
+-        result = await this.transactionRunner.run((tx) =>
+-          tx.perform(prepareSend, {
+-            operation: { ...plannedOperation, updatedAt },
++        if (options.offline) {
++          if (
++            operation.method !== 'default' ||
++            ('forceSwap' in operation.methodData && operation.methodData.forceSwap) ||
++            options.coverReceiverFees
++          ) {
++            throw new OfflineSendError(
++              'unsupported_option',
++              'Offline send cannot use a send target, forceSwap or coverReceiverFees',
++            );
++          }
++          // Sending stored proofs as they are creates no outputs, so nothing here needs the mint.
++          const updatedAt = Date.now();
++          result = await this.transactionRunner.run((tx) =>
++            tx.perform(prepareSend, { operation: { ...operation, updatedAt }, offline: true }),
++          );
++        } else {
++          const metadata = await this.mintMetadataRefresh.refreshAndCommitIfStale(
++            operation.mintUrl,
++          );
++          const keys = this.activeKeys(metadata, operation.unit);
++          const seed = await this.loadSeed();
++          const receiverAmount = options.coverReceiverFees ? operation.amount : undefined;
++          // P2PK outputs are randomized in preflight. Unlocked Sends defer fee planning until
++          // authoritative selection determines that existing proofs cannot be sent directly.
++          const plannedOperation =
++            receiverAmount && operation.method === 'p2pk'
++              ? {
++                  ...operation,
++                  amount: feeCoveredSendAmount(
++                    receiverAmount,
++                    keys,
++                    createKeyChain(operation.mintUrl, operation.unit, metadata.keysets),
++                  ),
++                }
++              : operation;
++          const plan = handler.prepare({
++            operation: plannedOperation,
+             activeKeys: keys,
+-            seed,
+-            ...plan,
+-            receiverAmount,
+-          }),
+-        );
++            mintInfo: metadata.mint.mintInfo,
++            outputDataCreator: this.outputDataCreator,
++          });
++          const updatedAt = Date.now();
++          result = await this.transactionRunner.run((tx) =>
++            tx.perform(prepareSend, {
++              operation: { ...plannedOperation, updatedAt },
++              activeKeys: keys,
++              seed,
++              ...plan,
++              receiverAmount,
++            }),
++          );
++        }
+       } finally {
+         releaseMintLock();
+       }
+diff --git a/packages/core/operations/send/SendTransitionTypes.ts b/packages/core/operations/send/SendTransitionTypes.ts
+index 27418bfc..3b078672 100644
+--- a/packages/core/operations/send/SendTransitionTypes.ts
++++ b/packages/core/operations/send/SendTransitionTypes.ts
+@@ -13,6 +13,7 @@ import type {
+ 
+ export interface PrepareSendInput {
+   operation: InitSendOperation;
++  offline?: false;
+   /** Active keys and seed loaded before entering the transaction. */
+   activeKeys: MintKeys;
+   seed: Uint8Array;
+@@ -24,6 +25,12 @@ export interface PrepareSendInput {
+   receiverAmount?: Amount;
+ }
+ 
++/** Stored proofs are sent as they are: no outputs, so no active keys or seed are loaded. */
++export interface OfflineSendInput {
++  operation: InitSendOperation;
++  offline: true;
++}
++
+ export interface PrepareSendResult {
+   operation: PreparedSendOperation;
+   reservation: {
+diff --git a/packages/core/operations/send/SendTransitions.ts b/packages/core/operations/send/SendTransitions.ts
+index 5b4cd5d6..356119f9 100644
+--- a/packages/core/operations/send/SendTransitions.ts
++++ b/packages/core/operations/send/SendTransitions.ts
+@@ -26,6 +26,7 @@ import type {
+   CompletePendingSendResult,
+   CompleteSendReclaimInput,
+   CompleteSendReclaimResult,
++  OfflineSendInput,
+   PrepareSendInput,
+   PrepareSendResult,
+   ApplySendResult,
+@@ -57,7 +58,7 @@ import {
+ } from './SendValidation.ts';
+ 
+ /** Reserve inputs and persist their output allocation and prepared Send together. */
+-export const prepareSend = defineTransition<PrepareSendInput, PrepareSendResult>(
++export const prepareSend = defineTransition<PrepareSendInput | OfflineSendInput, PrepareSendResult>(
+   async (tx, input) => {
+     const operation = input.operation;
+     const existing = await tx.sendOperations.getById(operation.id);
+@@ -74,20 +75,22 @@ export const prepareSend = defineTransition<PrepareSendInput, PrepareSendResult>
+       unit: operation.unit,
+       operationId: operation.id,
+       amount: operation.amount,
+-      forceSwap: input.forceSwap,
+-      receiver: input.receiverAmount
+-        ? {
+-            amount: input.receiverAmount,
+-            swapOutputKeys: input.fixedSendOutputs ? undefined : input.activeKeys,
+-          }
+-        : undefined,
++      forceSwap: !input.offline && input.forceSwap,
++      offline: input.offline,
++      receiver:
++        !input.offline && input.receiverAmount
++          ? {
++              amount: input.receiverAmount,
++              swapOutputKeys: input.fixedSendOutputs ? undefined : input.activeKeys,
++            }
++          : undefined,
+     });
+     const inputAmount = sumProofs(selected.proofs);
+     const inputProofSecrets = selected.proofs.map((proof) => proof.secret);
+ 
+     let outputData: PreparedSendOperation['outputData'];
+     let counterUpdate: PrepareSendResult['counter'];
+-    if (selected.needsSwap) {
++    if (!input.offline && selected.needsSwap) {
+       const allocation = await tx.outputs.allocate({
+         mintUrl: operation.mintUrl,
+         unit: operation.unit,
+@@ -99,11 +102,11 @@ export const prepareSend = defineTransition<PrepareSendInput, PrepareSendResult>
+       });
+       outputData = allocation.outputData;
+       counterUpdate = allocation.counter;
+-    } else {
++    } else if (!input.offline) {
+       await tx.outputs.assertActiveKeys(operation.mintUrl, operation.unit, input.activeKeys);
+     }
+ 
+-    if (input.receiverAmount) {
++    if (!input.offline && input.receiverAmount) {
+       const outgoing = outputData
+         ? outputData.send.map((output) => output.blindedMessage)
+         : selected.proofs;
+diff --git a/packages/core/proofs/ProofSelection.ts b/packages/core/proofs/ProofSelection.ts
+index ba7e066c..56125fc6 100644
+--- a/packages/core/proofs/ProofSelection.ts
++++ b/packages/core/proofs/ProofSelection.ts
+@@ -8,7 +8,7 @@ import {
+   type SelectProofs,
+ } from '@cashu/cashu-ts';
+ import { assertSameUnit, normalizeUnit } from '@core/amounts.ts';
+-import { ProofValidationError } from '@core/models/Error.ts';
++import { OfflineSendError, ProofValidationError } from '@core/models/Error.ts';
+ 
+ /** Receiver net target and, when needed, the keys for planning new swap outputs. */
+ export interface ReceiverFeePolicy {
+@@ -17,8 +17,9 @@ export interface ReceiverFeePolicy {
+   swapOutputKeys?: MintKeys;
+ }
+ 
++/** `offline` selects only proofs that can be sent as they are and never plans a swap. */
+ export function selectProofInputs(
+-  operation: { amount: Amount; unit: string },
++  operation: { amount: Amount; unit: string; offline?: boolean },
+   available: Proof[],
+   keyChain: KeyChain,
+   selectProofs: SelectProofs,
+@@ -32,6 +33,10 @@ export function selectProofInputs(
+   if (sumProofs(available).lessThan(receiver?.amount ?? operation.amount)) {
+     throw new ProofValidationError('Not enough proofs to send');
+   }
++  if (operation.offline) {
++    const proofs = selectStoredProofs(operation.amount, available, keyChain);
++    return { proofs, fee: Amount.zero(), needsSwap: false, sendAmount: operation.amount };
++  }
+ 
+   if (!forceSwap) {
+     const exact = selectProofs(
+@@ -60,6 +65,42 @@ export function selectProofInputs(
+   throw new ProofValidationError('Send amount is not sufficient after fees');
+ }
+ 
++/**
++ * Takes the largest proof that still fits, which finds an exact sum whenever one exists if every
++ * denomination divides the next larger one, as powers of two do. The randomized selector used
++ * online can miss such a sum. Among equal proofs, the one the receiver pays least to redeem
++ * goes first.
++ */
++function selectStoredProofs(amount: Amount, available: Proof[], keyChain: KeyChain): Proof[] {
++  const redemptionFee = (proof: Proof) => {
++    try {
++      return keyChain.getKeyset(proof.id).fee;
++    } catch {
++      // A keyset that is not stored has no known fee, so its proofs go last.
++      return Number.MAX_SAFE_INTEGER;
++    }
++  };
++  const largestFirst = [...available].sort((a, b) =>
++    a.amount.equals(b.amount)
++      ? redemptionFee(a) - redemptionFee(b)
++      : a.amount.greaterThan(b.amount)
++        ? -1
++        : 1,
++  );
++  const selected: Proof[] = [];
++  let remaining = amount;
++  for (const proof of largestFirst) {
++    if (proof.amount.greaterThan(remaining)) continue;
++    selected.push(proof);
++    remaining = remaining.subtract(proof.amount);
++  }
++  if (remaining.isZero()) return selected;
++  throw new OfflineSendError(
++    'no_exact_match',
++    'Offline send requires stored proofs matching the exact amount',
++  );
++}
++
+ export function calculateProofFee(
+   proofs: readonly Pick<Proof, 'id'>[],
+   keyChain: KeyChain,
+diff --git a/packages/core/test/unit/OfflineSend.test.ts b/packages/core/test/unit/OfflineSend.test.ts
+new file mode 100644
+index 00000000..c9c96a14
+--- /dev/null
++++ b/packages/core/test/unit/OfflineSend.test.ts
+@@ -0,0 +1,356 @@
++import { Amount, deriveKeysetId, sumProofs } from '@cashu/cashu-ts';
++import { Database } from 'bun:sqlite';
++import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
++import { mkdtempSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { SqlStorageRepositories } from '../../../sql-storage/src/repositories.ts';
++import { SqliteDb } from '../../../sqlite-bun/src/db.ts';
++import { initializeCoco, type CocoConfig, type Manager } from '../../Manager.ts';
++import type { PrepareSendInput } from '../../api/SendOpsApi.ts';
++import {
++  OfflineSendError,
++  ProofValidationError,
++  type OfflineSendReason,
++} from '../../models/Error.ts';
++import type { Repositories } from '../../repositories/index.ts';
++import { MemoryRepositories } from '../../repositories/memory/MemoryRepositories.ts';
++import { testMintInfo, testMintKeypairs, testMintKeysetId } from '../fixtures/MintMetadata.ts';
++
++const mintUrl = 'https://offline-send.test';
++const disabledRuntime = {
++  requestRateLimit: { disabled: true },
++  watchers: {
++    mintOperationWatcher: { disabled: true },
++    proofStateWatcher: { disabled: true },
++    meltQuoteWatcher: { disabled: true },
++  },
++  processors: {
++    mintOperationProcessor: { disabled: true },
++    meltSettlementProcessor: { disabled: true },
++    mintSwapOperationProcessor: { disabled: true },
++  },
++} satisfies Pick<CocoConfig, 'requestRateLimit' | 'watchers' | 'processors'>;
++
++// Stored proofs stand in for earlier issuance. Assertions use the application API.
++async function seedWallet(
++  repo: Repositories,
++  options: { active?: boolean; unit?: string; feePpk?: number } = {},
++) {
++  const unit = options.unit ?? 'sat';
++  const feePpk = options.feePpk ?? 0;
++  const id = testMintKeysetId(unit, { input_fee_ppk: feePpk });
++  await repo.init();
++  await repo.mintRepository.addNewMint({
++    mintUrl,
++    name: 'Offline send mint',
++    trusted: true,
++    mintInfo: testMintInfo,
++    createdAt: 1,
++    updatedAt: 1,
++  });
++  await repo.keysetRepository.addKeyset({
++    mintUrl,
++    id,
++    unit,
++    keypairs: testMintKeypairs,
++    active: options.active ?? true,
++    feePpk,
++  });
++  await repo.proofRepository.saveProofs(mintUrl, [
++    {
++      mintUrl,
++      id,
++      unit,
++      amount: Amount.from(8),
++      secret: `offline-${unit}`,
++      C: testMintKeypairs['8'],
++      state: 'ready',
++    },
++  ]);
++}
++
++describe('offline sends through the public API', () => {
++  const managers: Manager[] = [];
++  const cleanup: (() => void)[] = [];
++  let originalFetch: typeof fetch;
++
++  beforeEach(() => {
++    originalFetch = globalThis.fetch;
++  });
++
++  afterEach(async () => {
++    for (const manager of managers.splice(0)) await manager.dispose();
++    globalThis.fetch = originalFetch;
++    for (const work of cleanup.splice(0).reverse()) work();
++  });
++
++  async function start(repo: Repositories) {
++    const manager = await initializeCoco({
++      repo,
++      seedGetter: async () => new Uint8Array(64),
++      ...disabledRuntime,
++    });
++    managers.push(manager);
++    return manager;
++  }
++
++  /** The mint is the system boundary: every request fails, as it does without a network. */
++  function blockNetwork() {
++    const fetch = mock(async () => {
++      throw new Error('network is offline');
++    });
++    globalThis.fetch = fetch as unknown as typeof globalThis.fetch;
++    return fetch;
++  }
++
++  it.each(['memory', 'sqlite'] as const)(
++    'prepares and executes from stale stored metadata after restarting offline (%s)',
++    async (adapter) => {
++      let repo: Repositories;
++      let database: Database | undefined;
++      let filename: string | undefined;
++      if (adapter === 'sqlite') {
++        const directory = mkdtempSync(join(tmpdir(), 'coco-offline-'));
++        cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
++        filename = join(directory, 'wallet.sqlite');
++        database = new Database(filename);
++        cleanup.push(() => database?.close());
++        repo = new SqlStorageRepositories({ database: new SqliteDb({ database }) });
++      } else {
++        repo = new MemoryRepositories();
++      }
++      await seedWallet(repo);
++      const first = await start(repo);
++      await first.dispose();
++      if (filename && database) {
++        database.close();
++        database = new Database(filename);
++        repo = new SqlStorageRepositories({ database: new SqliteDb({ database }) });
++      }
++      const fetch = blockNetwork();
++      const manager = await start(repo);
++      expect(fetch).not.toHaveBeenCalled();
++      const prepared = await manager.ops.send.prepare({ mintUrl, amount: 8, offline: true });
++      expect(prepared.needsSwap).toBe(false);
++      expect(prepared.fee).toEqual(Amount.zero());
++      await manager.dispose();
++      const resumed = await start(repo);
++      const result = await resumed.ops.send.execute(prepared.id);
++      expect(result.operation.state).toBe('pending');
++      expect(result.token.proofs.map((proof) => proof.secret)).toEqual(['offline-sat']);
++      expect(result.token.proofs[0]!.amount).toEqual(Amount.from(8));
++      expect(fetch).not.toHaveBeenCalled();
++    },
++  );
++
++  it('sends inactive-keyset proofs without creating outputs or mixing units', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo, { active: false });
++    await seedWallet(repo, { active: false, unit: 'usd' });
++    const fetch = blockNetwork();
++    const manager = await start(repo);
++    const prepared = await manager.ops.send.prepare({
++      mintUrl,
++      amount: 8,
++      unit: 'usd',
++      offline: true,
++    });
++    expect(prepared.outputData).toBeUndefined();
++    const result = await manager.ops.send.execute(prepared);
++    expect(result.token.unit).toBe('usd');
++    expect(result.token.proofs.map((proof) => proof.secret)).toEqual(['offline-usd']);
++    expect((await manager.wallet.balances.byUnit()).sat?.spendable).toEqual(Amount.from(8));
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    { input: { amount: 3 }, reason: 'no_exact_match' },
++    { input: { amount: 8, forceSwap: true }, reason: 'unsupported_option' },
++    { input: { amount: 7, coverReceiverFees: true }, reason: 'unsupported_option' },
++    {
++      input: { amount: 8, target: { type: 'p2pk', pubkey: testMintKeypairs['1'] } },
++      reason: 'unsupported_option',
++    },
++  ] satisfies { input: Partial<PrepareSendInput>; reason: OfflineSendReason }[])(
++    'refuses a send that needs the mint and reserves nothing: %j',
++    async ({ input, reason }) => {
++      const repo = new MemoryRepositories();
++      await seedWallet(repo);
++      const fetch = blockNetwork();
++      const manager = await start(repo);
++      const rejection = await manager.ops.send
++        .prepare({ mintUrl, offline: true, ...input })
++        .catch((error: unknown) => error);
++      expect(rejection).toBeInstanceOf(OfflineSendError);
++      expect((rejection as OfflineSendError).reason).toBe(reason);
++      expect(await manager.ops.send.listPrepared()).toEqual([]);
++      expect((await manager.wallet.balances.byUnit()).sat?.spendable).toEqual(Amount.from(8));
++      const prepared = await manager.ops.send.prepare({ mintUrl, amount: 8, offline: true });
++      await manager.ops.send.cancel(prepared.id);
++      expect((await manager.wallet.balances.byUnit()).sat?.spendable).toEqual(Amount.from(8));
++      expect(fetch).not.toHaveBeenCalled();
++    },
++  );
++
++  it('reports a balance below the amount as it does online', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    const fetch = blockNetwork();
++    const manager = await start(repo);
++    const rejection = await manager.ops.send
++      .prepare({ mintUrl, amount: 9, offline: true })
++      .catch((error: unknown) => error);
++    expect(rejection).toBeInstanceOf(ProofValidationError);
++    expect(rejection).not.toBeInstanceOf(OfflineSendError);
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it('prefers the proof the receiver pays least to redeem among equal amounts', async () => {
++    const repo = new MemoryRepositories();
++    // Three stored 8-unit proofs: keysets charging 1000 ppk and 100 ppk, and one not stored.
++    await seedWallet(repo, { feePpk: 1000 });
++    const cheaperId = testMintKeysetId('sat', { input_fee_ppk: 100 });
++    await repo.keysetRepository.addKeyset({
++      mintUrl,
++      id: cheaperId,
++      unit: 'sat',
++      keypairs: testMintKeypairs,
++      active: false,
++      feePpk: 100,
++    });
++    await repo.proofRepository.saveProofs(mintUrl, [
++      {
++        mintUrl,
++        id: cheaperId,
++        unit: 'sat',
++        amount: Amount.from(8),
++        secret: 'cheaper-to-redeem',
++        C: testMintKeypairs['8'],
++        state: 'ready',
++      },
++      // A proof whose keyset is not stored has no known fee, so it is taken last.
++      {
++        mintUrl,
++        id: '00ffffffffffffff',
++        unit: 'sat',
++        amount: Amount.from(8),
++        secret: 'unknown-keyset',
++        C: testMintKeypairs['8'],
++        state: 'ready',
++      },
++    ]);
++    blockNetwork();
++    const manager = await start(repo);
++    const prepared = await manager.ops.send.prepare({ mintUrl, amount: 8, offline: true });
++    expect(prepared.inputProofSecrets).toEqual(['cheaper-to-redeem']);
++  });
++
++  it('sends a stored proof whose keyset is not stored, as an online exact send does', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    await repo.keysetRepository.deleteKeyset(mintUrl, testMintKeysetId());
++    const fetch = blockNetwork();
++    const manager = await start(repo);
++    const prepared = await manager.ops.send.prepare({ mintUrl, amount: 8, offline: true });
++    const { token } = await manager.ops.send.execute(prepared);
++    expect(token.proofs.map((proof) => proof.secret)).toEqual(['offline-sat']);
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it('refuses without a library error when a stored proof exceeds the safe integer range', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    await repo.proofRepository.saveProofs(mintUrl, [
++      {
++        mintUrl,
++        id: testMintKeysetId(),
++        unit: 'sat',
++        amount: Amount.from('18014398509481984'),
++        secret: 'beyond-safe-integers',
++        C: testMintKeypairs['8'],
++        state: 'ready',
++      },
++    ]);
++    blockNetwork();
++    const manager = await start(repo);
++    const rejection = await manager.ops.send
++      .prepare({ mintUrl, amount: 3, offline: true })
++      .catch((error: unknown) => error);
++    expect(rejection).toBeInstanceOf(OfflineSendError);
++    expect((rejection as OfflineSendError).reason).toBe('no_exact_match');
++    expect(await manager.ops.send.listPrepared()).toEqual([]);
++  });
++
++  it('lets only one of two sessions reserve the same stored proofs', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    const fetch = blockNetwork();
++    const first = await start(repo);
++    const second = await start(repo);
++    const attempts = await Promise.allSettled([
++      first.ops.send.prepare({ mintUrl, amount: 8, offline: true }),
++      second.ops.send.prepare({ mintUrl, amount: 8, offline: true }),
++    ]);
++    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
++    expect((await second.wallet.balances.byUnit()).sat?.spendable).toEqual(Amount.zero());
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it('does not suppress metadata refresh for subsequent online sends', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    const fetch = blockNetwork();
++    const manager = await start(repo);
++    const prepared = await manager.ops.send.prepare({ mintUrl, amount: 8, offline: true });
++    await manager.ops.send.cancel(prepared.id);
++    expect(fetch).not.toHaveBeenCalled();
++    await expect(manager.ops.send.prepare({ mintUrl, amount: 8 })).rejects.toThrow(
++      'Failed to fetch mint',
++    );
++    expect(fetch).toHaveBeenCalled();
++    expect((await manager.wallet.balances.byUnit()).sat?.spendable).toEqual(Amount.from(8));
++  });
++
++  it('finds an exact binary amount even when randomized selection misses it', async () => {
++    const repo = new MemoryRepositories();
++    await seedWallet(repo);
++    await repo.proofRepository.deleteProofs(mintUrl, ['offline-sat']);
++    const amounts = [512, 1, 32, 32, 8, 1, 4, 1, 256, 4, 8, 512];
++    const keypairs = Object.fromEntries(amounts.map((amount) => [amount, testMintKeypairs['1']]));
++    const id = deriveKeysetId(keypairs, { unit: 'sat' });
++    await repo.keysetRepository.addKeyset({
++      mintUrl,
++      id,
++      unit: 'sat',
++      keypairs,
++      active: true,
++      feePpk: 0,
++    });
++    await repo.proofRepository.saveProofs(
++      mintUrl,
++      amounts.map((amount, index) => ({
++        mintUrl,
++        id,
++        unit: 'sat',
++        amount: Amount.from(amount),
++        secret: `selection-${index}`,
++        C: testMintKeypairs['1'],
++        state: 'ready' as const,
++      })),
++    );
++    const fetch = blockNetwork();
++    const manager = await start(repo);
++    // Pins the seed at which the randomized selector misses this sum, so a return to it fails.
++    const random = spyOn(Math, 'random').mockReturnValue(0);
++    try {
++      const prepared = await manager.ops.send.prepare({ mintUrl, amount: 1097, offline: true });
++      const { token } = await manager.ops.send.execute(prepared);
++      expect(sumProofs(token.proofs)).toEqual(Amount.from(1097));
++      expect(new Set(token.proofs.map((proof) => proof.secret)).size).toBe(token.proofs.length);
++      expect(fetch).not.toHaveBeenCalled();
++    } finally {
++      random.mockRestore();
++    }
++  });
++});
+diff --git a/packages/core/transactions/proofs/ScopedProofs.ts b/packages/core/transactions/proofs/ScopedProofs.ts
+index ba4fe46a..a267173b 100644
+--- a/packages/core/transactions/proofs/ScopedProofs.ts
++++ b/packages/core/transactions/proofs/ScopedProofs.ts
+@@ -35,6 +35,8 @@ export interface SelectAndReserveProofsInput {
+   operationId: string;
+   amount: Amount;
+   forceSwap: boolean;
++  /** Select only proofs that can be sent as they are; reject instead of planning a swap. */
++  offline?: boolean;
+   /** Opt-in receiver fee coverage for Payment Requests. */
+   receiver?: ReceiverFeePolicy;
+ }
+diff --git a/packages/docs/pages/send-operations.md b/packages/docs/pages/send-operations.md
+index a682674a..3d43b661 100644
+--- a/packages/docs/pages/send-operations.md
++++ b/packages/docs/pages/send-operations.md
+@@ -124,6 +124,27 @@ const prepared = await coco.ops.send.prepare({
+ Forcing a swap may add an input fee, which is reflected in `prepared.fee`. P2PK sends already swap
+ to create locked outputs, so this option only changes default sends.
+ 
++### Sending Without the Mint
++
++Preparing a send normally refreshes mint metadata that is more than five minutes old, which fails
++when the mint is unreachable. Set `offline` to prepare from stored proofs and keysets instead:
++
++```ts
++const prepared = await coco.ops.send.prepare({ mintUrl, amount: 64, offline: true });
++const { token } = await coco.ops.send.execute(prepared.id);
++```
++
++Preparing makes no mint request and never plans a swap, so it works only when stored proofs add up
++to the amount as they are. Otherwise `prepare` throws `OfflineSendError` and reserves nothing. Its
++`reason` is `no_exact_match`, or `unsupported_option` when `offline` is combined with a send
++target, `forceSwap` or `coverReceiverFees`. Ordinary input, balance and trust validation errors
++are unchanged. When the mint's denominations are powers of two, an exact match is found whenever
++one exists; for other denominations selection can miss one.
++
++Stored proofs are not checked against the mint, so the receiver finds out on redemption whether
++they are still spendable. Reclaiming an executed send still needs the mint, and watchers and
++startup recovery keep making their own requests.
++
+ ### P2PK Sends
+ 
+ Use a P2PK target when the token should be locked to one or more public keys:
+-- 
+2.56.0
+

@@ -14,7 +14,8 @@
  * The exception is ADR 0019: `ops.send.prepare({ offline: true })`, which
  * prepares an exact-match send from stored mint data without contacting the
  * mint. The patch is the compiled output of the coco commit kept in
- * `app/patches/sources/`; see `app/patches/README.coco-offline-send.md`.
+ * `app/patches/sources/coco-core/` (upstream cashubtc/coco#533); see
+ * `app/patches/README.coco-offline-send.md`.
  *
  * This fails if any other patch arrives, or if that one reaches further.
  */
@@ -31,28 +32,54 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
+const COCO_VERSION = '0.0.0-nightly-20261120132306-58abfae';
+const OFFLINE_SEND_PATCH = `@cashu+coco-core+${COCO_VERSION}.patch`;
 const PATCHES_DIR = resolve(__dirname, '..', 'patches');
 
-describe('@cashu/coco-core ships unmodified', () => {
+describe('@cashu/coco-core carries one patch', () => {
   it('found the installed bundle to check', () => {
     expect(bundlePath).toBeTruthy();
   });
 
-  it('has no patch registered against any coco package', () => {
+  it('has only the offline-send patch registered against a coco package', () => {
     const root = JSON.parse(
       readFileSync(resolve(__dirname, '..', '..', 'package.json'), 'utf8')
     ) as { patchedDependencies?: Record<string, string> };
     const patched = Object.entries(root.patchedDependencies ?? {}).filter(([name]) =>
       name.startsWith('@cashu/coco-')
     );
-    expect(patched).toEqual([]);
+    expect(patched).toEqual([
+      [`@cashu/coco-core@${COCO_VERSION}`, `app/patches/${OFFLINE_SEND_PATCH}`],
+    ]);
   });
 
-  it('has no coco patch file waiting to be registered', () => {
+  it('has no other coco patch file waiting to be registered', () => {
     const files = readdirSync(PATCHES_DIR).filter(
       (name) => /coco/i.test(name) && /\.patch$/.test(name)
     );
-    expect(files).toEqual([]);
+    expect(files).toEqual([OFFLINE_SEND_PATCH]);
+  });
+
+  it('changes only the published bundle and its type declarations', () => {
+    const patch = readFileSync(resolve(PATCHES_DIR, OFFLINE_SEND_PATCH), 'utf8');
+    const files = patch
+      .split('\n')
+      .filter((line) => line.startsWith('diff --git '))
+      .map((line) => line.split(' b/')[1]);
+    expect(files.every((file) => /^dist\/[\w.-]+\.(js|d\.ts)$/.test(file ?? ''))).toBe(true);
+    expect(files).toContain('dist/index.js');
+  });
+
+  it('carries the offline prepare option and refuses what has no exact match', () => {
+    expect(bundle).toContain('offline: input.offline');
+    expect(bundle).toContain('function selectStoredProofs(amount, available, keyChain)');
+    expect(bundle).toContain('Offline send requires stored proofs matching the exact amount');
+  });
+
+  it('keeps the online path refreshing stale mint data', () => {
+    expect(bundle).toContain(
+      'await this.mintMetadataRefresh.refreshAndCommitIfStale(operation.mintUrl)'
+    );
   });
 
   it('carries none of the reclaim code the earlier patch added', () => {
