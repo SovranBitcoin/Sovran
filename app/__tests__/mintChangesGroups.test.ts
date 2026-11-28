@@ -2,7 +2,7 @@
  * Grouping per mint (what the detail screen walks) and the flattening back out
  * into one row per update (what the Mints tab lists).
  */
-import { decodeFeed, type RawChange } from '@/features/mint/lib/mintChanges/decode';
+import { decodeFeed, type RawChange } from './helpers/mintChangesFeed';
 import {
   buildMintChangeListItems,
   flattenMintChangeUpdates,

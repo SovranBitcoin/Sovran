@@ -456,15 +456,6 @@ function truncate(text: string, max: number): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }
 
-/**
- * "Sovran added Onchain sending & receiving" — the collapsed row's one line.
- * A revision made entirely of protocol bookkeeping leaves no phrase; the row
- * still exists, so name the thing that did happen.
- */
-export function mintChangeSentence(mintName: string, phrase: MintChangePhrase | undefined): string {
-  return `${mintName} ${phrase?.text ?? 'updated its details'}`;
-}
-
 /** Standalone sentence for the detail screen, where the mint is already named. */
 export function capitalize(text: string): string {
   return text.length > 0 ? text[0]!.toUpperCase() + text.slice(1) : text;

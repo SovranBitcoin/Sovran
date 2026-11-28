@@ -71,8 +71,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/mint/components/RatingBarChart.tsx",
     "features/mint/components/RatingStars.tsx",
     "features/mint/components/distribution/MintDistributionCards.tsx",
-    "features/mint/components/mintChanges/MintChangeRow.tsx",
-    "features/mint/components/mintChanges/NotificationRowPressable.tsx",
+    "features/mint/components/mintChanges/MintChangeGlyph.tsx",
     "features/mint/components/rebalance/RebalanceActionPill.tsx",
     "features/mint/components/rebalance/RebalanceChainCard.tsx",
     "features/mint/components/rebalance/RebalanceStepRow.tsx",
@@ -246,6 +245,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 240,
+  "total": 239,
 }
 `;

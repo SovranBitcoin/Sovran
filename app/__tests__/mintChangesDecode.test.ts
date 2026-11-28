@@ -5,12 +5,8 @@
  * observatory (`src/decode.test.ts`); the copy those labels used to produce is
  * now pinned by `mintChangesPhrases.test.ts`.
  */
-import {
-  decodeFeed,
-  decodePointer,
-  pairPatchOps,
-  type RawFeed,
-} from '@/features/mint/lib/mintChanges/decode';
+import { decodePointer, pairPatchOps } from '@/features/mint/lib/mintChanges/decode';
+import { decodeFeed, type RawFeed } from './helpers/mintChangesFeed';
 
 describe('decodePointer', () => {
   it('names a NUT by its spec title', () => {
