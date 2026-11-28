@@ -621,12 +621,14 @@ describe('Timeline state matrix screen', () => {
       expect(tabs).toContain('locked-send(timed-refund)');
       expect(tabs).toHaveLength(12);
 
-      expect(count()).toBe('18 of 18 distinct states');
-      expect(allByTestId('timeline-matrix-cell-17')).toHaveLength(1);
-      expect(queryByTestId('timeline-matrix-cell-18')).toBeNull();
+      // The title is read with the timeline, so it no longer splits frames
+      // whose rows are the same: one card per appearance.
+      expect(count()).toBe('11 of 11 distinct states');
+      expect(allByTestId('timeline-matrix-cell-10')).toHaveLength(1);
+      expect(queryByTestId('timeline-matrix-cell-11')).toBeNull();
       // The cards are the real timeline card, drawing the fixture's rows.
       const cards = screen.UNSAFE_root.findAllByType(TimelineCardView);
-      expect(cards).toHaveLength(18);
+      expect(cards).toHaveLength(11);
       expect(
         (cards[0].props.timeline as { displayLabel: string }[]).map((step) => step.displayLabel)
       ).toEqual(['Invoice created', 'Waiting for payment']);
@@ -641,11 +643,12 @@ describe('Timeline state matrix screen', () => {
   it('narrows to the states whose title and timeline disagree', () => {
     const view = render(<SettingsDesignSystemTimelineMatrixScreen />, { wrapper: Wrapper });
     try {
+      const total = Number(count().split(' of ')[1].split(' ')[0]);
       pressAndFlush('timeline-matrix-only-disagreements');
       const shown = Number(count().split(' of ')[0]);
-      expect(shown).toBeGreaterThan(0);
-      expect(shown).toBeLessThan(18);
+      // Every disagreement shown is labelled; none is left for this flow.
       expect(allByTestId('timeline-matrix-disagreement')).toHaveLength(shown);
+      expect(count()).toBe(`0 of ${total} distinct states`);
     } finally {
       view.unmount();
     }

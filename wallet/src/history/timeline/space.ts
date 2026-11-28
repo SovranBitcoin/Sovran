@@ -91,14 +91,21 @@ interface TimelineSurfaces {
   cardLabel: string;
   statusHeader: string;
   statusColor: ReturnType<typeof getStatusColorType>;
+  /** The title the detail screen shows: read with the timeline it draws. */
   headerTitle: string;
   headerPhase: string;
   /**
    * Set when the screen title and the timeline tell different stories, as
-   * "title says X, timeline says Y". The title reads only the entry; the
-   * timeline also reads the clock, the quote and the error.
+   * "title says X, timeline says Y".
    */
   disagreement: string | null;
+  /**
+   * The same check for the title read off the entry alone: what a caller
+   * without the timeline shows, and what the screen shows until the timeline
+   * has reported. The entry cannot know the quote's expiry, our explorer's
+   * count or a cancel tap.
+   */
+  entryOnlyDisagreement: string | null;
 }
 
 // The title's phases for each way a timeline can end. An open timeline is
@@ -113,13 +120,8 @@ const TITLE_PHASES: Record<TimelineModel['outcome']['kind'], readonly string[]> 
   empty: [],
 };
 
-export function describeTimelineSurfaces(
-  frame: Pick<TimelineFrame, 'node' | 'model'>,
-  paymentCopy?: PaymentCopyResolver
-): TimelineSurfaces {
-  const { historyEntry, tokenCreated, nostrSent } = frame.node.input;
-  const { steps, outcome } = frame.model;
-  const headerPhase = transactionHeaderPhase(historyEntry);
+function titleDisagreement(phase: string, model: TimelineModel): string | null {
+  const { steps, outcome } = model;
   // A reversed melt with a recorded failure ends in the rolled-back kind, but
   // it is a failed payment, not a cancellation: the row says "Payment failed".
   const paymentFailed = steps.some((step) => step.id === 'payment-failed');
@@ -130,19 +132,34 @@ export function describeTimelineSurfaces(
     : reversing
       ? ['reversing']
       : TITLE_PHASES[outcome.kind];
-  // The title decides a mint invoice's expiry by the device clock, the fixture
+  return expected.length > 0 && !expected.includes(phase)
+    ? `title says ${phase}, timeline says ${outcome.kind}`
+    : null;
+}
+
+export function describeTimelineSurfaces(
+  frame: Pick<TimelineFrame, 'node' | 'model'>,
+  paymentCopy?: PaymentCopyResolver
+): TimelineSurfaces {
+  const { historyEntry, tokenCreated, nostrSent } = frame.node.input;
+  const { model } = frame;
+  const { steps, outcome } = model;
+  const headerPhase = transactionHeaderPhase(historyEntry, model);
+  const entryPhase = transactionHeaderPhase(historyEntry);
+  // The entry decides a mint invoice's expiry by the device clock, the fixture
   // by its own; an open timeline under an "expired" title is that difference.
-  const clockArtefact = headerPhase === 'expired' && outcome.kind === 'pending';
+  const clockArtefact = entryPhase === 'expired' && outcome.kind === 'pending';
   return {
     cardLabel: getCardLabel(historyEntry, steps, tokenCreated, nostrSent, paymentCopy),
     statusHeader: getStatusHeader(steps),
     statusColor: getStatusColorType(steps),
-    headerTitle: transactionHeaderTitle(historyEntry, paymentCopy ? { paymentCopy } : {}),
+    headerTitle: transactionHeaderTitle(historyEntry, {
+      timeline: model,
+      ...(paymentCopy ? { paymentCopy } : {}),
+    }),
     headerPhase,
-    disagreement:
-      expected.length > 0 && !expected.includes(headerPhase) && !clockArtefact
-        ? `title says ${headerPhase}, timeline says ${outcome.kind}`
-        : null,
+    disagreement: titleDisagreement(headerPhase, model),
+    entryOnlyDisagreement: clockArtefact ? null : titleDisagreement(entryPhase, model),
   };
 }
 

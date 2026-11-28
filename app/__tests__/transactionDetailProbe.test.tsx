@@ -7,9 +7,11 @@ import { InteractionManager, Dimensions, Keyboard } from 'react-native';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { QRCodeFrame } from '@/shared/ui/composed/QRCodeFrame';
 import TestRenderer, { act } from 'react-test-renderer';
+import type { TimelineModel } from 'wallet';
 
 import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
+import { useReportTimeline } from '@/features/transactions/components/detail/timeline/timelineReport';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -20,6 +22,7 @@ const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
 const mockNavigateToProfile = jest.fn();
+const mockHeaderTitle = jest.fn((..._args: unknown[]) => 'Sent Lightning');
 jest.mock('@/shared/hooks/useNip05Verification', () => ({
   useNip05Verification: () => ({ state: { status: 'none' }, retry: jest.fn() }),
 }));
@@ -78,7 +81,7 @@ jest.mock('wallet', () => ({
   getCounterparty: () => mockCounterparty,
   // The title resolver is covered by wallet's own unit tests; this probe only
   // needs the shell to get A title so the header renders.
-  transactionHeaderTitle: () => 'Sent Lightning',
+  transactionHeaderTitle: (...args: unknown[]) => mockHeaderTitle(...args),
 }));
 // The shared identity resolver reaches the whole nostr data layer; this probe
 // only cares about the scroll/timeline spine, so it stands in for the answer.
@@ -286,6 +289,49 @@ describe('TransactionDetailShell device probe', () => {
       mockReducedMotion = false;
     }
   );
+
+  it('names the screen from the timeline it draws, once the timeline has reported', () => {
+    const entry = { id: 'melt-1', type: 'melt' as const, amount: 50, unit: 'sat', state: 'UNPAID' };
+    const model: TimelineModel = {
+      steps: [
+        {
+          id: 'expired',
+          rowKey: 'submitted',
+          state: 'expired',
+          displayLabel: 'Quote expired',
+          stepType: 'expired',
+        },
+      ],
+      outcome: { kind: 'expired' },
+      doneRowKeys: [],
+      flow: 'lightning-melt',
+    };
+    function ReportingTimeline() {
+      useReportTimeline(model);
+      return null;
+    }
+    mockHeaderTitle.mockClear();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <TransactionDetailShell
+          screenName="LightningSendScreen"
+          testID="title-follows-timeline"
+          entry={entry as never}
+          footer={null}
+          timeline={<ReportingTimeline />}>
+          <view />
+        </TransactionDetailShell>
+      );
+    });
+    // First paint reads the entry alone; the report then hands over the model.
+    expect(mockHeaderTitle.mock.calls[0][1]).toMatchObject({ timeline: null });
+    expect(mockHeaderTitle).toHaveBeenLastCalledWith(
+      entry,
+      expect.objectContaining({ timeline: model })
+    );
+    act(() => renderer.unmount());
+  });
 
   it('commits the known detail and exact blank QR frame before deferred work or payload resolution', () => {
     mockCounterparty = { pubkey: 'fixture-counterparty' };

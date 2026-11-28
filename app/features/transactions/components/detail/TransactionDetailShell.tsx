@@ -1,11 +1,11 @@
 import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 import { useAppStyle } from '@/shared/styles/appStyle';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, type ScrollView, type View as NativeView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { transactionHeaderTitle, type SpendingConditions } from 'wallet';
+import { transactionHeaderTitle, type SpendingConditions, type TimelineModel } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -18,6 +18,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HistoryEntryHeader } from '@/features/transactions/components/detail/HistoryEntryHeader';
 import { HistoryEntryRefresh } from '@/features/transactions/components/detail/HistoryEntryRefresh';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
+import { TimelineReportContext } from '@/features/transactions/components/detail/timeline/timelineReport';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import {
   transactionIdentitySnapshot,
@@ -140,8 +141,16 @@ export function TransactionDetailShell({
   // One phrase names the screen and the person: the collapsed bar shows the
   // icon and this title beneath it, so "Paid Alex" must not become "Alex" on
   // the way into the header.
+  // The timeline below has read more than the entry (the quote's expiry, our
+  // explorer's count, a cancel tap); the title follows what it drew. Until it
+  // reports, and on screens without one, the entry alone decides.
+  const [timelineModel, setTimelineModel] = useState<TimelineModel | null>(null);
   const title =
-    headerTitle ?? transactionHeaderTitle(entry, { counterpartyName: namedIdentity?.name });
+    headerTitle ??
+    transactionHeaderTitle(entry, {
+      counterpartyName: namedIdentity?.name,
+      timeline: timelineModel,
+    });
   const identity = namedIdentity ? { ...namedIdentity, name: title } : undefined;
   const morph = useIdentityHeader({ identity, title, collapseAt: 48 });
   useScreenOptions(
@@ -248,11 +257,13 @@ export function TransactionDetailShell({
               collapsable={false}
               onLayout={focusTimeline}
               testID="transaction-timeline-anchor">
-              {entry
-                ? (timeline ?? (
-                    <HistoryEntryTimeline historyEntry={entry} cancelling={cancelling} />
-                  ))
-                : timeline}
+              <TimelineReportContext.Provider value={setTimelineModel}>
+                {entry
+                  ? (timeline ?? (
+                      <HistoryEntryTimeline historyEntry={entry} cancelling={cancelling} />
+                    ))
+                  : timeline}
+              </TimelineReportContext.Provider>
             </View>
           )}
           {entry && counterpartyPubkey ? (

@@ -47,6 +47,7 @@ import { Log, paymentLog } from '@/shared/lib/logger';
 import { ExpiryCountdown, getExpiryBadgeText } from './ExpiryCountdown';
 import { TimelineRow, timelineStepTypeToCheckpointStatus } from './TimelineRow';
 import { connectorType, rowDelays } from './timelineTheme';
+import { useReportTimeline } from './timelineReport';
 
 interface HistoryEntryTimelineProps {
   /** Local action feedback only; history remains the authority for the outcome. */
@@ -268,6 +269,8 @@ export function HistoryEntryTimeline({
     setDrawn({ entryId, flow: model.flow, rowKeys: model.doneRowKeys });
   }
   if (model.recheckAt !== recheckAt) setRecheckAt(model.recheckAt);
+  // The screen title reads this same model, so the two tell one story.
+  useReportTimeline(model);
   const timeline = model.steps;
 
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
