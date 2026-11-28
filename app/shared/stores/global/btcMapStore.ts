@@ -3,13 +3,13 @@ import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 import {
-  type BtcMapPlace,
+  BtcMapPlace,
   type BtcMapPlaceDetails as BtcMapPlaceDetailsBase,
   BtcMapPlaceDetails as BtcMapPlaceDetailsSchema,
-  BtcMapPlacesResponse,
   parseWith,
 } from '@sovranbitcoin/schemas';
-import { fetchJson } from '@/shared/lib/apiClient';
+import { err, ok, type Result } from 'neverthrow';
+import { ApiParseError, fetchJson } from '@/shared/lib/apiClient';
 import { type RequestControls } from 'wallet';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { createFileCacheStorage } from '@/shared/lib/persist/fileCacheStorage';
@@ -56,8 +56,8 @@ interface PlaceDetailsCache {
   };
 }
 
-/** 1 hour — places don't change frequently */
-const PLACES_CACHE_TTL_MS = 60 * 60 * 1000;
+/** 24 hours: places change slowly, and each refetch parses ~30k rows. */
+const PLACES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** 24 hours for individual place details */
 const PLACE_DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -127,7 +127,52 @@ function isCacheExpired(timestampMs: number, ttlMs: number, nowMs: number): bool
 }
 
 // Shared schemas tolerate new upstream fields; detail parsing preserves osm:*.
-const parsePlaces = parseWith(BtcMapPlacesResponse, 'app/btcmap/places');
+// The places list is checked as an envelope here (the same 200k cap as
+// `BtcMapPlacesResponse`) and its rows in chunks below.
+const PLACES_WHERE = 'app/btcmap/places';
+const parsePlacesEnvelope = parseWith(z.array(z.unknown()).max(200_000), PLACES_WHERE);
+const PlaceRows = z.array(BtcMapPlace);
+/** Rows parsed per JS-thread turn: a few ms each, instead of one 2–3 s block. */
+const PLACES_PARSE_CHUNK = 2_000;
+
+/**
+ * Parse every row exactly as `BtcMapPlacesResponse` does, yielding to the JS
+ * thread between chunks so animations and touches keep running.
+ */
+async function parsePlacesInChunks(rows: unknown[]): Promise<Result<BtcMapPlace[], Error>> {
+  const places: BtcMapPlace[] = [];
+  for (let start = 0; start < rows.length; start += PLACES_PARSE_CHUNK) {
+    if (start > 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const parsed = PlaceRows.safeParse(rows.slice(start, start + PLACES_PARSE_CHUNK));
+    if (!parsed.success) {
+      const error = new ApiParseError({
+        type: 'schema/zod',
+        where: PLACES_WHERE,
+        issues: parsed.error.issues.map((issue) => ({
+          ...issue,
+          path: [start + Number(issue.path[0]), ...issue.path.slice(1)],
+        })),
+      });
+      storeLog.warn('store.btc_map.fetch_places.parse_failed', { issues: error.issues });
+      return err(error);
+    }
+    for (const place of parsed.data) places.push(place);
+  }
+  return ok(places);
+}
+
+/** Same rows in the same order: a refetch that changed nothing keeps the old array. */
+function samePlaces(a: readonly BtcMapPlace[], b: readonly BtcMapPlace[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index++) {
+    const before = a[index] as Record<string, unknown>;
+    const after = b[index] as Record<string, unknown>;
+    const keys = Object.keys(after);
+    if (keys.length !== Object.keys(before).length) return false;
+    for (const key of keys) if (before[key] !== after[key]) return false;
+  }
+  return true;
+}
 const parsePlaceDetails = parseWith(BtcMapPlaceDetailsSchema, 'app/btcmap/places/:id');
 
 interface BTCMapState {
@@ -227,13 +272,16 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
         set({ isLoading: true, error: null });
 
         const run = async (): Promise<BtcMapPlace[]> => {
-          const result = await fetchJson(
+          const envelope = await fetchJson(
             BTCMAP_PLACES_URL,
-            parsePlaces,
-            'app/btcmap/places',
+            parsePlacesEnvelope,
+            PLACES_WHERE,
             undefined,
             controls
           );
+          const result = envelope.isOk()
+            ? await parsePlacesInChunks(envelope.value)
+            : err(envelope.error);
 
           // reset() ran while the request was in flight — drop the result
           // rather than re-populating storage that was just cleared.
@@ -259,7 +307,8 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
             throw result.error;
           }
 
-          const data = result.value as BtcMapPlace[];
+          const previous = get().placesCache?.data;
+          const data = previous && samePlaces(previous, result.value) ? previous : result.value;
           storeLog.info('store.btc_map.fetch_places.success', {
             count: data.length,
             duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
@@ -370,6 +419,8 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
       storage: createFileCacheStorage(),
       // A cache of public map data: a bad blob is simply replaced.
       preserveUnreadable: false,
+      // Loading and error flips must not reserialise and rewrite the 2 MB file.
+      skipUnchangedSaves: true,
       schema: PersistedBtcMapStore,
       logKey: 'btc_map',
       partialize: (state) => ({

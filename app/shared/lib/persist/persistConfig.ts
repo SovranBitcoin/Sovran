@@ -5,6 +5,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   createJSONStorage,
   type PersistOptions,
+  type PersistStorage,
   type StateStorage,
   type StorageValue,
 } from 'zustand/middleware';
@@ -80,6 +81,8 @@ interface PersistConfigOptions<TFull, TPartial> {
    * person cannot get back any other way. See `recoverUnreadable`.
    */
   recoverUnreadable?: UnreadableRecovery<TFull, TPartial>;
+  /** Skip saves that change only unpersisted state (a loading flag). Not with `recoverUnreadable`. */
+  skipUnchangedSaves?: boolean;
 }
 
 interface UnreadableRecovery<TFull, TPartial> {
@@ -99,6 +102,32 @@ interface UnreadableRecovery<TFull, TPartial> {
    * Recovery stops if it changes while a read or save is under way.
    */
   owner: () => string | undefined;
+}
+
+/** Drop a save whose top-level persisted fields are the same objects as the last save's. */
+function skipUnchangedSaves<T>(storage: PersistStorage<T>): PersistStorage<T> {
+  let last: StorageValue<T> | null = null;
+  const same = (a: StorageValue<T>, b: StorageValue<T>) => {
+    const [x, y] = [a.state, b.state] as Record<string, unknown>[];
+    const keys = Object.keys(y);
+    return (
+      a.version === b.version &&
+      keys.length === Object.keys(x).length &&
+      keys.every((key) => key in x && Object.is(x[key], y[key]))
+    );
+  };
+  return {
+    getItem: (name) => ((last = null), storage.getItem(name)),
+    removeItem: (name) => ((last = null), storage.removeItem(name)),
+    setItem: async (name, value) => {
+      if (last && same(last, value)) return;
+      last = value;
+      await Promise.resolve(storage.setItem(name, value)).catch((error: unknown) => {
+        if (last === value) last = null;
+        throw error;
+      });
+    },
+  };
 }
 
 /**
@@ -318,7 +347,7 @@ export function persistConfig<TFull, TPartial>(
   const jsonStorage = createJSONStorage<TPartial>(() => guard?.storage ?? reported);
   return {
     name: opts.name,
-    storage: jsonStorage,
+    storage: opts.skipUnchangedSaves && jsonStorage ? skipUnchangedSaves(jsonStorage) : jsonStorage,
     version,
     partialize: opts.partialize,
     migrate,
