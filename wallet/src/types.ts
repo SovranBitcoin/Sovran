@@ -70,6 +70,19 @@ export interface PaymentRequestInfo {
    * when it locks to a key. Null when the request carries no P2PK lock.
    */
   lockP2pkPubkey?: string | null;
+  /**
+   * NUT-18 `sm`: the payee only takes ecash from a mint that can melt by one
+   * of these. Absent when the request names none. See
+   * `supportedMethodsRefusal` for what a payer owes them.
+   */
+  supportedMethods?: PaymentRequestSupportedMethod[];
+}
+
+/** One NUT-18 `SupportedMethod`: `mn`, and `mf` (0 when omitted). */
+export interface PaymentRequestSupportedMethod {
+  method: string;
+  /** Extra fee in the request unit for a payment the payee must melt out of. */
+  fee: number;
 }
 
 export interface PaymentRequestTransport {

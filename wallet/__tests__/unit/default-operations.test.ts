@@ -646,7 +646,16 @@ describe("executePaymentRequest — HTTP transport", () => {
 describe("executePaymentRequest — inband fallback", () => {
   it("executes through paymentRequests API when no explicit transport matches", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
-    const mockManager = createMockManager();
+    // What Coco's `execute` resolves with for a request without a transport.
+    const mockManager = createMockManager({
+      paymentRequests: {
+        execute: vi.fn().mockResolvedValue({
+          type: "inband",
+          token: { mint: MINT1, unit: "sat", proofs: [] },
+          operation: { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 },
+        }),
+      },
+    });
 
     mockGetPRInfo.mockReturnValue({
       mints: [MINT1],
@@ -1978,5 +1987,288 @@ describe("rollbackSend", () => {
       reason: "notInvalidated",
     });
     expect(stateListeners.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No transport — the token exists only in the payer's wallet
+// ---------------------------------------------------------------------------
+
+describe("executePaymentRequest — request without a transport", () => {
+  // nutshell `cashu request` and cocod emit these: the payee expects the
+  // token handed over in person (cashubtc/nutshell cashu/wallet/cli/cli.py,
+  // coco PaymentRequestService.execute `inband`).
+  it("returns the created token for the payer to hand over", async () => {
+    const sendNostrDM = vi.fn();
+    const token = {
+      mint: MINT1,
+      unit: "sat",
+      proofs: [{ id: "proof-1", amount: Amount.from(100), C: "abc", secret: "def" }],
+    };
+    const operation = { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 };
+    const execute = vi.fn().mockResolvedValue({ type: "inband", token, operation });
+    const mockManager = createMockManager({ paymentRequests: { execute } });
+    mockGetPRInfo.mockReturnValue({ mints: [MINT1], amount: 100, unit: "sat" });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqInband",
+      amount: 100,
+      unit: "sat",
+    });
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+    expect(result.handOver).toBe(true);
+    const entry = JSON.parse(result.historyEntry);
+    expect(entry.type).toBe("send");
+    expect(entry.token.proofs).toHaveLength(1);
+    // Not reported as delivered over a transport it never used.
+    expect(entry.metadata?.transportType).toBeUndefined();
+    expect(entry.metadata?.phase).toBeUndefined();
+  });
+
+  it("keeps reporting an HTTP request as delivered, with no token to hand over", async () => {
+    const mockManager = createMockManager({
+      paymentRequests: { execute: vi.fn().mockResolvedValue({ type: "http" }) },
+    });
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "post", target: "https://receiver.example.com/pay" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqHTTP",
+      amount: 100,
+      unit: "sat",
+    });
+    expect(result.handOver).toBeUndefined();
+    expect(JSON.parse(result.historyEntry).metadata.transportType).toBe("http");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NFC write-back for a request that locks the ecash
+// ---------------------------------------------------------------------------
+
+describe("executeNfcSend — request with a NUT-10 lock", () => {
+  const key = `02${"a".repeat(64)}`;
+  const token = {
+    mint: MINT1,
+    unit: "sat",
+    proofs: [{ id: "00aa", amount: Amount.from(100), C: `02${"b".repeat(64)}`, secret: "s" }],
+  };
+  const operation = { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 };
+  const locked = (transports: unknown[] = []) =>
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      hasSpendingCondition: true,
+      lockP2pkPubkey: key,
+      transports,
+    });
+
+  it("creates the token through Coco's payment-request send, which applies the lock", async () => {
+    const parsed = { id: "parsed", spendingCondition: { kind: "P2PK" } };
+    const transaction = { sendOperation: { id: "op-1" } };
+    const manager = createMockManager({
+      paymentRequests: {
+        parse: vi.fn().mockResolvedValue(parsed),
+        prepare: vi.fn().mockResolvedValue(transaction),
+        execute: vi.fn().mockResolvedValue({ type: "inband", token, operation }),
+      },
+    });
+    locked();
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+
+    const result = await ops.executeNfcSend!({
+      mintUrl: MINT1,
+      amount: 100,
+      unit: "sat",
+      paymentRequest: "creqLocked",
+    });
+
+    expect(manager.paymentRequests.parse).toHaveBeenCalledWith("creqLocked");
+    expect(manager.paymentRequests.prepare).toHaveBeenCalledWith(parsed, { mintUrl: MINT1, amount: 100 });
+    expect(manager.paymentRequests.execute).toHaveBeenCalledWith(transaction);
+    // The plain send, which knows no lock, is never used.
+    expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(result.operationId).toBe("op-1");
+    expect(result.token).toBe(getEncodedToken(token as never));
+  });
+
+  it.each(["unsupported", "malformed"])(
+    "refuses a %s condition before reserving any ecash",
+    async (kind) => {
+      const manager = createMockManager({
+        paymentRequests: {
+          parse: vi.fn().mockResolvedValue({ spendingCondition: { kind } }),
+          prepare: vi.fn(),
+          execute: vi.fn(),
+        },
+      });
+      locked();
+      const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+      await expect(
+        ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat", paymentRequest: "creqLocked" }),
+      ).rejects.toThrow("This request requires locked ecash this wallet cannot create yet.");
+      expect(manager.paymentRequests.prepare).not.toHaveBeenCalled();
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    },
+  );
+
+  // Coco would POST the token instead of returning it for the tag.
+  it("refuses a locked request that names a transport before reserving any ecash", async () => {
+    const manager = createMockManager();
+    locked([{ type: "post", target: "https://payee.example/pay" }]);
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await expect(
+      ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat", paymentRequest: "creqLocked" }),
+    ).rejects.toThrow("This request requires locked ecash this wallet cannot create yet.");
+    expect(manager.paymentRequests.parse).not.toHaveBeenCalled();
+    expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+  });
+
+  it("takes the prepared send back when the token cannot be created", async () => {
+    const cancel = vi.fn();
+    const manager = createMockManager({
+      ops: { send: { get: vi.fn().mockResolvedValue({ id: "op-1", state: "prepared" }), cancel } },
+      paymentRequests: {
+        parse: vi.fn().mockResolvedValue({ spendingCondition: { kind: "P2PK" } }),
+        prepare: vi.fn().mockResolvedValue({ sendOperation: { id: "op-1" } }),
+        execute: vi.fn().mockRejectedValue(new Error("mint down")),
+      },
+    });
+    locked();
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await expect(
+      ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat", paymentRequest: "creqLocked" }),
+    ).rejects.toThrow("mint down");
+    expect(cancel).toHaveBeenCalledWith("op-1");
+  });
+
+  it("keeps the plain send for a request without a lock", async () => {
+    const manager = createMockManager({
+      ops: {
+        send: {
+          prepare: vi.fn().mockResolvedValue({ id: "prepared-send-1" }),
+          execute: vi.fn().mockResolvedValue({ operation, token }),
+        },
+      },
+    });
+    mockGetPRInfo.mockReturnValue({ mints: [MINT1], amount: 100, unit: "sat" });
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat" });
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({ mintUrl: MINT1, amount: 100, unit: "sat" });
+    expect(manager.paymentRequests.parse).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NUT-18 supported methods (`sm`): honoured, or refused before any ecash moves
+// ---------------------------------------------------------------------------
+
+describe("payment request supported methods", () => {
+  // cashubtc/nuts tests/18-tests.md: Preferred Mint List with Supported Methods.
+  const SM_REQUEST =
+    "creqApmFpdXByZWZlcnJlZF9mZWVfbWV0aG9kc2FhGGRhdWNzYXRhbYF4GGh0dHBzOi8vbWludC5leGFtcGxlLmNvbWJtcPVic22CoWJtbmZib2x0MTGiYm1uZmJvbHQxMmJtZgU=";
+  const info = (mints: string[]) => ({
+    requestId: "preferred_fee_methods",
+    mints,
+    mintsPreferred: true,
+    amount: 100,
+    unit: "sat",
+    supportedMethods: [
+      { method: "bolt11", fee: 0 },
+      { method: "bolt12", fee: 5 },
+    ],
+  });
+  const melts = (...methods: string[]) => ({
+    getMintInfo: vi.fn().mockResolvedValue({
+      nuts: { "5": { methods: methods.map((method) => ({ method, unit: "sat" })) } },
+    }),
+  });
+  const inband = {
+    execute: vi.fn().mockResolvedValue({
+      type: "inband",
+      token: { mint: MINT1, unit: "sat", proofs: [] },
+      operation: { id: "op-1", createdAt: 1, mintUrl: MINT1, amount: 100 },
+    }),
+  };
+
+  it("pays from a listed mint that melts by a listed method, giving Coco the request without `sm`", async () => {
+    const manager = createMockManager({ mint: melts("bolt11"), paymentRequests: inband });
+    mockGetPRInfo.mockReturnValue(info([MINT1]));
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: SM_REQUEST, amount: 100, unit: "sat" });
+
+    const given = manager.paymentRequests.parse.mock.calls[0][0] as string;
+    expect(given).not.toBe(SM_REQUEST);
+    // The patched SDK decodes it: the methods are gone, the rest is intact.
+    expect(decodePaymentRequest(given).id).toBe("preferred_fee_methods");
+    expect(decodePaymentRequest(given).amount?.toNumber()).toBe(100);
+  });
+
+  it.each([
+    ["cannot melt by any listed method", [MINT1], ["onchain"], /pay out by bolt11 or bolt12/],
+    ["is outside the list and owes a method fee", ["https://other.example"], ["bolt12"], /extra fee/],
+  ] as const)(
+    "refuses a mint that %s before preparing or delivering",
+    async (_name, mints, methods, message) => {
+      const sendNostrDM = vi.fn();
+      const manager = createMockManager({ mint: melts(...methods) });
+      mockGetPRInfo.mockReturnValue({
+        ...info([...mints]),
+        transports: [{ type: "nostr", target: "nprofile1abc" }],
+      });
+      const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager, sendNostrDM });
+
+      await expect(
+        ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: SM_REQUEST, amount: 100, unit: "sat" }),
+      ).rejects.toThrow(message);
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+      expect(manager.paymentRequests.prepare).not.toHaveBeenCalled();
+      expect(sendNostrDM).not.toHaveBeenCalled();
+      // The NFC paths apply the same rule.
+      expect(
+        await ops.paymentRequestPayabilityFrom!({ mintUrl: MINT1, unit: "sat", paymentRequest: SM_REQUEST }),
+      ).toEqual({ payable: false, reason: expect.stringMatching(message) });
+      await expect(
+        ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat", paymentRequest: SM_REQUEST }),
+      ).rejects.toThrow(message);
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses when the mint's methods cannot be read", async () => {
+    const manager = createMockManager({
+      mint: { getMintInfo: vi.fn().mockRejectedValue(new Error("offline")) },
+    });
+    mockGetPRInfo.mockReturnValue(info([MINT1]));
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: SM_REQUEST, amount: 100, unit: "sat" }),
+    ).rejects.toThrow(/pay out by/);
+    expect(manager.paymentRequests.prepare).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing of the mint for a request without supported methods", async () => {
+    const manager = createMockManager({ paymentRequests: inband });
+    mockGetPRInfo.mockReturnValue({ mints: [MINT1], amount: 100, unit: "sat" });
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqInband", amount: 100, unit: "sat" });
+    expect(manager.mint.getMintInfo).not.toHaveBeenCalled();
+    expect(manager.paymentRequests.parse).toHaveBeenCalledWith("creqInband");
   });
 });

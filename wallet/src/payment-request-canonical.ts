@@ -13,7 +13,7 @@
 const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-function base64UrlDecode(input: string): Uint8Array | null {
+export function base64UrlDecode(input: string): Uint8Array | null {
   const body = input.replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
   if (body.length % 4 === 1) return null;
   const out: number[] = [];
@@ -32,7 +32,7 @@ function base64UrlDecode(input: string): Uint8Array | null {
   return Uint8Array.from(out);
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
+export function base64UrlEncode(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const n = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
@@ -48,7 +48,7 @@ const CBOR_UNDEFINED = 0xf7;
 class UnsupportedCbor extends Error {}
 
 /** Header of the item at `at`: major type, argument, and header length. */
-function header(bytes: Uint8Array, at: number) {
+export function cborHeader(bytes: Uint8Array, at: number) {
   const initial = bytes[at];
   if (initial === undefined) throw new UnsupportedCbor("truncated");
   const major = initial >> 5;
@@ -62,7 +62,7 @@ function header(bytes: Uint8Array, at: number) {
   return { major, arg, size: 1 + width };
 }
 
-function encodeHeader(major: number, arg: number): number[] {
+export function encodeCborHeader(major: number, arg: number): number[] {
   const m = major << 5;
   if (arg < 24) return [m | arg];
   if (arg < 0x100) return [m | 24, arg];
@@ -72,7 +72,7 @@ function encodeHeader(major: number, arg: number): number[] {
 
 /** Copy one CBOR item, dropping map entries whose value is null/undefined. */
 function copyItem(bytes: Uint8Array, at: number, out: number[]): number {
-  const { major, arg, size } = header(bytes, at);
+  const { major, arg, size } = cborHeader(bytes, at);
   if (major === 2 || major === 3) {
     const end = at + size + arg;
     if (end > bytes.length) throw new UnsupportedCbor("truncated");
@@ -80,7 +80,7 @@ function copyItem(bytes: Uint8Array, at: number, out: number[]): number {
     return end;
   }
   if (major === 4) {
-    out.push(...encodeHeader(4, arg));
+    out.push(...encodeCborHeader(4, arg));
     let next = at + size;
     for (let i = 0; i < arg; i++) next = copyItem(bytes, next, out);
     return next;
@@ -98,7 +98,7 @@ function copyItem(bytes: Uint8Array, at: number, out: number[]): number {
       entries.push(...entry);
       kept++;
     }
-    out.push(...encodeHeader(5, kept), ...entries);
+    out.push(...encodeCborHeader(5, kept), ...entries);
     return next;
   }
   if (major === 6) {
@@ -108,6 +108,24 @@ function copyItem(bytes: Uint8Array, at: number, out: number[]): number {
   // Integers, simple values and floats are wholly inside their header.
   out.push(...bytes.subarray(at, at + size));
   return at + size;
+}
+
+/** Where the CBOR item at `at` ends. Throws on CBOR this cannot walk. */
+export function cborItemEnd(bytes: Uint8Array, at: number): number {
+  const { major, arg, size } = cborHeader(bytes, at);
+  if (major === 2 || major === 3) {
+    if (at + size + arg > bytes.length) throw new UnsupportedCbor("truncated");
+    return at + size + arg;
+  }
+  let next = at + size;
+  if (major === 4) {
+    for (let i = 0; i < arg; i++) next = cborItemEnd(bytes, next);
+  } else if (major === 5) {
+    for (let i = 0; i < arg * 2; i++) next = cborItemEnd(bytes, next);
+  } else if (major === 6) {
+    next = cborItemEnd(bytes, next);
+  }
+  return next;
 }
 
 /**

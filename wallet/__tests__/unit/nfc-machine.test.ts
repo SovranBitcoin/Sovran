@@ -3,6 +3,8 @@ import { createTestMachine } from "../_harness/createTestMachine";
 import { INPUTS, MINT1, MINT2, WALLETS } from "../_harness/fixtures";
 import type { MachineOperations } from "../../src/machine/types";
 import type { WalletContext, PaymentRequestInfo } from "../../src/types";
+import { PaymentRequestUndeliveredError } from "../../src/errors";
+import { NUT00_V4_TOKEN } from "../_harness/tokenVectors";
 
 const accepted = "https://mint1.example.com";
 const other = "https://mint2.example.com";
@@ -19,6 +21,9 @@ function setup({
   contextLags = false,
   satBalances = { [accepted]: 500, [other]: 1000, [third]: 2000 },
   unitSwitchTakes = true,
+  transports,
+  lockP2pkPubkey,
+  supportedMethods,
   operations = {},
 }: {
   unit?: string;
@@ -33,6 +38,10 @@ function setup({
   satBalances?: Record<string, number>;
   /** Whether the host's unit actually changes when asked to. */
   unitSwitchTakes?: boolean;
+  /** The transports the request offers; none means the tag takes the token. */
+  transports?: PaymentRequestInfo["transports"];
+  lockP2pkPubkey?: string;
+  supportedMethods?: PaymentRequestInfo["supportedMethods"];
   operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
@@ -42,6 +51,9 @@ function setup({
     mints,
     mintsPreferred,
     hasSpendingCondition,
+    ...(transports ? { transports } : {}),
+    ...(lockP2pkPubkey ? { lockP2pkPubkey } : {}),
+    ...(supportedMethods ? { supportedMethods } : {}),
   };
   const unitBalances: Record<string, Record<string, number>> = {
     sat: satBalances,
@@ -265,10 +277,15 @@ describe("NFC terminal unit and mints", () => {
     expect(tm.handlerCalls).toHaveLength(handled);
     expect(tm.machine.inspect().isExecuting).toBe(false);
   });
-  it("rejects amountless requests before switching units", async () => {
+  // The wallet's unit is not switched for an amount nobody has entered yet:
+  // the request is turned down for its unit, with the way to pay it.
+  it("turns down an amountless request in another unit without switching units", async () => {
     const { tm, switchUnit } = setup({ unit: "usd", amount: null });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertError({ code: "NFC_READ_FAILED" });
+    tm.assertError({
+      code: "UNSUPPORTED_PAYMENT_METHOD",
+      message: expect.stringMatching(/denominated in usd/),
+    });
     expect(sentMint(tm)).toBeUndefined();
     expect(switchUnit).not.toHaveBeenCalled();
   });
@@ -996,5 +1013,301 @@ describe("an NFC read the machine is too busy to take", () => {
 
     expect(tap.adapter.releaseSession).not.toHaveBeenCalled();
     await done();
+  });
+});
+
+// minibits emulates a read-only tag (minibits_wallet src/screens/Wallet/
+// QRCode.tsx:250-254 `writable: false`) whose request carries a nostr
+// transport, the one its own NFC payer uses (src/screens/NfcPayScreen.tsx:769).
+// A request that names a transport is paid over it; the tag is only written
+// when the request names none.
+describe("an NFC request that offers a nostr transport", () => {
+  const nostr = [{ type: "nostr", target: "nprofile1payee" }];
+  const calls = (tm: ReturnType<typeof createTestMachine>, name: string) =>
+    tm.operationCalls.filter((call) => call.name === name).length;
+  /** Every way a token could leave the wallet for this tap. */
+  const tokensOut = (
+    tm: ReturnType<typeof createTestMachine>,
+    adapter: ReturnType<typeof setup>["adapter"],
+  ) => ({
+    overTransport: calls(tm, "executePaymentRequest"),
+    forTheTag: calls(tm, "executeNfcSend"),
+    written: adapter.writeToken.mock.calls.length,
+  });
+
+  it("pays over the transport and never writes to the tag", async () => {
+    const { tm, adapter } = setup({ transports: nostr });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    expect(tm.operationCalls.find((c) => c.name === "executePaymentRequest")?.args).toEqual([
+      expect.objectContaining({ mintUrl: accepted, amount: 50, unit: "sat" }),
+    ]);
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "settled" } });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+    expect(tm.notificationCalls.filter((c) => c.key === "onPaymentConfirmed")).toHaveLength(1);
+  });
+
+  it("lets go of the tag before the network send", async () => {
+    const order: string[] = [];
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          order.push("send");
+          return { historyEntry: JSON.stringify({ id: "pr-1", type: "send", state: "pending" }) };
+        },
+      },
+    });
+    adapter.releaseSession.mockImplementation(async () => {
+      order.push("release");
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(order).toEqual(["release", "send"]);
+  });
+
+  it("keeps the terminal's unit once it paid", async () => {
+    const { tm, switchUnit } = setup({ unit: "usd", transports: nostr });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("navigateToPaymentRequest");
+    expect(switchUnit.mock.calls.map(([unit]) => unit)).toEqual(["usd"]);
+  });
+
+  it("is not sent again by Pay, the mint list, a mint or an amount", async () => {
+    for (const again of [
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.confirmPaymentRequest(),
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.requestMintSelector(),
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.changeMint(accepted),
+      (tm: ReturnType<typeof createTestMachine>) =>
+        tm.machine.enterAmount({ value: 50, unit: "sat" }, accepted),
+    ]) {
+      const { tm, adapter } = setup({ transports: nostr });
+      await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+      await again(tm);
+      await tm.machine.confirmPaymentRequest();
+      expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    }
+  });
+
+  // The operation took the ecash back itself (its own rollback, unchanged):
+  // the tag is not tried as a second way to deliver.
+  it("does not fall back to the tag when delivery fails and the ecash is taken back", async () => {
+    const { tm, adapter, switchUnit } = setup({
+      unit: "usd",
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => ({
+          historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "rolledBack" }),
+          rolledBack: true,
+          errorMessage: "relay refused",
+        }),
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    expect(tm.notificationCalls).toContainEqual({
+      key: "onPaymentFailed",
+      data: expect.objectContaining({ variant: "paymentRequest", rolledBack: true }),
+    });
+    // Nothing went out: the preview still waits for Pay.
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "preview" } });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(switchUnit.mock.calls.map(([unit]) => unit)).toEqual(["usd", "sat"]);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
+
+  it("does not fall back to the tag when the send fails before any ecash exists", async () => {
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          throw new Error("mint unreachable");
+        },
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "preview" } });
+  });
+
+  // Delivery failed and the ecash could not be taken back: it may be out, so
+  // neither the tag nor a second Pay sends another token.
+  it("offers nothing more when the ecash is out and could not be taken back", async () => {
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          throw new PaymentRequestUndeliveredError("op-1", new Error("relay refused"));
+        },
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({
+      phase: { kind: "undelivered", operationId: "op-1" },
+    });
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
+    await tm.machine.changeMint(accepted);
+    await tm.machine.confirmPaymentRequest();
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+  });
+
+  it("still writes the token to the tag for a request without a transport", async () => {
+    const { tm, adapter } = setup({ transports: [] });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 0, forTheTag: 1, written: 1 });
+  });
+
+  // Coco POSTs a bare token, not the NUT-18 payload: the tag keeps being
+  // written for these, as before, until the POST body is right.
+  it("still writes the token to the tag when the only transport is HTTP POST", async () => {
+    const { tm, adapter } = setup({
+      transports: [{ type: "post", target: "https://payee.example/pay" }],
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 0, forTheTag: 1, written: 1 });
+  });
+});
+
+// macadamia (Wallet/RequestView.swift:367,381, amount optional) and
+// cashu-wallet (Core/PaymentRequestBuilder.kt:18-25, `a: null`) put requests
+// without an amount on their tags. The payer is asked for it on the existing
+// amount step; the tag is let go, and the flow carries on from the screen.
+describe("an NFC request without an amount", () => {
+  it("asks the payer for the amount instead of failing", async () => {
+    const { tm, adapter } = setup({ amount: null });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("enterAmount");
+    expect(tm.handlerCalls.at(-1)).toMatchObject({ step: "enterAmount" });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
+
+  it("continues to the request preview once the amount is entered, and pays once", async () => {
+    const { tm, adapter } = setup({ amount: null });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    await tm.machine.enterAmount({ value: 21, unit: "sat" }, accepted);
+
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({
+      amount: 21,
+      mintUrl: accepted,
+      phase: { kind: "preview" },
+    });
+    // Entering the amount is not a tap: nothing is sent until Pay.
+    expect(tm.operationCalls.filter((c) => c.name === "executePaymentRequest")).toHaveLength(0);
+
+    await tm.machine.confirmPaymentRequest();
+    await tm.machine.confirmPaymentRequest();
+    expect(tm.operationCalls.filter((c) => c.name === "executePaymentRequest")).toHaveLength(1);
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+  });
+
+  it("still fails a tag that is not an ecash request and has no amount", async () => {
+    const { tm } = setup();
+    await tm.machine.scan!(INPUTS.lightningAddress, { source: "nfc" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
+  });
+});
+
+// macadamia can lock its NFC request to a key (Wallet/RequestView.swift:
+// 370-377). The token written to the tag must carry the request's NUT-10
+// option, so the operation is told which request it answers.
+describe("an NFC request locked to a P2PK key", () => {
+  const key = `02${"a".repeat(64)}`;
+
+  it("writes back a token made for the request's lock", async () => {
+    const { tm, adapter } = setup({ hasSpendingCondition: true, lockP2pkPubkey: key });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([
+      { mintUrl: accepted, amount: 50, unit: "sat", paymentRequest: expect.stringMatching(/^creqA/) },
+    ]);
+    expect(adapter.writeToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not name the request for an unlocked one", async () => {
+    const { tm } = setup();
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "sat" }]);
+  });
+
+  it("says a condition that is not a P2PK lock cannot be paid yet", async () => {
+    const { tm, adapter } = setup({ hasSpendingCondition: true });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertError({
+      code: "UNSUPPORTED_PAYMENT_METHOD",
+      message: "This request requires locked ecash this wallet cannot create yet.",
+    });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+  });
+});
+
+// A tag can hold a token instead of a request (cashu.me writes them, as text
+// or as a binary record the NFC layer turns into text). It is received like
+// a scanned token, and the tag is let go.
+describe("an NFC tag that holds an ecash token", () => {
+  it("opens the receive step and lets the tag go", async () => {
+    const adapter = {
+      readPaymentRequest: vi.fn(async () => NUT00_V4_TOKEN),
+      writeToken: vi.fn(async () => {}),
+      releaseSession: vi.fn(async () => {}),
+      isAvailable: vi.fn(async () => true),
+    };
+    const tm = createTestMachine({ nfcAdapter: adapter });
+    await tm.machine.scan!(NUT00_V4_TOKEN, { source: "nfc" });
+
+    tm.assertStep("receiveToken");
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: "receiveToken",
+      data: { token: NUT00_V4_TOKEN },
+    });
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// NUT-18 `sm`: the operations decide whether a mint meets the request's
+// supported methods, so a tap tells them which request it is paying.
+describe("an NFC request that names supported methods", () => {
+  const supportedMethods = [{ method: "bolt11", fee: 0 }];
+
+  it("asks the gate and the send about that request", async () => {
+    const { tm } = setup({ supportedMethods });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    const request = expect.stringMatching(/^creqA/);
+    expect(
+      tm.operationCalls.find((c) => c.name === "paymentRequestPayabilityFrom")?.args,
+    ).toEqual([{ mintUrl: accepted, unit: "sat", paymentRequest: request }]);
+    expect(sentMint(tm)?.args).toEqual([
+      { mintUrl: accepted, amount: 50, unit: "sat", paymentRequest: request },
+    ]);
+  });
+
+  it("skips a mint the methods rule out and says why when none is left", async () => {
+    const reason = "This request only accepts ecash from a mint that can pay out by bolt11. Choose another mint.";
+    const { tm, adapter } = setup({
+      supportedMethods,
+      operations: { paymentRequestPayabilityFrom: async () => ({ payable: false, reason }) },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertError({ code: "PAYMENT_REQUEST_FAILED", message: reason });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
   });
 });

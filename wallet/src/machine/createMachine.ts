@@ -11,6 +11,7 @@ import {
   isMintOfflineError,
   PaymentRequestUndeliveredError,
   MeltOutcomeUnknownError,
+  LOCKED_REQUEST_UNSUPPORTED,
 } from "../errors";
 import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
@@ -972,6 +973,36 @@ export function createPaymentMachine(
   }
 
   /**
+   * The request, for the operations that must meet its NUT-18 supported
+   * methods; nothing for a request that names none.
+   */
+  function methodConstraint(
+    paymentRequest: string | undefined,
+  ): { paymentRequest: string } | undefined {
+    return paymentRequest &&
+      detectors.getPaymentRequestInfo(paymentRequest)?.supportedMethods?.length
+      ? { paymentRequest }
+      : undefined;
+  }
+
+  /**
+   * Whether a tapped request is paid over its own transport instead of by
+   * writing the token back to the tag: it is when it offers nostr and no
+   * HTTP POST, the one case `executePaymentRequest` sends as a NIP-17 DM.
+   * NUT-18: a request without a transport is answered in band, here the tag.
+   */
+  function nfcPaysOverTransport(
+    data: StepDataMap["navigateToPaymentRequest"],
+  ): boolean {
+    const transports =
+      detectors.getPaymentRequestInfo(data.paymentRequest)?.transports ?? [];
+    return (
+      transports.some((transport) => transport.type === "nostr") &&
+      !transports.some((transport) => transport.type === "post")
+    );
+  }
+
+  /**
    * An NFC tap's payment went out, or may have: its flow is over, and the
    * context keeps nothing (request, intent, amount, mint) that choosing a
    * mint or an amount could rebuild a preview from for Pay to send again.
@@ -1376,8 +1407,11 @@ export function createPaymentMachine(
           // Normal success path
           logger.info("machine.paymentRequest.success", {
             ...mintUrlFields(data.mintUrl),
+            handOver: effect.value.kind === "handOver",
           });
-          settleConfirm({ kind: "delivered" });
+          settleConfirm({
+            kind: effect.value.kind === "handOver" ? "handOver" : "delivered",
+          });
           setStep(effect.value.step, effect.value.data);
           announcePayment(effect.value);
         }
@@ -1479,17 +1513,18 @@ export function createPaymentMachine(
         if (info) {
           const requestedUnit = (info.unit ?? "sat").trim().toLowerCase();
           const amount = info.amount;
-          if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+          if (info.hasSpendingCondition && !info.lockP2pkPubkey) {
+            // Not a P2PK lock (an HTLC, an unknown kind, a malformed key):
+            // no send can build it. A P2PK lock is left to the send, which
+            // applies the request's own NUT-10 option or refuses.
             nfcError = {
               code: "UNSUPPORTED_PAYMENT_METHOD",
-              message:
-                "This request requires locked ecash, which NFC payments do not support yet.",
+              message: LOCKED_REQUEST_UNSUPPORTED,
             };
           } else if (!isValidSatAmount(amount)) {
-            nfcError = {
-              code: "NFC_READ_FAILED",
-              message: "Payment request must include an amount for NFC payment",
-            };
+            // No amount on the tag: the flow below asks the payer for one.
+            // The unit is not switched for an amount nobody has entered; a
+            // request in another unit is turned down for its unit.
           } else if (requestedUnit !== unit.trim().toLowerCase()) {
             const funded = walletCtx.trustedMintUrls.some(
               (mintUrl) =>
@@ -1838,6 +1873,7 @@ export function createPaymentMachine(
                   ? await operations.paymentRequestPayabilityFrom({
                       mintUrl: candidate.mintUrl,
                       unit: flowCtx.unit,
+                      ...methodConstraint(flowCtx.paymentRequest),
                     })
                   : { payable: true as const };
                 // Overtaken: the tap's end lets go of the tag and the unit.
@@ -1913,18 +1949,29 @@ export function createPaymentMachine(
                   }
                 : { kind: "stopped" };
             } else if (step === "enterAmount") {
-              // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
-              end = {
-                kind: "stopped",
-                error: {
-                  code: "NFC_READ_FAILED",
-                  message:
-                    "Payment request must include an amount for NFC payment",
-                },
-              };
+              // An ecash request without an amount (macadamia, cashu-wallet):
+              // the tag is let go and the payer enters it on the amount
+              // screen, then pays from the preview like a scanned request.
+              // Anything else that needs an amount stays a failed read.
+              end =
+                flowCtx.paymentRequest && !flowCtx.meltTarget
+                  ? { kind: "stopped" }
+                  : {
+                      kind: "stopped",
+                      error: {
+                        code: "NFC_READ_FAILED",
+                        message:
+                          "Payment request must include an amount for NFC payment",
+                      },
+                    };
             } else if (
               step === "navigateToPaymentRequest" &&
-              operations?.executeNfcSend
+              operations &&
+              (nfcPaysOverTransport(
+                stepData as StepDataMap["navigateToPaymentRequest"],
+              )
+                ? operations.executePaymentRequest
+                : operations.executeNfcSend)
             ) {
               const data = stepData as StepDataMap["navigateToPaymentRequest"];
               // The resolver picks a mint without a picker when one is the
@@ -1942,6 +1989,7 @@ export function createPaymentMachine(
                   await operations.paymentRequestPayabilityFrom({
                     mintUrl: data.mintUrl,
                     unit: data.unit,
+                    ...methodConstraint(data.paymentRequest),
                   });
                 // Overtaken: the tap's end lets go of the tag and the unit.
                 if (stale("nfc.payability")) {
@@ -1958,6 +2006,108 @@ export function createPaymentMachine(
                   continue;
                 }
               }
+              if (
+                nfcPaysOverTransport(data) &&
+                operations.executePaymentRequest
+              ) {
+                // The request names a transport the payee listens on: the
+                // token goes there, once, and nothing is written to the tag
+                // (minibits' tag is read-only). The tag is let go first, so a
+                // slow relay never holds the phone to the terminal. What the
+                // send does with the ecash when delivery fails is its own
+                // rollback, the same as for a scanned request.
+                await releaseNfcSession(nfcTap).catch((error: unknown) => {
+                  logger.warn("machine.nfc.release.failed", {
+                    error: errField(error),
+                  });
+                });
+                setExecuting(true);
+                tell("onNfcPaymentProgress", () =>
+                  notifications?.onNfcPaymentProgress?.({ phase: "creating" }),
+                );
+                logger.info("machine.nfc.payOverTransport.start", {
+                  ...mintUrlFields(data.mintUrl),
+                  amount: data.amount,
+                });
+                beginCommit(sendGeneration);
+                let sent: Awaited<
+                  ReturnType<typeof runConfirmPaymentRequestEffect>
+                >;
+                try {
+                  sent = await runConfirmPaymentRequestEffect({
+                    data,
+                    operation: operations.executePaymentRequest,
+                    context: flowCtx,
+                    isStale: stale,
+                  });
+                } finally {
+                  endCommit(sendGeneration);
+                }
+
+                if (sent.isOk()) {
+                  if (sent.value.kind === "stale") {
+                    // Overtaken: the flow that overtook it owns the machine.
+                    end = { kind: "stopped" };
+                    continue;
+                  }
+                  if (sent.value.kind === "rolledBack") {
+                    logger.warn("machine.nfc.payOverTransport.rolledBack", {
+                      ...mintUrlFields(data.mintUrl),
+                    });
+                    // The ecash is back: the preview stays for Pay to retry.
+                    routeOperationFailure(
+                      sent.value.cause,
+                      "paymentRequest",
+                      data.paymentRequest,
+                      data,
+                      { rolledBack: true },
+                    );
+                    end = { kind: "stopped" };
+                  } else {
+                    logger.info("machine.nfc.payOverTransport.success", {
+                      ...mintUrlFields(data.mintUrl),
+                    });
+                    setStep(sent.value.step, sent.value.data);
+                    forgetNfcPayment();
+                    announcePayment(sent.value);
+                    end = { kind: "paid" };
+                  }
+                } else {
+                  const cause = sent.error.cause;
+                  const undelivered =
+                    cause instanceof PaymentRequestUndeliveredError;
+                  logger.warn("machine.nfc.payOverTransport.failed", {
+                    undelivered,
+                    error: errField(cause),
+                  });
+                  if (undelivered) {
+                    // The ecash may be out: final, like a scanned request's.
+                    setStep("navigateToPaymentRequest", {
+                      ...data,
+                      phase: {
+                        kind: "undelivered",
+                        operationId: cause.operationId,
+                      },
+                    });
+                    forgetNfcPayment();
+                  }
+                  routeOperationFailure(
+                    cause,
+                    "paymentRequest",
+                    data.paymentRequest,
+                    data,
+                    { undelivered },
+                  );
+                  end = { kind: "stopped" };
+                }
+
+                setExecuting(false, false);
+                continue;
+              }
+              if (!operations.executeNfcSend) {
+                end = { kind: "stopped" };
+                continue;
+              }
               // Auto-execute: create token → write back to NFC tag
               setExecuting(true);
 
@@ -1968,6 +2118,9 @@ export function createPaymentMachine(
                   data,
                   executeNfcSend: operations.executeNfcSend,
                   rollbackSend: operations.rollbackSend,
+                  constrainedRequest:
+                    !!flowCtx.paymentRequestLockPubkey ||
+                    !!methodConstraint(data.paymentRequest),
                   nfcAdapter: {
                     writeToken: (token) => writeNfcToken(nfcTap, token),
                     releaseSession: () => releaseNfcSession(nfcTap),

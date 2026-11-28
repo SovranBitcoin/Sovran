@@ -68,6 +68,7 @@ type PaymentRequestOperationResult = {
   historyEntry: string;
   rolledBack?: boolean;
   errorMessage?: string;
+  handOver?: boolean;
 };
 type ConfirmSendEffectPath = 'localFirst' | 'online' | 'offlineFallback';
 type ConfirmSendContextPatch = Partial<
@@ -164,6 +165,14 @@ type ConfirmPaymentRequestEffectSuccess =
       kind: 'completed';
       step: 'navigateToPaymentRequest';
       data: StepDataMap['navigateToPaymentRequest'];
+      links: MachineEffectLink[];
+      notifications: MachineEffectNotification[];
+    }
+  | {
+      /** No transport took the ecash: its token is shown to hand over. */
+      kind: 'handOver';
+      step: 'sendComplete';
+      data: StepDataMap['sendComplete'];
       links: MachineEffectLink[];
       notifications: MachineEffectNotification[];
     }
@@ -352,6 +361,11 @@ interface RunNfcWriteBackEffectConfig {
   data: StepDataMap['navigateToPaymentRequest'];
   executeNfcSend: NonNullable<MachineOperations['executeNfcSend']>;
   rollbackSend?: MachineOperations['rollbackSend'];
+  /**
+   * The request constrains the payment (a NUT-10 lock, NUT-18 supported
+   * methods): the send is told which request it answers.
+   */
+  constrainedRequest?: boolean;
   nfcAdapter: Pick<NfcIOAdapter, 'writeToken' | 'releaseSession'> & {
     ownsSession?: () => boolean;
   };
@@ -640,6 +654,7 @@ function buildConfirmPaymentRequestResult(
   context: FlowContext,
 ): ConfirmPaymentRequestEffectSuccess {
   const parsed = parseHistoryEntryOnce(result.historyEntry);
+  const variant = result.handOver ? 'send' : 'paymentRequest';
   const links: MachineEffectLink[] = parsed?.id
     ? [
         {
@@ -653,7 +668,7 @@ function buildConfirmPaymentRequestResult(
     {
       type: 'onPaymentConfirmed',
       data: {
-        variant: 'paymentRequest',
+        variant,
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
@@ -687,6 +702,20 @@ function buildConfirmPaymentRequestResult(
     notifications: summarizeNotifications(notifications),
     context: summarizeContext(context),
   });
+
+  if (result.handOver) {
+    return {
+      kind: 'handOver',
+      step: 'sendComplete',
+      data: {
+        historyEntry: result.historyEntry,
+        recipientPubkey: context.recipientPubkey,
+        recipientProfile: context.recipientProfile,
+      },
+      links,
+      notifications,
+    };
+  }
 
   return {
     kind: 'completed',
@@ -1651,6 +1680,7 @@ export function runNfcWriteBackEffect({
   data,
   executeNfcSend,
   rollbackSend,
+  constrainedRequest = false,
   nfcAdapter,
   context,
   onProgress,
@@ -1724,6 +1754,9 @@ export function runNfcWriteBackEffect({
           mintUrl: data.mintUrl,
           amount: data.amount,
           unit: data.unit,
+          ...(constrainedRequest
+            ? { paymentRequest: data.paymentRequest }
+            : {}),
         });
         logger.info('effects.nfcWriteBack.tokenCreated', {
           operationIdPresent: nfcSendResult.operationId.length > 0,

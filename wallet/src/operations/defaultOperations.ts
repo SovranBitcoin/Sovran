@@ -57,6 +57,7 @@ import {
   AuthoredError,
   MeltUserCancelledError,
   MeltOutcomeUnknownError,
+  LOCKED_REQUEST_UNSUPPORTED,
   PaymentRequestUndeliveredError,
   UnitRateUnavailableError,
 } from "../errors";
@@ -64,9 +65,14 @@ import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, requireAmount, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
 import {
+  sdkPaymentRequest,
+  supportedMethodsRefusal,
+} from "../payment-request";
+import {
   compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
+  meltMethodNamesFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
 import { normalizeMintUrl } from "../transport/plan";
@@ -480,7 +486,7 @@ async function sendEntryWithToken(
   mgr: Manager,
   operation: SendOperationLike,
   token: CoreToken,
-  logPrefix: "executeSend" | "executeOfflineSend",
+  logPrefix: "executeSend" | "executeOfflineSend" | "executePaymentRequest",
 ): Promise<{ historyEntry: string }> {
   const historyEntry = await findSendHistoryEntryByOperationId(
     mgr,
@@ -538,6 +544,118 @@ async function attemptRollback(
       error: errField(e),
     });
     return false;
+  }
+}
+
+type RequestInfo = NonNullable<
+  ReturnType<typeof defaultDetectors.getPaymentRequestInfo>
+>;
+
+/**
+ * NUT-18 `sm`: the ecash must come from a mint that melts the request unit by
+ * a listed method, and a mint outside the request's list owes a method fee
+ * this wallet cannot add. Refused here, before any ecash is reserved; a mint
+ * whose methods cannot be read is one that meets none.
+ */
+async function assertSupportedMethodsHonoured(
+  mgr: Manager,
+  info: RequestInfo,
+  mintUrl: string,
+  unit: string,
+): Promise<void> {
+  if (!info.supportedMethods?.length) return;
+  const meltMethods = await mgr.mint
+    .getMintInfo(mintUrl)
+    .then((mintInfo) => meltMethodNamesFromInfo(mintInfo, unit))
+    .catch((error: unknown) => {
+      logger.warn("operations.paymentRequest.methods.mintInfoFailed", {
+        ...mintUrlFields(mintUrl),
+        error: errField(error),
+      });
+      return [];
+    });
+  const refusal = supportedMethodsRefusal(info, mintUrl, meltMethods);
+  if (refusal) {
+    logger.warn("operations.paymentRequest.methods.refused", {
+      ...mintUrlFields(mintUrl),
+      requested: info.supportedMethods.map(({ method }) => method),
+      meltMethods,
+    });
+    throw new AuthoredError(refusal);
+  }
+}
+
+/** The request as Coco's payment-request API takes it. */
+function requestForCoco(paymentRequest: string, info: RequestInfo): string {
+  // Coco decodes with the SDK, which refuses supported methods; they were
+  // checked by `assertSupportedMethodsHonoured` and are left out of its copy.
+  const sdkReadable = sdkPaymentRequest(paymentRequest);
+  if (!info.mintsPreferred) return sdkReadable;
+  // Coco 2.0.0 treats every m list as strict. Remove only the advisory
+  // list in its input copy; the original request remains the flow identity.
+  const sdkRequest = decodePaymentRequest(sdkReadable);
+  sdkRequest.mints = undefined;
+  return sdkRequest.toEncodedRequest();
+}
+
+/**
+ * The token for a request that locks the ecash and names no transport, to be
+ * handed over in band (written to its NFC tag). Coco's payment-request send
+ * builds the lock from the request's own NUT-10 option: key, further keys,
+ * locktime, refund keys, signature counts, flag and any other tag
+ * (`PaymentRequest.toP2PKOptions`), and requires NUT-11 of the mint. Anything
+ * it cannot build is refused before ecash is reserved.
+ */
+async function createLockedRequestToken(
+  mgr: Manager,
+  input: {
+    paymentRequest: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  },
+): Promise<Awaited<ReturnType<Manager["ops"]["send"]["execute"]>>> {
+  const { paymentRequest, mintUrl, amount, unit } = input;
+  const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
+  if (!info) throw new AuthoredError("Invalid payment request");
+  if ((info.unit ?? "sat").trim().toLowerCase() !== unit.trim().toLowerCase()) {
+    throw new AuthoredError(
+      `Payment request unit (${info.unit}) does not match the wallet unit (${unit})`,
+    );
+  }
+  // With a transport Coco would send the token there instead of returning it.
+  if (info.transports?.length) {
+    throw new AuthoredError(LOCKED_REQUEST_UNSUPPORTED);
+  }
+  const parsed = await mgr.paymentRequests.parse(
+    requestForCoco(paymentRequest, info),
+  );
+  if (parsed.spendingCondition?.kind !== "P2PK") {
+    logger.warn("operations.executeNfcSend.lockUnsupported", {
+      kind: parsed.spendingCondition?.kind ?? "none",
+    });
+    throw new AuthoredError(LOCKED_REQUEST_UNSUPPORTED);
+  }
+  const transaction = await mgr.paymentRequests.prepare(parsed, {
+    mintUrl,
+    amount,
+  });
+  const operationId = transaction.sendOperation.id;
+  logger.info("operations.executeNfcSend.lockedPrepared", { operationId });
+  try {
+    const executed = await mgr.paymentRequests.execute(transaction);
+    if (executed.type !== "inband") {
+      throw new Error("Locked request was not created for hand-over");
+    }
+    return { operation: executed.operation, token: executed.token };
+  } catch (error) {
+    logger.warn("operations.executeNfcSend.lockedExecuteFailed", {
+      operationId,
+      error: errField(error),
+    });
+    // Nothing has been handed over: take the send back like any other.
+    await attemptRollback(mgr, operationId);
+    throw error;
   }
 }
 
@@ -1170,10 +1288,14 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
-    paymentRequestPayabilityFrom: async ({ mintUrl, unit }) => {
+    paymentRequestPayabilityFrom: async ({ mintUrl, unit, paymentRequest }) => {
       const mgr = requireManager();
       try {
         await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+        const info = paymentRequest
+          ? defaultDetectors.getPaymentRequestInfo(paymentRequest)
+          : null;
+        if (info) await assertSupportedMethodsHonoured(mgr, info, mintUrl, unit);
         return { payable: true };
       } catch (error) {
         return {
@@ -1186,21 +1308,45 @@ export function createDefaultOperations(
       }
     },
 
-    executeNfcSend: async ({ mintUrl, amount, unit = "sat" }) => {
+    executeNfcSend: async ({ mintUrl, amount, unit = "sat", paymentRequest }) => {
       const mgr = requireManager();
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
       logger.info("operations.executeNfcSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
+        forConstrainedRequest: !!paymentRequest,
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount, unit });
-      logger.info("operations.executeNfcSend.prepared", {
-        operationId: prepared.id,
-        needsSwap: !!prepared.needsSwap,
-      });
-      const { operation, token } = await executeSendWithRescue(mgr, prepared, {
-        logPrefix: "executeNfcSend",
-      });
+      const requestInfo = paymentRequest
+        ? defaultDetectors.getPaymentRequestInfo(paymentRequest)
+        : null;
+      if (paymentRequest && !requestInfo) {
+        throw new AuthoredError("Invalid payment request");
+      }
+      if (requestInfo) {
+        await assertSupportedMethodsHonoured(mgr, requestInfo, mintUrl, unit);
+      }
+      const { operation, token } = paymentRequest &&
+      (requestInfo?.hasSpendingCondition || requestInfo?.lockP2pkPubkey)
+        ? await createLockedRequestToken(mgr, {
+            paymentRequest,
+            mintUrl,
+            amount,
+            unit,
+          })
+        : await (async () => {
+            const prepared = await mgr.ops.send.prepare({
+              mintUrl,
+              amount,
+              unit,
+            });
+            logger.info("operations.executeNfcSend.prepared", {
+              operationId: prepared.id,
+              needsSwap: !!prepared.needsSwap,
+            });
+            return executeSendWithRescue(mgr, prepared, {
+              logPrefix: "executeNfcSend",
+            });
+          })();
       logger.info("operations.executeNfcSend.tokenCreated", {
         operationId: operation.id,
         state: operation.state,
@@ -1836,14 +1982,19 @@ export function createDefaultOperations(
       }
 
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+      await assertSupportedMethodsHonoured(mgr, info, mintUrl, unit);
 
       let operationId: string;
+      let handOver: Extract<
+        Awaited<ReturnType<Manager["paymentRequests"]["execute"]>>,
+        { type: "inband" }
+      > | null = null;
 
       if (nostrTransport && !httpTransport) {
         // Sovran creates plain permanent P2PK requests. Reject conditions we
         // cannot preserve rather than silently stripping their tags.
         const nut10 = info.lockP2pkPubkey
-          ? decodePaymentRequest(paymentRequest).nut10
+          ? decodePaymentRequest(sdkPaymentRequest(paymentRequest)).nut10
           : undefined;
         const lock =
           nut10?.kind === "P2PK" && !nut10.tags?.length
@@ -1995,15 +2146,9 @@ export function createDefaultOperations(
           transport: "http",
         });
         // HTTP / transport-less payment request: use the paymentRequests API
-        let requestForCoco = paymentRequest;
-        if (info.mintsPreferred) {
-          // Coco 2.0.0 treats every m list as strict. Remove only the advisory
-          // list in its input copy; the original request remains the flow identity.
-          const sdkRequest = decodePaymentRequest(paymentRequest);
-          sdkRequest.mints = undefined;
-          requestForCoco = sdkRequest.toEncodedRequest();
-        }
-        const parsed = await mgr.paymentRequests.parse(requestForCoco);
+        const parsed = await mgr.paymentRequests.parse(
+          requestForCoco(paymentRequest, info),
+        );
         logger.info("operations.executePaymentRequest.http.parsed", {
           ...mintUrlFields(mintUrl),
           amount,
@@ -2023,10 +2168,13 @@ export function createDefaultOperations(
           if (mockFailEnabled("paymentRequest")) {
             throw new Error("Mock delivery failure (dev)");
           }
-          await mgr.paymentRequests.execute(transaction);
+          const executed = await mgr.paymentRequests.execute(transaction);
           logger.info("operations.executePaymentRequest.http.executed", {
             operationId,
           });
+          if (!httpTransport && executed.type === "inband") {
+            handOver = executed;
+          }
         } catch (deliveryErr) {
           logger.warn("operations.executePaymentRequest.http.deliveryFailed", {
             operationId,
@@ -2050,6 +2198,34 @@ export function createDefaultOperations(
           }
           throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
+      }
+
+      // No transport at all: Coco created the token and sent it nowhere. It
+      // is the payer's to hand over, so it goes back with the send instead of
+      // being dropped behind a "delivered" payment. The ecash is out of the
+      // balance by now, so a history read that fails must not hide the token.
+      if (handOver) {
+        const { operation, token } = handOver;
+        logger.info("operations.executePaymentRequest.handOver", {
+          operationId,
+        });
+        const entry = await sendEntryWithToken(
+          mgr,
+          operation,
+          token,
+          "executePaymentRequest",
+        ).catch((err: unknown) => {
+          logger.warn("operations.executePaymentRequest.historyLookupFailed", {
+            operationId,
+            error: errField(err),
+          });
+          return {
+            historyEntry: JSON.stringify(
+              buildSyntheticSendEntry(operation, token),
+            ),
+          };
+        });
+        return { ...entry, handOver: true };
       }
 
       // The payment is delivered by now. A history read that fails must not

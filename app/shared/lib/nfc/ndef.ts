@@ -3,6 +3,8 @@
  */
 
 import { utf8ToBytes } from '@noble/hashes/utils.js';
+import { ecashTokenTextFromBinary } from 'wallet';
+
 import { NfcError } from './errors';
 import { NDEF_TEXT_LANG, SHORT_RECORD_FLAG } from './constants';
 import { nfcLog } from '../logger';
@@ -194,7 +196,8 @@ function parseFirstRecord(ndef: number[]): NdefRecord {
  * - Text RTD (`T`): the NFC Forum text record, UTF-8 or UTF-16.
  * - URI RTD (`U`): identifier-code prefix expanded, so `cashu:…`,
  *   `bitcoin:?creq=…` and `https://…` all come back as the full string.
- * - MIME (TNF 2) and NFC-external (TNF 4) records: payload as UTF-8.
+ * - MIME (TNF 2) and NFC-external (TNF 4) records: payload as UTF-8, or,
+ *   when it is a binary ecash token (`crawB`), that token in its text form.
  *
  * Anything else raises `UNSUPPORTED_RECORD` with the type in the message.
  */
@@ -225,6 +228,12 @@ export function decodeNdefText(ndef: number[]): string {
     return uri;
   }
   if (record.tnf === TNF_MIME || record.tnf === TNF_EXTERNAL) {
+    // cashu.me and cashu-wallet write a token as raw bytes (`crawB`).
+    const token = ecashTokenTextFromBinary(record.payload);
+    if (token !== null) {
+      nfcLog.debug('nfc.ndef.decoded', { kind: 'binary-token', type: typeText });
+      return token;
+    }
     const text = new TextDecoder().decode(Uint8Array.from(record.payload));
     nfcLog.debug('nfc.ndef.decoded', {
       kind: record.tnf === TNF_MIME ? 'mime' : 'external',

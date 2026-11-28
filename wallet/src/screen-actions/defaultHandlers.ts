@@ -625,6 +625,13 @@ export function createDefaultScreenActionHandlers(
           return;
         }
 
+        // The machine moved on to the token screen: this preview is behind
+        // it and has nothing to report.
+        if (outcome.kind === "handOver") {
+          logger.info("screenAction.paymentRequest.confirm.handOver");
+          return;
+        }
+
         // Delivered, rolled back, or (ecash out, neither delivered nor taken
         // back) undelivered, which offers no retry: a second Pay could pay
         // twice.

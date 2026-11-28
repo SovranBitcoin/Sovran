@@ -395,3 +395,41 @@ describe('payment request — confirm after delivery', () => {
     expect(attempts).toBe(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A request without a transport: the token is handed over in person
+// ---------------------------------------------------------------------------
+
+describe('payment request — no transport', () => {
+  it('shows the token to hand over instead of reporting a delivery', async () => {
+    const historyEntry = JSON.stringify({
+      id: 'send:op-1',
+      type: 'send',
+      state: 'pending',
+      operationId: 'op-1',
+      token: { mint: MINT1, unit: 'sat', proofs: [] },
+    });
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => ({ historyEntry, handOver: true }),
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    tm.assertStep('navigateToPaymentRequest');
+
+    const outcome = await tm.machine.confirmPaymentRequest();
+
+    expect(outcome).toEqual({ kind: 'handOver' });
+    tm.assertStep('sendComplete');
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: 'sendComplete',
+      data: { historyEntry },
+    });
+    const confirmed = tm.notificationCalls.filter((c) => c.key === 'onPaymentConfirmed');
+    expect(confirmed).toHaveLength(1);
+    expect(confirmed[0].data).toMatchObject({ variant: 'send', historyEntry });
+    // The token is out: a second Pay does nothing.
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: 'ignored' });
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+  });
+});
