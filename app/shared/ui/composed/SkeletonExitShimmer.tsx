@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 import {
   useVisualLayoutLogger,
@@ -154,27 +155,36 @@ export function SkeletonLoadingShimmer({
   });
 
   useEffect(() => {
-    if (!active) {
-      cancelAnimation(progress);
-      progress.set(0);
-      return;
-    }
+    if (active) return;
+    cancelAnimation(progress);
     progress.set(0);
-    progress.set(
-      withRepeat(
-        withDelay(
-          SKELETON_LOADING_SHIMMER_GAP_MS,
-          withTiming(1, {
-            duration: SKELETON_LOADING_SHIMMER_DURATION_MS,
-            easing: Easing.inOut(Easing.cubic),
-          })
-        ),
-        -1,
-        false
-      )
-    );
-    return () => cancelAnimation(progress);
   }, [active, progress]);
+  // The endless sweep runs only while its screen is focused and the app is in
+  // the foreground; a load that never settles under a modal or in the
+  // background no longer loops on the UI thread.
+  useVisualActivityEffect(
+    useCallback(() => {
+      progress.set(0);
+      progress.set(
+        withRepeat(
+          withDelay(
+            SKELETON_LOADING_SHIMMER_GAP_MS,
+            withTiming(1, {
+              duration: SKELETON_LOADING_SHIMMER_DURATION_MS,
+              easing: Easing.inOut(Easing.cubic),
+            })
+          ),
+          -1,
+          false
+        )
+      );
+      return () => {
+        cancelAnimation(progress);
+        progress.set(0);
+      };
+    }, [progress]),
+    active
+  );
 
   const { sweepWidth, handleLayout } = useShimmerSweep({ onLayout });
   const highlightWidth = Math.max(40, Math.round(sweepWidth * LOADING_HIGHLIGHT_WIDTH_RATIO));

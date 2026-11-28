@@ -16,7 +16,7 @@
  * Own leaf component on purpose (same rule as `ExpiryCountdown`): the tick
  * must never re-render the rows around it.
  */
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, TextInput, type TextInputProps, type TextStyle } from 'react-native';
 import Animated, {
   useAnimatedProps,
@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 
 interface AnimatedTextProps {
   text: string;
@@ -87,18 +88,25 @@ export const ElapsedSeconds: React.FC<ElapsedSecondsProps> = ({
     if (next !== seconds.get()) seconds.set(next);
   }, false);
 
+  // A perpetual tick stops uiautomator ever reaching idle, which blinds every
+  // Android e2e AX dump — the same gate Skeleton/LoadingIndicator/
+  // ExpiryCountdown carry.
+  const active = running && !IS_ANDROID_E2E;
   useEffect(() => {
-    // A perpetual tick stops uiautomator ever reaching idle, which blinds every
-    // Android e2e AX dump — the same gate Skeleton/LoadingIndicator/
-    // ExpiryCountdown carry.
-    const active = running && !IS_ANDROID_E2E;
-    if (active) {
-      firstFrameMs.set(-1);
-      seconds.set(0);
-    }
-    frameCallback.setActive(active);
-    return () => frameCallback.setActive(false);
-  }, [running, frameCallback, firstFrameMs, seconds]);
+    if (!active) return;
+    firstFrameMs.set(-1);
+    seconds.set(0);
+  }, [active, firstFrameMs, seconds]);
+  // The per-frame callback runs only while the screen is focused and the app
+  // is in the foreground. Frame timestamps keep counting while it is paused,
+  // so the readout is right again on the first frame back.
+  useVisualActivityEffect(
+    useCallback(() => {
+      frameCallback.setActive(true);
+      return () => frameCallback.setActive(false);
+    }, [frameCallback]),
+    active
+  );
 
   const animatedProps = useAnimatedProps<AnimatedTextProps>(() => ({
     text: label(seconds.get(), prefix),
