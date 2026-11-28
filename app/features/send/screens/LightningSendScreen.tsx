@@ -11,7 +11,7 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
@@ -22,6 +22,7 @@ import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryRefresh,
+  HistoryEntryTimeline,
   TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
@@ -42,6 +43,8 @@ import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from 'wallet/amount';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useMeltQuoteExpiry } from '@/shared/hooks/useMeltQuoteExpiry';
+import { canOnchainMeltQuoteExpire } from '@/shared/lib/cashu/onchainMelt';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
@@ -73,6 +76,12 @@ export function LightningSendScreen({
     meltHistoryEntry
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
+  // The quote's expiry is what turns an unpaid quote into "Quote expired" and
+  // drives the countdown. The preview carries the pre-created quote's id in
+  // metadata until the real entry takes it over.
+  const previewQuoteId =
+    typeof entry?.metadata?.meltQuoteId === 'string' ? entry.metadata.meltQuoteId : undefined;
+  const quoteExpiry = useMeltQuoteExpiry(entry?.mintUrl, entry?.quoteId || previewQuoteId);
   const bip321 = useBip321Info(entry?.id);
   // History view (transactions list) → fixed mint, non-clickable "Sent with".
   const isHistoryView = useIsTransactionHistoryView();
@@ -282,6 +291,22 @@ export function LightningSendScreen({
       entry={entry}
       source={source}
       footer={bottomButtons}
+      timeline={
+        <HistoryEntryTimeline
+          historyEntry={entry}
+          // Only `expiry` is read for melts, and only while the quote can
+          // still expire: a paid or reversed send never shows a countdown.
+          meltQuote={
+            quoteExpiry !== undefined && canOnchainMeltQuoteExpire(String(entry.state))
+              ? // Prop is typed for the full bolt11 quote; only `expiry` is read.
+                // ast-grep-ignore: double-assertion-tsx
+                ({ expiry: quoteExpiry } as unknown as ComponentProps<
+                  typeof HistoryEntryTimeline
+                >['meltQuote'])
+              : undefined
+          }
+        />
+      }
       headerIdentity={
         recipientPubkey && headerDisplayName
           ? {
