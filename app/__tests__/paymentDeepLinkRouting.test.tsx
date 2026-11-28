@@ -65,7 +65,7 @@ jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({ handlePermission: async () => true }),
+  useCameraPermissionGate: () => ({ view: 'camera', requestPermission: jest.fn() }),
 }));
 jest.mock('@/shared/lib/nfc', () => ({
   createNfcAdapter: () => ({}),

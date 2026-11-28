@@ -4,7 +4,7 @@ import { useCameraPermissions, type PermissionResponse } from 'expo-camera';
 import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
-export function useHandleCameraPermission() {
+function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
 
   const handlePermission = async (): Promise<boolean> => {

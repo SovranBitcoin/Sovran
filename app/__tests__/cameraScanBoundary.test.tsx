@@ -90,10 +90,6 @@ jest.mock('@/runtime/WalletProjection', () => ({
   useWalletContextWithOverride: () => mockWallet,
 }));
 jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({
-    permission: { granted: true },
-    handlePermission: async () => true,
-  }),
   useCameraPermissionGate: () => ({ view: 'camera', requestPermission: jest.fn() }),
 }));
 jest.mock('@/features/camera/screens/CameraScreen/CameraLayout', () => ({

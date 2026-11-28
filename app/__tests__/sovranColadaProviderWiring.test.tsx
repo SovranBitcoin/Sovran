@@ -28,7 +28,6 @@ const mockBridge = { kind: 'screen actions bridge' };
 let mockUrl: string | null = null;
 let mockKeys: { pubkey: string } | null = { pubkey: 'ab'.repeat(32) };
 let mockOffline = false;
-let mockPermission = true;
 
 jest.mock('@react-native-async-storage/async-storage', () => {
   const disk: Record<string, string> = {};
@@ -68,9 +67,6 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 }));
 jest.mock('@/runtime/connectivity', () => ({
   useOfflineStatus: () => ({ isOffline: mockOffline }),
-}));
-jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
-  useHandleCameraPermission: () => ({ handlePermission: async () => mockPermission }),
 }));
 jest.mock('@/shared/lib/nfc', () => ({ createNfcAdapter: () => mockNfcAdapter }));
 jest.mock('@/shared/lib/migrations/dataMigrations', () => ({
@@ -190,7 +186,6 @@ beforeEach(() => {
   mockUrl = null;
   mockKeys = { pubkey: 'ab'.repeat(32) };
   mockOffline = false;
-  mockPermission = true;
   useSettingsStore.setState({ mockOffline: false });
   useMintStore.setState({ activeUnit: 'sat' });
 });
@@ -396,18 +391,6 @@ describe('navigation callbacks', () => {
     props().navigation.scanQr!(loose({ unit: 'sat', context }));
 
     expect(mockRouter.navigate).toHaveBeenCalledWith({ pathname, params: { unit: 'sat' } });
-  });
-
-  it('opens the camera even when permission is refused; the camera screen shows that state', async () => {
-    mockPermission = false;
-    await mount();
-
-    props().navigation.scanQr!(loose({ unit: 'sat', context: 'receive' }));
-
-    expect(mockRouter.navigate).toHaveBeenCalledWith({
-      pathname: '/(receive-flow)/camera',
-      params: { unit: 'sat' },
-    });
   });
 
   it('opens nearby, mint info, add mint and back', async () => {
