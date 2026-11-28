@@ -151,12 +151,14 @@ function CircleActionsPreview() {
       <CircleActionButtonFlat
         icon="lucide:arrow-up-right"
         label="Send"
+        haptics={false}
         onPress={noop}
         testID="design-system-wallet-circle-send"
       />
       <CircleActionButtonFlat
         icon="lucide:arrow-down-left"
         label="Receive"
+        haptics={false}
         onPress={noop}
         testID="design-system-wallet-circle-receive"
       />

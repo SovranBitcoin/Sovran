@@ -9,7 +9,6 @@ import {
 import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
-import { HapticsOff } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -48,7 +47,7 @@ export function SettingsDesignSystemUiKitScreen() {
         testID="design-system-ui-kit-count">{`${scenarios.length} ${scenarios.length === 1 ? 'state' : 'states'}`}</Text>
       {scenarios.map((scenario) => (
         <Section key={scenario.id} title={scenario.title}>
-          <View testID={`design-system-scenario-ui-kit-${scenario.id}`}><HapticsOff>{scenario.render()}</HapticsOff></View>
+          <View testID={`design-system-scenario-ui-kit-${scenario.id}`}>{scenario.render()}</View>
         </Section>
       ))}
     </ScreenWrapper>

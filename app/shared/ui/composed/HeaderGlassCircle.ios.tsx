@@ -4,11 +4,7 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
-import {
-  firePressHaptic,
-  useHapticsEnabled,
-  type PressHaptics,
-} from '@/shared/ui/primitives/Haptics';
+import { firePressHaptic, type PressHaptics } from '@/shared/ui/primitives/Haptics';
 import { headerButtonSize, zIndex } from '@/shared/styles/tokens';
 
 /**
@@ -50,9 +46,8 @@ export function HeaderGlassCircle({
   const interactive = !!onPress && !disabled;
   // SwiftUI's Button reports only the tap, not a press-in, so the haptic
   // lands with the action.
-  const hapticsEnabled = useHapticsEnabled();
   const handlePress = () => {
-    if (hapticsEnabled) firePressHaptic(haptics);
+    firePressHaptic(haptics);
     onPress?.();
   };
   const containerStyle = React.useMemo(

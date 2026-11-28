@@ -8,7 +8,7 @@ import { GlassView } from 'expo-glass-effect';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { firePressHaptic, useHapticsEnabled } from '@/shared/ui/primitives/Haptics';
+import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
 import {
   CapsuleButtonContent,
   DEFAULT_HEIGHT,
@@ -143,11 +143,10 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   });
 
   const glassTap = useGlassTapFallback(guardedPress);
-  const hapticsEnabled = useHapticsEnabled();
   const { gesture, onTouchMove, onTouchEnd } = glassTap;
   // GlassView bypasses Pressable, so its touch-down fires the same press-in haptic.
   const onTouchStart = (e: GestureResponderEvent) => {
-    if (!disabled && !busy && hapticsEnabled) firePressHaptic(haptics);
+    if (!disabled && !busy) firePressHaptic(haptics);
     glassTap.onTouchStart(e);
   };
 

@@ -4,7 +4,7 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
-import { firePressHaptic, useHapticsEnabled } from '@/shared/ui/primitives/Haptics';
+import { firePressHaptic } from '@/shared/ui/primitives/Haptics';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
 import { useBalancePillDimensions } from './useBalancePillDimensions';
@@ -42,7 +42,6 @@ export default function BalancePillLiquid({
   const dimensions = useBalancePillDimensions({ width, height, contentHeight });
   const h = dimensions.buttonHeight;
   const colorScheme = useColorScheme();
-  const hapticsEnabled = useHapticsEnabled();
 
   const buttonModifiers = [
     environment('colorScheme', colorScheme),
@@ -71,11 +70,14 @@ export default function BalancePillLiquid({
       <Host
         style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }}
         matchContents>
-        <SwiftUIButton testID={testID} modifiers={buttonModifiers} onPress={
+        <SwiftUIButton
+          testID={testID}
+          modifiers={buttonModifiers}
+          onPress={
             onPress
               ? () => {
                   // SwiftUI reports only the tap; the haptic lands with it.
-                  if (hapticsEnabled) firePressHaptic(haptics);
+                  firePressHaptic(haptics);
                   onPress();
                 }
               : undefined

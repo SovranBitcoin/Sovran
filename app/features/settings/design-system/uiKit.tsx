@@ -171,6 +171,7 @@ export function MintPillFixture({
       width={width}
       loadingProgress={loadingProgress}
       displayPreference={0}
+      haptics={false}
       onPress={noop}
       iconNode={
         <View className="relative">
@@ -195,6 +196,7 @@ function BalancePillDefault() {
       unit="sat"
       iconBoxSize={24}
       displayPreference={0}
+      haptics={false}
       onPress={noop}
       iconNode={<Icon name="solar:wallet-bold" size={20} color={foreground} />}
     />
@@ -290,6 +292,7 @@ function RowsFixture({ title, subtitle, selected = false, disabled = false }: Ro
         avatar={{ seed: FIXTURE_PUBKEY, name: title, size: 44 }}
         selected={selected}
         disabled={disabled}
+        haptics={false}
         onPress={noop}
         testID="design-system-ui-kit-list-row"
       />
@@ -331,7 +334,7 @@ function SelectionFixture({
         variant="primary"
         accessibilityLabel="Square mark"
       />
-      <Switch isSelected={selected} isDisabled={disabled} onSelectedChange={noop} />
+      <Switch isSelected={selected} isDisabled={disabled} haptics={false} onSelectedChange={noop} />
     </View>
   );
   // A badge has no disabled look of its own; the frame dims the group.
@@ -535,7 +538,7 @@ function NoticeFixture(props: ComponentProps<UiParts['Notice']>) {
 
 function ButtonFixture(props: Omit<ComponentProps<UiParts['Button']>, 'onPress'>) {
   const { Button } = ui();
-  return <Button {...props} onPress={noop} />;
+  return <Button {...props} haptics={false} onPress={noop} />;
 }
 
 function MintHeaderFixture(props: ComponentProps<UiParts['MintHeader']>) {

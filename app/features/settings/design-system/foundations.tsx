@@ -142,10 +142,10 @@ export const FOUNDATION_SCENARIOS = [
     covers: [SOURCES.button],
     render: () => (
       <VStack gap={8}>
-        <Button text="Primary action" variant="primary" onPress={noop} />
-        <Button text="Secondary action" variant="secondary" onPress={noop} />
-        <Button text="Dangerous action" variant="dangerous" onPress={noop} />
-        <Button text="Underlined action" variant="underline" onPress={noop} />
+        <Button text="Primary action" variant="primary" haptics={false} onPress={noop} />
+        <Button text="Secondary action" variant="secondary" haptics={false} onPress={noop} />
+        <Button text="Dangerous action" variant="dangerous" haptics={false} onPress={noop} />
+        <Button text="Underlined action" variant="underline" haptics={false} onPress={noop} />
       </VStack>
     ),
   },
@@ -155,11 +155,17 @@ export const FOUNDATION_SCENARIOS = [
     covers: [SOURCES.button, SOURCES.spinner],
     render: () => (
       <VStack gap={8}>
-        <Button text="Disabled" variant="primary" disabled onPress={noop} />
-        <Button text="Processing" variant="primary" loading onPress={noop} />
+        <Button text="Disabled" variant="primary" disabled haptics={false} onPress={noop} />
+        <Button text="Processing" variant="primary" loading haptics={false} onPress={noop} />
         <HStack gap={8} wrap="wrap">
-          <Button text="Selected" variant="primary" size="compact" onPress={noop} />
-          <Button text="Available" variant="secondary" size="compact" onPress={noop} />
+          <Button text="Selected" variant="primary" size="compact" haptics={false} onPress={noop} />
+          <Button
+            text="Available"
+            variant="secondary"
+            size="compact"
+            haptics={false}
+            onPress={noop}
+          />
         </HStack>
       </VStack>
     ),
