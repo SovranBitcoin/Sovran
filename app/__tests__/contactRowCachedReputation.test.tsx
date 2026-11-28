@@ -148,6 +148,9 @@ jest.mock('@/shared/ui/composed/RowStatsAccent', () => ({
   RowStatsAccentSkeleton: function RowStatsAccentSkeleton() {
     return null;
   },
+  RowStatsAccentSpacer: function RowStatsAccentSpacer() {
+    return null;
+  },
   STAT_ICONS: {
     score: 'score',
     audit: 'audit',
@@ -252,5 +255,97 @@ describe('ContactRow cached reputation', () => {
       />
     );
     expect(stats ?? []).toEqual([]);
+  });
+});
+
+// Audit D13: a person's row grew when their NIP-05 or stats arrived. A people
+// list opts in with `reserveAccentLine`, and the row then hands ListRow an
+// accent node of the line's height in every state. (What is pinned here is
+// WHICH node the row renders; pixel heights are not measurable in this
+// environment.)
+describe('ContactRow reserved accent line', () => {
+  const accentOf = (element: React.ReactElement): string | undefined => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(element);
+    });
+    const props = jest.mocked(ListRow).mock.calls.at(-1)?.[0] as
+      { accent?: React.ReactElement } | undefined;
+    act(() => {
+      renderer.unmount();
+    });
+    const type = props?.accent?.type as { name?: string } | undefined;
+    return type?.name;
+  };
+
+  beforeEach(() => {
+    jest.mocked(ListRow).mockClear();
+    mockCachedStats = undefined;
+  });
+
+  it('holds the line with a skeleton while the profile loads', () => {
+    expect(
+      accentOf(
+        <ContactRow
+          identity={nostrIdentity('someone', undefined, { isLoadingProfile: true })}
+          reserveAccentLine
+        />
+      )
+    ).toBe('RowStatsAccentSkeleton');
+  });
+
+  it('shows the pills once the person has a NIP-05', () => {
+    expect(
+      accentOf(
+        <ContactRow
+          identity={nostrIdentity('someone', { name: 'Ann', nip05: 'ann@example.com' })}
+          reserveAccentLine
+        />
+      )
+    ).toBe('RowStatsAccent');
+  });
+
+  it('keeps an empty line of the same height when the person has neither NIP-05 nor stats', () => {
+    expect(
+      accentOf(
+        <ContactRow identity={nostrIdentity('someone', { name: 'Ann' })} reserveAccentLine />
+      )
+    ).toBe('RowStatsAccentSpacer');
+  });
+
+  it('shows the pills, not the empty line, when stats arrive from the cache later', () => {
+    mockCachedStats = { score: 77, followersCount: 12 };
+    expect(
+      accentOf(
+        <ContactRow
+          identity={nostrIdentity('operator-pubkey', { name: 'Op' })}
+          stats={['reputation', 'followers']}
+          reserveAccentLine
+        />
+      )
+    ).toBe('RowStatsAccent');
+  });
+
+  it('does not hold a line the list hides', () => {
+    expect(
+      accentOf(
+        <ContactRow
+          identity={nostrIdentity('someone', { name: 'Ann' })}
+          reserveAccentLine
+          hideMetadata
+        />
+      )
+    ).toBe('RowStatsAccent');
+  });
+
+  it('leaves rows that did not opt in exactly as they were', () => {
+    expect(
+      accentOf(
+        <ContactRow identity={nostrIdentity('someone', undefined, { isLoadingProfile: true })} />
+      )
+    ).toBe('RowStatsAccent');
+    expect(accentOf(<ContactRow identity={nostrIdentity('someone', { name: 'Ann' })} />)).toBe(
+      'RowStatsAccent'
+    );
   });
 });
