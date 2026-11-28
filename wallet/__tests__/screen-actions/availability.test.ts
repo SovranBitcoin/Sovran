@@ -127,6 +127,29 @@ describe("receiveTokenAvailability — redeem", () => {
 // paymentRequest — Confirm availability
 // ---------------------------------------------------------------------------
 
+describe("meltQuoteAvailability — cancel", () => {
+  // Coco cancels only a `prepared` melt (`MeltOpsApi.cancel`, coco
+  // packages/core/api/MeltOpsApi.ts:143-152). A PENDING melt is a payment in
+  // flight: it cannot be called back, and Coco's settlement processor already
+  // releases the inputs itself if the mint reports the quote UNPAID.
+  it("offers Cancel for a prepared, unpaid quote", () => {
+    const actions = getAvailableActions("meltQuote", { quoteId: "q", state: "UNPAID" });
+    expect(actions.cancel.available).toBe(true);
+    expect(actions.pay.available).toBe(true);
+  });
+
+  it("offers no Cancel while the payment is pending", () => {
+    const actions = getAvailableActions("meltQuote", { quoteId: "q", state: "PENDING" });
+    expect(actions.cancel.available).toBe(false);
+    expect(actions.pay.available).toBe(false);
+  });
+
+  it("offers no Cancel once paid, nor for a preview without a quote", () => {
+    expect(getAvailableActions("meltQuote", { quoteId: "q", state: "PAID" }).cancel.available).toBe(false);
+    expect(getAvailableActions("meltQuote", { state: "UNPAID" }).cancel.available).toBe(false);
+  });
+});
+
 describe("paymentRequestAvailability — confirm", () => {
   it("confirm is available for a preview entry (no operationId, no phase)", () => {
     const entry = {

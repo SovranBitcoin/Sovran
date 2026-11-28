@@ -358,8 +358,10 @@ describe('reopening a Lightning send', () => {
     });
 
     expect(testIds()).not.toContain('melt-pay');
-    // QUIRK: a Lightning payment already in flight is offered Cancel.
-    expect(testIds()).toContain('melt-cancel');
+    // A payment already in flight cannot be cancelled (Coco cancels only a
+    // prepared melt), so it is offered Close, never Cancel.
+    expect(testIds()).not.toContain('melt-cancel');
+    expect(testIds()).toContain('melt-close');
     expect(moneyCalls()).toEqual([]);
   });
 

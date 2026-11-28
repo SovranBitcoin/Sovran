@@ -318,13 +318,13 @@ describe("which actions each screen offers for each entry state", () => {
       meltEntry(),
       ["back", "cancel", "pay"],
     ],
-    // QUIRK: Cancel is offered on a PENDING melt, whose payment may already be
-    // in flight at the mint.
+    // A PENDING melt is a payment in flight: Coco cancels only a prepared
+    // melt, so Cancel is not offered.
     [
       "a pending melt",
       "meltQuote",
       meltEntry({ state: "PENDING" }),
-      ["back", "cancel"],
+      ["back"],
     ],
     ["a paid melt", "meltQuote", meltEntry({ state: "PAID" }), ["back"]],
     [
