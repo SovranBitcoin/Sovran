@@ -214,6 +214,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F258](F258.md) | high | device | Verify the house sheets, toasts, menu popover, slider and tier ring on iPhone and Android |
 | [F259](F259.md) | medium | fix | Nostr data path: defects from the data audit left after batching, merge and inbox work |
 | [F260](F260.md) | medium | device | Measure the Nostr data changes on a phone: reconnect and inbox heat, cold contacts paint, person-row height |
-| [F261](F261.md) | high | decision | Send can read a saved lightning address up to a day old; read a fresh kind-0 before paying |
+| [F261](F261.md) | high | decision | Send can pay a saved lightning address up to a day old, from an unverified kind-0; read a fresh one first |
 
 <!-- list:end -->
