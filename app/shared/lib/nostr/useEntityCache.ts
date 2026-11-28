@@ -246,13 +246,27 @@ export function isProfileMissed(pubkey: string): boolean {
 }
 
 /**
- * Write authoritative kind-0 metadata into the single owner (relay-fresh, so it
- * wins the merge and isn't immediately re-fetched). Use for resolved profiles
- * (own accounts, recipient resolution, recent-people, mock data).
+ * Write kind-0 metadata the app resolved itself (recipient resolution on Send,
+ * the own-account refresh) into the single owner.
+ *
+ * `createdAt` is each profile's kind-0 `created_at` in unix SECONDS, and is
+ * the merge order: the entry replaces an older cached profile, removals
+ * included, and is replaced by any newer one fetched later. That ordering is
+ * what stops Send paying a Lightning address the person has since removed.
+ *
+ * An entry without an event time (the app-view refresh carries none) ranks
+ * above a seed and below every real event, and is not stamped as fetched, so
+ * the real kind-0 is still fetched and then replaces it.
  */
-export function ingestResolvedProfiles(metadata: Record<string, facade.ProfileMetadata>): void {
-  if (Object.keys(metadata).length === 0) return;
-  buildNostrDataLayer()?.cache.ingestProfileMetadata(metadata, Date.now(), 'relay');
+export function ingestResolvedProfiles(
+  metadata: Record<string, facade.ProfileMetadata>,
+  createdAt: Readonly<Record<string, number | undefined>> = {}
+): void {
+  const pubkeys = Object.keys(metadata);
+  if (pubkeys.length === 0) return;
+  const fetchedAt: Record<string, number> = {};
+  for (const pubkey of pubkeys) if (!createdAt[pubkey]) fetchedAt[pubkey] = 0;
+  buildNostrDataLayer()?.cache.ingestProfileMetadata(metadata, 1, 'relay', { createdAt, fetchedAt });
 }
 
 /**

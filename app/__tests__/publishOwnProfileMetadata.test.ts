@@ -165,8 +165,10 @@ it('acceptance updates profile and cache, removes the old avatar, and clears the
   expect(mockDelete).toHaveBeenCalledWith(pubkey);
   expect(mockIngest).toHaveBeenCalledWith(
     { [pubkey]: expect.objectContaining({ displayName: 'New' }) },
-    expect.any(Number),
-    'relay'
+    1,
+    'relay',
+    // The merge order is the event's own time, in seconds.
+    { createdAt: { [pubkey]: expect.any(Number) } }
   );
   expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
   expect(useOwnProfileMetadataStore.getState().latest?.content).toEqual({
