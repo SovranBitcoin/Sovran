@@ -1,11 +1,8 @@
 /**
- * @fileoverview Camera screen for the send/receive modal groups.
+ * @fileoverview Camera screen for the receive modal group.
  *
- * Both `(send-flow)/camera` and `(receive-flow)/camera` render exactly this —
- * a transparent-header "Scan QR" screen over `CameraScreen`, which drives
- * `machine.scan` directly. The two route files exist because expo-router keys
- * screens by path; the body lives here so their header options and title
- * cannot drift apart.
+ * `(receive-flow)/camera` renders exactly this — a transparent-header
+ * "Scan QR" screen over `CameraScreen`, which drives `machine.scan` directly.
  */
 import { Stack } from 'expo-router';
 
