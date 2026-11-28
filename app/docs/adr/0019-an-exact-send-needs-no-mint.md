@@ -6,6 +6,12 @@ Status: Accepted; native verification outstanding.
 Amended by [ADR 0020](0020-retry-access-without-replacing-custody.md): exact bearer
 sends now use the local path immediately, including while online.
 
+Amended 2026-11-28: the patch was dropped on 2026-11-26 in the belief that
+Coco `master` no longer needed it, which regressed offline sends; it is carried
+again, narrowed to the `offline` prepare option as proposed upstream in
+cashubtc/coco#533. The stale-refresh fallback, `Manager.setOffline` and the
+reachability check described below are not part of it.
+
 Amends [ADR 0017](0017-the-wallet-core-ships-unmodified.md): the wallet core
 carries one patch, named here. Everything else in 0017 stands.
 
