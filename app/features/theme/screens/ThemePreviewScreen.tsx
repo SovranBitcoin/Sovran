@@ -120,9 +120,7 @@ export function ThemePreviewScreen() {
     router.back();
   }, [discard]);
 
-  // Close at once: the commit finishes in the draft store, which waits for the
-  // primary wallpaper before re-theming the wallet, so nothing is written
-  // until the theme can actually be applied.
+  // Close at once; the commit still waits for the primary wallpaper first.
   const handleApply = useCallback(() => {
     log.info('theme.preview.apply', { albumSlug: activeAlbumSlug });
     router.back();

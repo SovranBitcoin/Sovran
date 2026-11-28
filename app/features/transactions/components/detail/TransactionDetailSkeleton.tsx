@@ -5,20 +5,14 @@ import { Surface } from '@/shared/ui/composed/Surface';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { View } from '@/shared/ui/primitives/View/View';
 
-/**
- * What a transaction detail screen draws until its entry resolves: the same
- * `Screen` frame and spine as `TransactionDetailShell` (amount header, mint
- * status card, timeline card, `space.item` apart) at the sizes those parts
- * render at, so the real content lands in place instead of replacing a
- * centred spinner.
- */
+/** `TransactionDetailShell`'s frame and spine (header, mint card, timeline) at
+ *  their rendered sizes, drawn until the entry resolves. */
 export function TransactionDetailSkeleton({
   screenName,
   label,
 }: {
-  /** The screen's telemetry name, as `TransactionDetailShell` would get it. */
   screenName: string;
-  /** Spoken while loading, e.g. "Loading transaction". */
+  /** Spoken while loading. */
   label: string;
 }): React.ReactElement {
   return (
@@ -30,7 +24,6 @@ export function TransactionDetailSkeleton({
         accessibilityLabel={label}
         accessibilityState={{ busy: true }}
         testID="transaction-detail-skeleton">
-        {/* HistoryEntryHeader: 36pt amount over a 16pt fiat line, 48pt avatar. */}
         <View className="flex-row items-center justify-between px-4">
           <View className="gap-1.5">
             <Skeleton className="h-10 w-40 rounded-lg" />
@@ -38,7 +31,6 @@ export function TransactionDetailSkeleton({
           </View>
           <Skeleton className="h-12 w-12 rounded-full" />
         </View>
-        {/* HistoryEntryRefresh: 40pt mint icon, status line, mint name. */}
         <View className="mx-4">
           <Surface>
             <View className="flex-row items-center gap-3 p-4">
@@ -50,7 +42,6 @@ export function TransactionDetailSkeleton({
             </View>
           </Surface>
         </View>
-        {/* TimelineCard: label, then the first steps. */}
         <View className="mx-4">
           <Surface>
             <View className="p-5">

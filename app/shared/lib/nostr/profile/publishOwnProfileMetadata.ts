@@ -166,13 +166,8 @@ export function publishOwnProfileMetadata({
   accountIndex: number;
   patch: OwnProfilePatch;
   initialLoad: OwnProfileLoadResult;
-  /**
-   * Fires once the edit is read, verified, signed and shown optimistically —
-   * everything but the relay publish — so an editor can close while relays
-   * answer. Every failure the editor shows inline comes before it; after it
-   * only the publish (or an account switch) can still fail. Not called for a
-   * caller that joined a save already in flight.
-   */
+  /** After read, verify, sign and the optimistic overlay, before the relay
+   *  publish; only the publish can fail after it. Not called when joining. */
   onCommitted?: () => void;
 }): ResultAsync<PublishResult, OwnProfilePublishError> {
   const existing = inFlight.get(pubkey);

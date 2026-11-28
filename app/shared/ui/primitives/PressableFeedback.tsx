@@ -32,10 +32,7 @@ type PressState = {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/**
- * Press-in lands within the first frames so the tap reads on contact;
- * release eases back a little slower so a quick tap is still visible.
- */
+/** Press-in reads on contact; release is slower so a quick tap still shows. */
 export function pressScaleTiming(pressed: boolean) {
   'worklet';
   return {

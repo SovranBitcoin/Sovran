@@ -1,10 +1,5 @@
-/**
- * The mint page's name and icon, first source that has one: the bridge's
- * NUT-06 read on the entry, what the opening screen already showed (`seed*`),
- * the stored mint metadata, then the URL. The seed and the store let the page
- * paint a known mint's name and icon on the first frame instead of the URL
- * until the bridge's fetch lands.
- */
+/** Name and icon from the bridge's read, the caller's seed, stored metadata,
+ *  then the URL, so a known mint paints on frame one, not as its URL. */
 export function resolveMintInfoIdentity(
   entry: Record<string, unknown> | null | undefined,
   cached: { displayName?: string; iconUrl?: string } | undefined,

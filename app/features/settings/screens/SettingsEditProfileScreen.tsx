@@ -425,10 +425,8 @@ function ProfileEditor({
       nip05: nip05 === base.nip05 ? nip05 : checks.nip05.ok ? checks.nip05.value : nip05,
       about: checks.about.ok ? checks.about.value : about,
     };
-    // Optimistic: once the edit is signed and shown locally, close and let
-    // the relays answer in the background. Failures the editor shows inline
-    // (base, identity) come before that point; a publish failure after it
-    // takes the same popup as before.
+    // Close once signed and shown; inline (base, identity) errors come before
+    // that, and a later publish failure takes the same popup.
     let closed = false;
     const result = await publishOwnProfileMetadata({
       client,

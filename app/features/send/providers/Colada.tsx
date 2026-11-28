@@ -15,7 +15,6 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useHandleCameraPermission } from '@/features/camera/hooks/useHandleCameraPermission';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
@@ -266,15 +265,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     for (const listener of offlineListeners) listener();
   }, [isOffline, offlineListeners]);
-
-  // Camera permission lives here rather than behind a (receive-flow)-scoped
-  // context provider so it's reachable from this provider's navigation /
-  // screen-action bridges. A descendant context would resolve to undefined
-  // here and silently no-op the Receive scan-QR button. Delegating to
-  // useHandleCameraPermission keeps a single canonical permission gateway
-  // (the hook owns the explainer + Open-Settings popup chain).
-  const { handlePermission } = useHandleCameraPermission();
-  const requestCameraPermission = useCallback(() => handlePermission(), [handlePermission]);
 
   const identity = useColadaIdentity(client, keys);
 
@@ -632,11 +622,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       createSovranScreenActionsBridge({
         manager,
-        requestCameraPermission,
         subscribeP2pkKeyRefreshed: identity.subscribeP2pkKeyRefreshed,
         subscribeOfflineChanged,
       }),
-    [manager, requestCameraPermission, identity, subscribeOfflineChanged]
+    [manager, identity, subscribeOfflineChanged]
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
