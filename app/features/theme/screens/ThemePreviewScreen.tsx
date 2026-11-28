@@ -120,10 +120,13 @@ export function ThemePreviewScreen() {
     router.back();
   }, [discard]);
 
-  const handleApply = useCallback(async () => {
+  // Close at once: the commit finishes in the draft store, which waits for the
+  // primary wallpaper before re-theming the wallet, so nothing is written
+  // until the theme can actually be applied.
+  const handleApply = useCallback(() => {
     log.info('theme.preview.apply', { albumSlug: activeAlbumSlug });
-    // A Cancel during the download already closed the editor.
-    if (await commit()) router.back();
+    router.back();
+    void commit();
   }, [commit, activeAlbumSlug]);
 
   const handleUnitPress = useCallback((unitId: string) => {
