@@ -13,7 +13,8 @@ import { useScreenActions, type BoundAction } from 'wallet/react';
 import { useReceiveRailRoute } from '@/features/receive/hooks/useReceiveRailRoute';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { paymentLog } from '@/shared/lib/logger';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
+import { TransactionDetailSkeleton } from '@/features/transactions/components/detail/TransactionDetailSkeleton';
 
 import { OnchainReceiveScreen, type OnchainReceiveEntry } from './OnchainReceiveScreen';
 
@@ -93,7 +94,7 @@ function OnchainReceiveRouteContent({
   }
 
   if (!typedEntry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
+    return <TransactionDetailSkeleton screenName="OnchainReceiveScreen" label="Loading transaction" />;
   }
 
   return (

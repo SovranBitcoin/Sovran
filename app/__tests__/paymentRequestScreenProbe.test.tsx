@@ -107,7 +107,6 @@ jest.mock('@/shared/lib/strings', () => ({ truncateMiddle: (value: string) => va
 jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
-  ScreenLoadingState: () => null,
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: jest.fn(() => null) }));
 

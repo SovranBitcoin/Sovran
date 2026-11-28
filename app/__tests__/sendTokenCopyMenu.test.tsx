@@ -62,6 +62,8 @@ jest.mock('wallet/react', () => ({
 }));
 
 jest.mock('@/features/transactions', () => ({
+  TransactionDetailSkeleton: (props: object) =>
+    jest.requireActual<typeof React>('react').createElement('TransactionDetailSkeleton', props),
   entryDetailItems: () => [],
   TransactionDetailShell: ({
     cancelling,
@@ -159,7 +161,6 @@ jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => 
 jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
-  ScreenLoadingState: () => null,
 }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({
   BottomButtons: ({ children }: React.PropsWithChildren) => <>{children}</>,
@@ -230,6 +231,26 @@ describe('SendTokenScreen Copy menu', () => {
     expect(
       renderer.root.findByProps({ testID: 'send-token-cancel-transaction' }).props.disabled
     ).toBe(false);
+  });
+
+  it('draws the detail skeleton in its own screen frame until the entry resolves', async () => {
+    const { useScreenActions } = jest.requireMock<{ useScreenActions: jest.Mock }>('wallet/react');
+    const resolved = useScreenActions.getMockImplementation()!;
+    useScreenActions.mockImplementation(() => ({ ...resolved(), entry: null }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    try {
+      await act(async () => {
+        renderer = TestRenderer.create(
+          <SendTokenScreen sendHistoryEntry="send:1" onNavigateBack={jest.fn()} />
+        );
+      });
+      expect(renderer.root.findByType('TransactionDetailSkeleton' as never).props).toEqual({
+        screenName: 'SendTokenScreen',
+        label: 'Loading transaction',
+      });
+    } finally {
+      useScreenActions.mockImplementation(resolved);
+    }
   });
 
   it('starts the NFC write in the same tick as the tap, with no fixed delay', async () => {

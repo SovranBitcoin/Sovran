@@ -28,6 +28,7 @@ import {
   stateDetailItem,
   mintDetailItem,
   entryDetailItems,
+  TransactionDetailSkeleton,
 } from '@/features/transactions';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -35,7 +36,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { Surface } from '@/shared/ui/composed/Surface';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -179,7 +180,7 @@ export function SendTokenScreen({
   }
 
   if (!entry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
+    return <TransactionDetailSkeleton screenName="SendTokenScreen" label="Loading transaction" />;
   }
   log.debug('send.token.render', {
     state: entry.state,

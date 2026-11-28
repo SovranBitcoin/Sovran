@@ -39,6 +39,7 @@ import {
   stateDetailItem,
   mintDetailItem,
   entryDetailItems,
+  TransactionDetailSkeleton,
 } from '@/features/transactions';
 import {
   canOnchainMeltQuoteExpire,
@@ -70,7 +71,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -213,7 +214,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
   }
   if (!entry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
+    return <TransactionDetailSkeleton screenName="OnchainSendScreen" label="Loading transaction" />;
   }
 
   const railEnabled = hasFeature('onchain');

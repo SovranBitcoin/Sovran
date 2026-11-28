@@ -147,7 +147,6 @@ jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => 
 jest.mock('@/shared/ui/composed/CopyableValue', () => ({ CopyableValue: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => 'error state',
-  ScreenLoadingState: () => 'loading state',
 }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({
   BottomButtons: ({ children }: React.PropsWithChildren) => <>{children}</>,

@@ -11,6 +11,7 @@ export { HistoryEntryHeader } from './components/detail/HistoryEntryHeader';
 export { HistoryEntryRefresh } from './components/detail/HistoryEntryRefresh';
 export { HistoryEntryTimeline } from './components/detail/timeline';
 export { TransactionDetailShell } from './components/detail/TransactionDetailShell';
+export { TransactionDetailSkeleton } from './components/detail/TransactionDetailSkeleton';
 export { AccelerateSection } from './components/detail/AccelerateSection';
 export {
   useBip321Info,

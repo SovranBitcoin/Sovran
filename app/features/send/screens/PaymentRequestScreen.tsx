@@ -26,12 +26,13 @@ import {
   amountDetailItem,
   mintDetailItem,
   entryDetailItems,
+  TransactionDetailSkeleton,
 } from '@/features/transactions';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -65,7 +66,7 @@ export function PaymentRequestScreen({
   }
 
   if (!entry) {
-    return <ScreenLoadingState message="Loading payment request..." />;
+    return <TransactionDetailSkeleton screenName="PaymentRequestScreen" label="Loading payment request" />;
   }
 
   const tokenCreated = entry.metadata?.tokenCreated === 'true';

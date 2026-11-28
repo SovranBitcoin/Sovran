@@ -1,7 +1,5 @@
 import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { withAlpha } from '@/shared/lib/color';
@@ -65,30 +63,6 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
           ]}
         />
       </View>
-    </Screen>
-  );
-}
-
-interface ScreenLoadingStateProps {
-  message: string;
-}
-
-export function ScreenLoadingState({ message }: ScreenLoadingStateProps) {
-  const foreground = useThemeColor('foreground');
-
-  return (
-    <Screen name="ScreenLoadingState" scroll="none">
-      <VStack
-        accessible
-        accessibilityRole="progressbar"
-        accessibilityLabel={message}
-        accessibilityState={{ busy: true }}
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Spinner size={32} />
-        <Text size={16} style={{ color: withAlpha(foreground, 0.5), marginTop: 16 }}>
-          {message}
-        </Text>
-      </VStack>
     </Screen>
   );
 }
