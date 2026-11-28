@@ -190,7 +190,12 @@ describe('live gift-wrap subscription', () => {
     await vi.advanceTimersByTimeAsync(2_000);
     await flush();
     const second = InboxSocket.instances[1]!;
-    expect(second.req()[2]).toEqual({ kinds: [1059], since: newest - TWO_DAYS });
+    expect(second.req().slice(2)).toEqual([
+      // Stored wraps: only the window this relay may not have delivered.
+      { kinds: [1059], since: newest - TWO_DAYS },
+      // Arrivals from now on: any date, as the unbounded subscription had.
+      { kinds: [1059], limit: 0 },
+    ]);
     // The relay replays the window; nothing is verified or delivered twice.
     for (const wrap of inbox) second.emit(['EVENT', second.req()[1], wrap]);
     expect(verify).toHaveBeenCalledTimes(3);
@@ -214,6 +219,7 @@ describe('live gift-wrap subscription', () => {
       kinds: [1059],
       since: NOW_SEC - TWO_DAYS,
     });
+    expect(InboxSocket.instances[1]!.req()[3]).toEqual({ kinds: [1059], limit: 0 });
     stop();
   });
 
@@ -249,8 +255,84 @@ describe('live gift-wrap subscription', () => {
     first.drop();
     await vi.advanceTimersByTimeAsync(2_000);
     await flush();
-    expect(InboxSocket.instances[1]!.req()[2]).toEqual({ kinds: [1059] });
+    expect(InboxSocket.instances[1]!.req().slice(2)).toEqual([{ kinds: [1059] }]);
     stop();
+  });
+
+  test('a caller’s own lower bound is kept on both filters of a resumed subscription', async () => {
+    const connection = createRelayPoolConnection({ relays: ['wss://a.test'], WebSocketImpl: Impl });
+    const floor = NOW_SEC - 1000;
+    const [wrap] = wraps(1, () => NOW_SEC - 10);
+    const stop = connection.subscribe!([{ kinds: [1059], since: floor }], () => {}, {
+      resumeOverlapSec: TWO_DAYS,
+    });
+    await flush();
+    const first = InboxSocket.instances[0]!;
+    first.emit(['EVENT', first.req()[1], wrap]);
+    first.drop();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flush();
+    expect(InboxSocket.instances[1]!.req().slice(2)).toEqual([
+      { kinds: [1059], since: floor },
+      { kinds: [1059], since: floor, limit: 0 },
+    ]);
+    stop();
+  });
+});
+
+describe('counted: an inbox of 40 wraps on 5 relays, one read and two live subscriptions', () => {
+  const RELAYS = ['wss://r1.test', 'wss://r2.test', 'wss://r3.test', 'wss://r4.test', 'wss://r5.test'];
+
+  test('cold start verifies each wrap once; a relay reconnecting verifies none and asks for the window only', async () => {
+    const verify = countingVerify();
+    const connection = createRelayPoolConnection({
+      relays: RELAYS,
+      WebSocketImpl: Impl,
+      settleMs: 0,
+      verify,
+    });
+    const inbox = wraps(40, (i) => NOW_SEC - 100 - i);
+    const delivered: string[][] = [[], []];
+    const stops = delivered.map((sink) =>
+      connection.subscribe!([{ kinds: [1059] }], (ev) => sink.push(ev.id!), {
+        resumeOverlapSec: TWO_DAYS,
+      }),
+    );
+    const read = connection.request([{ kinds: [1059] }]);
+    await flush();
+    expect(InboxSocket.instances).toHaveLength(5);
+    // Every relay replays the whole inbox to every subscription on it.
+    for (const socket of InboxSocket.instances) {
+      for (const req of socket.sent.filter((f) => f[0] === 'REQ')) {
+        for (const wrap of inbox) socket.emit(['EVENT', req[1], wrap]);
+        socket.emit(['EOSE', req[1]]);
+      }
+    }
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await read)._unsafeUnwrap()).toHaveLength(40);
+    expect(delivered.map((sink) => sink.length)).toEqual([40, 40]);
+    // 5 relays x 3 subscriptions x 40 wraps = 600 frames, 40 verifications.
+    expect(verify).toHaveBeenCalledTimes(40);
+
+    // One relay drops and comes back.
+    const dropped = InboxSocket.instances[0]!;
+    dropped.drop();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flush();
+    const back = InboxSocket.instances.at(-1)!;
+    expect(back.url).toBe('wss://r1.test');
+    const reqs = back.sent.filter((f) => f[0] === 'REQ');
+    expect(reqs).toHaveLength(2);
+    for (const req of reqs) {
+      expect(req.slice(2)).toEqual([
+        { kinds: [1059], since: NOW_SEC - 100 - TWO_DAYS },
+        { kinds: [1059], limit: 0 },
+      ]);
+      for (const wrap of inbox) back.emit(['EVENT', req[1], wrap]);
+    }
+    expect(verify).toHaveBeenCalledTimes(40);
+    expect(delivered.map((sink) => sink.length)).toEqual([40, 40]);
+    for (const stop of stops) stop();
   });
 });
 

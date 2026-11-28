@@ -120,7 +120,9 @@ export type RelaySubscribeOptions = {
   /**
    * Re-attach to a relay with `since` set to the newest `created_at` that
    * relay has sent on this subscription, less this many seconds, instead of
-   * replaying everything. The first attach to a relay is never narrowed.
+   * replaying everything. The first attach to a relay is never narrowed, and
+   * a re-attach still receives every event that arrives after it, whatever
+   * its date.
    *
    * The mark is kept per relay (one relay being ahead says nothing about what
    * another missed) and never runs past the local clock, so an event dated in
@@ -331,7 +333,15 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         const newest = newestFrom.get(url);
         if (resumeOverlapSec === undefined || newest === undefined) return filters;
         const since = newest - resumeOverlapSec;
-        return filters.map((filter) => ({ ...filter, since: Math.max(filter.since ?? 0, since) }));
+        // Two filters per original, OR-ed by the relay: the stored events of
+        // the window, and (`limit: 0`: no stored events) everything that
+        // ARRIVES from now on whatever its date. A narrowed subscription alone
+        // would stop the relay pushing a late-published event dated before the
+        // window, which the unbounded subscription it replaces did receive.
+        return filters.flatMap((filter) => [
+          { ...filter, since: Math.max(filter.since ?? 0, since) },
+          { ...filter, limit: 0 },
+        ]);
       };
 
       const attach = (url: string) => {
