@@ -15,6 +15,43 @@ import { createSharedReadStore, type SharedReadStore } from "./sharedReadStore";
 // (matches how the app previously filtered usePaginatedHistory()).
 const PENDING_PAGE_SIZE = 100;
 
+// The three coco reads behind a breakdown: per-mint balances, the history
+// page (pending sends) and in-flight receives.
+type Reads = [
+  Awaited<ReturnType<Manager["wallet"]["balances"]["byMint"]>>,
+  Awaited<ReturnType<Manager["history"]["getPaginatedHistory"]>>,
+  Awaited<ReturnType<Manager["ops"]["receive"]["listInFlight"]>>,
+];
+type Read = 0 | 1 | 2;
+
+// Which reads each event can change. Balances move only with proofs or a
+// mint. Pending sends come from history, which coco re-projects on every send
+// transition, and which reserve, release or spend proofs. In-flight receives
+// are listed again on every event: a receive starts executing without one.
+const EVENT_READS: Record<string, readonly Read[]> = {
+  "proofs:saved": [0, 2],
+  "proofs:state-changed": [0, 1, 2],
+  "proofs:reserved": [0, 1, 2],
+  "proofs:released": [0, 1, 2],
+  "mint:updated": [0, 2],
+  "history:updated": [1, 2],
+  "receive-op:prepared": [2],
+  "receive-op:finalized": [0, 2],
+  "receive-op:rolled-back": [0, 2],
+};
+
+/** Same figures and per-mint amounts: consumers may keep the old object. */
+function sameBreakdown(a: WalletBalanceBreakdown, b: WalletBalanceBreakdown): boolean {
+  const keys = ["spendable", "reserved", "total", "pending", "redeeming"] as const;
+  if (keys.some((key) => a[key] !== b[key])) return false;
+  const mints = Object.keys(b.byMint);
+  return mints.length === Object.keys(a.byMint).length && mints.every((url) => {
+    const [x, y] = [a.byMint[url], b.byMint[url]];
+    return !!x && x.spendable.equals(y.spendable) && x.reserved.equals(y.reserved) &&
+      x.total.equals(y.total) && Object.keys(x).length === Object.keys(y).length;
+  });
+}
+
 /**
  * One coco read of every figure the breakdown shows, or `null` when the read
  * failed. Module scope on purpose: the React Compiler cannot lower a `try`
@@ -25,13 +62,17 @@ async function readBreakdown(
   mgr: Manager,
   unit: string,
   includeMint: ((mintUrl: string) => boolean) | undefined,
-): Promise<WalletBalanceBreakdown | null> {
+  dirty: ReadonlySet<Read>,
+  last: Reads | null,
+): Promise<{ reads: Reads; breakdown: WalletBalanceBreakdown } | null> {
+  const stale = (read: Read) => !last || dirty.has(read);
   try {
     const [perMint, historyPage, inFlight] = await Promise.all([
-      mgr.wallet.balances.byMint({ units: [unit] }),
-      mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []),
-      mgr.ops.receive.listInFlight().catch(() => []),
+      stale(0) ? mgr.wallet.balances.byMint({ units: [unit] }) : last![0],
+      stale(1) ? mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []) : last![1],
+      stale(2) ? mgr.ops.receive.listInFlight().catch(() => []) : last![2],
     ]);
+    const reads: Reads = [perMint, historyPage, inFlight];
     // Coco's total() reads byMint() again. Aggregate this one snapshot with
     // Amount arithmetic, matching Coco without a second scan of ready proofs.
     let spendable = Amount.zero();
@@ -48,7 +89,7 @@ async function readBreakdown(
       reserved = reserved.add(balance.reserved);
       total = total.add(balance.total);
     }
-    return {
+    return { reads, breakdown: {
       spendable: amountToNumber(spendable),
       reserved: amountToNumber(reserved),
       total: amountToNumber(total),
@@ -67,7 +108,7 @@ async function readBreakdown(
             included((op as { mintUrl?: unknown }).mintUrl),
         )
         .reduce((sum, op) => sum + amountToNumber(op.amount), 0),
-    };
+    } };
   } catch (err) {
     logger.warn("balance.breakdown.reload_failed", {
       unit,
@@ -135,46 +176,58 @@ function createBalanceStore(
   includeMint?: (mintUrl: string) => boolean,
 ): SharedReadStore<WalletBalanceBreakdown> {
   return createSharedReadStore(emptyBalanceBreakdown, (publish) => {
-    // A subscription lifetime owns both the read and its trailing refresh.
+    // A subscription lifetime owns its reads, their trailing refresh and the
+    // last reads and value it published.
     let cancelled = false;
     let running = false;
-    let requested = false;
+    let scheduled = false;
+    let reads: Reads | null = null;
+    let published: WalletBalanceBreakdown | null = null;
+    const dirty = new Set<Read>([0, 1, 2]);
     const reload = async () => {
-      requested = true;
       if (running) return;
       running = true;
-      while (requested && !cancelled) {
-        requested = false;
-        const next = await readBreakdown(manager, unit, includeMint);
-        // Events received during a read invalidate it. Collapse their work
-        // into one trailing read, and never paint the outdated snapshot.
-        if (next && !requested && !cancelled) {
-          publish(next);
-          logger.debug("balance.breakdown.reload", {
-            unit,
-            mintCount: Object.keys(next.byMint).length,
-          });
+      while (dirty.size > 0 && !cancelled) {
+        const reading = new Set(dirty);
+        dirty.clear();
+        const next = await readBreakdown(manager, unit, includeMint, reading, reads);
+        if (!next) {
+          for (const read of reading) dirty.add(read);
+          break;
         }
+        // Events received during a read invalidate the parts they name.
+        // Collapse their work into one trailing read (reusing the other
+        // parts), and never paint the outdated snapshot.
+        reads = next.reads;
+        if (dirty.size > 0 || cancelled) continue;
+        if (published && sameBreakdown(published, next.breakdown)) continue;
+        published = next.breakdown;
+        publish(next.breakdown);
+        logger.debug("balance.breakdown.reload", {
+          unit,
+          mintCount: Object.keys(next.breakdown.byMint).length,
+        });
       }
       running = false;
     };
-    const onChange = () => void reload();
-    const events = [
-      "proofs:saved",
-      "proofs:state-changed",
-      "proofs:reserved",
-      "proofs:released",
-      "mint:updated",
-      "history:updated",
-      "receive-op:prepared",
-      "receive-op:finalized",
-      "receive-op:rolled-back",
-    ] as const;
-    for (const event of events) manager.on(event, onChange);
+    // One coco change emits several events in the same turn: read once.
+    const handlers = Object.entries(EVENT_READS).map(([event, reads]) => {
+      const handler = () => {
+        for (const read of reads) dirty.add(read);
+        if (scheduled) return;
+        scheduled = true;
+        queueMicrotask(() => {
+          scheduled = false;
+          void reload();
+        });
+      };
+      return [event as "proofs:saved", handler] as const;
+    });
+    for (const [event, handler] of handlers) manager.on(event, handler);
     void reload();
     return () => {
       cancelled = true;
-      for (const event of events) manager.off(event, onChange);
+      for (const [event, handler] of handlers) manager.off(event, handler);
     };
   });
 }

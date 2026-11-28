@@ -100,7 +100,8 @@ test('balance event bursts coalesce into one trailing read without publishing th
     newer.resolve({ 'https://mint.example': mintBalance(200) });
   });
   expect(result.current.total).toBe(200);
-  expect(mockManager.history.getPaginatedHistory).toHaveBeenCalledTimes(2);
+  // New proofs cannot change the pending-send total: the history page is read once.
+  expect(mockManager.history.getPaginatedHistory).toHaveBeenCalledTimes(1);
 });
 
 test('an old manager cannot publish a balance or run queued work after a profile switch', async () => {
