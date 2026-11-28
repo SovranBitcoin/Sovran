@@ -47,6 +47,7 @@ function fixture(operations: object[] = [], quotes: object[] = []) {
   const manager = {
     paymentRequests: { incoming: { list: jest.fn().mockResolvedValue(operations) } },
     quotes: { mint: { listPending: jest.fn().mockResolvedValue(quotes) } },
+    mint: { isTrustedMint: jest.fn().mockResolvedValue(true) },
     history: { getPaginatedHistory: read },
   } as unknown as Manager;
   return { manager, read };

@@ -81,6 +81,7 @@ const STATUS_BADGE: Record<RailStatus, { label: string; variant: BadgeVariant; i
   paid: { label: 'Paid', variant: 'success', icon: 'fluent:checkmark-16-filled' },
   cancelled: { label: 'Replaced', variant: 'error' },
   expired: { label: 'Expired', variant: 'primary' },
+  inactive: { label: 'Inactive', variant: 'primary' },
 };
 
 // Why a non-copyable row can't be copied — shown as a toast on tap when there
@@ -95,6 +96,10 @@ const NON_COPYABLE_TOAST: Record<
   },
   cancelled: { title: 'Replaced', message: 'This was replaced by a newer request.' },
   expired: { title: 'Expired', message: 'This address is no longer valid.' },
+  inactive: {
+    title: 'Inactive',
+    message: "This mint is no longer one of your mints, so payments here aren't watched.",
+  },
 };
 
 async function loadRailItems(
@@ -202,7 +207,8 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
               {item.isCurrent ? <Icon name="mdi:check" size={18} color={accent} /> : null}
               {/* Reusable rails (onchain/bolt12) show the live "Listening" pill
                   while the quote is live. Other rows fall to their status
-                  badge: "Expired" (a past expiry) or "Paid" + tap-through.
+                  badge: "Expired" (a past expiry), "Inactive" (mint no longer
+                  trusted) or "Paid" + tap-through.
                   Payment requests keep their status badge (different transport). */}
               {item.listening === true && item.status !== 'paid' ? (
                 <ListeningPill green={green} />
