@@ -120,7 +120,16 @@ export function describeTimelineSurfaces(
   const { historyEntry, tokenCreated, nostrSent } = frame.node.input;
   const { steps, outcome } = frame.model;
   const headerPhase = transactionHeaderPhase(historyEntry);
-  const expected = TITLE_PHASES[outcome.kind];
+  // A reversed melt with a recorded failure ends in the rolled-back kind, but
+  // it is a failed payment, not a cancellation: the row says "Payment failed".
+  const paymentFailed = steps.some((step) => step.id === 'payment-failed');
+  // A reversal in flight has not ended yet: the title may not call it done.
+  const reversing = steps.some((step) => step.id === 'cancelling');
+  const expected = paymentFailed
+    ? ['failed']
+    : reversing
+      ? ['reversing']
+      : TITLE_PHASES[outcome.kind];
   // The title decides a mint invoice's expiry by the device clock, the fixture
   // by its own; an open timeline under an "expired" title is that difference.
   const clockArtefact = headerPhase === 'expired' && outcome.kind === 'pending';
