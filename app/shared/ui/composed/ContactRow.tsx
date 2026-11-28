@@ -37,6 +37,7 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   RowStatsAccent,
   RowStatsAccentSkeleton,
+  RowStatsAccentSpacer,
   STAT_ICONS,
   STAT_COLOR_SOCIAL,
   STAT_COLOR_ERROR,
@@ -345,6 +346,15 @@ interface ContactRowProps {
   hideMetadata?: boolean;
   /** Default `true`. Set `false` to omit the NIP-05 pill even when present. */
   showNip05?: boolean;
+  /**
+   * For a list of people whose rows show the NIP-05 / stats line. Every Nostr
+   * row then keeps that line's height from its first frame: a fixed-size
+   * skeleton while the profile is still loading, the pills when they exist,
+   * an empty line of the same height when the person has neither. Without it
+   * a row grows when its NIP-05 or stats arrive, and pushes every row under it
+   * down. Default `false`: rows elsewhere are unchanged.
+   */
+  reserveAccentLine?: boolean;
 
   /** Declarative stat picker. Omit to use the kind's default. Order preserved,
    *  stats with no data drop out silently. */
@@ -796,6 +806,7 @@ export function ContactRow({
   subtitle: subtitleOverride,
   hideMetadata = false,
   showNip05 = true,
+  reserveAccentLine = false,
   stats: statsOverride,
   selectable = false,
   selected = false,
@@ -1036,10 +1047,14 @@ export function ContactRow({
   // for explicit stats — nostr rows often have no accent, so reserving theirs
   // would over-shoot and shift the other way. Plain contact/ble/geohash
   // skeletons are unaffected.
+  // A people list that opted in (`reserveAccentLine`) holds the line for its
+  // Nostr rows in every state, so there is no over-shoot to fear: the row is
+  // the same height loading, with pills, and with nothing to show.
+  const holdsAccentLine = reserveAccentLine && !!nostr && !mint && !hideMetadata;
   const reserveAccent =
     resolvedLoading &&
     !hideMetadata &&
-    (!!mint || (statsOverride != null && statsOverride.length > 0));
+    (!!mint || (statsOverride != null && statsOverride.length > 0) || holdsAccentLine);
 
   const nip05 =
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
@@ -1047,8 +1062,11 @@ export function ContactRow({
       : undefined;
   const hasNip05 = !!nip05;
 
+  const accentIsEmpty = statList.length === 0 && !hasNip05 && !disabledReason;
   const accentNode = reserveAccent ? (
     <RowStatsAccentSkeleton seed={seed} />
+  ) : holdsAccentLine && accentIsEmpty ? (
+    <RowStatsAccentSpacer />
   ) : (
     // Key by mintUrl so a FlashList cell recycled from mint A→B remounts the
     // stat pills (fresh first-render → no spurious roll); a same-mint

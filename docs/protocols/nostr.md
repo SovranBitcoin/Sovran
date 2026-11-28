@@ -50,9 +50,17 @@ Relays can refuse or remove events, impose access rules, and become unavailable.
 
 ## The data layer
 
-The app reads profiles, contacts, and payment-inbox events directly through
-`nostr/client` (`NostrClient` + `RelayPool`) and the tiered data layer
-(Primal → direct relay) built by `buildNostrDataLayer()`. See
+The app reads profiles and contacts through the tiered data layer (Primal and
+direct relays, asked together; the newest event wins) built by
+`buildNostrDataLayer()`, and publishes through `nostr/client` (`NostrClient` +
+`RelayPool`). Profile reads are batched: every profile asked for within one
+frame goes out as one request per source.
+
+Payment-inbox events (ecash sent as a message, payment-request replies) are read
+through a separate inbox (`paymentInbox.ts`) that always uses the default relays.
+It does not depend on the tier switches in Settings → Network, so switching the
+relay tier off changes where profiles load from and does not stop payments
+arriving. See
 [Provider setup](/protocols/provider-setup) for how the client and data layer
 are assembled, and [Navigation and routes](/protocols/navigation-and-routes)
 for how screens consume them.

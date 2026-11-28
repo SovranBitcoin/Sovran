@@ -78,10 +78,14 @@ export function ingestOwnProfileMetadata(
     .getState()
     .updateProfileMetadata(accountIndex, metadata.displayName ?? metadata.name, metadata.picture);
   const cache = buildNostrDataLayer()?.cache;
-  // The cache's ordinary ingestion is additive and preserves undefined fields.
-  // A full confirmed own kind-0 must also remove the old avatar/name fields.
+  // A confirmed own kind-0 is the whole profile, removed fields included, and
+  // stands even over a cached copy with an equal or later date: the store's
+  // own ordering above has already decided this snapshot is the one to keep.
+  // Ingested at the event's time (seconds), so a later edit still replaces it.
   cache?.profiles.delete(pubkey);
-  cache?.ingestProfileMetadata({ [pubkey]: metadata }, Date.now(), 'relay');
+  cache?.ingestProfileMetadata({ [pubkey]: metadata }, 1, 'relay', {
+    createdAt: { [pubkey]: snapshot.createdAt },
+  });
   store.setLatest(snapshot);
   store.clearOptimistic(snapshot.eventId);
 }

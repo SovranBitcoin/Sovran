@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import { createNostrDataLayer, socialGraphFromEvents, type SocialGraph } from '../src/facade';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
+import { createPrimalTier } from '../src/facade/primal';
 import type { NaggError } from '../src/errors';
 
 const ME = 'a'.repeat(64);
@@ -87,4 +88,39 @@ describe('getSocialGraph through the facade', () => {
     for (const follows of updates) expect(follows).toEqual([F1]);
   });
 
+});
+
+describe('getSocialGraph without profiles (D12)', () => {
+  test('asks Primal for the contact list alone and caches nobody', async () => {
+    const me = 'a'.repeat(64);
+    const followed = 'b'.repeat(64);
+    const params: unknown[] = [];
+    const layer = createNostrDataLayer({
+      tiers: [
+        createPrimalTier({
+          connection: {
+            request: (request) => {
+              params.push(request.params);
+              return Promise.resolve(
+                ok([
+                  { id: '1'.repeat(64), pubkey: me, kind: 3, content: '', tags: [['p', followed]], created_at: 100 },
+                  // A cache that bundles profiles anyway must still not reach the entity cache.
+                  { id: '2'.repeat(64), pubkey: followed, kind: 0, content: '{"name":"bob"}', created_at: 100 },
+                ]),
+              );
+            },
+          },
+        }),
+      ],
+    });
+    const graph = (await layer.getSocialGraph({ pubkey: me, withProfiles: false }))._unsafeUnwrap();
+    expect(graph.follows).toEqual([followed]);
+    expect(params).toEqual([{ pubkey: me, extended_response: false }]);
+    expect(layer.cache.getProfile(followed)).toBeUndefined();
+
+    // The default still bundles and caches, as the own-graph seed needs.
+    await layer.getSocialGraph({ pubkey: me });
+    expect(params[1]).toEqual({ pubkey: me, extended_response: true });
+    expect(layer.cache.getProfile(followed)?.name).toBe('bob');
+  });
 });

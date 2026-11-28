@@ -1,9 +1,12 @@
 import { isLegacyMockProfile } from '@/shared/stores/runtime/legacyMockProfiles';
-import { setNostrLogger, facade, type NostrLogger } from 'nostr';
+import { facade } from 'nostr';
 
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { log } from '@/shared/lib/logger';
+import { onceLoaded } from '@/shared/lib/persist/hydrationOutcome';
+import { bridgeNostrLoggerOnce } from '@/shared/lib/nostr/nostrLogBridge';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
+import { sharedRelayConnection } from '@/shared/lib/nostr/relayConnection';
 import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
@@ -34,22 +37,13 @@ const WRITE_BEHIND_DEBOUNCE_MS = 5_000;
 // built again after the dispose) drops the old snapshot instead of writing it,
 // because the profile-scoped mirror is by then the new account's. One account
 // never serves or stores another's cached data (ADR-0002). Tier toggles (Settings → Network) likewise
-// rebuild, so a disabled tier drops out of the nagg → Primal → relay chain.
+// rebuild, so a disabled tier drops out of the Primal → relay chain.
+//
+// This layer serves SOCIAL data (profiles, contacts, search, reviews). Payment
+// ingress (ecash DMs, NUT-18 replies) does not read through it: it has its own
+// always-on inbox (`paymentInbox.ts`), so switching a tier off here cannot stop
+// money arriving.
 // ---------------------------------------------------------------------------
-
-let loggerBridged = false;
-
-/** Route the `nostr` package's structured logs into the app logger so the tier trace is visible. */
-function bridgeNostrLoggerOnce(): void {
-  if (loggerBridged) return;
-  loggerBridged = true;
-  const bridge: NostrLogger = {
-    debug: (event, data) => log.debug(event, data),
-    info: (event, data) => log.info(event, data),
-    warn: (event, data) => log.warn(event, data),
-  };
-  setNostrLogger(bridge);
-}
 
 type TierConfig = ReturnType<typeof getNostrTierConfig>;
 
@@ -65,7 +59,8 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
   }
 
   if (config.relay.enabled) {
-    const connection = facade.relay.createRelayPoolConnection({ relays: [...config.relay.relays] });
+    // The connection the payment inbox uses too: one socket per relay.
+    const connection = sharedRelayConnection(config.relay.relays);
     tiers.push(facade.relay.createRelayTier({ connection }));
   }
 
@@ -91,32 +86,49 @@ type LayerMemo = {
 let memo: LayerMemo | null = null;
 
 /**
- * Boot-seed the entity cache (the single profile owner) from the persisted
- * mirror at low confidence (seenAt 0), so non-feed surfaces (DMs, contacts,
- * signer) render cached names/avatars instantly on cold start — before any
- * fetch — exactly as the old separate persisted cache did. A real kind-0 from
- * any tier overrides it (higher seenAt wins the merge).
+ * Seed the entity cache (the single profile owner) from the persisted mirror,
+ * so non-feed surfaces (DMs, contacts, signer) render saved names and avatars
+ * on cold start before any fetch.
+ *
+ * Each entry keeps the time it was fetched, so a profile saved an hour ago is
+ * still fresh and is NOT refetched (only entries past the 24 h window are),
+ * and the `created_at` of its kind-0 where one was saved, so it merges at its
+ * real order. An entry saved without an event time is a seed: any fetched
+ * kind-0 replaces it.
  */
 function seedPersistedProfiles(layer: facade.NostrDataLayer): void {
   const byPubkey = useNostrMetadataCache.getState().byPubkey;
   const metadata: Record<string, facade.ProfileMetadata> = {};
+  const createdAt: Record<string, number> = {};
+  const fetchedAt: Record<string, number> = {};
   let count = 0;
   for (const [pubkey, entry] of Object.entries(byPubkey)) {
     if (isLegacyMockProfile(pubkey, entry)) continue;
-    const { fetchedAt: _fetchedAt, ...rest } = entry;
+    const { fetchedAt: savedFetchedAt, createdAt: savedCreatedAt, ...rest } = entry;
     metadata[pubkey] = rest;
+    fetchedAt[pubkey] = savedFetchedAt;
+    if (savedCreatedAt !== undefined) createdAt[pubkey] = savedCreatedAt;
     count += 1;
   }
   if (count === 0) return;
-  layer.cache.ingestProfileMetadata(metadata, 0, 'cache');
+  layer.cache.ingestProfileMetadata(metadata, 0, 'cache', { createdAt, fetchedAt });
   log.debug('nostr.facade.profiles_boot_seeded', { count });
 }
 
 /**
  * Mirror the entity cache's profile snapshot to durable storage (write-behind,
- * debounced) so the boot-seed above has data next launch. The entity cache is
- * the single owner; this store is purely its persistent tail. Returns a
- * teardown that removes the listener and writes or drops a pending snapshot.
+ * debounced) so the seed above has data next launch. The entity cache is the
+ * single owner; this store is purely its persistent tail. Returns a teardown
+ * that removes the listeners and writes or drops a pending snapshot.
+ *
+ * The saved mirror may not have been read yet when the layer is first built
+ * (it is not one of the stores the app waits for). Two rules follow:
+ *
+ * - The cache is seeded when the read finishes, not only at build, so a layer
+ *   built first still paints saved profiles.
+ * - Nothing is written until the read has finished, and a write starts from
+ *   what the mirror holds and lays the cache over it. A snapshot taken from a
+ *   cache that never saw the saved entries cannot replace them with less.
  *
  * The mirror is whichever account is active, so a snapshot is only written
  * while that is still `owner`: a layer built again during an account switch
@@ -127,10 +139,26 @@ function startProfilePersistence(
   owner: string | undefined
 ): LayerMemo['teardownPersistence'] {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** A change the cache saw while the mirror could not be written yet. */
+  let dirty = false;
+  /** The saved mirror could not be read at all: there is nothing on disk to protect. */
+  let mirrorUnreadable = false;
+  /** Seeding writes what the mirror already holds: not a change to save. */
+  let seeding = false;
+  let torn = false;
+  const mirrorKnown = () => mirrorUnreadable || useNostrMetadataCache.persist.hasHydrated();
   const flush = () => {
     timer = undefined;
     if (activePubkey() !== owner) return;
+    if (!mirrorKnown()) {
+      dirty = true;
+      return;
+    }
+    dirty = false;
     const records: Record<string, NostrProfileMetadata> = {};
+    for (const [pubkey, saved] of Object.entries(useNostrMetadataCache.getState().byPubkey)) {
+      if (!isLegacyMockProfile(pubkey, saved)) records[pubkey] = saved;
+    }
     for (const record of layer.cache.profiles.values()) {
       const mapped = cachedProfileToMetadata(record);
       if (mapped && record.pubkey && !isLegacyMockProfile(record.pubkey, mapped))
@@ -138,12 +166,41 @@ function startProfilePersistence(
     }
     useNostrMetadataCache.getState().persistOwnerSnapshot(records);
   };
-  const unsub = layer.cache.profiles.subscribe(() => {
-    if (timer) return; // a flush is already scheduled
+  const schedule = () => {
+    if (timer || seeding) return; // a flush is already scheduled
     timer = setTimeout(flush, WRITE_BEHIND_DEBOUNCE_MS);
-  });
+  };
+  const onMirrorRead = () => {
+    if (torn || activePubkey() !== owner) return;
+    mirrorUnreadable = false;
+    seeding = true;
+    try {
+      seedPersistedProfiles(layer);
+    } finally {
+      seeding = false;
+    }
+    if (dirty) schedule();
+  };
+  if (useNostrMetadataCache.persist.hasHydrated()) {
+    onMirrorRead();
+  } else {
+    onceLoaded(
+      useNostrMetadataCache,
+      (loaded) => {
+        if (torn || loaded || activePubkey() !== owner) return;
+        mirrorUnreadable = true;
+        if (dirty) schedule();
+      },
+      { orFailed: true }
+    );
+  }
+  const unsub = layer.cache.profiles.subscribe(schedule);
+  // Every later read too: the mirror is read again when the profile changes.
+  const stopHydrationListener = useNostrMetadataCache.persist.onFinishHydration(onMirrorRead);
   return (pending) => {
+    torn = true;
     unsub();
+    stopHydrationListener();
     if (!timer) return;
     clearTimeout(timer);
     timer = undefined;
@@ -202,7 +259,7 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   const layer = assembleLayer(config);
   if (layer) {
     seedOwnProfile(layer);
-    seedPersistedProfiles(layer);
+    // Seeds from the saved mirror now if it has been read, else when it is.
     const teardownPersistence = startProfilePersistence(layer, pubkey);
     memo = { layer, configKey, pubkey, teardownPersistence };
   } else {

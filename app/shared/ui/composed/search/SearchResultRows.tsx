@@ -212,6 +212,8 @@ function PersonRow({ person }: { person: Extract<SearchListItem, { type: 'person
         isLoadingProfile: person.isLoadingProfile,
       })}
       titleTrailing={<FollowBadge pubkey={person.pubkey} />}
+      // Same height while the profile loads, with a NIP-05, and without one.
+      reserveAccentLine
       onPress={() => navigateToProfile(person.pubkey)}
       testID={`contact-row:nostr:${person.pubkey}`}
     />

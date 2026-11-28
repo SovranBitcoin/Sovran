@@ -122,6 +122,8 @@ async function setup(options: { initial?: AppStateStatus; honourSince?: boolean 
 describe('payment-request inbox poll', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    // After every wrap these tests date: the read window never runs past the clock.
+    jest.setSystemTime(1_800_000_100_000);
     mockUnwrap.mockReset();
     mockUnwrap.mockReturnValue({
       content: '{"id":"r","unit":"sat","mint":"https://mint.example","proofs":[]}',
@@ -345,5 +347,42 @@ describe('payment-request inbox poll', () => {
     expect(next.getDmEnvelopes.mock.calls[1][0]).not.toHaveProperty('since');
     expect(next.ingestPayload).toHaveBeenCalledTimes(2);
     await next.dispose();
+  });
+
+  it('a wrap dated in the future cannot move the read window past wraps still to come', async () => {
+    const t = await setup({ honourSince: true });
+    // Anyone can send one of these; it must not blind the poll to later payers.
+    const future = wrap('a', 1_900_000_000);
+    t.setInbox([future]);
+    await t.activate();
+    await advance(POLL_INTERVAL_MS);
+    // Bounded by the clock (1_800_000_100) less the two-day overlap, not by 1_900_000_000.
+    expect(t.getDmEnvelopes.mock.calls[1][0].since).toBe(1_800_000_100 - 172_800);
+
+    const honest = wrap('b', 1_800_000_050);
+    t.setInbox([future, honest]);
+    await advance(POLL_INTERVAL_MS);
+    expect(t.ingestPayload.mock.calls.map((call) => call[1].transportMessageId)).toContain(
+      honest.id
+    );
+    await t.dispose();
+  });
+
+  it('reads the whole inbox again once six hours have passed since the last full read', async () => {
+    const t = await setup({ honourSince: true });
+    t.setInbox([wrap('a', 1_800_000_000)]);
+    await t.activate();
+    await advance(POLL_INTERVAL_MS);
+    expect(t.getDmEnvelopes.mock.calls[1][0]).toHaveProperty('since');
+    // A wrap built offline days ago and only now published: dated before the window.
+    const lateOld = wrap('c', 1_799_000_000);
+    t.setInbox([wrap('a', 1_800_000_000), lateOld]);
+    await advance(6 * 60 * 60 * 1000);
+    const last = t.getDmEnvelopes.mock.calls.at(-1)![0];
+    expect(last).not.toHaveProperty('since');
+    expect(t.ingestPayload.mock.calls.map((call) => call[1].transportMessageId)).toContain(
+      lateOld.id
+    );
+    await t.dispose();
   });
 });

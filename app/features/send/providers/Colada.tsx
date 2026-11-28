@@ -159,7 +159,8 @@ async function resolveRecipientProfileFromRelays(
     // Warm the single owner (entity cache) so other surfaces (ContactRow,
     // DmChatHeader, profile screens, HistoryEntryHeader) hit warm cache
     // for this pubkey on next render without re-fetching.
-    ingestResolvedProfiles({ [pubkey]: parsed });
+    // With the event's own time, so a newer kind-0 fetched later replaces it.
+    ingestResolvedProfiles({ [pubkey]: parsed }, { [pubkey]: event.created_at });
     const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
     if (!displayName) {
       paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {

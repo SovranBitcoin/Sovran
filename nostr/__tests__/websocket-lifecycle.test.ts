@@ -72,9 +72,9 @@ describe.each(Object.entries(requests))(
       });
       expect(result._unsafeUnwrap()).toEqual([]);
       expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
-      // A relay's socket is shared between requests and closes once it has
-      // been idle; a per-request socket (Primal) is closed already.
-      await vi.advanceTimersByTimeAsync(5_000);
+      // Both sockets are shared between requests and close once idle
+      // (relay 5 s, Primal 15 s).
+      await vi.advanceTimersByTimeAsync(15_000);
       expect(socket.close).toHaveBeenCalledTimes(1);
       expect(vi.getTimerCount()).toBe(0);
     });

@@ -32,8 +32,16 @@ export interface NostrClientConfig {
   relays?: readonly string[];
   signer?: NostrSigner;
   WebSocketImpl?: new (url: string) => WebSocketLike;
+  /** First reconnect delay; doubles per consecutive failure. Default 3 s. */
   reconnectDelayMs?: number;
+  /** Ceiling for the doubled delay. Default 60 s. */
+  reconnectMaxDelayMs?: number;
+  /** Source of the 0..1 reconnect jitter (tests pin it). Defaults to `Math.random`. */
+  random?: () => number;
 }
+
+/** A socket that stayed open this long was a real connection: the next drop starts the backoff over. */
+const STABLE_CONNECTION_MS = 30_000;
 
 interface PendingPublish {
   event: VerifiedEvent;
@@ -57,6 +65,10 @@ interface ManagedRelay {
   status: RelayHealth;
   frames: number;
   disconnectCount: number;
+  /** Consecutive failed or short-lived connections; sets the reconnect delay. */
+  backoffStep: number;
+  /** When the current socket opened (ms), or null while it has not. */
+  openedAt: number | null;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   pendingPublishes: Map<string, PendingPublish>;
   subscriptions: Map<string, ActiveSub>;
@@ -100,12 +112,17 @@ export class NostrClient {
   private readonly listeners = new Map<NostrClientEvent, Set<(url: string) => void>>();
   private readonly wsImpl: (new (url: string) => WebSocketLike) | undefined;
   private readonly reconnectDelayMs: number;
+  private readonly reconnectMaxDelayMs: number;
+  private readonly random: () => number;
+  private _paused = false;
   private _signer: NostrSigner | undefined;
   private _disposed = false;
 
   constructor(config: NostrClientConfig = {}) {
     this.wsImpl = config.WebSocketImpl;
     this.reconnectDelayMs = config.reconnectDelayMs ?? 3_000;
+    this.reconnectMaxDelayMs = config.reconnectMaxDelayMs ?? 60_000;
+    this.random = config.random ?? Math.random;
     this._signer = config.signer;
     if (config.relays && config.relays.length > 0) {
       this.ensureRelays(config.relays);
@@ -185,15 +202,58 @@ export class NostrClient {
         const entry = this.createRelayEntry(url);
         this.relays.set(url, entry);
         added.push(url);
-        this.connectRelay(entry);
+        // While paused, `resume` opens it; a publish or subscription still can.
+        if (!this._paused) this.connectRelay(entry);
       } else {
         const entry = this.relays.get(url)!;
-        if (!entry.socket && entry.status === 'disconnected') {
+        if (!this._paused && !entry.socket && entry.status === 'disconnected') {
           this.connectRelay(entry);
         }
       }
     }
     return added;
+  }
+
+  get paused(): boolean {
+    return this._paused;
+  }
+
+  /**
+   * The app left the foreground. Stop reconnecting on a timer, and close every
+   * socket that carries nothing: no subscription and no publish awaiting its
+   * OK. A socket in use is left alone, and a publish or subscription started
+   * while paused still connects, so nothing a caller asked for is dropped.
+   */
+  pause(): void {
+    if (this._disposed || this._paused) return;
+    this._paused = true;
+    for (const relay of this.relays.values()) {
+      if (relay.reconnectTimer) {
+        clearTimeout(relay.reconnectTimer);
+        relay.reconnectTimer = null;
+      }
+      if (!relay.socket || relay.pendingPublishes.size > 0 || relay.subscriptions.size > 0) continue;
+      const sock = relay.socket;
+      relay.socket = null;
+      relay.openedAt = null;
+      closeWebSocket(sock);
+      this.setStatus(relay, 'disconnected');
+    }
+  }
+
+  /** Back in the foreground: reconnect every configured relay now, from the first backoff step. */
+  resume(): void {
+    if (this._disposed || !this._paused) return;
+    this._paused = false;
+    for (const relay of this.relays.values()) {
+      if (!this.configuredRelays.has(relay.url) || relay.socket) continue;
+      if (relay.reconnectTimer) {
+        clearTimeout(relay.reconnectTimer);
+        relay.reconnectTimer = null;
+      }
+      relay.backoffStep = 0;
+      this.connectRelay(relay);
+    }
   }
 
   publishToRelay(rawUrl: string, event: VerifiedEvent, timeoutMs = 10_000): Promise<void> {
@@ -395,6 +455,8 @@ export class NostrClient {
       status: 'disconnected',
       frames: 0,
       disconnectCount: 0,
+      backoffStep: 0,
+      openedAt: null,
       reconnectTimer: null,
       pendingPublishes: new Map(),
       subscriptions: new Map(),
@@ -439,6 +501,7 @@ export class NostrClient {
     socket.onopen = () => {
       if (this._disposed || relay.socket !== socket) return;
       relay.disconnectCount = 0;
+      relay.openedAt = Date.now();
       this.setStatus(relay, 'connected');
       this.emit('relay:connect', relay.url);
       for (const pending of [...relay.pendingPublishes.values()]) {
@@ -557,6 +620,11 @@ export class NostrClient {
       relay.socket = null;
       closeWebSocket(sock);
     }
+    // A relay that accepts and then drops straight away is as dead as one
+    // that refuses: only a connection that lasted starts the backoff over.
+    const lasted = relay.openedAt !== null && Date.now() - relay.openedAt >= STABLE_CONNECTION_MS;
+    relay.openedAt = null;
+    relay.backoffStep = lasted ? 1 : relay.backoffStep + 1;
     relay.disconnectCount += 1;
     this.setStatus(relay, relay.disconnectCount >= 2 ? 'flapping' : 'disconnected');
     this.failPending(relay, error);
@@ -566,13 +634,22 @@ export class NostrClient {
       return;
     }
 
+    // Paused: `resume` reconnects. No timer runs while the app is in the background.
+    if (this._paused) return;
     if (!this._disposed && this.relays.has(relay.url) && !relay.reconnectTimer) {
       relay.reconnectTimer = setTimeout(() => {
         relay.reconnectTimer = null;
-        if (!this._disposed && this.relays.has(relay.url)) {
+        if (!this._disposed && !this._paused && this.relays.has(relay.url)) {
           this.connectRelay(relay);
         }
-      }, this.reconnectDelayMs);
+      }, this.reconnectDelay(relay.backoffStep));
     }
+  }
+
+  /** Exponential backoff with jitter: 3 s, 6 s, 12 s … capped at 60 s, each scaled by 0.5–1. */
+  private reconnectDelay(step: number): number {
+    const exponent = Math.min(Math.max(step - 1, 0), 20);
+    const base = Math.min(this.reconnectDelayMs * 2 ** exponent, this.reconnectMaxDelayMs);
+    return Math.round(base * (0.5 + this.random() / 2));
   }
 }

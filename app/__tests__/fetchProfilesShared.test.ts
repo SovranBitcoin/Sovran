@@ -47,8 +47,54 @@ it('shares overlapping Home and row enrichment while fetching only new keys', as
     [bob]: expect.objectContaining({ name: 'b' }),
     [carol]: expect.objectContaining({ name: 'c' }),
   });
-  expect(request).toHaveBeenCalledTimes(2);
-  expect(request).toHaveBeenNthCalledWith(2, [{ kinds: [0], authors: [carol] }], expect.anything());
+  // Asked for in the same frame: one request carries all three, each once.
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenCalledWith(
+    [{ kinds: [0], authors: [alice, bob, carol] }],
+    expect.anything()
+  );
+});
+
+it('a lookup made while one is in flight fetches only the keys not already on their way', async () => {
+  jest.useFakeTimers();
+  try {
+    const answer = deferred<facade.relay.RawRelayEvent[]>();
+    const request = jest.fn(
+      async (filters: Parameters<facade.relay.RelayConnection['request']>[0]) =>
+        ok(
+          (await answer.promise).filter((event) =>
+            filters.some((filter) => filter.authors?.includes(event.pubkey ?? ''))
+          )
+        )
+    );
+    mockLayer = facade.createNostrDataLayer({
+      tiers: [facade.relay.createRelayTier({ connection: { request } })],
+    });
+    const home = fetchProfilesViaFacade([alice, bob]);
+    await jest.advanceTimersByTimeAsync(16);
+    const row = fetchProfilesViaFacade([bob, carol]);
+    await jest.advanceTimersByTimeAsync(16);
+    answer.resolve(
+      [alice, bob, carol].map((pubkey) => ({
+        id: pubkey,
+        pubkey,
+        kind: 0,
+        created_at: 1,
+        content: JSON.stringify({ name: pubkey[0] }),
+      }))
+    );
+    await jest.advanceTimersByTimeAsync(0);
+    expect(await home).toMatchObject({ [alice]: { name: 'a' }, [bob]: { name: 'b' } });
+    expect(await row).toMatchObject({ [bob]: { name: 'b' }, [carol]: { name: 'c' } });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      [{ kinds: [0], authors: [carol] }],
+      expect.anything()
+    );
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('releases a completed miss so a later lookup can retry', async () => {
@@ -115,7 +161,7 @@ it('shares late gap filling after the first aggregate answer has returned', asyn
   }
 });
 
-it('keeps a mounted row eligible to retry after shared slow sources miss', async () => {
+it('a mounted row joins a fetch already in flight, and a miss is not retried inside its window', async () => {
   jest.useFakeTimers();
   try {
     const relay = jest.fn(async () => {
@@ -140,20 +186,21 @@ it('keeps a mounted row eligible to retry after shared slow sources miss', async
     await act(async () => {
       await jest.advanceTimersByTimeAsync(8800);
     });
+    // Bob is still owed by the slow source: the row holds its placeholder
+    // and has not started a request of its own.
     expect(row.result.current.isResolving).toBe(true);
     expect(relay).toHaveBeenCalledTimes(1);
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(700);
+      await jest.advanceTimersByTimeAsync(800);
     });
     await home;
+    expect(row.result.current.isResolving).toBe(false);
+    // Every source answered without Bob: recorded once, for every surface.
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(4000);
+      await jest.advanceTimersByTimeAsync(30_000);
     });
-    expect(relay).toHaveBeenCalledTimes(2);
+    expect(relay).toHaveBeenCalledTimes(1);
     row.unmount();
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(9500);
-    });
   } finally {
     jest.useRealTimers();
   }

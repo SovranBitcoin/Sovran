@@ -2763,6 +2763,11 @@ exports[`persisted schema drift nostr-metadata-cache schema matches the golden s
                 "maxLength": 2048,
                 "type": "string",
               },
+              "createdAt": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer",
+              },
               "displayName": {
                 "maxLength": 512,
                 "type": "string",
@@ -2827,6 +2832,11 @@ exports[`persisted schema drift nostr-metadata-cache schema matches the golden s
               "banner": {
                 "maxLength": 2048,
                 "type": "string",
+              },
+              "createdAt": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer",
               },
               "displayName": {
                 "maxLength": 512,

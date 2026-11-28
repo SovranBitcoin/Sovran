@@ -1,148 +1,39 @@
 import type { facade } from 'nostr';
 
-import { log } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { NOSTR_METADATA_STALE_TTL_MS } from '@/shared/stores/global/nostrMetadataCache';
 
 type ProfileMetadata = facade.ProfileMetadata;
-type ProfileBatch = Record<string, ProfileMetadata>;
-// Overlapping lookups of one key share one read; account/tier changes get a new layer.
-const profileFlights = new WeakMap<
-  facade.NostrDataLayer,
-  Map<string, Promise<ProfileMetadata | undefined>>
->();
 
 /**
  * Fetch kind-0 metadata for a set of pubkeys through the tier-selecting facade
- * (every enabled tier is asked at once; relays fill what Primal lacks).
- * Always asks the tiers, never answers from the cache alone. Returns pubkey →
- * metadata for the ones a tier resolved; never throws. Empty when every tier is
- * disabled or exhausted.
+ * (every enabled tier is asked at once and the newest event wins). Always asks
+ * the tiers, never answers from the cache alone.
+ *
+ * Batched in the facade: every pubkey asked for within one frame, by any
+ * caller, goes out as ONE request per source, and a pubkey already being
+ * fetched joins that request. Returns pubkey → metadata for the ones a tier
+ * resolved; never throws. Empty when every tier is disabled or exhausted.
  */
 export async function fetchProfilesViaFacade(
-  pubkeys: string[],
-  options: { readId?: string } = {}
+  pubkeys: readonly string[]
 ): Promise<Record<string, ProfileMetadata>> {
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
   if (!layer) return {};
-  return fetchProfilesFromLayer(layer, pubkeys, options);
+  return layer.loadProfiles(pubkeys);
 }
 
-async function fetchProfilesFromLayer(
-  layer: facade.NostrDataLayer,
-  pubkeys: string[],
-  options: { readId?: string } = {}
-): Promise<ProfileBatch> {
-  const fetch = async (keys: string[]): Promise<ProfileBatch> => {
-    const result = await layer.getProfiles({
-      pubkeys: keys,
-      refresh: true,
-      ...options,
-    });
-    return result.match(
-      (resolved) => resolved.profiles,
-      () => ({})
-    );
-  };
-  const resolveProfile = async (
-    key: string,
-    profiles: ProfileBatch,
-    previous: facade.CachedProfile | undefined
-  ): Promise<ProfileMetadata | undefined> => {
-    const recordAtAnswer = layer.cache.getProfile(key);
-    const seedPending =
-      layer.cache.pendingProfiles.has(key) && (!recordAtAnswer || recordAtAnswer.seenAt === 0);
-    if (Object.hasOwn(profiles, key) && !seedPending) return profiles[key];
-    // A partial aggregate is not a miss. Wait for this key's remaining
-    // sources so joining screens do not spend retry attempts on one read.
-    if (layer.cache.pendingProfiles.has(key)) {
-      await new Promise<void>((resolve) => {
-        const finish = () => {
-          unsubscribe();
-          resolve();
-        };
-        const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
-          if (!layer.cache.pendingProfiles.has(key)) finish();
-        });
-        if (!layer.cache.pendingProfiles.has(key)) finish();
-      });
-    }
-    const record = layer.cache.getProfile(key);
-    if (record === previous || !record?.seenAt) return undefined;
-    const {
-      pubkey: _pubkey,
-      seenAt: _seenAt,
-      srcRank: _srcRank,
-      fetchedAt: _fetchedAt,
-      ...metadata
-    } = record;
-    return metadata;
-  };
-  const flights =
-    profileFlights.get(layer) ?? new Map<string, Promise<ProfileMetadata | undefined>>();
-  profileFlights.set(layer, flights);
-  const keys = [...new Set(pubkeys)];
-  const missing = keys.filter((key) => !flights.has(key));
-  if (missing.length) {
-    const previous = new Map(missing.map((key) => [key, layer.cache.getProfile(key)]));
-    const batch = fetch(missing);
-    for (const key of missing) {
-      const flight = batch.then((profiles) => resolveProfile(key, profiles, previous.get(key)));
-      flights.set(key, flight);
-      const release = () => {
-        if (layer.cache.pendingProfiles.has(key)) {
-          const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
-            if (layer.cache.pendingProfiles.has(key)) return;
-            if (flights.get(key) === flight) flights.delete(key);
-            unsubscribe();
-          });
-        } else if (flights.get(key) === flight) flights.delete(key);
-      };
-      void flight.then(release, release);
-    }
-  }
-  const entries = await Promise.all(
-    keys.map(async (key) => [key, await flights.get(key)] as const)
-  );
-  return Object.fromEntries(
-    entries.filter((entry): entry is readonly [string, ProfileMetadata] => entry[1] !== undefined)
-  );
-}
-
-const queuedProfileBackfills = new WeakMap<facade.NostrDataLayer, Set<string>>();
-
-/** Batch idle row lookups in one microtask; the shared flight owns their settlement. */
-export function backfillProfile(layer: facade.NostrDataLayer, pubkey: string): void {
-  const queued = queuedProfileBackfills.get(layer);
-  if (queued) {
-    queued.add(pubkey);
-    return;
-  }
-  const batch = new Set([pubkey]);
-  queuedProfileBackfills.set(layer, batch);
-  void Promise.resolve().then(async () => {
-    queuedProfileBackfills.delete(layer);
-    const keys = [...batch].filter((key) => {
-      const record = layer.cache.getProfile(key);
-      return (
-        !layer.cache.settledProfiles.has(key) &&
-        !layer.cache.pendingProfiles.has(key) &&
-        (!record || (record.seenAt === 0 && !record.picture))
-      );
-    });
-    if (keys.length === 0) return;
-    try {
-      await fetchProfilesFromLayer(layer, keys);
-    } catch (error) {
-      log.warn('nostr.profiles.backfill_failed', () => ({ count: keys.length, error }));
-    } finally {
-      for (const key of keys) {
-        if (!layer.cache.pendingProfiles.has(key) && !layer.cache.settledProfiles.has(key)) {
-          layer.cache.settledProfiles.set(key, { settledAt: Date.now() });
-        }
-      }
-    }
-  });
+/**
+ * Make sure these profiles are loaded, without waiting for them: schedules a
+ * batched fetch for each one that is missing or older than the staleness
+ * window, unless a recent fetch already found nothing or one is in flight.
+ * The row reads the result from the entity cache. Safe to call from every row
+ * on every mount: a call that has nothing to do costs a few map lookups.
+ */
+export function ensureProfilesViaFacade(pubkeys: readonly string[]): void {
+  if (pubkeys.length === 0) return;
+  buildNostrDataLayer()?.ensureProfiles(pubkeys, { maxAgeMs: NOSTR_METADATA_STALE_TTL_MS });
 }
 
 /**
@@ -190,8 +81,12 @@ export async function fetchFollowingCountViaFacade(
 ): Promise<number | undefined> {
   const layer = buildNostrDataLayer();
   if (!layer) return undefined;
+  // The lists alone: only the count is wanted. Asking for everyone followed
+  // with their profiles pulled thousands of kind-0s for one number and pushed
+  // them through the cache the viewer's own contacts live in.
   const result = await layer.getSocialGraph({
     pubkey,
+    withProfiles: false,
     ...(options.signal ? { signal: options.signal } : {}),
     ...(options.readId ? { readId: options.readId } : {}),
   });

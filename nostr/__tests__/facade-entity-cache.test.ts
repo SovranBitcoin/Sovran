@@ -194,6 +194,8 @@ describe("profile fetch time", () => {
       );
       expect(cache.getProfile("author")?.fetchedAt).toBe(fetched?.fetchedAt);
       expect(cache.getProfile("author")?.name).toBe("Fetched");
+      // A re-answer moves the stamp once it is meaningfully newer (5 min).
+      clock.mockReturnValue(Date.now() + 10 * 60_000);
       ingestProfiles(cache, {
         tier: "relay",
         profiles: { author: { name: "Lower tier" } },

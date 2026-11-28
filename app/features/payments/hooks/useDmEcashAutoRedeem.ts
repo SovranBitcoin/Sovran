@@ -12,6 +12,13 @@
  *
  * Live arrivals between passes go through step 3 for their one envelope.
  *
+ * How much of the inbox step 3 reads: the WHOLE inbox on mount and at least
+ * every `FULL_WALK_INTERVAL_MS` after; in between, only wraps dated after the
+ * newest one already read, less the NIP-59 backdating window. A foreground
+ * used to make every relay send the whole inbox again each time. The inbox is
+ * the payment inbox (`paymentInbox.ts`): it does not depend on which tiers
+ * Settings → Network has switched on.
+ *
  * Nothing here decides how a token is redeemed. Mint trust, retry and the
  * receive itself belong to the queue's orchestrator, shared with Nut Drop: a
  * token from an untrusted mint is parked there, and surfaces on the wallet
@@ -37,7 +44,7 @@ import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedee
 
 import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import { fetchDmEnvelopes, subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
-import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
+import { envelopeUnixSeconds, type DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { createDmEnvelopeCursor, type DmEnvelopeCursor } from '../data/dmPagination';
 import { intakeDmEcash, type DmEcashQueuePort } from '../lib/dmEcashIntake';
 import { reconcileParkedMessageEcash } from '../lib/dmEcashRecovery';
@@ -66,6 +73,13 @@ const SLOW_FOLLOW_UP_MS = 30_000;
  * window before a page of known messages is allowed to end it.
  */
 const BACKDATING_WINDOW_SEC = 2 * 24 * 60 * 60 + 60 * 60;
+/**
+ * How long incremental passes may stand in for a full read. The window above
+ * holds for a wrap published when it was made. One built offline and sent days
+ * later is dated before it, and only a read of the whole inbox finds that one
+ * if it arrived while no relay socket was open.
+ */
+const FULL_WALK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const queuePort: DmEcashQueuePort = {
   has: (tokenHash) => tokenHash in useNutDropRedeemQueueStore.getState().byTokenHash,
@@ -90,10 +104,6 @@ const queueEntries = () => useNutDropRedeemQueueStore.getState().byTokenHash;
 function useDmEcashAutoRedeem(): void {
   const { keys } = useNostrKeysContext();
   const mockMode = useSettingsStore((s) => s.mockMode);
-  // The live subscription is bound to the data layer it was opened on. A tier
-  // switched on or off in Network settings builds a new layer, so the effect
-  // re-runs and subscribes on that one.
-  const tiers = useSettingsStore((s) => `${s.primalTierEnabled}|${s.relayTierEnabled}`);
   const pubkey = keys?.pubkey;
   const privateKey = keys?.privateKey;
   // Until the queue is read for this profile it holds an empty default: a token
@@ -132,6 +142,11 @@ function useDmEcashAutoRedeem(): void {
     const examined = new Set<string>();
     let walkedToEnd = false;
     let walking = false;
+    // The newest wrap date a finished walk has read, never past the clock: a
+    // wrap dated in the future must not move the next read beyond wraps still
+    // to come. Unset until one walk has read the whole inbox.
+    let newestReadSec: number | undefined;
+    let lastFullWalkAt: number | undefined;
     // One unit of work at a time, and a unit is at most one page: a live
     // arrival waits for the page in hand, never for the rest of the history.
     let chain: Promise<void> = Promise.resolve();
@@ -210,26 +225,61 @@ function useDmEcashAutoRedeem(): void {
       });
     };
 
+    /** What one walk reads from, and the newest wrap date it has seen so far. */
+    type Walk = { cursor: DmEnvelopeCursor; since: number | undefined; newestSec: number };
+
+    /**
+     * A walk that may read only what can be new: the whole inbox has been read
+     * this session, recently enough, and the newest date read is known.
+     */
+    const startWalk = (): Walk => {
+      const incremental =
+        walkedToEnd &&
+        newestReadSec !== undefined &&
+        lastFullWalkAt !== undefined &&
+        Date.now() - lastFullWalkAt < FULL_WALK_INTERVAL_MS;
+      return {
+        cursor: createDmEnvelopeCursor(),
+        since: incremental ? newestReadSec! - BACKDATING_WINDOW_SEC : undefined,
+        newestSec: -Infinity,
+      };
+    };
+
+    /** The walk read to its end: later ones may start from what it saw. */
+    const finishWalk = (walk: Walk) => {
+      walkedToEnd = true;
+      if (walk.since === undefined) lastFullWalkAt = Date.now();
+      if (walk.newestSec > (newestReadSec ?? -Infinity)) newestReadSec = walk.newestSec;
+    };
+
     /** One page of the walk. Resolves true when another page should follow. */
-    const readPage = async (cursor: DmEnvelopeCursor, pageIndex: number): Promise<boolean> => {
+    const readPage = async (walk: Walk, pageIndex: number): Promise<boolean> => {
+      const { cursor } = walk;
       const page = await fetchDmEnvelopes({
         viewer: pubkey,
         limit: PAGE_LIMIT,
         refresh: pageIndex === 0,
         ...(pageIndex > 0 ? { until: cursor.nextUntil() } : {}),
+        ...(walk.since !== undefined ? { since: walk.since } : {}),
       });
       const unexamined = page.envelopes.filter((envelope) => !examined.has(envelope.id));
       // Redeem what this page brought before asking for the next one: a
       // later page failing must not hold back money already in hand.
       await ingestAndDrain(page);
       if (disposed) return false;
-      for (const envelope of page.envelopes) examined.add(envelope.id);
+      const nowSec = Math.floor(Date.now() / 1000);
+      for (const envelope of page.envelopes) {
+        examined.add(envelope.id);
+        const wrapSec = Math.floor(envelopeUnixSeconds(envelope.createdAt));
+        if (Number.isFinite(wrapSec))
+          walk.newestSec = Math.max(walk.newestSec, Math.min(wrapSec, nowSec));
+      }
       // A page that repeats the walk so far is a transport that ignores the
       // cursor (the relay tier returns the whole inbox every time).
       const advanced = cursor.track(page) > 0;
 
       if (!page.hasNextPage || !advanced || cursor.nextUntil() === undefined) {
-        walkedToEnd = true;
+        finishWalk(walk);
         return false;
       }
       const pastBackdating = (cursor.nextUntil() ?? 0) < Date.now() / 1000 - BACKDATING_WINDOW_SEC;
@@ -237,7 +287,7 @@ function useDmEcashAutoRedeem(): void {
       if (pageIndex + 1 >= MAX_PAGES_PER_PASS) {
         // Treated as a full walk so later ones can stop early; the tail past
         // the cap is not read by this build.
-        walkedToEnd = true;
+        finishWalk(walk);
         paymentLog.warn('payment.dm_ecash.backfill_capped', { pages: MAX_PAGES_PER_PASS });
         return false;
       }
@@ -245,19 +295,19 @@ function useDmEcashAutoRedeem(): void {
     };
 
     /** Each page is its own unit of work, queued behind whatever arrived live. */
-    const walk = (cursor: DmEnvelopeCursor, pageIndex: number) => {
+    const walk = (state: Walk, pageIndex: number) => {
       walking = true;
       const page = async () => {
         if (disposed) return false;
         if (pageIndex === 0) {
           await hydrateDmDecryptCaches(pubkey);
         }
-        return readPage(cursor, pageIndex);
+        return readPage(state, pageIndex);
       };
       run('inbox', () =>
         page().then(
           (more) => {
-            if (more) walk(cursor, pageIndex + 1);
+            if (more) walk(state, pageIndex + 1);
             else walking = false;
           },
           (error: unknown) => {
@@ -278,7 +328,7 @@ function useDmEcashAutoRedeem(): void {
       });
       // A walk in flight already starts from the newest message; the paging
       // boundary belongs to one walk, so each new walk gets its own cursor.
-      if (!walking) walk(createDmEnvelopeCursor(), 0);
+      if (!walking) walk(startWalk(), 0);
     };
 
     pass();
@@ -306,7 +356,7 @@ function useDmEcashAutoRedeem(): void {
       unsubscribeRestore();
       appState.remove();
     };
-  }, [mockMode, pubkey, privateKey, tiers, queueReady]);
+  }, [mockMode, pubkey, privateKey, queueReady]);
 }
 
 /** Account-scoped mount point; renders its children unchanged. */

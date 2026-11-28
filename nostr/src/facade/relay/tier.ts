@@ -20,7 +20,7 @@ import {
   type DmEnvelopesBundle,
   type DmEnvelopesRequest,
 } from '../dm';
-import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
+import { latestKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import {
   profileSearchHitsFromKind0,
   type ProfileSearchBundle,
@@ -38,6 +38,13 @@ import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 // envelopes, profiles and NIP-50 profile search straight off relays. Feature
 // ceilings are accepted here (no follower counts, unranked search).
 // ---------------------------------------------------------------------------
+
+/**
+ * NIP-59 dates a gift wrap up to two days in the past. A resumed inbox
+ * subscription reads back through that window, plus an hour for clock skew
+ * between sender and relay.
+ */
+export const GIFT_WRAP_RESUME_OVERLAP_SEC = 2 * 24 * 60 * 60 + 60 * 60;
 
 export type RelayTierConfig = {
   connection: RelayConnection;
@@ -141,12 +148,18 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       onEnvelope: (envelope: DmEnvelope) => void,
     ): () => void {
       // Live counterpart of getDmEnvelopes: an open REQ for the viewer's DM
-      // wraps that stays past EOSE. Same NO since/limit reasoning (gift-wrap
-      // created_at is randomized). The relay `subscribe` dedupes by id, so
-      // repeat wraps never double-fire.
+      // wraps that stays past EOSE. The first attach is as wide as the caller
+      // asks (unbounded without `since`). A re-attach after a dropped socket
+      // resumes from what that relay last sent, less the overlap, instead of
+      // having the relay replay the whole inbox. The relay `subscribe`
+      // dedupes by id, so repeat wraps never double-fire.
       if (!config.connection.subscribe) return () => {};
       const filters: NostrFilter[] = [
-        { kinds: DM_ENVELOPE_KINDS, '#p': [request.viewerPubkey] },
+        {
+          kinds: DM_ENVELOPE_KINDS,
+          '#p': [request.viewerPubkey],
+          ...(request.since !== undefined ? { since: request.since } : {}),
+        },
       ];
       return config.connection.subscribe(filters, (raw) => {
         if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') return;
@@ -158,7 +171,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           tags: Array.isArray(raw.tags) ? (raw.tags as string[][]) : [],
           createdAtSec: typeof raw.created_at === 'number' ? raw.created_at : 0,
         });
-      });
+      }, { resumeOverlapSec: GIFT_WRAP_RESUME_OVERLAP_SEC });
     },
 
     async getProfiles(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>> {
@@ -169,7 +182,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<ProfilesBundle>>(
-        (events) => answered({ profiles: profilesFromKind0(events) }),
+        (events) => answered(latestKind0(events)),
         (error) => failed(error),
       );
     },

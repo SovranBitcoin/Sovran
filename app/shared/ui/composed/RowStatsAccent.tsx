@@ -192,3 +192,28 @@ export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
     </HStack>
   );
 }
+
+/**
+ * An empty accent line: the height of `RowStatsAccent`'s stats row and nothing
+ * to see. For a row in a list that reserves the accent line (see
+ * `ContactRow`'s `reserveAccentLine`) when the person turned out to have
+ * neither stats nor a NIP-05: the row keeps the height it had while that was
+ * still unknown, instead of shrinking under the reader's thumb.
+ *
+ * Co-located with `RowStatsAccent` for the same reason as the skeleton: the
+ * same row (2px top margin) around a `Text` at the same `size`/`bold`, so the
+ * line box matches at every font scale. A fixed pixel height would not.
+ */
+export function RowStatsAccentSpacer() {
+  return (
+    <View
+      className="mt-0.5 flex-row items-center opacity-0"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      testID="row-stats-accent-spacer">
+      <Text size={12} bold>
+        {' '}
+      </Text>
+    </View>
+  );
+}

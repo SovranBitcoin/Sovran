@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import { answered } from '../src/tiers';
 import {
@@ -131,5 +131,50 @@ describe('mergeSearchHit — an upgrade keeps what the new tier could not measur
   test('a hit with no figures at all leaves the base figures alone', () => {
     const base = { pubkey: B, metadata: {}, score: 0.3, followers: 4 };
     expect(mergeSearchHit(base, { pubkey: B, metadata: {} })).toMatchObject({ score: 0.3, followers: 4 });
+  });
+});
+
+describe('search results are not fetched again (audit D11)', () => {
+  test('ten hits that came with their kind-0 leave nothing for the result rows to fetch', async () => {
+    vi.useFakeTimers();
+    try {
+      const pubkeys = Array.from({ length: 10 }, (_, index) => index.toString(16).padStart(64, '0'));
+      const events = pubkeys.map((pubkey, index) => ({
+        id: `${pubkey.slice(2)}aa`,
+        pubkey,
+        kind: 0,
+        content: JSON.stringify({ name: `hit-${index}`, lud16: `hit${index}@example.com` }),
+        created_at: 1_700_000_000 + index,
+      }));
+      const profileRequests: unknown[] = [];
+      const layer = createNostrDataLayer({
+        tiers: [
+          createPrimalTier({
+            connection: {
+              request: (request) => {
+                if (request.verb === 'user_infos') profileRequests.push(request.params);
+                return Promise.resolve(ok(request.verb === 'user_search' ? events : []));
+              },
+            },
+          }),
+        ],
+      });
+      const found = (await layer.searchProfiles({ query: 'hit', limit: 10 }))._unsafeUnwrap();
+      expect(found.hits).toHaveLength(10);
+      // Every hit is a fetched profile at its event's own time.
+      for (const [index, pubkey] of pubkeys.entries()) {
+        expect(layer.cache.getProfile(pubkey)).toMatchObject({
+          name: `hit-${index}`,
+          lud16: `hit${index}@example.com`,
+          seenAt: 1_700_000_000 + index,
+        });
+      }
+      // What each result row does on mount.
+      expect(layer.ensureProfiles(pubkeys)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(profileRequests).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
