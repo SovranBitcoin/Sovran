@@ -41,6 +41,7 @@ import {
 } from '@/features/nearPay/components/NutDropCelebrationOverlay';
 import { useNutDropCelebration } from '@/features/nearPay/hooks/useNutDropCelebration';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
+import { useNearbyRadio } from '@/features/nearPay/lib/nearbyRadio';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
@@ -1446,6 +1447,7 @@ export function NearPayScreen() {
   // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   // A token DM is only enabled after the peer advertises a valid creq capability.
+  useNearbyRadio();
   const peers = useFreshNearbyPeers();
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
@@ -2101,7 +2103,7 @@ export function NearPayScreen() {
 
   const bluetooth = useBluetoothState();
   // 'unknown' stays on the scanning path — iOS reports a real state only after
-  // startBLE has spun up CoreBluetooth, and useBLEPeers starts it on mount.
+  // startBLE has spun up CoreBluetooth, and useNearbyRadio starts it on mount.
   const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
   const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';

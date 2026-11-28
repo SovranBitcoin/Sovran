@@ -8,6 +8,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
+import { useNearbyRadio } from '@/features/nearPay/lib/nearbyRadio';
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
@@ -64,6 +65,7 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
+  useNearbyRadio();
   const peers = useFreshNearbyPeers();
 
   // The shared directory exposes authenticated payment recipients only.

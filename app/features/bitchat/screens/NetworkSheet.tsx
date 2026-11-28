@@ -29,6 +29,7 @@ import { List } from '@/shared/ui/composed/List';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { useBLEPeers } from '../hooks/useBLEPeers';
+import { useNearbyRadio } from '@/features/nearPay/lib/nearbyRadio';
 import { useBluetoothState } from '../hooks/useBluetoothState';
 import { BluetoothNotice } from '../components/BluetoothNotice';
 
@@ -87,6 +88,7 @@ export default function NetworkSheet() {
     'surface-secondary',
   ] as const);
 
+  useNearbyRadio();
   const { peers, connectedCount } = useBLEPeers();
   useVisualActivityEffect(acquirePublicBLEMesh);
   const bluetooth = useBluetoothState();
