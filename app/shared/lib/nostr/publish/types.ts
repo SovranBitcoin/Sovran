@@ -50,8 +50,7 @@ export interface PublishOptions {
   event: UnsignedNostrEvent | VerifiedEvent;
   /**
    * Explicit relay-url set. When omitted, the event publishes to the client's
-   * current relays. Phase 1's `resolveWriteRelays` is the source for
-   * outbox-aware sets.
+   * current relays.
    */
   relays?: readonly string[];
   /** Per-relay timeout (ms). Defaults to {@link PUBLISH_TIMEOUT_MS}. */

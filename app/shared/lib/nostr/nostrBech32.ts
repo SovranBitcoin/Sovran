@@ -187,17 +187,3 @@ export function tryNpubEncode(hex: string): string {
     return '';
   }
 }
-
-/** Encodes a NIP-19 `nevent` for an event (for quotes / share links). '' on error. */
-export function tryNeventEncode(
-  id: string,
-  author?: string,
-  kind?: number,
-  relays?: readonly string[]
-): string {
-  try {
-    return nip19.neventEncode({ id, author, kind, relays: relays ? [...relays] : undefined });
-  } catch {
-    return '';
-  }
-}

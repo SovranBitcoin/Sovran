@@ -33,8 +33,7 @@ type BlossomDeleteError =
 // Primal's DELETE runs a synchronous server-side media purge that can take
 // >15s; too short a cap aborts a delete that actually succeeds (the client logs
 // failure while the blob is really gone). 30s gives the purge room to return a
-// clean 2xx. A delete that still times out is recovered by the HEAD-probe in
-// `deleteOwnedBlob`.
+// clean 2xx.
 const DELETE_TIMEOUT_MS = 30_000;
 /** Existence probe timeout (settings refresh / post-delete verification). */
 const CHECK_TIMEOUT_MS = 10_000;

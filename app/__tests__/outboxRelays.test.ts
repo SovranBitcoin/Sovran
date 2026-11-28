@@ -1,5 +1,5 @@
 /**
- * Pure NIP-65 outbox logic: relay-list parse/serialize and write-relay routing,
+ * Pure NIP-65 outbox logic: relay-list parse/serialize,
  * over the real relay url normalizer (lowercase host, canonical trailing slash).
  */
 import {
@@ -8,8 +8,6 @@ import {
   readRelays,
   writeRelays,
 } from '@/shared/lib/nostr/outbox/nip65';
-import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
-import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
 
 describe('nip65 parse/serialize', () => {
   it('parses bare r-tags as read+write', () => {
@@ -61,48 +59,5 @@ describe('nip65 parse/serialize', () => {
       ['r', 'wss://r.com/', 'read'],
       ['r', 'wss://w.com/', 'write'],
     ]);
-  });
-});
-
-describe('resolveWriteRelays', () => {
-  it('uses own write relays when present', () => {
-    const out = resolveWriteRelays({ ownWriteRelays: ['wss://mine.com/'] });
-    expect(out).toEqual(['wss://mine.com/']);
-  });
-
-  it('falls back to defaults when own is empty', () => {
-    const out = resolveWriteRelays({ ownWriteRelays: [] });
-    expect(out).toEqual(DEFAULT_RELAYS.map((r) => `${r.toLowerCase()}/`));
-  });
-
-  it('adds recipient read relays (mention fan-out)', () => {
-    const out = resolveWriteRelays({
-      ownWriteRelays: ['wss://mine.com/'],
-      recipients: [{ pubkey: 'p1', readRelays: ['wss://their-inbox.com/'] }],
-    });
-    expect(out).toEqual(expect.arrayContaining(['wss://mine.com/', 'wss://their-inbox.com/']));
-  });
-
-  it('falls back to defaults for a recipient with no known relays', () => {
-    const out = resolveWriteRelays({
-      ownWriteRelays: ['wss://mine.com/'],
-      recipients: [{ pubkey: 'p1', readRelays: [] }],
-    });
-    expect(out).toEqual(expect.arrayContaining(['wss://mine.com/', 'wss://relay.damus.io/']));
-  });
-
-  it('dedupes and caps the fan-out, keeping own relays first', () => {
-    const out = resolveWriteRelays({
-      ownWriteRelays: ['wss://a.com/', 'wss://b.com/'],
-      recipients: [
-        { pubkey: 'p1', readRelays: ['wss://a.com/', 'wss://c.com/'] },
-        { pubkey: 'p2', readRelays: ['wss://d.com/', 'wss://e.com/', 'wss://f.com/'] },
-      ],
-      hintRelays: ['wss://g.com/', 'wss://h.com/', 'wss://i.com/'],
-      maxRelays: 4,
-    });
-    expect(out).toHaveLength(4);
-    expect(out.slice(0, 2)).toEqual(['wss://a.com/', 'wss://b.com/']);
-    expect(new Set(out).size).toBe(4); // no dupes
   });
 });
