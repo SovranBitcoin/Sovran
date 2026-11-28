@@ -269,12 +269,9 @@ describe('PopupHost presentation', () => {
     let finish!: () => void;
     const running = new Promise<void>((done) => (finish = done));
     const onPress = jest.fn(() => running);
-    act(() =>
-      usePopupStore.getState().open({
-        message: 'Redeem',
-        buttons: [{ text: 'Redeem', testID: 'slow-action', onPress }],
-      })
-    );
+    // Popups reach the store through the bridge's sheet config, which carries testIDs.
+    const redeem = { text: 'Redeem', testID: 'slow-action', onPress };
+    act(() => usePopupStore.getState().open({ message: 'Redeem', buttons: [redeem] }));
     const button = r.root.findAll(
       (node) => node.props.testID === 'slow-action' && typeof node.props.onPress === 'function'
     )[0]!;
