@@ -119,6 +119,8 @@ export type PaymentCopyKey =
   | "timeline.onchain.waitingForMint"
   | "timeline.cancelling.label"
   | "timeline.cancelling.info"
+  | "timeline.melt.returning.label"
+  | "timeline.melt.returning.info"
   | "timeline.mint.created.label"
   | "timeline.mint.issuing.label"
   | "timeline.mint.issuing.info"

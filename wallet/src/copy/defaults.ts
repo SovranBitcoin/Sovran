@@ -109,6 +109,8 @@ export const paymentCopyDefaults = {
   "timeline.onchain.waitingForMint": "Waiting for mint to credit",
   "timeline.cancelling.label": "Cancelling",
   "timeline.cancelling.info": "Returning ecash to your balance",
+  "timeline.melt.returning.label": "Returning ecash",
+  "timeline.melt.returning.info": "The payment didn't go through",
   "timeline.mint.created.label": "Invoice created",
   "timeline.mint.issuing.label": "Adding to wallet",
   "timeline.mint.issuing.info": "Collecting your ecash from the mint",

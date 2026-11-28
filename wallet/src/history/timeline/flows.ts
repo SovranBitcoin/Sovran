@@ -350,6 +350,13 @@ const meltPaid = (ctx: TimelineContext) =>
 
 /** `rolling_back` is the reversal in flight, not its result. */
 const meltReversing = (ctx: TimelineContext) => ctx.state === ROLLING_BACK;
+/** The user's cancel takes a melt from prepared straight to rolled_back; a
+ *  melt is only rolling_back while coco recovers a payment that did not go
+ *  through. So its reversal is never a cancel. */
+const meltReversalCopy: FlowDef["reversalCopy"] = (ctx) => ({
+  label: ctx.paymentCopy.text("timeline.melt.returning.label"),
+  info: ctx.paymentCopy.text("timeline.melt.returning.info"),
+});
 const meltReversed = (ctx: TimelineContext) =>
   ctx.state !== ROLLING_BACK && isTerminalFailureState(ctx.state);
 
@@ -436,6 +443,7 @@ const lightningMeltFlow: FlowDef = {
   variant: "lightning-melt",
   known: meltKnown,
   reversing: meltReversing,
+  reversalCopy: meltReversalCopy,
   outcomes: [meltRolledBackOutcome, meltPaymentFailedOutcome, meltExpiredOutcome],
   milestones: [
     meltCreatedMilestone,
@@ -520,6 +528,7 @@ const onchainMeltFlow: FlowDef = {
   known: (ctx) =>
     meltKnown(ctx) || onchainBroadcast(ctx) || !!ctx.onchainSettledInternally,
   reversing: meltReversing,
+  reversalCopy: meltReversalCopy,
   outcomes: [
     meltRolledBackOutcome,
     meltPaymentFailedOutcome,

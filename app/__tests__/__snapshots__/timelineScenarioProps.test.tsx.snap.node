@@ -941,11 +941,11 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-send-failed (Li
   ],
   "texts": [
     "Send • In Progress",
-    "CANCELLING",
+    "RETURNING ECASH",
     "Payment prepared",
     "2026-05-22",
-    "Cancelling",
-    "Returning ecash to your balance",
+    "Returning ecash",
+    "The payment didn't go through",
   ],
 }
 `;
@@ -5825,11 +5825,11 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send-faile
   ],
   "texts": [
     "Send • In Progress",
-    "CANCELLING",
+    "RETURNING ECASH",
     "Payment prepared",
     "2026-05-22",
-    "Cancelling",
-    "Returning ecash to your balance",
+    "Returning ecash",
+    "The payment didn't go through",
   ],
 }
 `;

@@ -122,10 +122,13 @@ describe('history timeline — lightning SEND (melt)', () => {
     expect(getCardLabel(melt('UNPAID') as never, timeline)).toBe('Send • Expired');
   });
 
+  // I-10: the user's own cancel goes straight from prepared to rolled_back;
+  // a melt is only ever rolling_back while coco recovers a payment that did
+  // not go through. Nobody cancelled it, so the row does not say so.
   it('rolling_back is the reversal in flight, not its result', () => {
     expect(rows(build(melt('rolling_back')))).toEqual([
       'complete | Payment prepared',
-      'current | Cancelling | Returning ecash to your balance',
+      "current | Returning ecash | The payment didn't go through",
     ]);
   });
 
@@ -183,7 +186,7 @@ describe('history timeline — lightning SEND (melt)', () => {
     const stuck = melt('rolling_back', { updatedAt: CREATED_AT + 1_000 });
     const late = build(stuck, { currentTime: CREATED_AT + 10 * 60_000 });
     expect(rows(late)[1]).toBe(
-      'waiting | Cancelling | This has not finished. Your ecash is still held and may need recovering.'
+      'waiting | Returning ecash | This has not finished. Your ecash is still held and may need recovering.'
     );
   });
 
