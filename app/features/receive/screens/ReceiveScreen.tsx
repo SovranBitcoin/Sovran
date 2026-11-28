@@ -59,7 +59,6 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 
@@ -153,7 +152,6 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
         parts={[{ value: npcAddress, kind: 'lightningAddress' }]}
         muted={muted}
         onPress={async () => {
-          await EnhancedHaptics.copyHaptic();
           await actions.copy.execute({ source: 'npc' });
         }}
       />
@@ -170,7 +168,6 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
           isNpcMintUpdating || !actions.changeNpcMint.available
             ? undefined
             : async () => {
-                await EnhancedHaptics.copyHaptic();
                 await actions.changeNpcMint.execute();
               }
         }
@@ -429,7 +426,6 @@ function ReceiveScreenForUnit({
 
   const handleFooterCopy = useCallback(async () => {
     if (!activePayload) return;
-    await EnhancedHaptics.copyHaptic();
     await setStringAsync(activePayload.value);
     copyPopup(activePayload.copyTarget);
     paymentLog.info('receive.qr.footer_copied', {

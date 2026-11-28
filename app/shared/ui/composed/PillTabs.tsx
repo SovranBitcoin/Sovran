@@ -14,6 +14,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import Icon from '@/assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -88,6 +89,7 @@ function PillTabItem<F extends string>({
         accessibilityValue={
           accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
         }
+        haptics={SELECTION_HAPTICS}
         onPressIn={() => isPressed.set(true)}
         onPressOut={() => isPressed.set(false)}
         onPress={() => {

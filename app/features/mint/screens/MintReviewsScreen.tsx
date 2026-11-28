@@ -91,7 +91,6 @@ function ReviewRow({
             accessibilityLabel={`Open ${displayName} profile`}
             activeOpacity={0.75}
             className="shrink-0"
-            haptics
             onPress={() => router.push(buildModalProfileHref({ pubkey: review.pubkey }))}>
             {avatar}
           </Pressable>

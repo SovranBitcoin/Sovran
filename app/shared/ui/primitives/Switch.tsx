@@ -8,6 +8,7 @@ import Animated, {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Pressable } from './Pressable';
+import { SELECTION_HAPTICS } from './Haptics';
 
 const TIMING = { duration: 175, easing: Easing.bezier(0.25, 0.1, 0.25, 1) };
 const SPRING = { damping: 120, stiffness: 1600, mass: 2 };
@@ -56,6 +57,7 @@ export function Switch({
       disabled={isDisabled}
       activeOpacity={1}
       hitSlop={{ top: 10, bottom: 10 }}
+      haptics={SELECTION_HAPTICS}
       onPress={() => onSelectedChange?.(!isSelected)}
       style={{ opacity: isDisabled ? 0.5 : 1 }}>
       <Animated.View

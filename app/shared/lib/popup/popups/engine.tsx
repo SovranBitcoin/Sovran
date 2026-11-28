@@ -7,6 +7,7 @@ import type { PopupTextSegment } from '../format';
 import { flattenSegments } from '../format';
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
 import { describeError, type ServiceFailure } from '@/shared/lib/errors';
+import { outcomeHaptic } from '@/shared/ui/primitives/Haptics';
 
 type PopupVariant = 'toast' | 'sheet';
 type PopupSeverity = 'success' | 'error' | 'warning' | 'info';
@@ -76,6 +77,10 @@ export const popup = (config: PopupConfig) => {
     errorId: errorPresentation?.id,
     errorService: failure?.service,
   });
+
+  // The one notification haptic for every popup outcome (success, warning,
+  // error; info is silent), so call sites never fire their own.
+  outcomeHaptic(severity);
 
   if (variant === 'sheet') {
     const sheetConfig: SheetConfig = {

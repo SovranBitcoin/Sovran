@@ -610,7 +610,6 @@ function SatMintRebalancePlan({ accountUnit }: { accountUnit: string }) {
       {runStatus === 'finished' && plan.steps.length > 0 && swapGroupId && (
         <View className="px-4 pb-2 pt-3">
           <Pressable
-            haptics
             accessibilityRole="button"
             accessibilityLabel="View Swap"
             testID="rebalance-view-swap"

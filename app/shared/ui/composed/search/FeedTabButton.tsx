@@ -39,7 +39,6 @@ export function FeedTabButton({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      haptics={!!onPress}
       activeOpacity={1}
       className="rounded-full"
       style={({ pressed }) => ({

@@ -656,7 +656,6 @@ const PeerNode = React.memo(function PeerNode({
     <Animated.View style={nodeStyle}>
       <Pressable
         onPress={handlePress}
-        haptics
         accessibilityRole="button"
         accessibilityLabel={`Pay ${target.peer.name}`}
         testID={`near-pay-peer-${target.peer.peerID}`}

@@ -49,6 +49,8 @@ export function KeypadKey({
       disabled={disabled}
       activeOpacity={1}
       className="flex-1"
+      // useKeypadPress fires the keypad's tuned haptic (heavier for backspace).
+      haptics={false}
       onPress={onPress}>
       <Animated.View
         className="items-center justify-center gap-0.5 rounded-[20px]"

@@ -85,7 +85,6 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
   return (
     <Surface style={styles.card} contentStyle={styles.cardContent} variant="right">
       <Pressable
-        haptics
         accessibilityRole="button"
         accessibilityLabel={accelerating ? 'Accelerating transaction' : 'Accelerate transaction'}
         accessibilityState={{ disabled: accelerating || busy, busy }}

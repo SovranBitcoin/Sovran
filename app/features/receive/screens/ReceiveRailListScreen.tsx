@@ -39,7 +39,6 @@ import { Surface } from '@/shared/ui/composed/Surface';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Button } from '@/shared/ui/primitives/Button';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -279,7 +278,6 @@ export function ReceiveRailListScreen() {
 
   const handlePress = useCallback((item: ReceiveRailItem) => {
     if (isRailItemCopyable(item.status)) {
-      void EnhancedHaptics.copyHaptic();
       setStringAsync(item.request).then(
         () => {
           copyPopup(item.copyTarget);

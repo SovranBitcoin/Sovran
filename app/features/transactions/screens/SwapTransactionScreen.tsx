@@ -25,7 +25,6 @@ import Animated, {
   Easing,
   LinearTransition,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text, UntranslatedText } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -64,6 +63,7 @@ import {
 import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -234,7 +234,6 @@ export function SwapTransactionScreen({ groupId }: Props) {
   const chevronRotation = useSharedValue(0);
 
   const toggleExpanded = useCallback(() => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     log.debug('tx.swap.toggle_expanded', { groupId });
     setExpanded((prev) => {
       chevronRotation.value = withTiming(prev ? 0 : 180, {
@@ -422,6 +421,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
         {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
         <Pressable
           onPress={toggleExpanded}
+          haptics={SELECTION_HAPTICS}
           accessibilityRole="button"
           accessibilityLabel="Transactions"
           accessibilityState={{ expanded }}

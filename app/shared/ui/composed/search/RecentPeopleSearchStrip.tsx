@@ -157,7 +157,6 @@ function RecentPersonCard({
       testID={`recent-person-${pubkey}`}
       accessibilityRole="button"
       accessibilityLabel={`Open ${displayName}`}
-      haptics
       activeOpacity={0.72}
       onPress={handlePress}
       className="min-h-[88px] w-[82px] items-center justify-center">

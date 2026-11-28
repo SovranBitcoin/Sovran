@@ -26,7 +26,6 @@ import type { useBip321RailSelection } from '@/features/receive/hooks/useBip321R
 import type { Bip321RailId } from '@/shared/stores/profile/mintStore';
 import { PaymentQRCodePlaceholder } from '@/shared/ui/composed/QRCodeFrame';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
@@ -165,14 +164,12 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   }, [settled, uriRef]);
 
   const handleCopyUri = useCallback(async (value: string) => {
-    await EnhancedHaptics.copyHaptic();
     await setStringAsync(value);
     copyPopup('bip321');
     paymentLog.info('receive.bip321.copied', { uriLength: value.length });
   }, []);
 
   const handleCopyRail = useCallback(async (id: Bip321RailId, value: string) => {
-    await EnhancedHaptics.copyHaptic();
     await setStringAsync(value);
     copyPopup(RAIL_COPY_TARGET[id]);
     paymentLog.info('receive.unified.rail_copied', { rail: id, valueLength: value.length });

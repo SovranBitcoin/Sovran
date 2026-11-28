@@ -44,7 +44,6 @@ import {
   useNostrProfileMetadataMany,
 } from '@/shared/hooks/useNostrProfileMetadata';
 import { copyPopup } from '@/shared/lib/popup';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -321,7 +320,6 @@ export function MintInfoScreen() {
       case 'nostr': {
         const npubToCopy = getMintInfoNostrCopyValue(info, pubkey);
         if (npubToCopy) {
-          await EnhancedHaptics.copyHaptic();
           await Clipboard.setStringAsync(npubToCopy);
           copyPopup('npub');
         }

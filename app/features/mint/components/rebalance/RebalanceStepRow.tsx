@@ -285,7 +285,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                       });
                       onRouteThrough();
                     }}
-                    haptics
                     accessibilityRole="button"
                     accessibilityLabel={
                       routeViaLabel

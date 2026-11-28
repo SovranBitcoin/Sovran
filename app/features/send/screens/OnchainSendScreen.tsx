@@ -373,7 +373,6 @@ function OpenInExplorerLink({ url, inferred }: { url: string; inferred?: boolean
   return (
     <>
       <Pressable
-        haptics
         accessibilityRole="link"
         accessibilityLabel="Open in explorer"
         onPress={handlePress}

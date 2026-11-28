@@ -26,7 +26,6 @@ import { CreqCustomizationCard } from '@/features/receive/components/CreqCustomi
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { Button } from '@/shared/ui/primitives/Button';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
@@ -94,7 +93,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
 
   const handleNewRequest = useCallback(async () => {
     paymentLog.info('receive.creq.rotate_requested', { source: 'button' });
-    await EnhancedHaptics.copyHaptic();
     await rotate();
   }, [rotate]);
 

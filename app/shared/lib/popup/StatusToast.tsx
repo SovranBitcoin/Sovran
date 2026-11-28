@@ -12,6 +12,7 @@ import { blend, withAlpha } from '@/shared/lib/color';
 
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 import { popupLog } from '@/shared/lib/logger';
+import { outcomeHaptic } from '@/shared/ui/primitives/Haptics';
 
 import { useToastSurface } from './useToastSurface';
 import {
@@ -66,6 +67,9 @@ type StatusToastProps = {
   indicatorSize?: number;
   /** Structured lifecycle context for log-doctor toast audits. */
   debugFields?: Record<string, unknown>;
+  /** Fire the outcome notification haptic when the toast turns terminal.
+   *  Default `true`; off where another surface owns that moment's haptic. */
+  outcomeHaptics?: boolean;
   /**
    * From `ToastHost` — `hide` (this toast) and its id; `testID` lands on the frame.
    */
@@ -95,6 +99,7 @@ export function StatusToast({
   ringSuccessColor,
   indicatorSize,
   debugFields,
+  outcomeHaptics = true,
   toastProps,
 }: StatusToastProps) {
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
@@ -124,6 +129,13 @@ export function StatusToast({
       withTiming(1, { duration: TERMINAL_TINT_DURATION_MS, easing: Easing.out(Easing.ease) })
     );
   }, [isTerminal, confirmedProgress]);
+
+  // One notification haptic per terminal state the toast reaches: a payment
+  // sent/received/failed toast is the single place that moment buzzes.
+  useEffect(() => {
+    if (!isTerminal || !outcomeHaptics) return;
+    outcomeHaptic(status === 'confirmed' ? 'success' : status === 'failed' ? 'error' : 'warning');
+  }, [isTerminal, outcomeHaptics, status]);
 
   const hide = toastProps.hide;
   useEffect(() => {

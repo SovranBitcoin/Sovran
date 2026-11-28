@@ -1,6 +1,7 @@
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { SELECTION_HAPTICS } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 
 import type { SelectableCheckProps } from './types';
@@ -74,6 +75,7 @@ export function SelectableCheckSquare({
   return (
     <Pressable
       testID={testID}
+      haptics={SELECTION_HAPTICS}
       onPress={() => onChange(!selected)}
       disabled={disabled}
       accessibilityRole="checkbox"

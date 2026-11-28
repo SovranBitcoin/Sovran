@@ -13,7 +13,6 @@ import {
 import { View } from '@/shared/ui/primitives/View/View';
 import { PAYMENT_QR_PADDING, PaymentQRCodePlaceholder } from '@/shared/ui/composed/QRCodeFrame';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
-import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
 import {
@@ -106,7 +105,6 @@ export function PaymentInfo({
       copyTarget,
       valueLength: selectedValue.length,
     });
-    await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(selectedValue);
     copyPopup(copyTarget);
   }, [selectedValue, copyTarget]);
