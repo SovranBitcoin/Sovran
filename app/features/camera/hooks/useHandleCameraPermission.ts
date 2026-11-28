@@ -1,4 +1,5 @@
-import { useCameraPermissions } from 'expo-camera';
+import { useEffect, useRef, useState } from 'react';
+import { useCameraPermissions, type PermissionResponse } from 'expo-camera';
 
 import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
@@ -40,4 +41,44 @@ export function useHandleCameraPermission() {
   };
 
   return { permission, isChecking, handlePermission };
+}
+
+/** What the camera screen shows for the current permission state. */
+export type CameraPermissionView = 'starting' | 'camera' | 'required';
+
+/**
+ * Black "starting" until the permission is known and, when not granted, until
+ * the one automatic ask on open has settled; only then the "permission
+ * required" screen. `useCameraPermissions` starts at `null` on every mount, so
+ * reading `!granted` alone flashed "required" on each open.
+ */
+export function cameraPermissionView(
+  permission: Pick<PermissionResponse, 'granted'> | null,
+  askSettled: boolean
+): CameraPermissionView {
+  if (permission?.granted) return 'camera';
+  if (!permission || !askSettled) return 'starting';
+  return 'required';
+}
+
+/**
+ * The camera screen's permission: callers open the screen without awaiting
+ * anything, and the screen asks once when it opens (system prompt, or the
+ * denied/blocked popup `handlePermission` already shows).
+ */
+export function useCameraPermissionGate() {
+  const { permission, handlePermission } = useHandleCameraPermission();
+  const asked = useRef(false);
+  const [askSettled, setAskSettled] = useState(false);
+
+  useEffect(() => {
+    if (!permission || permission.granted || asked.current) return;
+    asked.current = true;
+    void handlePermission().finally(() => setAskSettled(true));
+  }, [permission, handlePermission]);
+
+  return {
+    view: cameraPermissionView(permission, askSettled),
+    requestPermission: () => void handlePermission(),
+  };
 }

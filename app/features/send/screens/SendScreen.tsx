@@ -42,7 +42,6 @@ import Animated, {
 import { withAlpha } from '@/shared/lib/color';
 
 import { useWalletContext } from '@/runtime/WalletProjection';
-import { useHandleCameraPermission } from '@/features/camera';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { useStartNearbySend } from '@/features/nearPay/hooks/useStartNearbySend';
 
@@ -122,7 +121,6 @@ function resultDisplayName(profile: NostrSearchResult): string {
 export function SendScreen({ unit }: { unit: string }) {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
-  const { handlePermission } = useHandleCameraPermission();
 
   const [foreground, surfaceSecondary, accent, overlay] = useThemeColor([
     'foreground',
@@ -258,12 +256,11 @@ export function SendScreen({ unit }: { unit: string }) {
   }, [runDestinationScan, trimmed]);
 
   // ── Method handlers ──────────────────────────────────────────────────────
-  const handleQrScan = useCallback(async () => {
-    const granted = await handlePermission();
-    if (!granted) return;
+  // The camera screen asks for permission itself, so the tap opens it at once.
+  const handleQrScan = useCallback(() => {
     clearPaymentContext('send.scan_qr');
     router.navigate({ pathname: '/camera', params: { to: 'sendToken', unit } });
-  }, [handlePermission, unit]);
+  }, [unit]);
 
   const handleCreateEcash = useCallback(() => {
     paymentLog.info('send.method.create_ecash');

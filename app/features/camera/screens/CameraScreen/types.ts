@@ -1,3 +1,5 @@
+import type { CameraPermissionView } from '@/features/camera/hooks/useHandleCameraPermission';
+
 export interface ScanningData {
   data: string;
   type?: string;
@@ -9,7 +11,7 @@ export interface CameraScreenShared {
   progress: number;
   flashlightOn: boolean | null;
   loading: boolean;
-  hasPermission: boolean;
+  permissionView: CameraPermissionView;
   requestPermission: () => void;
   handleScan: (data: { data?: string }) => void;
   handleCameraReady: () => void;

@@ -22,7 +22,6 @@ import type { HomeActions } from '@/features/wallet/home/types';
 import { useAppStyle } from '@/shared/styles/appStyle';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/runtime/WalletProjection';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
@@ -81,7 +80,6 @@ export function WalletScreen() {
   };
   const pullToAi = usePullToAiRefreshControl({ onRefresh: handlePullToAiRefresh });
 
-  const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
@@ -99,13 +97,9 @@ export function WalletScreen() {
     void machine.startReceive({ reset: true });
   };
 
-  const handleScanQR = async () => {
+  // The camera screen asks for permission itself, so the tap opens it at once.
+  const handleScanQR = () => {
     walletLog.info('wallet.action.scan_qr', { unit: account.unit });
-    const granted = await handlePermission();
-    if (!granted) {
-      walletLog.info('wallet.action.scan_qr_denied');
-      return;
-    }
     clearPaymentContext('wallet.scan_qr');
     router.navigate({
       pathname: '/camera',

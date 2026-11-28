@@ -94,6 +94,7 @@ jest.mock('@/features/camera/hooks/useHandleCameraPermission', () => ({
     permission: { granted: true },
     handlePermission: async () => true,
   }),
+  useCameraPermissionGate: () => ({ view: 'camera', requestPermission: jest.fn() }),
 }));
 jest.mock('@/features/camera/screens/CameraScreen/CameraLayout', () => ({
   CameraLayout: ({ children, ...props }: { children: React.ReactNode }) => {

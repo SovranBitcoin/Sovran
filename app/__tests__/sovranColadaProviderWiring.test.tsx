@@ -390,27 +390,24 @@ describe('navigation callbacks', () => {
   it.each([
     ['receive', '/(receive-flow)/camera'],
     ['send', '/camera'],
-  ] as const)('opens the %s camera after permission is granted', async (context, pathname) => {
+  ] as const)('opens the %s camera in the same tick as the tap', async (context, pathname) => {
     await mount();
 
     props().navigation.scanQr!(loose({ unit: 'sat', context }));
-    await act(async () => {
-      await Promise.resolve();
-    });
 
     expect(mockRouter.navigate).toHaveBeenCalledWith({ pathname, params: { unit: 'sat' } });
   });
 
-  it('opens no camera when permission is refused', async () => {
+  it('opens the camera even when permission is refused; the camera screen shows that state', async () => {
     mockPermission = false;
     await mount();
 
     props().navigation.scanQr!(loose({ unit: 'sat', context: 'receive' }));
-    await act(async () => {
-      await Promise.resolve();
-    });
 
-    expect(mockRouter.navigate).not.toHaveBeenCalled();
+    expect(mockRouter.navigate).toHaveBeenCalledWith({
+      pathname: '/(receive-flow)/camera',
+      params: { unit: 'sat' },
+    });
   });
 
   it('opens nearby, mint info, add mint and back', async () => {

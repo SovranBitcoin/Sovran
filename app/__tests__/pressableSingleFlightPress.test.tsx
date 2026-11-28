@@ -1,7 +1,6 @@
 /**
  * @jest-environment node
  */
-import React from 'react';
 import { Pressable as RNPressable, StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 

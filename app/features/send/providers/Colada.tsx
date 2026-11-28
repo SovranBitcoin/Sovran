@@ -578,20 +578,17 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
 
   const navigation = useMemo<NavigationCallbacks>(
     () => ({
+      // The camera screen asks for permission itself, so the tap opens it at once.
       scanQr: ({ unit, context }) => {
-        void (async () => {
-          const granted = await requestCameraPermission();
-          paymentLog.info(`${context}.scan.permission`, { granted });
-          if (!granted) return;
-          if (context === 'receive') {
-            router.navigate({
-              pathname: '/(receive-flow)/camera',
-              params: { unit },
-            });
-          } else {
-            router.navigate({ pathname: '/camera', params: { unit } });
-          }
-        })();
+        paymentLog.info(`${context}.scan.open`, { unit });
+        if (context === 'receive') {
+          router.navigate({
+            pathname: '/(receive-flow)/camera',
+            params: { unit },
+          });
+        } else {
+          router.navigate({ pathname: '/camera', params: { unit } });
+        }
       },
       // Nut Drop from the receive hub opens the SAME radar as SendScreen's Nut
       // Drop row — one nearby surface, not a receive-side copy. It starts no
@@ -615,7 +612,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         router.back();
       },
     }),
-    [requestCameraPermission]
+    []
   );
 
   const deepLinkUrl = Linking.useURL();
