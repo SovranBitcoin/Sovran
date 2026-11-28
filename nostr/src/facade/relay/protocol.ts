@@ -1,4 +1,4 @@
-import { verifyEvent } from 'nostr-tools/pure';
+import { getEventHash, verifyEvent } from 'nostr-tools/pure';
 import type { WebSocketLike } from '../websocket';
 import { createRelaySocketPool, type RelaySocketPool } from './socket-pool';
 import { ok, err, type Result } from 'neverthrow';
@@ -53,19 +53,82 @@ export type RawRelayEvent = {
 const GIFT_WRAP_KIND = 1059;
 const LIVE_RECONNECT_INITIAL_MS = 1_000;
 const LIVE_RECONNECT_MAX_MS = 30_000;
+/** Verdicts remembered per connection: an id and a signature, about 200 bytes each. */
+const MAX_REMEMBERED_VERDICTS = 5_000;
 
-/** An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`.
- *  Gift-wrapped payment envelopes (`kind: 1059`) are cryptographically verified before dedup so a
- *  forged outer frame with a spoofed `id` can never poison the seen-set or unwrap cache. */
-function readRelayEvent(payload: unknown): (RawRelayEvent & { id: string }) | null {
+type SignatureCheck = (event: Parameters<typeof verifyEvent>[0]) => boolean;
+
+/**
+ * Gift-wrap signature check that pays for the Schnorr verification once per
+ * event per connection, however many subscriptions and relays deliver it.
+ *
+ * A remembered verdict is reused only for the same bytes: the frame must carry
+ * the signature that was verified, and its fields must still hash to its id
+ * (the id commits to pubkey, created_at, kind, tags and content). A frame that
+ * borrows a verified id for other content fails the hash and is verified in
+ * full, which it then fails.
+ */
+function createGiftWrapVerifier(verify: SignatureCheck): (payload: object, id: string) => boolean {
+  const verdicts = new Map<string, string>();
+  return (payload, id) => {
+    const event = payload as Parameters<typeof verifyEvent>[0];
+    const known = verdicts.get(id);
+    if (known !== undefined && known === event.sig && hashesTo(event, id)) return true;
+    if (!verify(event)) return false;
+    verdicts.set(id, event.sig);
+    if (verdicts.size > MAX_REMEMBERED_VERDICTS) {
+      const oldest = verdicts.keys().next().value;
+      if (oldest !== undefined) verdicts.delete(oldest);
+    }
+    return true;
+  };
+}
+
+function hashesTo(event: Parameters<typeof getEventHash>[0], id: string): boolean {
+  try {
+    return getEventHash(event) === id;
+  } catch {
+    // Not serialisable as an event: let the full check refuse it.
+    return false;
+  }
+}
+
+/**
+ * An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`.
+ *
+ * `isDuplicate` runs BEFORE the signature check: an id enters a caller's seen
+ * set only after its event verified, so a frame repeating that id is dropped
+ * for free instead of costing a verification per replay. A forged frame under
+ * an id not yet seen still fails verification and never enters the set, so it
+ * cannot hide the real event that follows it.
+ */
+function readRelayEvent(
+  payload: unknown,
+  isDuplicate: (id: string) => boolean,
+  verifyGiftWrap: (payload: object, id: string) => boolean,
+): (RawRelayEvent & { id: string }) | null {
   if (!payload || typeof payload !== 'object') return null;
   const { id, kind }: { id?: unknown; kind?: unknown } = payload;
   if (typeof id !== 'string' || typeof kind !== 'number') return null;
-  if (kind === GIFT_WRAP_KIND && !verifyEvent(payload as Parameters<typeof verifyEvent>[0])) {
-    return null;
-  }
+  if (isDuplicate(id)) return null;
+  if (kind === GIFT_WRAP_KIND && !verifyGiftWrap(payload, id)) return null;
   return { ...payload, id, kind };
 }
+
+/** What a live subscription may be told about how to come back after a drop. */
+export type RelaySubscribeOptions = {
+  /**
+   * Re-attach to a relay with `since` set to the newest `created_at` that
+   * relay has sent on this subscription, less this many seconds, instead of
+   * replaying everything. The first attach to a relay is never narrowed.
+   *
+   * The mark is kept per relay (one relay being ahead says nothing about what
+   * another missed) and never runs past the local clock, so an event dated in
+   * the future cannot move it beyond events still to come. For NIP-59 gift
+   * wraps the overlap must cover the two days their dates are randomised over.
+   */
+  resumeOverlapSec?: number;
+};
 
 export interface RelayConnection {
   request(
@@ -78,7 +141,11 @@ export interface RelayConnection {
    * is the one explicit relay seam — the live listener behind a surface session's
    * "Load new". Optional: a connection that can't stream omits it.
    */
-  subscribe?(filters: NostrFilter[], onEvent: (event: RawRelayEvent) => void): () => void;
+  subscribe?(
+    filters: NostrFilter[],
+    onEvent: (event: RawRelayEvent) => void,
+    options?: RelaySubscribeOptions,
+  ): () => void;
 }
 
 export type RelayPoolConfig = {
@@ -95,12 +162,18 @@ export type RelayPoolConfig = {
   idleCloseMs?: number;
   /** Subscriptions one socket carries before another is opened to the same relay. Default 8. */
   maxSubscriptionsPerSocket?: number;
+  /** Signature check for gift wraps (tests count calls). Defaults to nostr-tools' `verifyEvent`. */
+  verify?: SignatureCheck;
+  /** Source of the 0..1 reconnect jitter (tests pin it). Defaults to `Math.random`. */
+  random?: () => number;
 };
 
 export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnection {
   const Ctor =
     config.WebSocketImpl ?? (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
   const settleMs = config.settleMs ?? 50;
+  const verifyGiftWrap = createGiftWrapVerifier(config.verify ?? verifyEvent);
+  const random = config.random ?? Math.random;
   let counter = 0;
   const pool: RelaySocketPool | null = Ctor
     ? createRelaySocketPool({
@@ -205,8 +278,8 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
               anyResponded = true;
               state.heard = true;
               if (message[0] === 'EVENT') {
-                const raw = readRelayEvent(message[2]);
-                if (raw && !byId.has(raw.id)) byId.set(raw.id, raw);
+                const raw = readRelayEvent(message[2], (id) => byId.has(id), verifyGiftWrap);
+                if (raw) byId.set(raw.id, raw);
               } else if (message[0] === 'EOSE' && !receivedEose) {
                 receivedEose = true;
                 eoseCount += 1;
@@ -225,7 +298,7 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       });
     },
 
-    subscribe(filters, onEvent) {
+    subscribe(filters, onEvent, options) {
       const relays = config.relays.filter((r) => r.length > 0);
       if (!pool || relays.length === 0) return () => {};
 
@@ -233,47 +306,70 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       const activeEnds = new Map<string, () => void>();
       const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
       const reconnectDelays = new Map<string, number>();
+      /** Per relay: the newest `created_at` it has sent here, capped at the clock. */
+      const newestFrom = new Map<string, number>();
+      const resumeOverlapSec = options?.resumeOverlapSec;
       let closed = false;
       nostrLog.debug('nostr.relay.listen', { relays: relays.length, filters: filters.length });
+
+      /** Exponential backoff with jitter, so relays that dropped together do not return together. */
+      const scheduleReattach = (url: string) => {
+        if (closed || reconnectTimers.has(url)) return;
+        const delay = reconnectDelays.get(url) ?? LIVE_RECONNECT_INITIAL_MS;
+        reconnectDelays.set(url, Math.min(delay * 2, LIVE_RECONNECT_MAX_MS));
+        const timer = setTimeout(
+          () => {
+            reconnectTimers.delete(url);
+            attach(url);
+          },
+          Math.round(delay * (0.5 + random() / 2)),
+        );
+        reconnectTimers.set(url, timer);
+      };
+
+      const filtersFor = (url: string): NostrFilter[] => {
+        const newest = newestFrom.get(url);
+        if (resumeOverlapSec === undefined || newest === undefined) return filters;
+        const since = newest - resumeOverlapSec;
+        return filters.map((filter) => ({ ...filter, since: Math.max(filter.since ?? 0, since) }));
+      };
 
       const attach = (url: string) => {
         if (closed) return;
         const subId = `sov-live-${++counter}`;
-        const end = pool.subscribe(url, subId, filters, {
+        const end = pool.subscribe(url, subId, filtersFor(url), {
           onFrame(message) {
             if (closed) return;
             // Healthy traffic resets the reconnect backoff for this relay.
             reconnectDelays.delete(url);
             // Stay open past EOSE — a live listener only cares about EVENTs.
             if (message[0] !== 'EVENT') return;
-            const candidate = readRelayEvent(message[2]);
-            if (!candidate || seen.has(candidate.id)) return;
+            noteCreatedAt(url, message[2]);
+            const candidate = readRelayEvent(message[2], (id) => seen.has(id), verifyGiftWrap);
+            if (!candidate) return;
             seen.add(candidate.id);
             onEvent(candidate);
           },
           onClosed: () => {
             activeEnds.delete(url);
-            if (closed || reconnectTimers.has(url)) return;
-            const delay = reconnectDelays.get(url) ?? LIVE_RECONNECT_INITIAL_MS;
-            reconnectDelays.set(url, Math.min(delay * 2, LIVE_RECONNECT_MAX_MS));
-            const timer = setTimeout(() => {
-              reconnectTimers.delete(url);
-              attach(url);
-            }, delay);
-            reconnectTimers.set(url, timer);
+            scheduleReattach(url);
           },
         });
-        if (end) {
-          activeEnds.set(url, end);
-        } else if (!closed && !reconnectTimers.has(url)) {
-          const delay = reconnectDelays.get(url) ?? LIVE_RECONNECT_INITIAL_MS;
-          reconnectDelays.set(url, Math.min(delay * 2, LIVE_RECONNECT_MAX_MS));
-          const timer = setTimeout(() => {
-            reconnectTimers.delete(url);
-            attach(url);
-          }, delay);
-          reconnectTimers.set(url, timer);
-        }
+        if (end) activeEnds.set(url, end);
+        else scheduleReattach(url);
+      };
+
+      /**
+       * Advance this relay's resume point. Counted for every frame the relay
+       * sends, duplicates included: what matters is how far this relay has
+       * been heard, not who delivered an event first.
+       */
+      const noteCreatedAt = (url: string, payload: unknown) => {
+        if (resumeOverlapSec === undefined || !payload || typeof payload !== 'object') return;
+        const { created_at: createdAt }: { created_at?: unknown } = payload;
+        if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return;
+        const capped = Math.min(createdAt, Math.floor(Date.now() / 1000));
+        if (capped > (newestFrom.get(url) ?? -Infinity)) newestFrom.set(url, capped);
       };
 
       for (const url of relays) attach(url);

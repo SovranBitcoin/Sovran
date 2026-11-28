@@ -113,3 +113,21 @@ describe('incremental DM envelopes', () => {
     ]);
   });
 });
+
+describe('subscribeDmEnvelopes — resuming after a dropped socket', () => {
+  test('asks the relay connection to resume with an overlap covering NIP-59 backdating, and passes the caller’s since', () => {
+    let captured: { filters: NostrFilter[]; options: unknown } | undefined;
+    const connection: RelayConnection = {
+      request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok([])),
+      subscribe: (filters, _onEvent, options) => {
+        captured = { filters, options };
+        return () => {};
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection })] });
+    layer.subscribeDmEnvelopes({ viewerPubkey: ME, since: 1_700_000_000 }, () => {});
+    expect(captured?.filters[0]?.since).toBe(1_700_000_000);
+    const overlap = (captured?.options as { resumeOverlapSec: number }).resumeOverlapSec;
+    expect(overlap).toBeGreaterThanOrEqual(2 * 24 * 60 * 60);
+  });
+});
