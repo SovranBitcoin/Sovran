@@ -15,7 +15,7 @@ test('release dates and links match the published GitHub entries reviewed on 202
 
 test('roadmap separates ongoing goals from released features and promised dates', () => {
   expect(siteCopy.roadmap.groups.map(group => group.id)).not.toEqual(['now', 'next', 'later']);
-  expect(new Set(siteCopy.roadmap.groups.map(group => group.id)).size).toBe(14);
+  expect(new Set(siteCopy.roadmap.groups.map(group => group.id)).size).toBe(11);
   expect(siteCopy.roadmap.note).toContain('not a list of released features or promised dates');
   expect(siteCopy.roadmap.note).toContain('not confirmed availability in your installed or store version');
   expect(siteCopy.roadmap.statusLabels).toEqual({ complete: 'Complete', 'in-progress': 'In progress', planned: 'Planned' });

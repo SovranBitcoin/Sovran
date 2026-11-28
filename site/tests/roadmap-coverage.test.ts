@@ -52,25 +52,14 @@ const sourceItems = [
   ['onchain-lightning-04', 'in-progress', "Wire Coco's onchain melt into the send and history screens", ['melt', 'send and history', 'selectable fee rates', 'live settlement progress', 'failure states']],
   ['onchain-lightning-05', 'planned', 'Add reusable Lightning offers (BOLT-12) for sending and receiving', ['BOLT-12', 'sending and receiving', 'static code', 'repeated payments', 'engine and release pipeline']],
   ['onchain-lightning-06', 'planned', 'Bring Payjoin to onchain sends:', ['Payjoin', 'on-chain sends', 'everyday payments', 'collaborative transactions', 'save fees', 'chain-analysis']],
-  ['social-feed-01', 'in-progress', 'The home feed ranks Nostr notes for relevance over raw recency', ['relevance', 'recency', 'reply chains', 'reposts, zaps', 'post metrics', 'unified search', 'grouped notifications', 'ranking, threading, and notification quality']],
-  ['social-feed-02', 'planned', 'Add a composer to the thread view', ['reply composer', 'thread view', 'nested under its parent']],
-  ['social-feed-03', 'planned', 'Add a mirror-to-X feature', ['connected X account', 'mirror', 'opt-in share', 'managed posting later']],
-  ['social-feed-04', 'planned', 'Make Nagg media-aware:', ['Nagg', 'image and video dimensions', 'aspect ratios', 'safe layout metadata', 'reserve space', 'filter or downrank']],
-  ['social-feed-05', 'planned', 'Move link preview images into Nagg:', ['Nagg fetch and cache', 'Open Graph preview image', 'feed response', 'metadata separately']],
-  ['notifications-01', 'in-progress', 'Notification policies (Relaxed, Moderate, Strict, Follows) and a Direct/Thread reply scope', ['Relaxed, Moderate, Strict, and Follows', 'Direct/Thread', 'adaptive ranking', 'opening or replying', 'never answer', 'without needing to block']],
-  ['notifications-02', 'in-progress', 'The Notifications App tab ships today as a static welcome card.', ['Notifications App tab', 'static welcome card', 'release notes', 'live mint status']],
-  ['messaging-01', 'complete', 'Pay from the chat composer:', ['chat composer', 'Lightning address', 'without leaving the thread', 'inline card', 'tap to redeem']],
-  ['messaging-02', 'in-progress', 'Extend encryption past two-party threads into private group chats.', ['private multi-member groups', 'opt-in MLS-encrypted', 'Marmot', 'two-party', 'remaining work']],
+  ['messaging-01', 'complete', 'Send ecash to a Nostr contact over NIP-17', ['ecash', 'Nostr contact', 'NIP-17', 'inbox relays are reachable', 'copying or sharing the token']],
   ['identity-01', 'complete', 'Receiving feels like sharing a username, not a protocol address:', ['each profile', 'npub.cash Lightning address', 'Nostr key', 'one-tap copy', 'receive screen', 'free names']],
-  ['identity-02', 'planned', 'Add the npub.cash address as a LUD on the Nostr profile', ['npub.cash', 'LUD', 'Nostr profile', 'zaps', 'not only the receive screen']],
+  ['identity-02', 'planned', 'Add the npub.cash address as a LUD on the Nostr profile', ['npub.cash', 'LUD', 'Nostr profile', 'not only the receive screen']],
   ['identity-03', 'planned', 'Resolve who zapped your npub.cash address:', ['npub.cash', 'incoming Lightning address payment', 'Nostr name and avatar', 'history when available', 'generic mint receive']],
-  ['identity-04', 'planned', 'Tag your profile with a group, event, or community', ['group, event, or community', 'meetup or cohort', 'share a feed', 'suggested follows']],
   ['history-insights-01', 'complete', 'Payment history reads as a live timeline:', ['QR, NFC, clipboard, or deep link', 'how money moved', 'how it settled', 'Group by date', 'month tabs', 'pinned', 'richer recipient and originating-request context']],
   ['history-insights-02', 'in-progress', 'The wallet screen already charts spent and received for the current month', ['current-month spending and receipts', 'projected trend line', 'past months', 'running totals', 'mint or currency']],
-  ['ai-01', 'in-progress', 'Let AI draw from your wallet balance instead of a separate Routstr account', ['wallet balance', 'separate Routstr balance', 'streams OpenAI, Claude, and Grok', 'ecash', 'token top-up', 'combining the balances']],
-  ['ai-02', 'planned', 'Offer opt-in AI-drafted replies', ['opt-in AI-drafted replies', 'confirming every send', 'not send a reply or move money on its own']],
   ['open-stack-01', 'complete', 'The app and every library behind it are public on GitHub', ['app and its supporting libraries public on GitHub', 'reading, auditing, and reuse', 'respective licenses']],
-  ['open-stack-02', 'in-progress', 'Packaging the search, notification, and feed recipes that power Sovran into nagg-ts', ['search, notification, and feed recipes', 'nagg-ts', 'Nostr client', 'without adopting a particular user interface']],
+  ['open-stack-02', 'in-progress', 'Keep the direct Nostr client, relay pool, and NIP-17 payment transport in the in-repo nostr package', ['Nostr client', 'relay pool', 'NIP-17 payment transport', 'nostr package', 'without adopting a particular user interface']],
   ['open-stack-03', 'in-progress', 'Documenting how Colada parses, routes, and sequences payments over the Coco engine', ['Colada parses, routes, and sequences', 'Coco', 'ecash and Lightning first and on-chain next', 'other wallets']],
   ['open-stack-04', 'planned', 'Spanish first, then a repeatable translation workflow and regular public progress notes', ['Spanish first', 'repeatable translation workflow', 'regular public progress notes']],
   ['releases-quality-01', 'in-progress', 'Fold the scattered build, submit, and AltStore sideload scripts into one release command', ['build, submit, and AltStore sideload', 'one release command', 'App Store, sideloadable iOS, and Android APK', 'in sync']],
@@ -81,21 +70,23 @@ const sourceItems = [
 const roadmap = siteCopy.roadmap;
 const items = roadmap.groups.flatMap(group => group.items.map(item => ({ ...item, sourceGroup: group.id })));
 
-test('all 64 original ideas remain separate in their 14 source groups, without a new schedule', () => {
+// 2026-11-26 rebuild (dfbac42cb) retired the feed, notifications and AI groups and
+// their items with the features; the remaining rows keep their original IDs.
+test('all 53 retained ideas remain separate in their 11 source groups, without a new schedule', () => {
   expect(roadmap.groups.map(group => group.id)).toEqual([
     'payments', 'payment-requests', 'mints', 'wallet-recovery', 'wallet-engine',
-    'onchain-lightning', 'social-feed', 'notifications', 'messaging', 'identity',
-    'history-insights', 'ai', 'open-stack', 'releases-quality',
+    'onchain-lightning', 'messaging', 'identity', 'history-insights', 'open-stack',
+    'releases-quality',
   ]);
-  expect(sourceItems).toHaveLength(64);
-  expect(items).toHaveLength(64);
-  expect(new Set(items.map(item => item.id)).size).toBe(64);
+  expect(sourceItems).toHaveLength(53);
+  expect(items).toHaveLength(53);
+  expect(new Set(items.map(item => item.id)).size).toBe(53);
   expect(items.map(item => item.id).sort()).toEqual(sourceItems.map(([id]) => id).sort());
   // Every original group remained in progress, even when some bullets were done.
   for (const group of roadmap.groups) expect(group.status).toBe('in-progress');
   expect(items.filter(item => item.status === 'complete')).toHaveLength(16);
-  expect(items.filter(item => item.status === 'in-progress')).toHaveLength(17);
-  expect(items.filter(item => item.status === 'planned')).toHaveLength(31);
+  expect(items.filter(item => item.status === 'in-progress')).toHaveLength(12);
+  expect(items.filter(item => item.status === 'planned')).toHaveLength(25);
 });
 
 for (const [id, status, sourceExcerpt, requiredDetails] of sourceItems) {
