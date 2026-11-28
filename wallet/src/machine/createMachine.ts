@@ -11,6 +11,7 @@ import {
   isMintOfflineError,
   PaymentRequestUndeliveredError,
   MeltOutcomeUnknownError,
+  LOCKED_REQUEST_UNSUPPORTED,
 } from "../errors";
 import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
@@ -1502,17 +1503,18 @@ export function createPaymentMachine(
         if (info) {
           const requestedUnit = (info.unit ?? "sat").trim().toLowerCase();
           const amount = info.amount;
-          if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+          if (info.hasSpendingCondition && !info.lockP2pkPubkey) {
+            // Not a P2PK lock (an HTLC, an unknown kind, a malformed key):
+            // no send can build it. A P2PK lock is left to the send, which
+            // applies the request's own NUT-10 option or refuses.
             nfcError = {
               code: "UNSUPPORTED_PAYMENT_METHOD",
-              message:
-                "This request requires locked ecash, which NFC payments do not support yet.",
+              message: LOCKED_REQUEST_UNSUPPORTED,
             };
           } else if (!isValidSatAmount(amount)) {
-            nfcError = {
-              code: "NFC_READ_FAILED",
-              message: "Payment request must include an amount for NFC payment",
-            };
+            // No amount on the tag: the flow below asks the payer for one.
+            // The unit is not switched for an amount nobody has entered; a
+            // request in another unit is turned down for its unit.
           } else if (requestedUnit !== unit.trim().toLowerCase()) {
             const funded = walletCtx.trustedMintUrls.some(
               (mintUrl) =>
@@ -1936,15 +1938,21 @@ export function createPaymentMachine(
                   }
                 : { kind: "stopped" };
             } else if (step === "enterAmount") {
-              // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
-              end = {
-                kind: "stopped",
-                error: {
-                  code: "NFC_READ_FAILED",
-                  message:
-                    "Payment request must include an amount for NFC payment",
-                },
-              };
+              // An ecash request without an amount (macadamia, cashu-wallet):
+              // the tag is let go and the payer enters it on the amount
+              // screen, then pays from the preview like a scanned request.
+              // Anything else that needs an amount stays a failed read.
+              end =
+                flowCtx.paymentRequest && !flowCtx.meltTarget
+                  ? { kind: "stopped" }
+                  : {
+                      kind: "stopped",
+                      error: {
+                        code: "NFC_READ_FAILED",
+                        message:
+                          "Payment request must include an amount for NFC payment",
+                      },
+                    };
             } else if (
               step === "navigateToPaymentRequest" &&
               operations &&
@@ -2098,6 +2106,7 @@ export function createPaymentMachine(
                   data,
                   executeNfcSend: operations.executeNfcSend,
                   rollbackSend: operations.rollbackSend,
+                  lockedRequest: !!flowCtx.paymentRequestLockPubkey,
                   nfcAdapter: {
                     writeToken: (token) => writeNfcToken(nfcTap, token),
                     releaseSession: () => releaseNfcSession(nfcTap),

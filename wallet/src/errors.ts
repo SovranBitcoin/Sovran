@@ -77,6 +77,14 @@ export class AuthoredError extends Error {
   }
 }
 
+/**
+ * A payment request asks for ecash under a NUT-10 condition no send here can
+ * build: not a P2PK lock, a malformed one, or one on a path that cannot carry
+ * it. Said before any ecash is reserved.
+ */
+export const LOCKED_REQUEST_UNSUPPORTED =
+  "This request requires locked ecash this wallet cannot create yet.";
+
 export interface FailureText {
   message: string;
   /** True when `message` was written by this package and can be shown as is. */

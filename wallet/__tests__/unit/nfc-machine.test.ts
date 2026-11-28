@@ -273,10 +273,15 @@ describe("NFC terminal unit and mints", () => {
     expect(tm.handlerCalls).toHaveLength(handled);
     expect(tm.machine.inspect().isExecuting).toBe(false);
   });
-  it("rejects amountless requests before switching units", async () => {
+  // The wallet's unit is not switched for an amount nobody has entered yet:
+  // the request is turned down for its unit, with the way to pay it.
+  it("turns down an amountless request in another unit without switching units", async () => {
     const { tm, switchUnit } = setup({ unit: "usd", amount: null });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertError({ code: "NFC_READ_FAILED" });
+    tm.assertError({
+      code: "UNSUPPORTED_PAYMENT_METHOD",
+      message: expect.stringMatching(/denominated in usd/),
+    });
     expect(sentMint(tm)).toBeUndefined();
     expect(switchUnit).not.toHaveBeenCalled();
   });
@@ -1165,5 +1170,85 @@ describe("an NFC request that offers a nostr transport", () => {
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     tm.assertStep("sendComplete");
     expect(tokensOut(tm, adapter)).toEqual({ overTransport: 0, forTheTag: 1, written: 1 });
+  });
+});
+
+// macadamia (Wallet/RequestView.swift:367-377, amount optional) and
+// cashu-wallet (Core/PaymentRequestBuilder.kt:18-25, `a: null`) put requests
+// without an amount on their tags. The payer is asked for it on the existing
+// amount step; the tag is let go, and the flow carries on from the screen.
+describe("an NFC request without an amount", () => {
+  it("asks the payer for the amount instead of failing", async () => {
+    const { tm, adapter } = setup({ amount: null });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("enterAmount");
+    expect(tm.handlerCalls.at(-1)).toMatchObject({ step: "enterAmount" });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
+
+  it("continues to the request preview once the amount is entered, and pays once", async () => {
+    const { tm, adapter } = setup({ amount: null });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    await tm.machine.enterAmount({ value: 21, unit: "sat" }, accepted);
+
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({
+      amount: 21,
+      mintUrl: accepted,
+      phase: { kind: "preview" },
+    });
+    // Entering the amount is not a tap: nothing is sent until Pay.
+    expect(tm.operationCalls.filter((c) => c.name === "executePaymentRequest")).toHaveLength(0);
+
+    await tm.machine.confirmPaymentRequest();
+    await tm.machine.confirmPaymentRequest();
+    expect(tm.operationCalls.filter((c) => c.name === "executePaymentRequest")).toHaveLength(1);
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+  });
+
+  it("still fails a tag that is not an ecash request and has no amount", async () => {
+    const { tm } = setup();
+    await tm.machine.scan!(INPUTS.lightningAddress, { source: "nfc" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
+  });
+});
+
+// macadamia can lock its NFC request to a key (Wallet/RequestView.swift:
+// 236-245). The token written to the tag must carry the request's NUT-10
+// option, so the operation is told which request it answers.
+describe("an NFC request locked to a P2PK key", () => {
+  const key = `02${"a".repeat(64)}`;
+
+  it("writes back a token made for the request's lock", async () => {
+    const { tm, adapter } = setup({ hasSpendingCondition: true, lockP2pkPubkey: key });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([
+      { mintUrl: accepted, amount: 50, unit: "sat", paymentRequest: expect.stringMatching(/^creqA/) },
+    ]);
+    expect(adapter.writeToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not name the request for an unlocked one", async () => {
+    const { tm } = setup();
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "sat" }]);
+  });
+
+  it("says a condition that is not a P2PK lock cannot be paid yet", async () => {
+    const { tm, adapter } = setup({ hasSpendingCondition: true });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertError({
+      code: "UNSUPPORTED_PAYMENT_METHOD",
+      message: "This request requires locked ecash this wallet cannot create yet.",
+    });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
   });
 });

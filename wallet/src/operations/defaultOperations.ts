@@ -57,6 +57,7 @@ import {
   AuthoredError,
   MeltUserCancelledError,
   MeltOutcomeUnknownError,
+  LOCKED_REQUEST_UNSUPPORTED,
   PaymentRequestUndeliveredError,
   UnitRateUnavailableError,
 } from "../errors";
@@ -538,6 +539,82 @@ async function attemptRollback(
       error: errField(e),
     });
     return false;
+  }
+}
+
+/** The request as Coco's payment-request API takes it. */
+function requestForCoco(
+  paymentRequest: string,
+  info: NonNullable<
+    ReturnType<typeof defaultDetectors.getPaymentRequestInfo>
+  >,
+): string {
+  if (!info.mintsPreferred) return paymentRequest;
+  // Coco 2.0.0 treats every m list as strict. Remove only the advisory
+  // list in its input copy; the original request remains the flow identity.
+  const sdkRequest = decodePaymentRequest(paymentRequest);
+  sdkRequest.mints = undefined;
+  return sdkRequest.toEncodedRequest();
+}
+
+/**
+ * The token for a request that locks the ecash and names no transport, to be
+ * handed over in band (written to its NFC tag). Coco's payment-request send
+ * builds the lock from the request's own NUT-10 option: key, further keys,
+ * locktime, refund keys, signature counts, flag and any other tag
+ * (`PaymentRequest.toP2PKOptions`), and requires NUT-11 of the mint. Anything
+ * it cannot build is refused before ecash is reserved.
+ */
+async function createLockedRequestToken(
+  mgr: Manager,
+  input: {
+    paymentRequest: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  },
+): Promise<Awaited<ReturnType<Manager["ops"]["send"]["execute"]>>> {
+  const { paymentRequest, mintUrl, amount, unit } = input;
+  const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
+  if (!info) throw new AuthoredError("Invalid payment request");
+  if ((info.unit ?? "sat").trim().toLowerCase() !== unit.trim().toLowerCase()) {
+    throw new AuthoredError(
+      `Payment request unit (${info.unit}) does not match the wallet unit (${unit})`,
+    );
+  }
+  // With a transport Coco would send the token there instead of returning it.
+  if (info.transports?.length) {
+    throw new AuthoredError(LOCKED_REQUEST_UNSUPPORTED);
+  }
+  const parsed = await mgr.paymentRequests.parse(
+    requestForCoco(paymentRequest, info),
+  );
+  if (parsed.spendingCondition?.kind !== "P2PK") {
+    logger.warn("operations.executeNfcSend.lockUnsupported", {
+      kind: parsed.spendingCondition?.kind ?? "none",
+    });
+    throw new AuthoredError(LOCKED_REQUEST_UNSUPPORTED);
+  }
+  const transaction = await mgr.paymentRequests.prepare(parsed, {
+    mintUrl,
+    amount,
+  });
+  const operationId = transaction.sendOperation.id;
+  logger.info("operations.executeNfcSend.lockedPrepared", { operationId });
+  try {
+    const executed = await mgr.paymentRequests.execute(transaction);
+    if (executed.type !== "inband") {
+      throw new Error("Locked request was not created for hand-over");
+    }
+    return { operation: executed.operation, token: executed.token };
+  } catch (error) {
+    logger.warn("operations.executeNfcSend.lockedExecuteFailed", {
+      operationId,
+      error: errField(error),
+    });
+    // Nothing has been handed over: take the send back like any other.
+    await attemptRollback(mgr, operationId);
+    throw error;
   }
 }
 
@@ -1186,21 +1263,35 @@ export function createDefaultOperations(
       }
     },
 
-    executeNfcSend: async ({ mintUrl, amount, unit = "sat" }) => {
+    executeNfcSend: async ({ mintUrl, amount, unit = "sat", paymentRequest }) => {
       const mgr = requireManager();
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
       logger.info("operations.executeNfcSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
+        forLockedRequest: !!paymentRequest,
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount, unit });
-      logger.info("operations.executeNfcSend.prepared", {
-        operationId: prepared.id,
-        needsSwap: !!prepared.needsSwap,
-      });
-      const { operation, token } = await executeSendWithRescue(mgr, prepared, {
-        logPrefix: "executeNfcSend",
-      });
+      const { operation, token } = paymentRequest
+        ? await createLockedRequestToken(mgr, {
+            paymentRequest,
+            mintUrl,
+            amount,
+            unit,
+          })
+        : await (async () => {
+            const prepared = await mgr.ops.send.prepare({
+              mintUrl,
+              amount,
+              unit,
+            });
+            logger.info("operations.executeNfcSend.prepared", {
+              operationId: prepared.id,
+              needsSwap: !!prepared.needsSwap,
+            });
+            return executeSendWithRescue(mgr, prepared, {
+              logPrefix: "executeNfcSend",
+            });
+          })();
       logger.info("operations.executeNfcSend.tokenCreated", {
         operationId: operation.id,
         state: operation.state,
@@ -1999,15 +2090,9 @@ export function createDefaultOperations(
           transport: "http",
         });
         // HTTP / transport-less payment request: use the paymentRequests API
-        let requestForCoco = paymentRequest;
-        if (info.mintsPreferred) {
-          // Coco 2.0.0 treats every m list as strict. Remove only the advisory
-          // list in its input copy; the original request remains the flow identity.
-          const sdkRequest = decodePaymentRequest(paymentRequest);
-          sdkRequest.mints = undefined;
-          requestForCoco = sdkRequest.toEncodedRequest();
-        }
-        const parsed = await mgr.paymentRequests.parse(requestForCoco);
+        const parsed = await mgr.paymentRequests.parse(
+          requestForCoco(paymentRequest, info),
+        );
         logger.info("operations.executePaymentRequest.http.parsed", {
           ...mintUrlFields(mintUrl),
           amount,

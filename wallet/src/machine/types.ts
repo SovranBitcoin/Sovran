@@ -1131,11 +1131,16 @@ export interface MachineOperations {
   /**
    * Execute a send for NFC POS payment. Unlike `executeSend`, returns the
    * encoded V4 token (for NFC write-back) and the operationId (for rollback).
+   *
+   * `paymentRequest` is set only for a request that locks the ecash (NUT-10):
+   * the token must then carry that request's lock, or the send must refuse
+   * before reserving anything.
    */
   executeNfcSend?: (request: {
     mintUrl: string;
     amount: number;
     unit?: string;
+    paymentRequest?: string;
   }) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
    * Take back a send: reclaim its ecash, or cancel it before it executed.
