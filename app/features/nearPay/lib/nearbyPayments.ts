@@ -14,6 +14,7 @@ import { classifyMeshToken, isEvenHex, normalizeMintUrl } from 'wallet';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from './nearbyPaymentStorage';
 import { createSecureVault } from '@/shared/lib/persist/secureVault';
 import { bitchatLog } from '@/shared/lib/logger';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -73,10 +74,23 @@ type Journal = z.infer<typeof journalSchema>;
 type Delivery = z.infer<typeof deliverySchema>;
 const services = new WeakMap<Manager, NearbyPayments>();
 
+// The journal as last read or written, per profile. Only this module writes
+// it, so the vault is read again only after a failed write or a new manager.
+// `generation` stops a slow read replacing a newer copy.
+type JournalCopy = {
+  journal: Journal | null;
+  generation: number;
+  writes: Promise<void>;
+  listeners: Set<() => void>;
+};
+const journalCopies = new Map<string, JournalCopy>();
+const emptyJournal = (): Journal => ({ version: 1, outbound: {}, inbound: {} });
+const parseJournal = (raw: string) => journalSchema.parse(JSON.parse(raw));
+
 /** A profile-bound delivery journal. Coco remains the owner of funds and settlement. */
 class NearbyPayments {
   private readonly storage;
-  private writes: Promise<void> = Promise.resolve();
+  private readonly copy: JournalCopy;
   private receiving: Promise<void> | null = null;
   private delivering: Promise<void> | null = null;
   private lastRecoveryAt = 0;
@@ -85,6 +99,14 @@ class NearbyPayments {
     private readonly owner: string
   ) {
     this.storage = createSecureVault(owner, NEARBY_PAYMENT_JOURNAL_KEY);
+    let copy = journalCopies.get(owner);
+    if (!copy) {
+      copy = { journal: null, generation: 0, writes: Promise.resolve(), listeners: new Set() };
+      journalCopies.set(owner, copy);
+    }
+    // A new manager (sign-in, Delete All, restore) reads the vault afresh.
+    copy.writes = copy.writes.catch(() => undefined).then(() => this.remember(null));
+    this.copy = copy;
   }
   private isCurrent() {
     return (
@@ -93,21 +115,49 @@ class NearbyPayments {
       CocoManager.getInstance() === this.manager
     );
   }
+  private remember(journal: Journal | null) {
+    this.copy.journal = journal;
+    this.copy.generation += 1;
+    for (const listener of this.copy.listeners) listener();
+  }
+  /** The current journal; callers only read it, `update` changes a copy. */
   private async read(): Promise<Journal> {
+    if (this.copy.journal) return this.copy.journal;
+    const generation = this.copy.generation;
     const raw = await this.storage.read();
     // A corrupt journal is an error, never permission to erase live delivery intent.
-    return raw ? journalSchema.parse(JSON.parse(raw)) : { version: 1, outbound: {}, inbound: {} };
+    const journal = raw ? journalSchema.parse(JSON.parse(raw)) : emptyJournal();
+    if (this.copy.generation === generation) this.remember(journal);
+    return journal;
   }
   private update(change: (journal: Journal) => void): Promise<void> {
-    const task = this.writes
+    const task = this.copy.writes
       .catch(() => undefined)
       .then(async () => {
-        const journal = await this.read();
+        const journal = parseJournal(JSON.stringify(await this.read()));
         change(journal);
-        await this.storage.write(JSON.stringify(journal));
+        const raw = JSON.stringify(journal);
+        // After a failed write the vault may hold either generation: reread it.
+        await this.storage.write(raw).catch((error: unknown) => {
+          this.remember(null);
+          throw error;
+        });
+        this.remember(parseJournal(raw));
       });
-    this.writes = task;
+    this.copy.writes = task;
     return task;
+  }
+  /** An unsettled delivery or unclaimed (not rejected) payment, or not read yet. */
+  hasPendingWork(): boolean {
+    const journal = this.copy.journal;
+    if (!journal) return true;
+    const inbound = Object.values(journal.inbound);
+    return Object.keys(journal.outbound).length > 0 || inbound.some((item) => !item.rejected);
+  }
+  /** Calls `listener` whenever the journal is read, written or dropped. */
+  subscribe(listener: () => void): () => void {
+    this.copy.listeners.add(listener);
+    return () => void this.copy.listeners.delete(listener);
   }
   bind(operationId: string, delivery: Delivery) {
     if (!this.isCurrent()) return Promise.reject(new Error('Wallet profile changed'));
@@ -160,12 +210,13 @@ class NearbyPayments {
     const delivering = (this.delivering ??= this.deliver(privateKey, nickname).finally(() => {
       this.delivering = null;
     }));
+    countIdleWork('nearby_payments.drain');
     return Promise.all([receiving, delivering]).then(() => undefined);
   }
   private async receive(identity: BitchatBLEIdentityMaterial): Promise<void> {
     // The failing caller receives its error; a later pass must still reconcile
     // the last durable generation after storage becomes available again.
-    await this.writes.catch(() => undefined);
+    await this.copy.writes.catch(() => undefined);
     if (!this.isCurrent()) return;
     const journal = await this.read();
     if (isSafeToMint(useWalletLifecycleStore.getState().restoreStatus)) {
@@ -245,7 +296,7 @@ class NearbyPayments {
     }
   }
   private async deliver(privateKey: Uint8Array, nickname: string): Promise<void> {
-    await this.writes.catch(() => undefined);
+    await this.copy.writes.catch(() => undefined);
     if (!this.isCurrent()) return;
     const journal = await this.read();
     for (const [operationId, delivery] of Object.entries(journal.outbound)) {

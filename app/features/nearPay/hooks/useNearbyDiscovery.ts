@@ -166,13 +166,26 @@ export function useNearbyDiscovery(): void {
     const foreground = AppState.addEventListener('change', (state) => {
       if (state === 'active') pump();
     });
-    const interval = setInterval(pump, 5_000);
+    // Retry every 5 s only while the journal holds a delivery or a payment to
+    // claim; an empty journal is drained on mount, foreground and arrival.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const schedule = () => {
+      const busy = !disposed && payments.hasPendingWork();
+      if (busy && !interval) interval = setInterval(pump, 5_000);
+      else if (!busy && interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    const unsubscribe = payments.subscribe(schedule);
+    schedule();
     pump();
     return () => {
       disposed = true;
       messages.remove();
       foreground.remove();
-      clearInterval(interval);
+      unsubscribe();
+      if (interval) clearInterval(interval);
     };
   }, [keys, identityMaterial, nickname]);
 
