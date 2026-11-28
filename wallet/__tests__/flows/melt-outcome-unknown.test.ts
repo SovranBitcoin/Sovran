@@ -217,6 +217,8 @@ describe('Pay after a Lightning payment that threw', () => {
           variant: 'melt',
           message: 'The payment may still complete. Check your history before you pay again.',
           authored: true,
+          // Not a failure the person should see in red: it may still pay.
+          outcomeUnknown: true,
         }),
       ]);
       // Nothing whose outcome is unknown is cancelled: Coco's recovery owns it.
@@ -261,6 +263,7 @@ describe('Pay after a Lightning payment that threw', () => {
     expect(notified('onPaymentFailed').map((c) => c.data)).toEqual([
       expect.objectContaining({ message: 'Lightning payment failed' }),
     ]);
+    expect(notified('onPaymentFailed')[0]?.data).not.toHaveProperty('outcomeUnknown', true);
     // Coco already gave the inputs back: there is nothing to cancel.
     expect(cancel).not.toHaveBeenCalled();
 

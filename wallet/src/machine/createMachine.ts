@@ -809,6 +809,8 @@ export function createPaymentMachine(
         message,
         authored,
         rolledBack: opts?.rolledBack,
+        // Ecash that left and could not be taken back may be claimed yet.
+        ...(opts?.undelivered ? { outcomeUnknown: true } : {}),
       }),
     );
 
@@ -1299,6 +1301,7 @@ export function createPaymentMachine(
               unit: data.unit,
               message: cause.message,
               authored: cause.authored,
+              outcomeUnknown: true,
             }),
           );
         } else {

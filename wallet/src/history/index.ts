@@ -54,6 +54,7 @@ export {
   getStatusColorType,
   getStatusHeader,
   isSettledStepType,
+  timelinePhase,
 } from "./timeline";
 export {
   groupAiRequests,
@@ -63,6 +64,7 @@ export type { AiRequestGroup, AiRequestState } from "./aiRequests";
 export type { TransactionDirection, TransactionPaymentType } from "./filters";
 export type {
   BuildTimelineInput,
+  PaymentPhase,
   TimelineFlowVariant,
   TimelineModel,
   TimelineStep,
