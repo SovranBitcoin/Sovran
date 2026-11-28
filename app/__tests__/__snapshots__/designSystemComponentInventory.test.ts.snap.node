@@ -137,6 +137,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback.tsx",
     "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx",
     "features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill.tsx",
+    "features/wallet/components/WalletGradientOverlay.tsx",
     "features/wallet/components/WalletSelectedMintProbe.tsx",
     "features/wallet/components/WalletWallpaperProbe.tsx",
     "shared/blocks/AccountMismatchScreen.tsx",
@@ -248,6 +249,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 242,
+  "total": 243,
 }
 `;

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
@@ -30,7 +29,6 @@ import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
 import { useWalletTabFocusPublisher } from '@/features/wallet/hooks/useWalletTabFocusPublisher';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
-import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { toRealUnit } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -38,6 +36,10 @@ import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { E2EReadyProofProbe } from '@/features/wallet/components/E2EReadyProofProbe';
 import { WalletSelectedMintProbe } from '@/features/wallet/components/WalletSelectedMintProbe';
 import { WalletWallpaperProbe } from '@/features/wallet/components/WalletWallpaperProbe';
+import {
+  useContentHeightStore,
+  WalletGradientOverlay,
+} from '@/features/wallet/components/WalletGradientOverlay';
 
 // The wallet-screen transaction list shows EVERY account's entries;
 // Transactions treats unit 'all' as unfiltered.
@@ -58,13 +60,9 @@ export function WalletScreen() {
   const minBalanceHeight = Math.max(windowHeight * 0.22, 200);
   const style = useAppStyle();
 
-  const [contentHeight, setContentHeight] = useState(0);
   // A docked layout pins its actions over the scroller; the scroller reserves
   // exactly the bar's measured height so the last row clears it.
-
-  const onContentSizeChange = (_width: number, height: number) => {
-    setContentHeight(height);
-  };
+  const { store: contentHeight, onContentSizeChange } = useContentHeightStore();
 
   // The active mint unit scopes the whole wallet view (balance, machine,
   // history filter, receive/send defaults). Persisted per profile.
@@ -241,7 +239,7 @@ export function WalletScreen() {
           <E2EToastProbe />
           <WalletSelectedMintProbe />
           <WalletWallpaperProbe />
-          <ScrollableGradientOverlay contentHeight={contentHeight} />
+          <WalletGradientOverlay store={contentHeight} />
 
           <View style={styles.topArea}>
             <HomeTop
