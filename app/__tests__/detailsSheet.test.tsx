@@ -41,6 +41,9 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: { copyHaptic: jest.fn(async () => undefined) },
 }));
 jest.mock('@/shared/ui/composed/CopyableValue', () => ({ CopyableValue: () => null }));

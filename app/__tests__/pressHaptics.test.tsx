@@ -9,15 +9,9 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Pressable as RNPressable, type GestureResponderEvent } from 'react-native';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import {
-  HapticsOff,
-  ROW_HAPTICS,
-  SELECTION_HAPTICS,
-  outcomeHaptic,
-} from '@/shared/ui/primitives/Haptics';
+import { ROW_HAPTICS, SELECTION_HAPTICS, outcomeHaptic } from '@/shared/ui/primitives/Haptics';
 import { buttonHaptics } from '@/shared/ui/primitives/Button';
 import { StatusToast, type StatusToastStatus } from '@/shared/lib/popup/StatusToast';
 
@@ -36,21 +30,23 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
 jest.mock('@/shared/lib/popup/useToastSurface', () => ({
-  useToastSurface: () => ({ fg: '#ffffff', bg: '#000000' }),
+  useToastSurface: () => ({ fg: 'white', bg: 'black' }),
 }));
 jest.mock('@/shared/lib/popup/ToastSlab', () => ({
   TINT_ALPHA: 0.3,
   OPAQUE_TINT_MIX: 0.45,
-  SUCCESS_DARK_BG: '#00ff00',
-  DANGER_DARK_BG: '#ff0000',
-  WARNING_DARK_BG: '#ffaa00',
+  SUCCESS_DARK_BG: 'green',
+  DANGER_DARK_BG: 'red',
+  WARNING_DARK_BG: 'orange',
   useToastFrosted: () => true,
   ToastSlab: ({ children }: { children: React.ReactNode }) => children,
 }));
+jest.mock('@/shared/lib/color', () => ({
+  withAlpha: (color: string) => color,
+  blend: (color: string) => color,
+}));
 jest.mock('@/shared/blocks/status', () => ({ LoadingIndicator: () => null }));
 jest.mock('@/shared/ui/primitives/PillButton', () => ({ PillButton: () => null }));
-
-const pressEvent = {} as GestureResponderEvent;
 
 function render(element: React.ReactElement) {
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -60,20 +56,26 @@ function render(element: React.ReactElement) {
   return renderer;
 }
 
-/** The RN Pressable the shared one renders, found by testID. */
+/** The RN Pressable the shared one renders: below it, carrying the wrapped handlers. */
 function surface(renderer: TestRenderer.ReactTestRenderer, testID: string) {
   return renderer.root.find(
-    (node) => node.type === RNPressable && node.props.testID === testID
+    (node) =>
+      node.type !== Pressable &&
+      typeof node.type !== 'string' &&
+      node.props.testID === testID &&
+      typeof node.props.onPressIn === 'function'
   );
 }
 
 function pressIn(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  act(() => surface(renderer, testID).props.onPressIn(pressEvent));
+  act(() => {
+    surface(renderer, testID).props.onPressIn();
+  });
 }
 
 async function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
   await act(async () => {
-    await surface(renderer, testID).props.onPress(pressEvent);
+    await surface(renderer, testID).props.onPress();
   });
 }
 
@@ -133,9 +135,7 @@ describe('Pressable haptics', () => {
   it('does not wait for the haptic before running the action', async () => {
     mockImpact.mockImplementationOnce(() => new Promise<void>(() => {}));
     const onPress = jest.fn();
-    const r = render(
-      <Pressable testID="p" haptics={ROW_HAPTICS} onPress={onPress} />
-    );
+    const r = render(<Pressable testID="p" haptics={ROW_HAPTICS} onPress={onPress} />);
     await press(r, 'p');
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -150,16 +150,6 @@ describe('Pressable haptics', () => {
     );
     pressIn(r, 'row');
     expect(mockImpact).toHaveBeenCalledTimes(1);
-  });
-
-  it('is silent inside a HapticsOff scope', () => {
-    const r = render(
-      <HapticsOff>
-        <Pressable testID="p" onPress={jest.fn()} />
-      </HapticsOff>
-    );
-    pressIn(r, 'p');
-    expect(mockImpact).not.toHaveBeenCalled();
   });
 });
 

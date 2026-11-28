@@ -62,7 +62,12 @@ jest.mock('@/shared/hooks/useMempoolAddressSummary', () => ({
 }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn(), staticPopup: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
-jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHaptic: jest.fn() } }));
+jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
+  EnhancedHaptics: { copyHaptic: jest.fn() },
+}));
 jest.mock('@/shared/blocks/PaymentInfo', () => ({ PaymentInfo: () => null }));
 jest.mock('@/shared/ui/composed/CopyRequestCard', () => ({ CopyRequestCard: () => null }));
 jest.mock('@/shared/ui/composed/ActionSegmentsCard', () => ({ ActionSegmentsCard: () => null }));

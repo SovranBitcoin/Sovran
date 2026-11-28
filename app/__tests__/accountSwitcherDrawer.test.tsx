@@ -107,6 +107,9 @@ jest.mock('@/shared/lib/identity', () => ({
   }) => overrideName ?? nostrProfile?.name ?? `name-${pubkey.slice(0, 1)}`,
 }));
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: { navigateHaptic: jest.fn(), buttonHaptic: jest.fn() },
 }));
 jest.mock('@/shared/ui/primitives/PressScale', () => ({

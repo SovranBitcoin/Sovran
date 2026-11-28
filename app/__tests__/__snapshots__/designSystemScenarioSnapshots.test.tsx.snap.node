@@ -9716,6 +9716,7 @@ exports[`Design System exact structural snapshots renders scrubber/mint-selector
             "accessibilityState": {
               "busy": false,
             },
+            "haptics": false,
             "style": [
               {
                 "alignSelf": "center",
@@ -37409,6 +37410,7 @@ exports[`Design System exact structural snapshots renders ui-kit/balance-pill-de
         "accessibilityState": {
           "busy": false,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -40061,6 +40063,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-e
         "accessibilityState": {
           "busy": false,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -40368,6 +40371,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
                 "accessibilityState": {
                   "busy": false,
                 },
+                "haptics": false,
                 "style": [
                   {
                     "alignSelf": "center",
@@ -40615,6 +40619,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-l
         "accessibilityState": {
           "busy": true,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -40903,6 +40908,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-o
         "accessibilityState": {
           "busy": false,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -41191,6 +41197,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-p
         "accessibilityState": {
           "busy": false,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -41479,6 +41486,7 @@ exports[`Design System exact structural snapshots renders ui-kit/mint-selector-w
         "accessibilityState": {
           "busy": false,
         },
+        "haptics": false,
         "style": [
           {
             "alignSelf": "center",
@@ -42278,6 +42286,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-default: r
           "disabled": false,
           "selected": false,
         },
+        "haptics": false,
         "isDisabled": false,
         "style": [
           false,
@@ -42725,6 +42734,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-disabled: 
           "disabled": true,
           "selected": false,
         },
+        "haptics": false,
         "isDisabled": true,
         "style": [
           {
@@ -43196,6 +43206,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-large-text
                   "disabled": false,
                   "selected": false,
                 },
+                "haptics": false,
                 "isDisabled": false,
                 "style": [
                   false,
@@ -43658,6 +43669,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-selected: 
           "disabled": false,
           "selected": true,
         },
+        "haptics": false,
         "isDisabled": false,
         "style": [
           false,
@@ -44105,6 +44117,7 @@ exports[`Design System exact structural snapshots renders ui-kit/rows-worst-case
           "disabled": false,
           "selected": true,
         },
+        "haptics": false,
         "isDisabled": false,
         "style": [
           false,

@@ -334,6 +334,9 @@ jest.mock('@/shared/ui/primitives/Skeleton', () => ({
 }));
 
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/primitives/Haptics')>(
+    '@/shared/ui/primitives/Haptics'
+  ),
   EnhancedHaptics: {
     copyHaptic: jest.fn(),
   },
