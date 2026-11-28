@@ -49,13 +49,7 @@ export function sourceRank(source: CacheSource | undefined): number {
 // `clear()` it so one account never renders another's cached data.
 // ---------------------------------------------------------------------------
 
-/**
- * A profile's kind-0, merged across sources. `seenAt` is the merge order: the
- * `created_at` (unix seconds) of the kind-0 event the fields came from, `1`
- * for a direct answer whose event time is unknown, `0` for a seed (a name and
- * picture lifted from a feed row, a search index entry, the persisted mirror
- * of an entry saved before event times were kept).
- */
+/** A profile's kind-0, merged across sources; `seenAt` is the merge order. */
 export type CachedProfile = ProfileMetadata & {
   pubkey: string;
   /** Kind-0 `created_at` in unix seconds; 1 when unknown; 0 for a seed. */
@@ -75,11 +69,7 @@ export type CachedProfile = ProfileMetadata & {
  */
 export type CachedProfileStats = ProfileStats;
 
-/**
- * A profile fetch that found nothing. `missUntil` is when asking again is
- * worth it; until then a row renders its fallback instead of refetching on
- * every mount. Memory only.
- */
+/** A profile fetch that found nothing, and when to ask again. Memory only. */
 export type ProfileMiss = {
   /** Epoch milliseconds before which the profile is not asked for again. */
   missUntil: number;
@@ -91,11 +81,7 @@ export type ProfileMiss = {
 const MISS_BACKOFF_MS = [60_000, 600_000, 3_600_000] as const;
 /** No source answered at all (offline, every tier down): ask again soon, and do not escalate. */
 const FAILED_FETCH_RETRY_MS = 30_000;
-/**
- * A re-answer that changes nothing moves `fetchedAt` only when it is at least
- * this much newer, so revalidating a profile does not hand every row showing
- * it a new object. Far below the 24 h staleness window the stamp is read for.
- */
+/** A re-answer that changes nothing moves `fetchedAt` only in steps this big, so the record keeps its identity. */
 const FETCHED_AT_GRANULARITY_MS = 5 * 60_000;
 
 const DEFAULT_LIMITS = {
@@ -114,20 +100,15 @@ function laterFetchedAt(existing: number | undefined, incoming: number | undefin
 }
 
 /**
- * Profile merge: a kind-0 is a replaceable event, so the newest `created_at`
- * wins the WHOLE value.
+ * Profile merge: a kind-0 is replaceable, so the newest `created_at` wins the
+ * WHOLE value.
  *
- * - Newer event (`seenAt` above the stored one): replaces every field. A field
- *   the newer event no longer carries is removed, whichever field it is. That
- *   is what stops Send paying a Lightning address the person took down.
- * - Same `seenAt`: the same event from two sources, or two answers whose event
- *   time is unknown. The higher-ranked source wins a field conflict
- *   (nagg>primal>relay) and the other fills what it left blank.
- * - Older event: ignored. It may not fill a blank either: a field missing from
- *   the newer event is a removal, not a gap.
- * - Seed (`seenAt` 0) onto a real event: fills blank display fields only, and
- *   never a payment address (`lud16`, `lud06`): an index's stale copy must not
- *   put back an address the event removed.
+ * - Newer event: replaces every field; one it no longer carries is removed.
+ *   That is what stops Send paying a Lightning address the person took down.
+ * - Same `seenAt`: the higher-ranked source wins a conflict (nagg>primal>relay)
+ *   and the other fills what it left blank.
+ * - Older event: ignored. It may not fill a blank: that blank is a removal.
+ * - Seed onto a real event: fills blank display fields, never `lud16`/`lud06`.
  */
 const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
   if (!existing) return fieldLevelMerge(undefined, patch);
@@ -209,9 +190,8 @@ export interface NostrEntityCache {
   ): void;
   /**
    * Ingest full kind-0 metadata, tagged by source. `seenAt` is the merge order
-   * for every entry (0 = seed, 1 = real but event time unknown); `times`
-   * carries each entry's own kind-0 `created_at`, which is what lets the
-   * newest event win.
+   * for every entry (0 = seed, 1 = event time unknown); `times` carries each
+   * entry's own kind-0 `created_at`.
    */
   ingestProfileMetadata(
     metadata: Record<string, ProfileMetadata>,
@@ -220,10 +200,8 @@ export interface NostrEntityCache {
     times?: ProfileIngestTimes,
   ): void;
   /**
-   * Record that a fetch, with every source settled, did not return these
-   * pubkeys. `answered`: at least one source replied and none had them, so
-   * they back off 1 min → 10 min → 1 h. `failed`: no source replied; ask again
-   * in 30 s, without escalating.
+   * A settled fetch did not return these pubkeys. `answered`: a source replied
+   * and none had them (1 min → 10 min → 1 h). `failed`: no source replied (30 s).
    */
   recordProfileMisses(pubkeys: readonly string[], outcome: 'answered' | 'failed', now?: number): void;
   /** A fetch returned these pubkeys: forget any miss. */

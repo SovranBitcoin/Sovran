@@ -7,11 +7,6 @@ export interface FeedEvent {
   created_at: number;
 }
 
-export interface ProfileInfo {
-  name: string;
-  picture?: string;
-}
-
 interface ReposterInfo {
   pubkey: string;
   event: FeedEvent;

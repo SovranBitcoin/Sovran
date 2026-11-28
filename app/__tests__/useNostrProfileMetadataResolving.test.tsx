@@ -140,7 +140,11 @@ describe('useNostrProfileMetadata isResolving', () => {
   it('is not resolving, and holds no placeholder, when every tier is switched off', () => {
     mockLayer = null;
     const { result } = renderHook(() => useNostrProfileMetadata(PUBKEY));
-    expect(result.current).toMatchObject({ metadata: undefined, isLoading: false, isResolving: false });
+    expect(result.current).toMatchObject({
+      metadata: undefined,
+      isLoading: false,
+      isResolving: false,
+    });
   });
 
   it('does not refetch a profile fetched inside the staleness window', async () => {

@@ -271,7 +271,8 @@ function useDmEcashAutoRedeem(): void {
       for (const envelope of page.envelopes) {
         examined.add(envelope.id);
         const wrapSec = Math.floor(envelopeUnixSeconds(envelope.createdAt));
-        if (Number.isFinite(wrapSec)) walk.newestSec = Math.max(walk.newestSec, Math.min(wrapSec, nowSec));
+        if (Number.isFinite(wrapSec))
+          walk.newestSec = Math.max(walk.newestSec, Math.min(wrapSec, nowSec));
       }
       // A page that repeats the walk so far is a transport that ignores the
       // cursor (the relay tier returns the whole inbox every time).

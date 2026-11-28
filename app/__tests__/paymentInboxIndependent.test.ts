@@ -35,9 +35,12 @@ class FakeSocket {
 
 const mockSettings = { primalTierEnabled: true, relayTierEnabled: true, primalHostsDisabled: [] };
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: Object.assign((select: (s: typeof mockSettings) => unknown) => select(mockSettings), {
-    getState: () => mockSettings,
-  }),
+  useSettingsStore: Object.assign(
+    (select: (s: typeof mockSettings) => unknown) => select(mockSettings),
+    {
+      getState: () => mockSettings,
+    }
+  ),
 }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -46,7 +49,9 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: (error: unknown) => error,
 }));
 jest.mock('@/shared/stores/global/profileStore', () => {
-  const useProfileStore = { getState: () => ({ getActiveProfile: () => ({ pubkey: 'a'.repeat(64) }) }) };
+  const useProfileStore = {
+    getState: () => ({ getActiveProfile: () => ({ pubkey: 'a'.repeat(64) }) }),
+  };
   return {
     useProfileStore,
     ...jest
@@ -95,7 +100,12 @@ afterEach(async () => {
 
 const giftWrap = () =>
   finalizeEvent(
-    { kind: 1059, created_at: Math.floor(Date.now() / 1000) - 60, tags: [['p', VIEWER]], content: 'cipher' },
+    {
+      kind: 1059,
+      created_at: Math.floor(Date.now() / 1000) - 60,
+      tags: [['p', VIEWER]],
+      content: 'cipher',
+    },
     generateSecretKey()
   );
 
@@ -120,10 +130,14 @@ describe('payment ingress with the relay tier switched off', () => {
   ])('a gift wrap still arrives live (%s)', async (_name, tiers) => {
     Object.assign(mockSettings, tiers);
     const pages: string[][] = [];
-    const stop = subscribeDmEnvelopesLive(VIEWER, (page) => pages.push(page.envelopes.map((e) => e.id)));
+    const stop = subscribeDmEnvelopesLive(VIEWER, (page) =>
+      pages.push(page.envelopes.map((e) => e.id))
+    );
     await flush();
     // One socket per payment relay, each asked for the viewer's wraps.
-    expect(FakeSocket.instances.map((socket) => socket.url).sort()).toEqual([...DEFAULT_RELAYS].sort());
+    expect(FakeSocket.instances.map((socket) => socket.url).sort()).toEqual(
+      [...DEFAULT_RELAYS].sort()
+    );
     const socket = FakeSocket.instances[0]!;
     const req = socket.sent.find((frame) => frame[0] === 'REQ')!;
     expect(req[2]).toEqual({ kinds: [4, 1059], '#p': [VIEWER] });

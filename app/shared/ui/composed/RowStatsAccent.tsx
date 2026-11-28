@@ -200,21 +200,20 @@ export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
  * neither stats nor a NIP-05: the row keeps the height it had while that was
  * still unknown, instead of shrinking under the reader's thumb.
  *
- * Co-located with `RowStatsAccent` for the same reason as the skeleton: it is
- * the same outer `HStack` and a `Text` at the same `size`/`bold`, so the line
- * box matches at every font scale. A fixed pixel height would not.
+ * Co-located with `RowStatsAccent` for the same reason as the skeleton: the
+ * same row (2px top margin) around a `Text` at the same `size`/`bold`, so the
+ * line box matches at every font scale. A fixed pixel height would not.
  */
 export function RowStatsAccentSpacer() {
   return (
-    <HStack
-      align="center"
-      style={{ gap: 4, marginTop: 2, opacity: 0 }}
+    <View
+      className="mt-0.5 flex-row items-center opacity-0"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       testID="row-stats-accent-spacer">
       <Text size={12} bold>
         {' '}
       </Text>
-    </HStack>
+    </View>
   );
 }

@@ -47,7 +47,7 @@ it('polls and listens on the payment inbox, with the social data layer unavailab
         addEventListener: () => ({ remove: () => undefined }),
       },
     });
-    dispose = await plugin.onInit?.({
+    const context = {
       services: {
         paymentRequestReceiveService: {
           ingestPayload: jest.fn(),
@@ -58,8 +58,10 @@ it('polls and listens on the payment inbox, with the social data layer unavailab
           },
         },
       },
-    } as never);
-    await handler?.activate?.({ id: 'request' } as never);
+    };
+    dispose = await plugin.onInit?.(context as never);
+    const operation = { id: 'request' };
+    await handler?.activate?.(operation as never);
     await settle();
 
     expect(mockBuildSocialLayer).not.toHaveBeenCalled();

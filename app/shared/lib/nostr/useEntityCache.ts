@@ -266,7 +266,10 @@ export function ingestResolvedProfiles(
   if (pubkeys.length === 0) return;
   const fetchedAt: Record<string, number> = {};
   for (const pubkey of pubkeys) if (!createdAt[pubkey]) fetchedAt[pubkey] = 0;
-  buildNostrDataLayer()?.cache.ingestProfileMetadata(metadata, 1, 'relay', { createdAt, fetchedAt });
+  buildNostrDataLayer()?.cache.ingestProfileMetadata(metadata, 1, 'relay', {
+    createdAt,
+    fetchedAt,
+  });
 }
 
 /**

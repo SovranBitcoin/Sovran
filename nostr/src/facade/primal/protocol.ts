@@ -72,24 +72,12 @@ export interface PrimalConnection {
 // ---------------------------------------------------------------------------
 // Default WebSocket-backed connection
 //
-// One shared socket per cache host, carrying every request to it at once and
-// telling them apart by request id (`subId`), the way a relay connection does.
-// A list of N profile rows used to mean N TLS handshakes; it is now one.
-//
-// Lifetime of a host's socket:
-//
-// - It opens when the first request asks for that host.
-// - It closes `idleCloseMs` after its last request finished. A socket still
-//   connecting with nobody waiting on it is closed straight away.
-// - It is dropped at once when it errors or closes, and every request on it
-//   fails, so each falls through to the next host in the list.
-// - A request that ran out its timeout on a socket that said nothing to anyone
-//   in that time drops the socket: one the OS killed in the background often
-//   reports nothing.
-//
-// A host that failed is not dialled again until a backoff has passed (1 s,
-// doubling to 60 s, with jitter); requests in that window go straight to the
-// next host, or to the relay floor when there is none. An answer clears it.
+// One shared socket per cache host; requests on it are told apart by request
+// id (`subId`), as on a relay connection. It opens on the first request,
+// closes `idleCloseMs` after the last, and is dropped when it errors, closes,
+// or stays silent through a request's timeout: every request on it then fails
+// over to the next host. A host that failed is not dialled again until a
+// jittered backoff has passed (1 s doubling to 60 s); an answer clears it.
 //
 // Uses the global `WebSocket` (React Native, Bun, modern Node), so no
 // transport dependency is added.

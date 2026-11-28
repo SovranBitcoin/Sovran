@@ -34,7 +34,9 @@ jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   }),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => {
-  const useProfileStore = { getState: () => ({ getActiveProfile: () => ({ pubkey: 'a'.repeat(64) }) }) };
+  const useProfileStore = {
+    getState: () => ({ getActiveProfile: () => ({ pubkey: 'a'.repeat(64) }) }),
+  };
   return {
     useProfileStore,
     ...jest
@@ -66,22 +68,28 @@ const settle = async () => {
 };
 
 function saveToDisk(entries: Record<string, unknown>) {
-  mockDisk.set('nostr-metadata-cache', JSON.stringify({ state: { byPubkey: entries }, version: 0 }));
+  mockDisk.set(
+    'nostr-metadata-cache',
+    JSON.stringify({ state: { byPubkey: entries }, version: 0 })
+  );
 }
 
 const savedEntries = (fetchedAt: number) =>
   Object.fromEntries(
     SAVED.map((pubkey, index) => [
       pubkey,
-      { name: `saved-${index}`, lud16: `u${index}@example.com`, fetchedAt, createdAt: 1_700_000_000 + index },
+      {
+        name: `saved-${index}`,
+        lud16: `u${index}@example.com`,
+        fetchedAt,
+        createdAt: 1_700_000_000 + index,
+      },
     ])
   );
 
 const diskEntries = () =>
-  JSON.parse(mockDisk.get('nostr-metadata-cache') ?? '{"state":{"byPubkey":{}}}').state.byPubkey as Record<
-    string,
-    { name?: string }
-  >;
+  JSON.parse(mockDisk.get('nostr-metadata-cache') ?? '{"state":{"byPubkey":{}}}').state
+    .byPubkey as Record<string, { name?: string }>;
 
 beforeEach(async () => {
   jest.useFakeTimers();
@@ -122,10 +130,18 @@ describe('a saved profile keeps its age across a cold start (D3)', () => {
     saveToDisk(savedEntries(NOW - HOUR));
     await useNostrMetadataCache.persist.rehydrate();
     const built = layer();
-    built.cache.ingestProfileMetadata({ [SAVED[3]!]: { name: 'older', lud16: 'old@example.com' } }, 1, 'primal', {
-      createdAt: { [SAVED[3]!]: 1_600_000_000 },
+    built.cache.ingestProfileMetadata(
+      { [SAVED[3]!]: { name: 'older', lud16: 'old@example.com' } },
+      1,
+      'primal',
+      {
+        createdAt: { [SAVED[3]!]: 1_600_000_000 },
+      }
+    );
+    expect(built.cache.profiles.peek(SAVED[3]!)).toMatchObject({
+      name: 'saved-3',
+      lud16: 'u3@example.com',
     });
-    expect(built.cache.profiles.peek(SAVED[3]!)).toMatchObject({ name: 'saved-3', lud16: 'u3@example.com' });
   });
 
   it('the event time survives the round trip to disk', async () => {
@@ -135,11 +151,17 @@ describe('a saved profile keeps its age across a cold start (D3)', () => {
     });
     jest.advanceTimersByTime(5_000);
     await settle();
-    expect(diskEntries()[NEW_CONTACT]).toMatchObject({ name: 'new', createdAt: 1_750_000_000, fetchedAt: NOW });
+    expect(diskEntries()[NEW_CONTACT]).toMatchObject({
+      name: 'new',
+      createdAt: 1_750_000_000,
+      fetchedAt: NOW,
+    });
   });
 
   it('an entry saved before event times were kept still loads, as a seed any fetch replaces', async () => {
-    saveToDisk({ [SAVED[0]!]: { name: 'legacy entry', lud16: 'legacy@example.com', fetchedAt: NOW - HOUR } });
+    saveToDisk({
+      [SAVED[0]!]: { name: 'legacy entry', lud16: 'legacy@example.com', fetchedAt: NOW - HOUR },
+    });
     await useNostrMetadataCache.persist.rehydrate();
     const built = layer();
     expect(built.cache.profiles.peek(SAVED[0]!)).toMatchObject({ name: 'legacy entry', seenAt: 0 });

@@ -60,13 +60,9 @@ type SignatureCheck = (event: Parameters<typeof verifyEvent>[0]) => boolean;
 
 /**
  * Gift-wrap signature check that pays for the Schnorr verification once per
- * event per connection, however many subscriptions and relays deliver it.
- *
- * A remembered verdict is reused only for the same bytes: the frame must carry
- * the signature that was verified, and its fields must still hash to its id
- * (the id commits to pubkey, created_at, kind, tags and content). A frame that
- * borrows a verified id for other content fails the hash and is verified in
- * full, which it then fails.
+ * event per connection. A remembered verdict is reused only for the same
+ * bytes: the same signature, and fields that still hash to the id. A frame
+ * borrowing a verified id for other content is verified in full, and fails.
  */
 function createGiftWrapVerifier(verify: SignatureCheck): (payload: object, id: string) => boolean {
   const verdicts = new Map<string, string>();
@@ -95,12 +91,9 @@ function hashesTo(event: Parameters<typeof getEventHash>[0], id: string): boolea
 
 /**
  * An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`.
- *
- * `isDuplicate` runs BEFORE the signature check: an id enters a caller's seen
- * set only after its event verified, so a frame repeating that id is dropped
- * for free instead of costing a verification per replay. A forged frame under
- * an id not yet seen still fails verification and never enters the set, so it
- * cannot hide the real event that follows it.
+ * `isDuplicate` runs BEFORE the signature check: an id enters a seen set only
+ * after its event verified, so a replayed id costs nothing, and a forged frame
+ * under an unseen id still fails and cannot hide the real event after it.
  */
 function readRelayEvent(
   payload: unknown,
@@ -118,16 +111,10 @@ function readRelayEvent(
 /** What a live subscription may be told about how to come back after a drop. */
 export type RelaySubscribeOptions = {
   /**
-   * Re-attach to a relay with `since` set to the newest `created_at` that
-   * relay has sent on this subscription, less this many seconds, instead of
-   * replaying everything. The first attach to a relay is never narrowed, and
-   * a re-attach still receives every event that arrives after it, whatever
-   * its date.
-   *
-   * The mark is kept per relay (one relay being ahead says nothing about what
-   * another missed) and never runs past the local clock, so an event dated in
-   * the future cannot move it beyond events still to come. For NIP-59 gift
-   * wraps the overlap must cover the two days their dates are randomised over.
+   * Re-attach to a relay with `since` = the newest `created_at` that relay has
+   * sent here, less this many seconds, instead of replaying everything. The
+   * first attach is never narrowed. The mark is per relay and capped at the
+   * local clock. For NIP-59 gift wraps the overlap must cover two days.
    */
   resumeOverlapSec?: number;
 };
@@ -333,11 +320,9 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         const newest = newestFrom.get(url);
         if (resumeOverlapSec === undefined || newest === undefined) return filters;
         const since = newest - resumeOverlapSec;
-        // Two filters per original, OR-ed by the relay: the stored events of
-        // the window, and (`limit: 0`: no stored events) everything that
-        // ARRIVES from now on whatever its date. A narrowed subscription alone
-        // would stop the relay pushing a late-published event dated before the
-        // window, which the unbounded subscription it replaces did receive.
+        // Two filters, OR-ed by the relay: the stored events of the window,
+        // and (`limit: 0`, no stored events) everything that ARRIVES from now
+        // on whatever its date, as the unbounded subscription received.
         return filters.flatMap((filter) => [
           { ...filter, since: Math.max(filter.since ?? 0, since) },
           { ...filter, limit: 0 },
@@ -369,11 +354,7 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         else scheduleReattach(url);
       };
 
-      /**
-       * Advance this relay's resume point. Counted for every frame the relay
-       * sends, duplicates included: what matters is how far this relay has
-       * been heard, not who delivered an event first.
-       */
+      /** Advance this relay's resume point, duplicates included: it is how far THIS relay has been heard. */
       const noteCreatedAt = (url: string, payload: unknown) => {
         if (resumeOverlapSec === undefined || !payload || typeof payload !== 'object') return;
         const { created_at: createdAt }: { created_at?: unknown } = payload;

@@ -87,7 +87,11 @@ it('a lookup made while one is in flight fetches only the keys not already on th
     expect(await home).toMatchObject({ [alice]: { name: 'a' }, [bob]: { name: 'b' } });
     expect(await row).toMatchObject({ [bob]: { name: 'b' }, [carol]: { name: 'c' } });
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(2, [{ kinds: [0], authors: [carol] }], expect.anything());
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      [{ kinds: [0], authors: [carol] }],
+      expect.anything()
+    );
   } finally {
     jest.useRealTimers();
   }

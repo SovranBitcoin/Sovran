@@ -16,10 +16,7 @@ import {
   useProfileRecordsMany,
   useProfileFetchSettlements,
 } from '@/shared/lib/nostr/useEntityCache';
-import {
-  ensureProfilesViaFacade,
-  fetchProfilesViaFacade,
-} from '@/shared/lib/nostr/fetchProfiles';
+import { ensureProfilesViaFacade, fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { useQueryResultLogger } from '@/shared/lib/logger';
 

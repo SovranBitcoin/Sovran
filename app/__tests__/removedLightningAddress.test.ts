@@ -39,9 +39,7 @@ const kind0 = (content: Record<string, string>, createdAt: number) => ({
 
 function layerWhereRelaysHold(event: ReturnType<typeof kind0>) {
   mockLayer = facade.createNostrDataLayer({
-    tiers: [
-      facade.relay.createRelayTier({ connection: { request: async () => ok([event]) } }),
-    ],
+    tiers: [facade.relay.createRelayTier({ connection: { request: async () => ok([event]) } })],
     profileBatchWindowMs: 0,
   });
   registerNostrDataLayer(mockLayer);

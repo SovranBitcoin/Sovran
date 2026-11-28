@@ -1,21 +1,14 @@
 // ---------------------------------------------------------------------------
 // Batcher — coalesce per-key loads into one request per window
 //
-// A list renders N rows and each asks for its own entity. Without this, that
-// is N requests per source. `load(key)` instead parks the key for one frame;
-// everything asked for in that window goes out as ONE `fetch(keys)`, and each
-// caller is resolved from the shared answer.
-//
-// - In-flight dedupe: a key that is queued or being fetched returns the
-//   promise already in hand, so five rows showing one person ask once.
-// - `maxKeys` bounds one request (relay `authors` filters and cache verbs both
-//   have practical limits); a fuller queue goes out as several.
-// - `fetch` hands back a resolver per key rather than one result, because an
-//   aggregate read settles key by key: a key the first source answered need
-//   not wait for the slowest source to give up on another.
+// A list renders N rows and each asks for its own entity: N requests per
+// source. `load(key)` parks the key for one frame; everything asked for in
+// that window goes out as ONE `fetch(keys)`. A key that is queued or in flight
+// returns the promise already in hand. `fetch` returns a resolver per key
+// because an aggregate read settles key by key.
 // ---------------------------------------------------------------------------
 
-export type BatcherOptions<V> = {
+type BatcherOptions<V> = {
   /** How long a key waits for company before the batch goes out. Default 16 ms (one frame). */
   windowMs?: number;
   /** Most keys in one `fetch`. Default 100. */
