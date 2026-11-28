@@ -1314,7 +1314,7 @@ export function createDefaultOperations(
       logger.info("operations.executeNfcSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
-        forLockedRequest: !!paymentRequest,
+        forConstrainedRequest: !!paymentRequest,
       });
       const requestInfo = paymentRequest
         ? defaultDetectors.getPaymentRequestInfo(paymentRequest)

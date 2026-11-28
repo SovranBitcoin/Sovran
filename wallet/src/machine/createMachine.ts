@@ -1409,13 +1409,10 @@ export function createPaymentMachine(
             ...mintUrlFields(data.mintUrl),
             handOver: effect.value.kind === "handOver",
           });
-          if (effect.value.kind === "handOver") {
-            settleConfirm({ kind: "handOver" });
-            setStep(effect.value.step, effect.value.data);
-          } else {
-            settleConfirm({ kind: "delivered" });
-            setStep(effect.value.step, effect.value.data);
-          }
+          settleConfirm({
+            kind: effect.value.kind === "handOver" ? "handOver" : "delivered",
+          });
+          setStep(effect.value.step, effect.value.data);
           announcePayment(effect.value);
         }
       } else {
