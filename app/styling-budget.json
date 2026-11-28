@@ -39,9 +39,8 @@
     "inline-style": 1,
     "stack-layout-props": 2
   },
-  "features/mint/components/mintChanges/MintChangeRow.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 3
+  "features/mint/components/mintChanges/MintChangeGlyph.tsx": {
+    "stylesheet-create": 1
   },
   "features/mint/components/rebalance/RebalanceChainCard.tsx": {
     "stack-layout-props": 2

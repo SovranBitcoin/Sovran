@@ -77,8 +77,6 @@ interface MintListScreenProps {
   /** True only when EVERY row is cold (no cache, not yet enriched) — drives the
    *  cohesive full-list shimmer wave. Mixed/cached lists render per-row instead. */
   loading?: boolean;
-  /** When true, all rows show a global loading state (a handler is executing). */
-  isExecuting?: boolean;
   /** Called when a selectable mint is tapped */
   onMintSelect: (item: MintListItem) => void;
   /** Called when a mint's inspect button is pressed; omit it to show no inspect button */
@@ -109,25 +107,23 @@ function MintInspectButton({ mintUrl, onPress }: { mintUrl: string; onPress: () 
   );
 }
 
-type MintRowInfo = { item: MintRow; extraData?: boolean };
+type MintRowInfo = { item: MintRow };
 
 // A component, not a closure in `renderItem`: the identity it builds is cached
-// per row, so a row re-rendered for `isExecuting` hands ContactRow the same
-// identity object and its identity-keyed effects stay quiet.
+// per row, so a re-render hands ContactRow the same identity object and its
+// identity-keyed effects stay quiet.
 function MintListRow({
   item,
   mockMode,
   presence,
-  isExecuting,
   onInspectMint,
   onPress,
 }: {
   item: MintListItem;
   mockMode: boolean;
   presence: ReturnType<typeof useMintPresence>[string] | undefined;
-  isExecuting: boolean;
   onInspectMint: ((mintUrl: string) => void) | undefined;
-  onPress: (item: MintListItem, isExecuting: boolean) => void;
+  onPress: (item: MintListItem) => void;
 }) {
   const identity = mintIdentity({
     ...(mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item),
@@ -141,7 +137,7 @@ function MintListRow({
     <ContactRow
       identity={identity}
       stats={MINT_ROW_STATS}
-      disabled={isExecuting || item.status !== 'available'}
+      disabled={item.status !== 'available'}
       disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
       trailing={trailing}
       trailingInteractive={inspectable}
@@ -150,7 +146,7 @@ function MintListRow({
       // Stats roll in when cached values are replaced by fresh ones; the
       // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
       animate
-      onPress={() => onPress(item, isExecuting)}
+      onPress={() => onPress(item)}
       testID={`contact-row:mint:${item.mintUrl}`}
     />
   );
@@ -159,7 +155,6 @@ function MintListRow({
 export function MintListScreen({
   items,
   loading = false,
-  isExecuting = false,
   onMintSelect,
   onInspectMint,
 }: MintListScreenProps) {
@@ -179,11 +174,11 @@ export function MintListScreen({
   );
 
   const prevRenderKey = useRef('');
-  const renderKey = `${items.length}:${isExecuting}`;
+  const renderKey = `${items.length}`;
   useEffect(() => {
     if (renderKey !== prevRenderKey.current) {
       prevRenderKey.current = renderKey;
-      cashuLog.debug('mint.list.render', { itemCount: items.length, isExecuting });
+      cashuLog.debug('mint.list.render', { itemCount: items.length });
     }
   });
 
@@ -271,13 +266,10 @@ export function MintListScreen({
     }
   }, [hasSelectedCurrency, selectedCurrency]);
 
-  // Takes `executing` from the row rather than closing over it, so neither
-  // this handler nor `renderItem` changes identity when a flow starts or ends.
-  const handleMintPress = (item: MintListItem, executing: boolean) => {
-    if (executing || item.status !== 'available') {
+  const handleMintPress = (item: MintListItem) => {
+    if (item.status !== 'available') {
       cashuLog.debug('mint.list.select.blocked', {
         ...mintUrlLogFields(item.mintUrl),
-        isExecuting: executing,
         status: item.status,
       });
       return;
@@ -301,7 +293,6 @@ export function MintListScreen({
       tabs: availableCurrencies.length,
       selectedCurrency,
       unknownUnits: items.filter((item) => !item.supportedUnits).length,
-      isExecuting,
     },
   }));
   useStateChangeLogger('MintListScreen', () => ({ selectedCurrency, totalHeaderHeight }), cashuLog);
@@ -311,7 +302,6 @@ export function MintListScreen({
       items,
       filteredItems,
       loading,
-      isExecuting,
       selectedCurrency,
       availableCurrencies,
       totalHeaderHeight,
@@ -329,14 +319,11 @@ export function MintListScreen({
     </Text>
   );
 
-  // `isExecuting` reaches the rows as FlashList `extraData`, the one channel
-  // that re-renders mounted cells without a new `renderItem`.
-  const renderItem = ({ item, extraData }: MintRowInfo) => (
+  const renderItem = ({ item }: MintRowInfo) => (
     <MintListRow
       item={item}
       mockMode={mockMode}
       presence={presence[normalizeMintUrlKey(item.mintUrl)]}
-      isExecuting={extraData === true}
       onInspectMint={onInspectMint}
       onPress={handleMintPress}
     />
@@ -378,7 +365,6 @@ export function MintListScreen({
       data={data}
       renderItem={skeleton ? renderSkeletonItem : renderRow}
       keyExtractor={keyExtractor}
-      extraData={isExecuting}
       drawDistance={300}
       // FlashList v2 enables maintainVisibleContentPosition by default and
       // inserts its scroll anchor BEFORE the ListHeaderComponent, so with a
