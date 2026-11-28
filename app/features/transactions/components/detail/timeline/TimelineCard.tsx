@@ -115,13 +115,6 @@ export function HistoryEntryTimeline({
   onchainConfirmationProgress,
   onchainSettledInternally,
 }: HistoryEntryTimelineProps) {
-  const { cardIsBare } = useStylePaint();
-  const [foreground, successColor, dangerColor, warningColor] = useThemeColor([
-    'foreground',
-    'success',
-    'danger',
-    'warning',
-  ] as const);
   const paymentCopy = usePaymentCopyResolver();
   // False for the very first render: first-paint rows get the uniform
   // staggered entrance fade (regardless of data readiness — late-resolving
@@ -163,9 +156,6 @@ export function HistoryEntryTimeline({
       paymentLog.debug('tx.history_timeline.unmount', { entryId });
     };
   }, [entryId, historyEntry.type]);
-
-  const foreground66 = withAlpha(foreground, 0.66);
-  const foreground50 = withAlpha(foreground, 0.5);
 
   const isOnchainMint = historyEntry.type === 'mint' && !!getOnchainMintAddress(historyEntry);
 
@@ -527,38 +517,16 @@ export function HistoryEntryTimeline({
     onchainConfirmationProgress,
   ]);
 
-  const getStatusHeaderColor = () => {
-    switch (statusColorType) {
-      case 'success':
-        return successColor;
-      case 'error':
-        return dangerColor;
-      case 'warning':
-        return warningColor;
-      default:
-        return foreground66;
-    }
-  };
-  const statusHeaderColor = getStatusHeaderColor();
+  const statusHeaderColor = useStatusHeaderColor(statusColorType);
 
   return (
     <Log name="HistoryEntryTimeline">
-      <Surface
-        style={styles.card}
-        contentStyle={[styles.cardContent, cardIsBare ? styles.cardContentBare : null]}>
-        <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
-          {cardLabel}
-        </Text>
-
-        <HStack style={{ marginBottom: 16 }} align="center">
-          <Text
-            size={14}
-            heavy
-            style={{
-              color: statusHeaderColor,
-            }}>
-            {statusHeader}
-          </Text>
+      <TimelineCardView
+        timeline={timeline}
+        cardLabel={cardLabel}
+        statusHeader={statusHeader}
+        statusColorType={statusColorType}
+        badge={
           <ExpiryCountdown
             historyEntry={historyEntry}
             meltQuote={meltQuote}
@@ -567,58 +535,143 @@ export function HistoryEntryTimeline({
             entryId={entryId}
             unlockAtMs={unlockAt}
           />
-        </HStack>
-
-        <View>
-          {timeline.map((step, index) => {
-            const isLast = index === timeline.length - 1;
-            const nextStep = !isLast ? timeline[index + 1] : null;
-            const showConfirmationRing = ownsConfirmationRing(step, onchainConfirmationProgress);
-            // A finished ring row draws a full ring whatever our explorer's
-            // count says: the mint can call a transaction deep enough while
-            // our own count is still behind, and a ticked row with a
-            // part-filled ring would be two answers at once.
-            const ringFinished = step.stepType === 'complete' || step.stepType === 'success';
-            const confirmationProgress =
-              showConfirmationRing && onchainConfirmationProgress
-                ? {
-                    currentConfirmations: ringFinished
-                      ? onchainConfirmationProgress.requiredConfirmations
-                      : onchainConfirmationProgress.currentConfirmations,
-                    requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,
-                  }
-                : undefined;
-
-            return (
-              <TimelineRow
-                key={step.rowKey}
-                step={step}
-                index={index}
-                isLast={isLast}
-                connector={nextStep ? connectorType(step, nextStep) : null}
-                hasMounted={hasMounted}
-                confirmationProgress={confirmationProgress}
-                segmentedInProgress={onchainConfirmationProgress?.hasPayment}
-                entryId={entryId}
-                detail={
-                  // On the row that is about the lock: the unlock row when
-                  // there is a date, otherwise the row waiting on the recipient.
-                  conditions &&
-                  (conditions.unlockAt !== null
-                    ? step.id === 'unlock'
-                    : step.id === 'claimed' && step.stepType === 'next-pending') ? (
-                    <SpendingConditionsCard
-                      conditions={conditions}
-                      recipientName={getCounterparty(historyEntry)?.displayName ?? null}
-                    />
-                  ) : undefined
-                }
-              />
-            );
-          })}
-        </View>
-      </Surface>
+        }
+        onchainConfirmationProgress={onchainConfirmationProgress}
+        conditions={conditions}
+        recipientName={getCounterparty(historyEntry)?.displayName ?? null}
+        hasMounted={hasMounted}
+        entryId={entryId}
+      />
     </Log>
+  );
+}
+
+type StatusColorType = ReturnType<typeof getStatusColorType>;
+
+/** The status header's colour, which the countdown beside it shares. */
+export function useStatusHeaderColor(statusColorType: StatusColorType): string {
+  const [foreground, successColor, dangerColor, warningColor] = useThemeColor([
+    'foreground',
+    'success',
+    'danger',
+    'warning',
+  ] as const);
+  switch (statusColorType) {
+    case 'success':
+      return successColor;
+    case 'error':
+      return dangerColor;
+    case 'warning':
+      return warningColor;
+    default:
+      return withAlpha(foreground, 0.66);
+  }
+}
+
+interface TimelineCardViewProps {
+  timeline: readonly TimelineStep[];
+  cardLabel: string;
+  statusHeader: string;
+  statusColorType: StatusColorType;
+  /** The countdown beside the status header; tint it with `useStatusHeaderColor`. */
+  badge?: React.ReactNode;
+  onchainConfirmationProgress?: OnchainConfirmationProgress | null;
+  /** A send's spending conditions, drawn on the row that is about the lock. */
+  conditions: ReturnType<typeof describeSendLock>;
+  recipientName: string | null;
+  /** False on the first render only: rows then play the staggered entrance. */
+  hasMounted: boolean;
+  entryId: string;
+}
+
+/**
+ * The card as drawn, from resolved values only: no wallet, no clock, no memory
+ * of earlier rows. `HistoryEntryTimeline` feeds it on real screens; the
+ * design-system state matrix feeds it one fixture frame per card.
+ */
+export function TimelineCardView({
+  timeline,
+  cardLabel,
+  statusHeader,
+  statusColorType,
+  badge,
+  onchainConfirmationProgress,
+  conditions,
+  recipientName,
+  hasMounted,
+  entryId,
+}: TimelineCardViewProps) {
+  const { cardIsBare } = useStylePaint();
+  const [foreground] = useThemeColor(['foreground'] as const);
+  const foreground50 = withAlpha(foreground, 0.5);
+  const statusHeaderColor = useStatusHeaderColor(statusColorType);
+
+  return (
+    <Surface
+      style={styles.card}
+      contentStyle={[styles.cardContent, cardIsBare ? styles.cardContentBare : null]}>
+      <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
+        {cardLabel}
+      </Text>
+
+      <HStack style={{ marginBottom: 16 }} align="center">
+        <Text
+          size={14}
+          heavy
+          style={{
+            color: statusHeaderColor,
+          }}>
+          {statusHeader}
+        </Text>
+        {badge}
+      </HStack>
+
+      <View>
+        {timeline.map((step, index) => {
+          const isLast = index === timeline.length - 1;
+          const nextStep = !isLast ? timeline[index + 1] : null;
+          const showConfirmationRing = ownsConfirmationRing(step, onchainConfirmationProgress);
+          // A finished ring row draws a full ring whatever our explorer's
+          // count says: the mint can call a transaction deep enough while
+          // our own count is still behind, and a ticked row with a
+          // part-filled ring would be two answers at once.
+          const ringFinished = step.stepType === 'complete' || step.stepType === 'success';
+          const confirmationProgress =
+            showConfirmationRing && onchainConfirmationProgress
+              ? {
+                  currentConfirmations: ringFinished
+                    ? onchainConfirmationProgress.requiredConfirmations
+                    : onchainConfirmationProgress.currentConfirmations,
+                  requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,
+                }
+              : undefined;
+
+          return (
+            <TimelineRow
+              key={step.rowKey}
+              step={step}
+              index={index}
+              isLast={isLast}
+              connector={nextStep ? connectorType(step, nextStep) : null}
+              hasMounted={hasMounted}
+              confirmationProgress={confirmationProgress}
+              segmentedInProgress={onchainConfirmationProgress?.hasPayment}
+              entryId={entryId}
+              detail={
+                // On the row that is about the lock: the unlock row when
+                // there is a date, otherwise the row waiting on the recipient.
+                conditions &&
+                (conditions.unlockAt !== null
+                  ? step.id === 'unlock'
+                  : step.id === 'claimed' && step.stepType === 'next-pending') ? (
+                  <SpendingConditionsCard conditions={conditions} recipientName={recipientName} />
+                ) : undefined
+              }
+            />
+          );
+        })}
+      </View>
+    </Surface>
   );
 }
 

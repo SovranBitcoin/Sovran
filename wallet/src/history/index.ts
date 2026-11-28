@@ -62,7 +62,6 @@ export {
 export type { AiRequestGroup, AiRequestState } from "./aiRequests";
 export type { TransactionDirection, TransactionPaymentType } from "./filters";
 export type {
-  BuildTimelineInput,
   TimelineFlowVariant,
   TimelineModel,
   TimelineStep,

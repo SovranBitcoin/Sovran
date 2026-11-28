@@ -16,7 +16,6 @@ export {
   mintHistoryEntryExpired,
 } from "./context";
 export type {
-  BuildTimelineInput,
   TimelineFlowVariant,
   TimelineModel,
   TimelineStep,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { StyleSheet } from 'react-native';
 
 import { PillButton } from '@/shared/ui/primitives/PillButton';
@@ -152,6 +153,16 @@ export function SettingsDesignSystemTimelineScreen() {
         waited on. Pick a payment type, then a path through it, and watch it step from the first
         state to the last.
       </Text>
+
+      <View className="mb-4">
+        <Button
+          variant="secondary"
+          size="compact"
+          text="Every state, side by side"
+          testID="design-system-timeline-open-matrix"
+          onPress={() => router.push('/(settings-flow)/design-system-timeline-matrix')}
+        />
+      </View>
 
       {/* Cancel the page's 16px padding so the Timeline's own 16px margin aligns with the cards. */}
       <View style={{ marginHorizontal: -16 }}>

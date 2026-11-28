@@ -67,6 +67,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
     '(settings-flow)/design-system-skeleton-crossfade.tsx',
   ],
   'settings-design-system-timeline': ['(settings-flow)/design-system-timeline.tsx'],
+  'settings-design-system-timeline-matrix': ['(settings-flow)/design-system-timeline-matrix.tsx'],
   'settings-design-system-wallet-controls': ['(settings-flow)/design-system-wallet-controls.tsx'],
   'settings-design-system-ui-kit': ['(settings-flow)/design-system-ui-kit.tsx'],
   'settings-design-system-scrubber': ['(settings-flow)/design-system-scrubber.tsx'],

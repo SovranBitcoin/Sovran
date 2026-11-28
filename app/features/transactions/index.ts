@@ -9,7 +9,13 @@ export { ReceivedThisMonth, SpentThisMonth } from './components/MonthlyChart';
 export { TransactionLocationSection } from './components/TransactionLocationSection';
 export { HistoryEntryHeader } from './components/detail/HistoryEntryHeader';
 export { HistoryEntryRefresh } from './components/detail/HistoryEntryRefresh';
-export { HistoryEntryTimeline } from './components/detail/timeline';
+export {
+  HistoryEntryTimeline,
+  ExpiryBadge,
+  TimelineCardView,
+  getExpiryBadgeText,
+  useStatusHeaderColor,
+} from './components/detail/timeline';
 export { TransactionDetailShell } from './components/detail/TransactionDetailShell';
 export { AccelerateSection } from './components/detail/AccelerateSection';
 export {

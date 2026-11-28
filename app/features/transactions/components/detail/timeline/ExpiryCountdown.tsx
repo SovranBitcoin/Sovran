@@ -131,6 +131,11 @@ export function ExpiryCountdown({
 
   if (!expiryBadge) return null;
 
+  return <ExpiryBadge text={expiryBadge} color={color} />;
+}
+
+/** The badge as drawn, for a caller that already has its text. */
+export function ExpiryBadge({ text, color }: { text: string; color: string }) {
   return (
     <Text
       size={12}
@@ -139,7 +144,7 @@ export function ExpiryCountdown({
         marginLeft: 4,
       }}>
       •{'  '}
-      {expiryBadge}
+      {text}
     </Text>
   );
 }
