@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
+import type { PressHaptics } from '@/shared/ui/primitives/Haptics';
 
 export interface CapsuleButtonProps {
   label: string;
@@ -13,6 +14,8 @@ export interface CapsuleButtonProps {
   iconNode?: ReactNode;
   systemIcon?: string;
   onPress: () => void;
+  /** Press haptic, as on `Pressable`: light impact on press-in by default. */
+  haptics?: PressHaptics;
   color?: string;
   /**
    * Selected/active treatment — a foreground-tinted fill instead of the neutral

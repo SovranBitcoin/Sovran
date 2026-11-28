@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Pressable, type PressHaptics } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
@@ -39,6 +39,8 @@ interface ScreenHeaderActionProps {
   /** Optional accessory rendered over the glyph (e.g. an absolutely
    *  positioned count badge) — positioning is the accessory's concern. */
   accessory?: React.ReactNode;
+  /** Press haptic, as on `Pressable`: light impact on press-in by default. */
+  haptics?: PressHaptics;
 }
 
 export function ScreenHeaderAction({
@@ -51,6 +53,7 @@ export function ScreenHeaderAction({
   size = 24,
   disabled,
   accessory,
+  haptics,
 }: ScreenHeaderActionProps) {
   const chrome = useControlChrome();
   const foreground = useThemeColor('foreground');
@@ -70,6 +73,7 @@ export function ScreenHeaderAction({
     return (
       <HeaderGlassCircle
         onPress={onPress}
+        haptics={haptics}
         disabled={disabled}
         testID={testID}
         accessibilityLabel={accessibilityLabel}>
@@ -96,6 +100,7 @@ export function ScreenHeaderAction({
   return (
     <Pressable
       onPress={onPress}
+      haptics={haptics}
       hitSlop={hitSlop.default}
       activeOpacity={0.7}
       accessibilityRole="button"

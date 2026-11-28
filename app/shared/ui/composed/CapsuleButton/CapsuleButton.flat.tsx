@@ -20,6 +20,7 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
   const chrome = useControlChrome();
   const {
     onPress,
+    haptics,
     label,
     accessibilityLabel,
     accessibilityRole = 'button',
@@ -73,6 +74,7 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
       <PressableFeedback
         animation={false}
         onPress={onPress}
+        haptics={haptics}
         isDisabled={disabled || busy}
         testID={testID}
         accessible

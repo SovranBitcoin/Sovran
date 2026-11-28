@@ -32,6 +32,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
+import { TOGGLE_ROW_HAPTICS, type PressHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
@@ -368,6 +369,9 @@ interface ContactRowProps {
   trailingVariant?: 'chevron' | 'spinner' | 'none';
 
   onPress?: () => void;
+  /** Press haptic, forwarded to ListRow (a light tap on release by default;
+   *  a selection tick when the row only toggles). */
+  haptics?: PressHaptics;
   loading?: boolean;
   /** Animate the stat-accent values (cached→fresh roll-in). Mint rows only;
    *  the accent is keyed by mintUrl so a recycled cell never rolls a neighbour's
@@ -805,6 +809,7 @@ export function ContactRow({
   trailingInteractive = false,
   trailingVariant,
   onPress,
+  haptics,
   loading,
   animate = false,
   disabled = false,
@@ -1295,6 +1300,7 @@ export function ContactRow({
       trailing={trailingNode}
       trailingInteractive={trailingIsInteractive && trailingNode != null}
       onPress={trackedPress}
+      haptics={haptics ?? (onPress ? undefined : selectable ? TOGGLE_ROW_HAPTICS : undefined)}
       loading={resolvedLoading}
       disabled={disabled}
       selected={selectable ? Boolean(selected) : undefined}

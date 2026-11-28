@@ -10,7 +10,7 @@
 import React from 'react';
 
 import { headerButtonSize } from '@/shared/styles/tokens';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Pressable, type PressHaptics } from '@/shared/ui/primitives/Pressable';
 
 export function HeaderGlassCircle({
   onPress,
@@ -18,12 +18,15 @@ export function HeaderGlassCircle({
   children,
   testID,
   accessibilityLabel,
+  haptics,
 }: {
   onPress?: () => void;
   disabled?: boolean;
   children: React.ReactNode;
   testID?: string;
   accessibilityLabel?: string;
+  /** Press haptic, as on `Pressable`. */
+  haptics?: PressHaptics;
 }) {
   return (
     <Pressable
@@ -33,6 +36,7 @@ export function HeaderGlassCircle({
       style={BOX_SIZE}
       testID={testID}
       onPress={onPress}
+      haptics={haptics}
       disabled={disabled || !onPress}
       accessible={!!accessibilityLabel}
       accessibilityRole={onPress ? 'button' : accessibilityLabel ? 'image' : undefined}

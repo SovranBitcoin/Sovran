@@ -14,6 +14,7 @@ const HORIZONTAL_PADDING = 12;
 export default function BalancePillFlat({
   testID,
   onPress,
+  haptics,
   width,
   height,
   contentWidth: contentWidthOverride,
@@ -51,6 +52,7 @@ export default function BalancePillFlat({
         accessibilityLabel={display.isLoading ? 'Loading mint' : undefined}
         accessibilityState={{ busy: Boolean(display.isLoading) }}
         onPress={onPress}
+        haptics={haptics}
         style={[
           styles.pressable,
           {

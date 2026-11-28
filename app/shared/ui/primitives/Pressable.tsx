@@ -9,29 +9,20 @@ import {
   type View,
 } from 'react-native';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { log } from '@/shared/lib/logger';
-import { EnhancedHaptics } from './Haptics';
+import {
+  fireHapticConfig,
+  resolvePressHaptics,
+  type HapticConfig,
+  type PressHaptics,
+} from './Haptics';
 
-/**
- * Configuration for haptic feedback fired by the press lifecycle.
- */
-export interface HapticConfig {
-  /** Type of haptic feedback to trigger */
-  type?: 'selection' | 'impact' | 'notification';
-  /** Impact style — only used when `type` is `'impact'` */
-  impactStyle?: 'light' | 'medium' | 'heavy';
-  /** Notification kind — only used when `type` is `'notification'` */
-  notificationType?: 'success' | 'warning' | 'error';
-  /** Fire on `onPressIn`. Default `true`. */
-  onPressStart?: boolean;
-  /** Fire on `onPress`. Default `false`. */
-  onPressEnd?: boolean;
-}
+export type { HapticConfig, PressHaptics };
 
 interface SharedPressableProps extends Omit<RNPressableProps, 'style'> {
-  /** Haptic feedback config — `true` for default selection haptic, an
-   *  object for fine-grained control, `false` (default) to disable. */
-  haptics?: boolean | HapticConfig;
+  /** Haptic feedback. Default: a light impact on press-in. `false` opts
+   *  out; an object overrides fields of the default. Never fires while
+   *  `disabled` or when there is nothing to press (no `onPress`/`onLongPress`). */
+  haptics?: PressHaptics;
   /** Opacity applied to children while the press is held. Mirrors RN's
    *  legacy `TouchableOpacity.activeOpacity`. Set to `1` to disable the
    *  built-in fade. Default `0.7`. */
@@ -42,14 +33,6 @@ interface SharedPressableProps extends Omit<RNPressableProps, 'style'> {
   style?: StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
 }
 
-const DEFAULT_HAPTIC: Required<HapticConfig> = {
-  type: 'selection',
-  impactStyle: 'medium',
-  notificationType: 'success',
-  onPressStart: true,
-  onPressEnd: false,
-};
-
 /**
  * The single tap-surface seam for the app. Wraps RN's `Pressable` with:
  *
@@ -58,7 +41,7 @@ const DEFAULT_HAPTIC: Required<HapticConfig> = {
  *      pass through untouched (the hook is a no-op when the return
  *      value isn't a Promise).
  *   2. **Haptic feedback** matching the previous shared TouchableOpacity
- *      behaviour — opt-in via the `haptics` prop.
+ *      behaviour — on by default, `haptics={false}` opts out.
  *   3. **Default opacity feedback** on press via Pressable's
  *      `style={(state) => ...}` API. Set `activeOpacity={1}` to disable.
  *
@@ -70,29 +53,24 @@ const DEFAULT_HAPTIC: Required<HapticConfig> = {
  * silently bypassed.
  */
 export const Pressable = forwardRef<View, SharedPressableProps>(function Pressable(
-  { onPress, onPressIn, haptics = false, activeOpacity = 0.7, style, ...rest },
+  { onPress, onPressIn, haptics, activeOpacity = 0.7, style, ...rest },
   ref
 ) {
-  const hapticConfig: Required<HapticConfig> = {
-    ...DEFAULT_HAPTIC,
-    ...(typeof haptics === 'object' ? haptics : {}),
-  };
-  const shouldFireHaptics = haptics !== false;
+  // A container Pressable (only onPressIn/out, or nothing) is not a control.
+  const pressable = !rest.disabled && !!(onPress || rest.onLongPress);
+  const hapticConfig = pressable ? resolvePressHaptics(haptics) : null;
 
-  const triggerHaptic = async (trigger: 'start' | 'end') => {
-    if (!shouldFireHaptics) return;
+  // Fire-and-forget: the press handler never waits on the haptic bridge.
+  const triggerHaptic = (trigger: 'start' | 'end') => {
+    if (!hapticConfig) return;
     if (trigger === 'start' && !hapticConfig.onPressStart) return;
     if (trigger === 'end' && !hapticConfig.onPressEnd) return;
-    try {
-      await fireHaptic(hapticConfig);
-    } catch (error) {
-      log.warn('ui.haptics.not_supported', { type: 'pressable', error });
-    }
+    fireHapticConfig(hapticConfig);
   };
 
   const guardedOnPress = useSingleFlight(async (e: GestureResponderEvent) => {
     if (!onPress) return;
-    void triggerHaptic('end');
+    triggerHaptic('end');
     // RN types onPress as `() => void` but callers routinely pass async
     // handlers; cast through `unknown` so the runtime check can see the
     // Promise the type system refuses to admit.
@@ -102,7 +80,7 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
 
   const handlePressIn = (e: GestureResponderEvent) => {
     onPressIn?.(e);
-    void triggerHaptic('start');
+    triggerHaptic('start');
   };
 
   // Compose the user's style with default opacity-on-press feedback so
@@ -127,37 +105,3 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
     />
   );
 });
-
-async function fireHaptic(config: Required<HapticConfig>): Promise<void> {
-  switch (config.type) {
-    case 'selection':
-      await EnhancedHaptics.buttonHaptic();
-      return;
-    case 'impact':
-      switch (config.impactStyle) {
-        case 'light':
-          await EnhancedHaptics.buttonHaptic();
-          return;
-        case 'heavy':
-          await EnhancedHaptics.destructiveHaptic();
-          return;
-        case 'medium':
-        default:
-          await EnhancedHaptics.actionHaptic();
-          return;
-      }
-    case 'notification':
-      switch (config.notificationType) {
-        case 'warning':
-          await EnhancedHaptics.warningHaptic();
-          return;
-        case 'error':
-          await EnhancedHaptics.errorHaptic();
-          return;
-        case 'success':
-        default:
-          await EnhancedHaptics.successHaptic();
-          return;
-      }
-  }
-}
