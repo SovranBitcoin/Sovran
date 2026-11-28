@@ -18,6 +18,7 @@ import Animated, {
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { injectParts } from '@/shared/lib/injectParts';
+import { duration } from '@/shared/styles/tokens';
 import { Pressable } from './Pressable';
 
 type PressState = {
@@ -31,16 +32,27 @@ type PressState = {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/**
+ * Press-in lands within the first frames so the tap reads on contact;
+ * release eases back a little slower so a quick tap is still visible.
+ */
+export function pressScaleTiming(pressed: boolean) {
+  'worklet';
+  return {
+    duration: pressed ? duration.instant : duration.quick,
+    easing: Easing.out(Easing.ease),
+  };
+}
+
 /** Shrinks a 300pt-wide surface by 1.5%; wider surfaces shrink proportionally less. */
 function useScaleStyle({ pressed, width }: PressState, enabled: boolean) {
   return useAnimatedStyle(() => {
     if (!enabled) return { transform: [{ scale: 1 }] };
     const coefficient = width.get() > 0 ? 300 / width.get() : 1;
-    const target = pressed.get() ? 1 - 0.015 * coefficient : 1;
+    const isPressed = pressed.get();
+    const target = isPressed ? 1 - 0.015 * coefficient : 1;
     return {
-      transform: [
-        { scale: withTiming(target, { duration: 300, easing: Easing.out(Easing.ease) }) },
-      ],
+      transform: [{ scale: withTiming(target, pressScaleTiming(isPressed)) }],
     };
   });
 }
@@ -122,10 +134,13 @@ function PressableFeedbackScale({
 function PressableFeedbackHighlight({ press }: PartProps) {
   const { pressed } = press as PressState;
   const backgroundColor = useTint();
-  const fade = useAnimatedStyle(() => ({
-    backgroundColor,
-    opacity: withTiming(pressed.get() ? 0.1 : 0, { duration: 200 }),
-  }));
+  const fade = useAnimatedStyle(() => {
+    const isPressed = pressed.get();
+    return {
+      backgroundColor,
+      opacity: withTiming(isPressed ? 0.1 : 0, pressScaleTiming(isPressed)),
+    };
+  });
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, fade]} />;
 }
 
