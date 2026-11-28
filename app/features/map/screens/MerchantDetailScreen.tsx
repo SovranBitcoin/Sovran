@@ -258,36 +258,7 @@ export function MerchantDetailScreen() {
     }
   };
 
-  // The same scroller and header as the loaded page (56pt icon, name over
-  // address), then one list card, so the details land in place.
-  if (isLoading) {
-    return (
-      <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
-        <ScreenScrollView
-          bottomSpacing={32}
-          style={styles.scrollView}
-          scrollEnabled={false}
-          contentContainerStyle={{ paddingTop: headerHeight + 16, paddingHorizontal: 16 }}>
-          <View
-            style={styles.header}
-            testID="merchant-detail-skeleton"
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel="Loading merchant details"
-            accessibilityState={{ busy: true }}>
-            <Skeleton style={styles.merchantIcon} />
-            <VStack style={{ flex: 1, marginLeft: 16 }} gap={8}>
-              <Skeleton className="h-6 w-48 rounded-md" />
-              <Skeleton className="h-4 w-64 rounded-md" />
-            </VStack>
-          </View>
-          <Skeleton className="h-28 w-full rounded-xl" />
-        </ScreenScrollView>
-      </Screen>
-    );
-  }
-
-  if (loadFailed && !place) {
+  if (!isLoading && loadFailed && !place) {
     return (
       <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
         <View style={styles.loadingContainer}>
@@ -309,7 +280,7 @@ export function MerchantDetailScreen() {
     );
   }
 
-  if (!place) {
+  if (!isLoading && !place) {
     return (
       <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
         <View style={styles.loadingContainer}>
@@ -334,93 +305,130 @@ export function MerchantDetailScreen() {
           paddingHorizontal: 16,
         }}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View style={[styles.merchantIcon, { backgroundColor: getMarkerColor(place.icon) }]}>
-            <Icon name="mdi:store" size={28} color="#fff" />
-          </View>
-          <VStack style={{ flex: 1, marginLeft: 16 }}>
-            <Text size={20} heavy style={{ color: withAlpha(foreground, 0.9) }}>
-              {place.name || 'Unknown Merchant'}
-            </Text>
-            {place.address && (
-              <Text size={13} style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
-                {place.address}
-              </Text>
-            )}
-            {verifiedDate && (
-              <HStack align="center" style={{ marginTop: 6 }}>
-                <Badge variant="success" icon="material-symbols:verified" size={12}>
-                  Verified {verifiedDate}
-                </Badge>
-              </HStack>
-            )}
-          </VStack>
-        </View>
+        {isLoading || !place ? (
+          <MerchantDetailSkeleton />
+        ) : (
+          <>
+            <View style={styles.header}>
+              <View style={[styles.merchantIcon, { backgroundColor: getMarkerColor(place.icon) }]}>
+                <Icon name="mdi:store" size={28} color="#fff" />
+              </View>
+              <VStack style={{ flex: 1, marginLeft: 16 }}>
+                <Text size={20} heavy style={{ color: withAlpha(foreground, 0.9) }}>
+                  {place.name || 'Unknown Merchant'}
+                </Text>
+                {place.address && (
+                  <Text size={13} style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
+                    {place.address}
+                  </Text>
+                )}
+                {verifiedDate && (
+                  <HStack align="center" style={{ marginTop: 6 }}>
+                    <Badge variant="success" icon="material-symbols:verified" size={12}>
+                      Verified {verifiedDate}
+                    </Badge>
+                  </HStack>
+                )}
+              </VStack>
+            </View>
 
-        {supportedPaymentMethods.length > 0 && (
-          <Section title="Payment Methods">
-            <ListGroup variant="secondary">
-              {supportedPaymentMethods.map((method) => (
-                <ListGroup.Item key={method.title}>
-                  <ListGroup.ItemPrefix>
-                    <Icon name={method.icon} size={20} color={BITCOIN_ACCENT} />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{method.title}</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              ))}
-            </ListGroup>
-          </Section>
-        )}
-
-        {contactItems.length > 0 && (
-          <Section title="Contact">
-            <ListGroup variant="secondary">
-              {contactItems.map((contact) => (
-                <PressableFeedback
-                  key={contact.method}
-                  animation={false}
-                  accessibilityRole="link"
-                  accessibilityLabel={`${CONTACT_METHOD_LABELS[contact.method] ?? contact.method}, ${contact.info}`}
-                  testID={`merchant-contact-${contact.method}`}
-                  onPress={() =>
-                    handleContactPress(contact.method, contact.info, contact.fullInfo)
-                  }>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
+            {supportedPaymentMethods.length > 0 && (
+              <Section title="Payment Methods">
+                <ListGroup variant="secondary">
+                  {supportedPaymentMethods.map((method) => (
+                    <ListGroup.Item key={method.title}>
                       <ListGroup.ItemPrefix>
-                        <Icon name={contact.icon} size={20} color={withAlpha(foreground, 0.4)} />
+                        <Icon name={method.icon} size={20} color={BITCOIN_ACCENT} />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>{contact.info}</ListGroup.ItemTitle>
+                        <ListGroup.ItemTitle>{method.title}</ListGroup.ItemTitle>
                       </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix />
+                      <ListGroup.ItemSuffix>
+                        <Icon
+                          name="mdi:check-circle"
+                          size={20}
+                          color={withAlpha(foreground, 0.4)}
+                        />
+                      </ListGroup.ItemSuffix>
                     </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-              ))}
-            </ListGroup>
-          </Section>
+                  ))}
+                </ListGroup>
+              </Section>
+            )}
+
+            {contactItems.length > 0 && (
+              <Section title="Contact">
+                <ListGroup variant="secondary">
+                  {contactItems.map((contact) => (
+                    <PressableFeedback
+                      key={contact.method}
+                      animation={false}
+                      accessibilityRole="link"
+                      accessibilityLabel={`${CONTACT_METHOD_LABELS[contact.method] ?? contact.method}, ${contact.info}`}
+                      testID={`merchant-contact-${contact.method}`}
+                      onPress={() =>
+                        handleContactPress(contact.method, contact.info, contact.fullInfo)
+                      }>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            <Icon
+                              name={contact.icon}
+                              size={20}
+                              color={withAlpha(foreground, 0.4)}
+                            />
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>{contact.info}</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix />
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+                  ))}
+                </ListGroup>
+              </Section>
+            )}
+
+            {place.opening_hours && (
+              <MerchantTextSection title="Opening Hours" body={place.opening_hours} />
+            )}
+
+            {place.description && <MerchantTextSection title="About" body={place.description} />}
+
+            <View style={[styles.sourceInfo, { borderTopColor: withAlpha(foreground, 0.1) }]}>
+              <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
+                Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
+              </Text>
+            </View>
+          </>
         )}
-
-        {place.opening_hours && (
-          <MerchantTextSection title="Opening Hours" body={place.opening_hours} />
-        )}
-
-        {place.description && <MerchantTextSection title="About" body={place.description} />}
-
-        <View style={[styles.sourceInfo, { borderTopColor: withAlpha(foreground, 0.1) }]}>
-          <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
-            Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
-          </Text>
-        </View>
       </ScreenScrollView>
     </Screen>
+  );
+}
+
+/** The loaded page's header (56pt icon, name over address) and one list card,
+ *  so the details land in place instead of replacing a spinner. */
+function MerchantDetailSkeleton() {
+  return (
+    <>
+      <View
+        className="mb-4 flex-row items-start"
+        testID="merchant-detail-skeleton"
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel="Loading merchant details"
+        accessibilityState={{ busy: true }}>
+        <Skeleton className="h-14 w-14 rounded-2xl" />
+        <View className="ml-4 flex-1 gap-2">
+          <Skeleton className="h-6 w-48 rounded-md" />
+          <Skeleton className="h-4 w-64 rounded-md" />
+        </View>
+      </View>
+      <Skeleton className="h-28 w-full rounded-xl" />
+    </>
   );
 }
 

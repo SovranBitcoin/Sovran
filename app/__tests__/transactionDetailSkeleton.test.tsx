@@ -16,9 +16,6 @@ jest.mock('@/shared/ui/composed/Surface', () => ({
   Surface: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('@/shared/ui/primitives/Skeleton', () => ({ Skeleton: 'Skeleton' }));
-jest.mock('@/shared/styles/appStyle', () => ({
-  useAppStyle: () => ({ space: { item: 12 } }),
-}));
 
 /* eslint-disable import/first */
 import TestRenderer, { act } from 'react-test-renderer';

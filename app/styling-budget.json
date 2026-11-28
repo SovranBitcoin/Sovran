@@ -28,7 +28,7 @@
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 9,
+    "inline-style": 8,
     "stack-layout-props": 1,
     "content-container-style": 1
   },
@@ -692,7 +692,7 @@
     "content-container-style": 1
   },
   "shared/ui/composed/ScreenStates.tsx": {
-    "inline-style": 5
+    "inline-style": 3
   },
   "shared/ui/composed/ScrollEdgeFade.tsx": {
     "inline-style": 1
