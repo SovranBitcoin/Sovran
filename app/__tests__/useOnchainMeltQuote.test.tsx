@@ -16,6 +16,7 @@ const mockedUseManagerContext = jest.mocked(useManagerContext);
 
 const MINT_URL = 'https://mint.example';
 const QUOTE_ID = 'quote-a';
+/** Longer than the 12 s poll this hook used to run. */
 const POLL_MS = 12_000;
 
 function deferred<T>() {
@@ -85,7 +86,7 @@ describe('useOnchainMeltQuote', () => {
     jest.useRealTimers();
   });
 
-  it('refreshes immediately and then at the exact twelve-second cadence', async () => {
+  it('refreshes once on open, then follows Coco instead of polling', async () => {
     const refresh = jest.fn().mockResolvedValue({ state: 'PENDING' });
     installRefresh(refresh);
 
@@ -95,21 +96,80 @@ describe('useOnchainMeltQuote', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenLastCalledWith({ mintUrl: MINT_URL, quoteId: QUOTE_ID });
     expect(result.current.state).toBe('PENDING');
+    expect(listeners.get('melt-quote:updated')?.size).toBe(1);
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(POLL_MS - 1);
+      await jest.advanceTimersByTimeAsync(POLL_MS * 10);
     });
     expect(refresh).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(1);
-    });
-    expect(refresh).toHaveBeenCalledTimes(2);
+    unmount();
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+  });
+
+  it("ignores Coco updates for another quote or another mint", async () => {
+    const refresh = jest.fn().mockResolvedValue({ state: 'PENDING' });
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(POLL_MS);
+      emitMeltQuoteUpdated('quote-other', { state: 'PAID' });
+      for (const listener of listeners.get('melt-quote:updated') ?? []) {
+        listener({
+          mintUrl: 'https://other-mint.example',
+          method: 'onchain',
+          quoteId: QUOTE_ID,
+          quote: { state: 'PAID' },
+        });
+      }
     });
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(result.current.state).toBe('PENDING');
+
+    await act(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'UNPAID' });
+    });
+    expect(result.current.state).toBe('UNPAID');
+
+    unmount();
+  });
+
+  it("does not count the event its own refresh causes as a second read", async () => {
+    // Coco emits melt-quote:updated from inside refresh when the row changes.
+    // Counting it would confirm the off-chain verdict without the re-check.
+    const refresh = jest.fn(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PAID' });
+      return { state: 'PAID' };
+    });
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    expect(result.current.offchainSettled).toBe(false);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(3_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(result.current.offchainSettled).toBe(true);
+
+    unmount();
+  });
+
+  it('does not listen when a settled verdict was already saved', async () => {
+    const refresh = jest.fn().mockResolvedValue({ state: 'PAID' });
+    installRefresh(refresh);
+
+    const { unmount } = renderHook(() =>
+      useOnchainMeltQuote(MINT_URL, QUOTE_ID, {
+        persistedOnchainMelt: { settledOffchain: true },
+      })
+    );
+    await flushEffects();
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(listeners.get('melt-quote:updated')?.size ?? 0).toBe(0);
 
     unmount();
   });
@@ -136,7 +196,7 @@ describe('useOnchainMeltQuote', () => {
     unmount();
   });
 
-  it('stops every future poll once a PAID quote includes its outpoint', async () => {
+  it('stops every future read once a PAID quote includes its outpoint', async () => {
     const refresh = jest.fn().mockResolvedValue({
       outpoint: `${'a'.repeat(64)}:0`,
       state: 'PAID',
@@ -153,34 +213,25 @@ describe('useOnchainMeltQuote', () => {
       await jest.advanceTimersByTimeAsync(POLL_MS * 5);
     });
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
 
     unmount();
   });
 
-  it('retains the last quote after a rejection and continues polling', async () => {
-    const refresh = jest
-      .fn()
-      .mockResolvedValueOnce({ state: 'PENDING' })
-      .mockRejectedValueOnce(new Error('mint offline'))
-      .mockResolvedValueOnce({ state: 'UNPAID' });
+  it('follows Coco after the opening refresh fails', async () => {
+    const refresh = jest.fn().mockRejectedValue(new Error('mint offline'));
     installRefresh(refresh);
 
     const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
     await flushEffects();
-    expect(result.current.state).toBe('PENDING');
-
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(POLL_MS);
-    });
-    expect(refresh).toHaveBeenCalledTimes(2);
-    expect(result.current.state).toBe('PENDING');
+    expect(result.current.state).toBeNull();
     expect(result.current.isLoading).toBe(false);
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(POLL_MS);
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PENDING' });
     });
-    expect(refresh).toHaveBeenCalledTimes(3);
-    expect(result.current.state).toBe('UNPAID');
+    expect(result.current.state).toBe('PENDING');
+    expect(refresh).toHaveBeenCalledTimes(1);
 
     unmount();
   });
@@ -219,7 +270,7 @@ describe('useOnchainMeltQuote', () => {
   });
 
   it('asks again when the read that decides an off-chain verdict fails', async () => {
-    // Polling stops on PAID. With no outpoint yet, one follow-up read decides
+    // Watching stops on PAID. With no outpoint yet, one follow-up read decides
     // between "no transaction" and "published late"; if it fails and nothing
     // is scheduled, the page waits on a verdict that never comes.
     const refresh = jest

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 
+import { normalizeMintUrl } from '@cashu/coco-core';
 import { useManagerContext } from '@cashu/coco-react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -18,11 +19,13 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
 import { paymentLog } from '@/shared/lib/logger';
 
 // The onchain melt quote is the source of truth for the outpoint (txid:vout) and
-// the mint's state. `manager.quotes.melt.get` reads a LOCAL row that never
-// self-refreshes, so polling it can't pull a PENDING→PAID transition; we poll
-// `refresh` instead, which re-checks the mint and cascades the row → PAID +
-// finalize. Polled while the detail is open, then stopped once settled.
-const MELT_QUOTE_POLL_MS = 12_000;
+// the mint's state. One `refresh` on open re-checks the mint; after that the
+// page follows Coco's `melt-quote:updated`. Coco's melt-quote watcher keeps an
+// `onchain_melt_quote` subscription (WebSocket, polling fallback) for an
+// unexpired quote and for as long as its melt operation is pending
+// (coco `services/watchers/MeltQuoteWatcherService.ts:122-131,295-321`,
+// `MeltSettlementProcessor.ts:155-158,261-297`), and emits the event on each
+// change (`quotes/QuoteLifecycle.ts:1647-1666`).
 // One quick confirm re-check after the FIRST PAID-without-outpoint read — the
 // mint may publish the outpoint a beat after flipping PAID.
 const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
@@ -33,8 +36,11 @@ const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
 const OFFCHAIN_CONFIRM_RETRY_MAX_MS = 60_000;
 const OFFCHAIN_CONFIRM_MAX_RETRIES = 6;
 
+type MeltQuoteUpdated = { mintUrl: string; quoteId: string; quote: unknown };
+
 interface MeltQuoteWatchCtx {
   manager: {
+    on: (event: 'melt-quote:updated', handler: (payload: MeltQuoteUpdated) => void) => () => void;
     quotes: {
       melt: { refresh: (args: { mintUrl: string; quoteId: string }) => Promise<unknown> };
     };
@@ -53,7 +59,7 @@ interface MeltQuoteWatchCtx {
   annotatedDestinationForQuoteRef: MutableRefObject<string | null>;
 }
 
-/** The effect body of useOnchainMeltQuote, verbatim; returns its cleanup. */
+/** The effect body of useOnchainMeltQuote; returns its cleanup. */
 function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
   const {
     manager,
@@ -70,10 +76,10 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
     annotatedDestinationForQuoteRef,
   } = ctx;
   let mounted = true;
-  let interval: ReturnType<typeof setInterval> | null = null;
+  let stopWatching: (() => void) | null = null;
   let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
   let settlement = INITIAL_OFFCHAIN_SETTLEMENT_STATE;
-  // Polling has stopped on PAID and the one follow-up read is what decides
+  // Watching has stopped on PAID and the one follow-up read is what decides
   // between "no transaction" and "outpoint published late". If that read
   // fails nothing else is scheduled, so it has to be tried again.
   let awaitingVerdict = false;
@@ -91,101 +97,110 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
     entrySettledAtMount: entrySettledRef.current,
     requiredVerdictReads,
   });
-  const stopPolling = () => {
-    if (interval) {
-      clearInterval(interval);
-      interval = null;
+  const stopListening = () => {
+    if (stopWatching) {
+      stopWatching();
+      stopWatching = null;
     }
   };
+  const applyQuote = (result: unknown) => {
+    const record = (result as Record<string, unknown> | null) ?? null;
+    setQuote(record);
+    const state = typeof record?.state === 'string' ? record.state : null;
+    const expiry = typeof record?.expiry === 'number' ? record.expiry : null;
+    const outpoint =
+      typeof record?.outpoint === 'string' && record.outpoint.trim()
+        ? record.outpoint.trim()
+        : null;
+    // Persist the outpoint the first time the mint surfaces it, so the
+    // explorer link survives the mint pruning this quote row later.
+    if (outpoint && annotatedOutpointForQuoteRef.current !== quoteId) {
+      annotatedOutpointForQuoteRef.current = quoteId;
+      setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+        onchainMelt: { outpoint, outpointSource: 'mint' },
+      });
+    }
+    // Persist the destination (address + sats) once — the facts the
+    // heuristic outpoint discovery needs when a persisted coco row carries
+    // no metadata.
+    const request =
+      typeof record?.request === 'string' && record.request.trim() ? record.request.trim() : null;
+    if (request && annotatedDestinationForQuoteRef.current !== quoteId) {
+      annotatedDestinationForQuoteRef.current = quoteId;
+      const amount = record?.amount;
+      const unit = typeof record?.unit === 'string' ? record.unit : null;
+      const amountSats =
+        typeof amount === 'number' && Number.isFinite(amount) && unit === 'sat'
+          ? amount
+          : undefined;
+      setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+        onchainMelt: {
+          address: request,
+          ...(amountSats != null ? { amountSats } : {}),
+        },
+      });
+    }
+    settlement = nextOffchainSettlementState(settlement, {
+      state,
+      hasOutpoint: !!outpoint,
+    });
+    const liveVerdict = isConfirmedOffchainSettlement(settlement, requiredVerdictReads);
+    setOffchainSettled(liveVerdict || (persistedVerdictRef.current && !outpoint));
+    // Persist the debounced live verdict so the next mount is instant.
+    if (liveVerdict && annotatedVerdictForQuoteRef.current !== quoteId) {
+      annotatedVerdictForQuoteRef.current = quoteId;
+      paymentLog.info('onchain.melt.quote.verdict_persisted', {
+        reads: settlement.paidNoOutpointReads,
+        requiredVerdictReads,
+      });
+      setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+        onchainMelt: { settledOffchain: true },
+      });
+    }
+    paymentLog.debug('onchain.melt.quote.result', {
+      found: !!record,
+      hasOutpoint: !!outpoint,
+      state,
+      hasExpiry: expiry != null,
+      paidNoOutpointReads: settlement.paidNoOutpointReads,
+    });
+    // PAID is terminal (coco's merge is PAID-sticky) — stop re-checking the
+    // mint while the detail stays open. Exception: the FIRST
+    // PAID-without-outpoint read gets one quick confirm re-check before the
+    // off-chain verdict is believed (the outpoint may land a beat later).
+    // An expired quote that never left UNPAID is equally terminal.
+    if (state === 'PAID') {
+      stopListening();
+      if (
+        !outpoint &&
+        !isConfirmedOffchainSettlement(settlement, requiredVerdictReads) &&
+        !confirmTimeout
+      ) {
+        awaitingVerdict = true;
+        confirmTimeout = setTimeout(() => {
+          confirmTimeout = null;
+          void fetchQuote();
+        }, OFFCHAIN_CONFIRM_REFETCH_MS);
+      } else {
+        awaitingVerdict = false;
+      }
+    } else if (isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
+      stopListening();
+    }
+  };
+  // Our own refresh also emits `melt-quote:updated` when the row changes; that
+  // is the same observation, so events are ignored while a refresh is out.
+  let refreshing = 0;
   const fetchQuote = async () => {
     setIsLoading(true);
+    refreshing += 1;
     try {
-      const result = await manager.quotes.melt.refresh({ mintUrl, quoteId });
+      const result = await manager.quotes.melt.refresh({ mintUrl, quoteId }).finally(() => {
+        refreshing -= 1;
+      });
       if (!mounted) return;
       failedVerdictReads = 0;
-      const record = (result as unknown as Record<string, unknown> | null) ?? null;
-      setQuote(record);
-      const state = typeof record?.state === 'string' ? record.state : null;
-      const expiry = typeof record?.expiry === 'number' ? record.expiry : null;
-      const outpoint =
-        typeof record?.outpoint === 'string' && record.outpoint.trim()
-          ? record.outpoint.trim()
-          : null;
-      // Persist the outpoint the first time the mint surfaces it, so the
-      // explorer link survives the mint pruning this quote row later.
-      if (outpoint && annotatedOutpointForQuoteRef.current !== quoteId) {
-        annotatedOutpointForQuoteRef.current = quoteId;
-        setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
-          onchainMelt: { outpoint, outpointSource: 'mint' },
-        });
-      }
-      // Persist the destination (address + sats) once — the facts the
-      // heuristic outpoint discovery needs when a persisted coco row carries
-      // no metadata.
-      const request =
-        typeof record?.request === 'string' && record.request.trim() ? record.request.trim() : null;
-      if (request && annotatedDestinationForQuoteRef.current !== quoteId) {
-        annotatedDestinationForQuoteRef.current = quoteId;
-        const amount = record?.amount;
-        const unit = typeof record?.unit === 'string' ? record.unit : null;
-        const amountSats =
-          typeof amount === 'number' && Number.isFinite(amount) && unit === 'sat'
-            ? amount
-            : undefined;
-        setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
-          onchainMelt: {
-            address: request,
-            ...(amountSats != null ? { amountSats } : {}),
-          },
-        });
-      }
-      settlement = nextOffchainSettlementState(settlement, {
-        state,
-        hasOutpoint: !!outpoint,
-      });
-      const liveVerdict = isConfirmedOffchainSettlement(settlement, requiredVerdictReads);
-      setOffchainSettled(liveVerdict || (persistedVerdictRef.current && !outpoint));
-      // Persist the debounced live verdict so the next mount is instant.
-      if (liveVerdict && annotatedVerdictForQuoteRef.current !== quoteId) {
-        annotatedVerdictForQuoteRef.current = quoteId;
-        paymentLog.info('onchain.melt.quote.verdict_persisted', {
-          reads: settlement.paidNoOutpointReads,
-          requiredVerdictReads,
-        });
-        setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
-          onchainMelt: { settledOffchain: true },
-        });
-      }
-      paymentLog.debug('onchain.melt.quote.result', {
-        found: !!record,
-        hasOutpoint: !!outpoint,
-        state,
-        hasExpiry: expiry != null,
-        paidNoOutpointReads: settlement.paidNoOutpointReads,
-      });
-      // PAID is terminal (coco's merge is PAID-sticky) — stop re-checking the
-      // mint while the detail stays open. Exception: the FIRST
-      // PAID-without-outpoint read gets one quick confirm re-check before the
-      // off-chain verdict is believed (the outpoint may land a beat later).
-      // An expired quote that never left UNPAID is equally terminal.
-      if (state === 'PAID') {
-        stopPolling();
-        if (
-          !outpoint &&
-          !isConfirmedOffchainSettlement(settlement, requiredVerdictReads) &&
-          !confirmTimeout
-        ) {
-          awaitingVerdict = true;
-          confirmTimeout = setTimeout(() => {
-            confirmTimeout = null;
-            void fetchQuote();
-          }, OFFCHAIN_CONFIRM_REFETCH_MS);
-        } else {
-          awaitingVerdict = false;
-        }
-      } else if (isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
-        stopPolling();
-      }
+      applyQuote(result);
     } catch (err) {
       paymentLog.warn('onchain.melt.quote.refresh_failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -210,15 +225,20 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
       if (mounted) setIsLoading(false);
     }
   };
-  void fetchQuote();
   // A persisted settled-off-chain verdict is terminal: one self-heal refresh
-  // (in case the mint published the outpoint late) instead of polling.
+  // (in case the mint published the outpoint late) instead of watching.
   if (!persistedVerdictRef.current) {
-    interval = setInterval(() => void fetchQuote(), MELT_QUOTE_POLL_MS);
+    const watchedMint = normalizeMintUrl(mintUrl);
+    stopWatching = manager.on('melt-quote:updated', (update) => {
+      if (!mounted || refreshing > 0 || update.quoteId !== quoteId) return;
+      if (normalizeMintUrl(update.mintUrl) !== watchedMint) return;
+      applyQuote(update.quote);
+    });
   }
+  void fetchQuote();
   return () => {
     mounted = false;
-    stopPolling();
+    stopListening();
     if (confirmTimeout) {
       clearTimeout(confirmTimeout);
       confirmTimeout = null;
@@ -230,9 +250,10 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
  * Live onchain melt-quote fields for the send-detail timeline — the `outpoint`
  * (once the mint broadcasts), the mint `state` (UNPAID/PENDING/PAID), and the
  * `request` (recipient bitcoin address, the source of truth for a persisted
- * entry that carries no metadata). Fetched via `manager.quotes.melt.refresh`
- * (a live mint re-check) and polled while mounted so the outpoint + PAID flip
- * land without a manual reload; polling stops once the quote reaches PAID.
+ * entry that carries no metadata). Fetched once via `manager.quotes.melt.refresh`
+ * (a live mint re-check), then updated from Coco's `melt-quote:updated` so the
+ * outpoint + PAID flip land without a manual reload; it stops listening once
+ * the quote reaches PAID or expires.
  */
 export function useOnchainMeltQuote(
   mintUrl: string | null | undefined,
@@ -286,7 +307,7 @@ export function useOnchainMeltQuote(
   // One verdict + one address/amount annotation write per quote.
   const annotatedVerdictForQuoteRef = useRef<string | null>(null);
   const annotatedDestinationForQuoteRef = useRef<string | null>(null);
-  // Read inside the effect without restarting polling when the annotation
+  // Read inside the effect without restarting the watch when the annotation
   // lands mid-session (e.g. the melt-op:finalized writer fires while open).
   const persistedVerdictRef = useLatestRef(persistedVerdict);
   const entrySettledRef = useLatestRef(opts?.entrySettledAtMount === true);
