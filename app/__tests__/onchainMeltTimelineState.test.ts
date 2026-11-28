@@ -5,6 +5,7 @@ import {
   canOnchainMeltQuoteExpire,
   INITIAL_OFFCHAIN_SETTLEMENT_STATE,
   isConfirmedOffchainSettlement,
+  isOnchainMeltInFlight,
   isOnchainMeltQuoteExpired,
   isOnchainMeltSettled,
   nextOffchainSettlementState,
@@ -138,5 +139,24 @@ describe('isOnchainMeltSettled', () => {
     expect(isOnchainMeltSettled('UNPAID')).toBe(false);
     expect(isOnchainMeltSettled(null)).toBe(false);
     expect(isOnchainMeltSettled('rolledBack')).toBe(false);
+  });
+});
+
+describe('isOnchainMeltInFlight', () => {
+  it('is true only while the melt operation is executing or pending', () => {
+    for (const state of ['executing', 'pending', 'PENDING']) {
+      expect(isOnchainMeltInFlight(state)).toBe(true);
+    }
+    for (const state of [
+      'prepared',
+      'UNPAID',
+      'finalized',
+      'PAID',
+      'rolling_back',
+      'rolled_back',
+      null,
+    ]) {
+      expect(isOnchainMeltInFlight(state)).toBe(false);
+    }
   });
 });

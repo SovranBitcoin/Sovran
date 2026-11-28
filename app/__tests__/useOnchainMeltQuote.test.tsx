@@ -18,6 +18,8 @@ const MINT_URL = 'https://mint.example';
 const QUOTE_ID = 'quote-a';
 /** Longer than the 12 s poll this hook used to run. */
 const POLL_MS = 12_000;
+/** The first safety re-check while a quote is open and not settled. */
+const SAFETY_MS = 30_000;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -46,7 +48,10 @@ function emitMeltQuoteUpdated(quoteId: string, quote: Record<string, unknown>): 
   }
 }
 
-function installRefresh(refresh: jest.Mock): void {
+function installRefresh(
+  refresh: jest.Mock,
+  get: jest.Mock = jest.fn().mockResolvedValue(null)
+): void {
   listeners.clear();
   const on = jest.fn((event: string, listener: QuoteListener) => {
     const set = listeners.get(event) ?? new Set<QuoteListener>();
@@ -59,7 +64,7 @@ function installRefresh(refresh: jest.Mock): void {
       manager: {
         on,
         quotes: {
-          melt: { refresh },
+          melt: { refresh, get },
         },
       },
     })
@@ -86,7 +91,7 @@ describe('useOnchainMeltQuote', () => {
     jest.useRealTimers();
   });
 
-  it('refreshes once on open, then follows Coco instead of polling', async () => {
+  it('refreshes once on open, then follows Coco with only a slow, backing-off re-check', async () => {
     const refresh = jest.fn().mockResolvedValue({ state: 'PENDING' });
     installRefresh(refresh);
 
@@ -98,13 +103,209 @@ describe('useOnchainMeltQuote', () => {
     expect(result.current.state).toBe('PENDING');
     expect(listeners.get('melt-quote:updated')?.size).toBe(1);
 
+    // Not the old 12 s poll: no read before the first 30 s safety re-check,
+    // then waits that double (30 s, 60 s, 120 s, ... up to 5 min).
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(POLL_MS * 10);
+      await jest.advanceTimersByTimeAsync(SAFETY_MS - 1);
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
+    });
+    // 30+60+120+240 s, then every 300 s: a dozen or so reads in an hour, not 300.
+    expect(refresh.mock.calls.length).toBeLessThan(20);
+
+    unmount();
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+    const callsAtUnmount = refresh.mock.calls.length;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(callsAtUnmount);
+  });
+
+  // Coco emits melt-quote:updated once per change (QuoteLifecycle.ts:1647);
+  // its watcher drops a PAID quote (MeltQuoteWatcherService.ts:295) and
+  // settlement does not emit again (MeltSettlementProcessor.ts:161).
+  it('keeps a PAID event that lands while the opening refresh is out, even if the refresh fails', async () => {
+    const outpoint = `${'c'.repeat(64)}:0`;
+    const opening = deferred<Record<string, unknown>>();
+    const refresh = jest.fn(() => opening.promise);
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await act(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PAID', outpoint });
+    });
+    await act(async () => {
+      opening.reject(new Error('timed out'));
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+
+    unmount();
+  });
+
+  it('applies the newer of the refresh result and an event that landed during it', async () => {
+    const outpoint = `${'c'.repeat(64)}:0`;
+    const opening = deferred<Record<string, unknown>>();
+    installRefresh(jest.fn(() => opening.promise));
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await act(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PAID', outpoint, updatedAt: 20 });
+    });
+    await act(async () => {
+      opening.resolve({ state: 'PENDING', updatedAt: 10 });
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
+
+    unmount();
+  });
+
+  // Coco excludes PAID rows from its watcher's startup list
+  // (MeltQuoteRepository.ts:213), so offline no event will ever come.
+  it('shows the locally saved PAID quote when the opening refresh fails offline', async () => {
+    const outpoint = `${'d'.repeat(64)}:2`;
+    const refresh = jest.fn().mockRejectedValue(new Error('network unavailable'));
+    const get = jest.fn().mockResolvedValue({ state: 'PAID', outpoint, updatedAt: 5 });
+    installRefresh(refresh, get);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    await flushEffects();
+
+    expect(get).toHaveBeenCalledWith({ mintUrl: MINT_URL, quoteId: QUOTE_ID });
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+
+    unmount();
+  });
+
+  it('does not take a locally saved PAID quote without an outpoint as a fresh verdict read', async () => {
+    const refresh = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('network unavailable'))
+      .mockResolvedValue({ state: 'PAID' });
+    const get = jest.fn().mockResolvedValue({ state: 'PAID' });
+    installRefresh(refresh, get);
+
+    const { result, unmount } = renderHook(() =>
+      useOnchainMeltQuote(MINT_URL, QUOTE_ID, { entrySettledAtMount: true })
+    );
+    await flushEffects();
+    await flushEffects();
+    expect(result.current.state).toBe('PAID');
+    expect(result.current.offchainSettled).toBe(false);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(3_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(result.current.offchainSettled).toBe(true);
+
+    unmount();
+  });
+
+  // Coco keeps watching a quote while its melt operation is pending
+  // (MeltSettlementProcessor.ts:261), whatever the quote's expiry.
+  it('keeps listening to an expired UNPAID quote while its operation is still in flight', async () => {
+    const outpoint = `${'e'.repeat(64)}:0`;
+    const refresh = jest.fn().mockResolvedValue({ state: 'UNPAID', expiry: 1 });
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() =>
+      useOnchainMeltQuote(MINT_URL, QUOTE_ID, { operationInFlight: true })
+    );
+    await flushEffects();
+    expect(result.current.state).toBe('UNPAID');
+    expect(listeners.get('melt-quote:updated')?.size).toBe(1);
+
+    await act(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PAID', outpoint });
+    });
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
+
+    unmount();
+  });
+
+  it('stops for an expired UNPAID quote once no operation is in flight', async () => {
+    const refresh = jest.fn().mockResolvedValue({ state: 'UNPAID', expiry: 1 });
+    installRefresh(refresh);
+
+    const { unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
     });
     expect(refresh).toHaveBeenCalledTimes(1);
 
     unmount();
-    expect(listeners.get('melt-quote:updated')?.size).toBe(0);
+  });
+
+  it('recovers a settlement whose event never came with the safety re-check', async () => {
+    const outpoint = `${'f'.repeat(64)}:1`;
+    const refresh = jest
+      .fn()
+      .mockResolvedValueOnce({ state: 'PENDING' })
+      .mockResolvedValue({ state: 'PAID', outpoint });
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    expect(result.current.state).toBe('PENDING');
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SAFETY_MS);
+    });
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
+
+    // Settled: nothing more is read.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    unmount();
+  });
+
+  it('runs no safety re-check while the screen is not focused, and resumes on focus', async () => {
+    const refresh = jest.fn().mockResolvedValue({ state: 'PENDING' });
+    installRefresh(refresh);
+
+    const { rerender, unmount } = renderHook(
+      ({ active }: { active: boolean }) => useOnchainMeltQuote(MINT_URL, QUOTE_ID, { active }),
+      { initialProps: { active: true } }
+    );
+    await flushEffects();
+    rerender({ active: false });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    rerender({ active: true });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SAFETY_MS);
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    unmount();
   });
 
   it('ignores Coco updates for another quote or another mint', async () => {
