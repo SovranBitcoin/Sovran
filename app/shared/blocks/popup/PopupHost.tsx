@@ -215,6 +215,10 @@ function StandardContent({
 
 // Each sheet button owns a single-flight slot (a component, for the hook): a
 // fast double-tap would otherwise navigate twice and double-stack the route.
+// The sheet closes before the action runs so a slow action never holds it on
+// screen; `close` is scoped to this sheet, so a follow-on sheet the action
+// opens is not touched. No popup passes `onClose`, so closing first cannot
+// report a button press as a dismiss.
 type SheetActionButtonProps = {
   button: { text: string; onPress?: () => void | Promise<void>; testID?: string };
   variant: 'primary' | 'tertiary';
@@ -232,8 +236,8 @@ function SheetActionButton({
   close,
 }: SheetActionButtonProps) {
   const handlePress = useSingleFlight(async () => {
-    if (button.onPress) await button.onPress();
     close();
+    if (button.onPress) await button.onPress();
   });
 
   return (

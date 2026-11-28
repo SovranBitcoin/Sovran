@@ -27,7 +27,14 @@ interface ActionMenuSheetContentProps extends CustomSheetSharedProps {
 
 type ActionMenuSheetButton = ActionSheetPayloads['action-menu']['buttons'][number];
 
+/**
+ * Close first, then run: a slow action (redeem, pay, recover) must not hold
+ * the sheet on screen, and the menu-lane host already closes before it runs.
+ * The pick is recorded before this runs, so the close never reads as a
+ * dismiss. `keepOpen` items swap the sheet's content and stay up.
+ */
 async function runSheetAction(button: ActionMenuSheetButton, close: () => void): Promise<void> {
+  if (button.keepOpen !== true) close();
   try {
     await button.onPress?.(close);
   } catch (error) {
@@ -35,10 +42,6 @@ async function runSheetAction(button: ActionMenuSheetButton, close: () => void):
       testID: button.testID,
       error: error instanceof Error ? error.message : String(error),
     });
-  } finally {
-    // Mirror the menu-lane host: auto-dismiss unless the item
-    // deliberately keeps the surface open to swap content.
-    if (button.keepOpen !== true) close();
   }
 }
 
