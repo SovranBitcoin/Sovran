@@ -29,10 +29,34 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
+type QuoteListener = (payload: {
+  mintUrl: string;
+  method: string;
+  quoteId: string;
+  quote: Record<string, unknown>;
+}) => void;
+
+/** Listeners the hook registered on the Coco manager, by event name. */
+const listeners = new Map<string, Set<QuoteListener>>();
+
+function emitMeltQuoteUpdated(quoteId: string, quote: Record<string, unknown>): void {
+  for (const listener of listeners.get('melt-quote:updated') ?? []) {
+    listener({ mintUrl: MINT_URL, method: 'onchain', quoteId, quote: { quoteId, ...quote } });
+  }
+}
+
 function installRefresh(refresh: jest.Mock): void {
+  listeners.clear();
+  const on = jest.fn((event: string, listener: QuoteListener) => {
+    const set = listeners.get(event) ?? new Set<QuoteListener>();
+    set.add(listener);
+    listeners.set(event, set);
+    return () => set.delete(listener);
+  });
   mockedUseManagerContext.mockReturnValue(
     Object.assign(Object.create(null), {
       manager: {
+        on,
         quotes: {
           melt: { refresh },
         },
@@ -86,6 +110,28 @@ describe('useOnchainMeltQuote', () => {
       await jest.advanceTimersByTimeAsync(POLL_MS);
     });
     expect(refresh).toHaveBeenCalledTimes(3);
+
+    unmount();
+  });
+
+  it('shows a quote that settles while the page is open, with its outpoint', async () => {
+    const outpoint = `${'b'.repeat(64)}:1`;
+    const refresh = jest
+      .fn()
+      .mockResolvedValueOnce({ state: 'PENDING' })
+      .mockResolvedValue({ state: 'PAID', outpoint });
+    installRefresh(refresh);
+
+    const { result, unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    expect(result.current.state).toBe('PENDING');
+
+    // Coco's watcher observes the settlement; the page learns it either way.
+    await act(async () => {
+      emitMeltQuoteUpdated(QUOTE_ID, { state: 'PAID', outpoint });
+      await jest.advanceTimersByTimeAsync(POLL_MS);
+    });
+    expect(result.current).toMatchObject({ state: 'PAID', outpoint });
 
     unmount();
   });
