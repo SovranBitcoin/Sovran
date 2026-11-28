@@ -3,6 +3,7 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 import { readSensitiveValue, writeSensitiveValue } from '@/shared/lib/nostr/secureStorage';
 import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 import {
   SecureVaultManifest as Manifest,
   secureVaultChunkKey,
@@ -23,12 +24,14 @@ export function createSecureVault(ownerPubkey: string, name: string) {
     secureVaultChunkKey(manifestKey, generation % 2, index);
 
   async function readRecord() {
+    countIdleWork('secure_vault.read');
     const raw = await readSensitiveValue(manifestKey);
     if (raw === null) return null;
     const manifest = Manifest.parse(JSON.parse(raw));
     if (manifest.generation === null) return { manifest, value: null };
     let value = '';
     for (let index = 0; index < manifest.slots[manifest.generation % 2]; index++) {
+      countIdleWork('secure_vault.read');
       const chunk = await readSensitiveValue(chunkKey(manifest.generation, index));
       if (chunk === null) throw new Error('Payment recovery storage is incomplete');
       value += chunk;

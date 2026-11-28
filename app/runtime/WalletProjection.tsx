@@ -36,6 +36,7 @@ import {
 } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
 const EMPTY_PROOF_AMOUNTS: Record<string, number[]> = {};
@@ -285,6 +286,7 @@ export function WalletProjection({ children }: { children: React.ReactNode }) {
     await Promise.all(
       stableMintUrls.map(async (url) => {
         try {
+          countIdleWork('wallet_projection.query');
           const proofs = await getReadyProofs(manager, url);
           const amounts = proofs
             .filter((p) => (p.unit ?? 'sat') === activeUnit && p.usedByOperationId == null)

@@ -10,6 +10,7 @@ import {
 } from 'zustand/middleware';
 
 import { redactError, storeLog } from '@/shared/lib/logger';
+import { countIdleWork } from '@/shared/lib/loggerIdleCounters';
 import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
@@ -114,6 +115,7 @@ function reportFailedSaves(logKey: string, storage: StateStorage): StateStorage 
     getItem: (name) => storage.getItem(name),
     removeItem: (name) => storage.removeItem(name),
     setItem: async (name, value) => {
+      countIdleWork('store.write');
       try {
         await storage.setItem(name, value);
       } catch (error) {
