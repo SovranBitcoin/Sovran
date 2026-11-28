@@ -19,7 +19,7 @@ const config = JSON.parse(await readFile(join(root, 'press/website.json'), 'utf8
 test('website selection is only OG, and named scene edits feed both consumers', () => {
   assert.deepEqual(websiteRecipes(config).map(entry => entry.output), ['social/og.png']);
   const edited = structuredClone(config);
-  edited.phones.feed.pose = { rotateZ: 8 };
+  edited.phones.receive.pose = { rotateZ: 8 };
   assert.deepEqual(websiteRecipes(edited)[0].recipe.phones, websiteScenes(edited).hero.phones);
   for (const update of [{ draft: true }, { output: '../secret.png' }, { scene: 'absent' }, { width: 1000 }]) {
     const invalid = structuredClone(config); Object.assign(invalid.recipes[0], update);
@@ -52,7 +52,7 @@ async function fixture(t) {
   await mkdir(join(repoRoot, 'site/public'), { recursive: true });
   const registry = {};
   const bytes = await sharp({ create: { width: 402, height: 874, channels: 4, background: '#54885b' } }).png().toBuffer();
-  for (const id of ['ios/wallet', 'ios/feed']) {
+  for (const id of ['ios/wallet', 'ios/receive-qr']) {
     registry[id] = { file: `source/screenshots/${id}.png`, context: id.slice(4), run: 'run-fixture', sha256: sha256(bytes),
       appSource: { fingerprint: appSourceFingerprint(repoRoot) } };
     await put(`press/artwork/${registry[id].file}`, bytes);
