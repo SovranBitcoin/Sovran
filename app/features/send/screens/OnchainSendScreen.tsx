@@ -249,8 +249,10 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              // Only after settlement (or when viewing history on a disabled rail); before that, Pay / Cancel apply.
-              condition: isPaid || !railEnabled,
+              // After settlement, on a disabled rail, or once nothing is left to
+              // pay or cancel (a payment in flight); before that, Pay / Cancel apply.
+              condition:
+                isPaid || !railEnabled || (!actions.pay.available && !actions.cancel.available),
             },
             {
               testID: 'onchain-send-cancel',
