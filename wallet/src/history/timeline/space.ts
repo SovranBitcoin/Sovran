@@ -13,6 +13,7 @@
 import type { PaymentCopyResolver } from '../../copy';
 import { transactionHeaderPhase, transactionHeaderTitle } from '../header-title';
 import { getCardLabel, getStatusColorType, getStatusHeader } from './classify';
+import { DEFAULT_PAYMENT_COPY } from './context';
 import { buildTimelineModel } from './engine';
 import type { BuildTimelineInput, TimelineModel } from './types';
 
@@ -91,14 +92,23 @@ interface TimelineSurfaces {
   cardLabel: string;
   statusHeader: string;
   statusColor: ReturnType<typeof getStatusColorType>;
+  /** The title the detail screen shows: read with the timeline it draws. */
   headerTitle: string;
   headerPhase: string;
   /**
    * Set when the screen title and the timeline tell different stories, as
-   * "title says X, timeline says Y". The title reads only the entry; the
-   * timeline also reads the clock, the quote and the error.
+   * "title says X, timeline says Y".
    */
   disagreement: string | null;
+  /**
+   * The same check for the title read off the entry alone: what a caller
+   * without the timeline shows, and what the screen shows until the timeline
+   * has reported. The entry cannot know the quote's expiry, our explorer's
+   * count or a cancel tap.
+   */
+  entryOnlyDisagreement: string | null;
+  /** Set when the card's label and the timeline under it disagree. */
+  cardDisagreement: string | null;
 }
 
 // The title's phases for each way a timeline can end. An open timeline is
@@ -113,27 +123,83 @@ const TITLE_PHASES: Record<TimelineModel['outcome']['kind'], readonly string[]> 
   empty: [],
 };
 
+function titleDisagreement(phase: string, model: TimelineModel): string | null {
+  const { steps, outcome } = model;
+  // A reversed melt with a recorded failure ends in the rolled-back kind, but
+  // it is a failed payment, not a cancellation: the row says "Payment failed".
+  const paymentFailed = steps.some((step) => step.id === 'payment-failed');
+  // A reversal in flight has not ended yet: the title may not call it done.
+  const reversing = steps.some((step) => step.id === 'cancelling');
+  const expected = paymentFailed
+    ? ['failed']
+    : reversing
+      ? ['reversing']
+      : TITLE_PHASES[outcome.kind];
+  return expected.length > 0 && !expected.includes(phase)
+    ? `title says ${phase}, timeline says ${outcome.kind}`
+    : null;
+}
+
+// Which endings each card status may sit over. "Ready" is the one open
+// status with a claim about the open row: nothing is under way yet.
+const CARD_STATUS_OUTCOMES: Record<string, readonly TimelineModel['outcome']['kind'][]> = {
+  complete: ['settled'],
+  failed: ['failed', 'already-spent'],
+  expired: ['expired'],
+  cancelled: ['rolled-back'],
+  alreadySpent: ['already-spent'],
+  notAdded: ['already-spent'],
+  ready: ['pending'],
+  inProgress: ['pending'],
+  waiting: ['pending'],
+  awaitingPayment: ['pending'],
+  pending: ['pending'],
+};
+
+function cardDisagreement(cardLabel: string, model: TimelineModel): string | null {
+  const status = cardLabel.split(' • ')[1];
+  if (status === undefined) return null;
+  const key = Object.keys(CARD_STATUS_OUTCOMES).find(
+    (candidate) => DEFAULT_PAYMENT_COPY.text(`timeline.status.${candidate}` as never) === status
+  );
+  if (!key) return `card says ${status}, which no ending explains`;
+  const { steps, outcome } = model;
+  const paymentFailed = steps.some((step) => step.id === 'payment-failed');
+  const kind = paymentFailed ? 'failed' : outcome.kind;
+  if (!CARD_STATUS_OUTCOMES[key].includes(kind)) return `card says ${key}, timeline says ${kind}`;
+  const open = steps[steps.length - 1];
+  if (key === 'ready' && (open?.stepType === 'current' || open?.stepType === 'waiting')) {
+    return 'card says ready, timeline is working';
+  }
+  return null;
+}
+
 export function describeTimelineSurfaces(
   frame: Pick<TimelineFrame, 'node' | 'model'>,
   paymentCopy?: PaymentCopyResolver
 ): TimelineSurfaces {
   const { historyEntry, tokenCreated, nostrSent } = frame.node.input;
-  const { steps, outcome } = frame.model;
-  const headerPhase = transactionHeaderPhase(historyEntry);
-  const expected = TITLE_PHASES[outcome.kind];
-  // The title decides a mint invoice's expiry by the device clock, the fixture
+  const { model } = frame;
+  const { steps, outcome } = model;
+  const headerPhase = transactionHeaderPhase(historyEntry, model);
+  const entryPhase = transactionHeaderPhase(historyEntry);
+  // The entry decides a mint invoice's expiry by the device clock, the fixture
   // by its own; an open timeline under an "expired" title is that difference.
-  const clockArtefact = headerPhase === 'expired' && outcome.kind === 'pending';
+  const clockArtefact = entryPhase === 'expired' && outcome.kind === 'pending';
+  const cardLabel = getCardLabel(historyEntry, steps, tokenCreated, nostrSent, paymentCopy);
   return {
-    cardLabel: getCardLabel(historyEntry, steps, tokenCreated, nostrSent, paymentCopy),
+    cardLabel,
     statusHeader: getStatusHeader(steps),
     statusColor: getStatusColorType(steps),
-    headerTitle: transactionHeaderTitle(historyEntry, paymentCopy ? { paymentCopy } : {}),
+    headerTitle: transactionHeaderTitle(historyEntry, {
+      timeline: model,
+      ...(paymentCopy ? { paymentCopy } : {}),
+    }),
     headerPhase,
-    disagreement:
-      expected.length > 0 && !expected.includes(headerPhase) && !clockArtefact
-        ? `title says ${headerPhase}, timeline says ${outcome.kind}`
-        : null,
+    disagreement: titleDisagreement(headerPhase, model),
+    entryOnlyDisagreement: clockArtefact ? null : titleDisagreement(entryPhase, model),
+    // Only with the default wording: the check matches the label's words.
+    cardDisagreement: paymentCopy ? null : cardDisagreement(cardLabel, model),
   };
 }
 

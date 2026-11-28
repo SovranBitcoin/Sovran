@@ -138,6 +138,7 @@ jest.mock('@/features/send/components/MeltSelectedMintProbe', () => ({
   MeltSelectedMintProbe: () => null,
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
+jest.mock('@/shared/hooks/useMeltQuoteExpiry', () => ({ useMeltQuoteExpiry: () => undefined }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
   useNostrProfileMetadata: () => ({ metadata: null }),
   parseRawMetadata: () => null,

@@ -283,6 +283,11 @@ export interface FlowDef {
   known?(ctx: TimelineContext): boolean;
   /** The flow is being reversed but has not finished reversing. */
   reversing?(ctx: TimelineContext): boolean;
+  /**
+   * What the reversal row says when this flow reverses itself, rather than
+   * because the user asked. Defaults to the cancel wording.
+   */
+  reversalCopy?(ctx: TimelineContext): { label: string; info: string };
   /** Checked in order before the open slot is drawn; first match wins. */
   outcomes: OutcomeDef[];
   milestones: MilestoneDef[];

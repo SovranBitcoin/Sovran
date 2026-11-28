@@ -15,7 +15,12 @@
 
 import { MintQuoteState, MeltQuoteState } from "@cashu/cashu-ts";
 
-import { isTerminalFailureState, receiveFailedAsSpent } from "../states";
+import {
+  isTerminalFailureState,
+  meltReversalFailed,
+  mintNothingRestored as mintRestoredNothing,
+  receiveFailedAsSpent,
+} from "../states";
 import {
   EXPIRED_STATE,
   FAILED_STATE,
@@ -82,12 +87,9 @@ const mintPaid = (ctx: TimelineContext) =>
   ctx.mintState === MintQuoteState.ISSUED;
 const mintIssued = (ctx: TimelineContext) =>
   ctx.mintState === MintQuoteState.ISSUED;
-/** coco's own verdict that an issued quote left nothing in the wallet. Matched
- *  on its wording because nothing else marks it, and matched narrowly: a
- *  live entry can still be carrying an error from an attempt that later
- *  succeeded, and any-error-at-all would call that success a failure. */
+/** coco's own verdict that an issued quote left nothing in the wallet. */
 const mintNothingRestored = (ctx: TimelineContext) =>
-  /no proofs could be restored/i.test(entryError(ctx) ?? "");
+  mintRestoredNothing((ctx.entry as { error?: unknown }).error);
 /** Issued AND in the wallet (see `mintUnrestoredOutcome`). */
 const mintCredited = (ctx: TimelineContext) =>
   mintIssued(ctx) && !mintNothingRestored(ctx);
@@ -348,21 +350,21 @@ const meltPaid = (ctx: TimelineContext) =>
 
 /** `rolling_back` is the reversal in flight, not its result. */
 const meltReversing = (ctx: TimelineContext) => ctx.state === ROLLING_BACK;
+/** The user's cancel takes a melt from prepared straight to rolled_back; a
+ *  melt is only rolling_back while coco recovers a payment that did not go
+ *  through. So its reversal is never a cancel. */
+const meltReversalCopy: FlowDef["reversalCopy"] = (ctx) => ({
+  label: ctx.paymentCopy.text("timeline.melt.returning.label"),
+  info: ctx.paymentCopy.text("timeline.melt.returning.info"),
+});
 const meltReversed = (ctx: TimelineContext) =>
   ctx.state !== ROLLING_BACK && isTerminalFailureState(ctx.state);
 
 // A reversed melt returns the ecash to the balance. Whether the user backed
-// out or the payment failed is not in the state; it is in the reason. The
-// wallet writes exactly one reason itself when the user backs out, and coco
-// has several for a payment that did not go through ("Recovered: …",
-// "Rollback requested by handler", whatever a later version adds). So the
-// known thing is the cancellation, and every other reason is a failure:
-// guessing the other way round calls a failed payment a choice the user made.
-const USER_CANCELLED = /user cancel|rolled back by user/i;
-const meltPaymentFailed = (ctx: TimelineContext) => {
-  const reason = entryError(ctx);
-  return reason !== undefined && !USER_CANCELLED.test(reason);
-};
+// out or the payment failed is not in the state; it is in the reason
+// (`meltReversalFailed`, shared with the screen title).
+const meltPaymentFailed = (ctx: TimelineContext) =>
+  meltReversalFailed(ctx.state, (ctx.entry as { error?: unknown }).error);
 
 const meltRolledBackOutcome: OutcomeDef = {
   id: "rolled-back",
@@ -441,6 +443,7 @@ const lightningMeltFlow: FlowDef = {
   variant: "lightning-melt",
   known: meltKnown,
   reversing: meltReversing,
+  reversalCopy: meltReversalCopy,
   outcomes: [meltRolledBackOutcome, meltPaymentFailedOutcome, meltExpiredOutcome],
   milestones: [
     meltCreatedMilestone,
@@ -525,6 +528,7 @@ const onchainMeltFlow: FlowDef = {
   known: (ctx) =>
     meltKnown(ctx) || onchainBroadcast(ctx) || !!ctx.onchainSettledInternally,
   reversing: meltReversing,
+  reversalCopy: meltReversalCopy,
   outcomes: [
     meltRolledBackOutcome,
     meltPaymentFailedOutcome,

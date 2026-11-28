@@ -34,7 +34,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cas
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -76,7 +76,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cas
   "texts": [
     "Receive • Complete",
     "ADDED TO WALLET",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Added to wallet",
     "2026-05-22",
@@ -100,7 +100,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-send (Cashu 
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -453,7 +453,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-receive-expired
     },
   ],
   "texts": [
-    "Receive • Failed",
+    "Receive • Expired",
     "INVOICE EXPIRED",
     "Invoice created",
     "2026-05-22",
@@ -795,7 +795,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-send-expired (L
     },
   ],
   "texts": [
-    "Send • Failed",
+    "Send • Expired",
     "QUOTE EXPIRED",
     "Payment prepared",
     "2026-05-22",
@@ -941,11 +941,11 @@ exports[`timeline scenario pins (redesign acceptance surface) ln-send-failed (Li
   ],
   "texts": [
     "Send • In Progress",
-    "CANCELLING",
+    "RETURNING ECASH",
     "Payment prepared",
     "2026-05-22",
-    "Cancelling",
-    "Returning ecash to your balance",
+    "Returning ecash",
+    "The payment didn't go through",
   ],
 }
 `;
@@ -1297,8 +1297,6 @@ exports[`timeline scenario pins (redesign acceptance surface) locked-claimed-ear
   "texts": [
     "Send • Complete",
     "CLAIMED",
-    "•",
-    "unlocks in 24h 0m 0s",
     "Created",
     "2026-05-22",
     "Claimed",
@@ -1597,7 +1595,7 @@ exports[`timeline scenario pins (redesign acceptance surface) locked-permanent (
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -5825,11 +5823,11 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send-faile
   ],
   "texts": [
     "Send • In Progress",
-    "CANCELLING",
+    "RETURNING ECASH",
     "Payment prepared",
     "2026-05-22",
-    "Cancelling",
-    "Returning ecash to your balance",
+    "Returning ecash",
+    "The payment didn't go through",
   ],
 }
 `;
@@ -6394,7 +6392,7 @@ exports[`timeline scenario pins (redesign acceptance surface) payment-request (R
   ],
   "lines": [],
   "texts": [
-    "Payment • Ready",
+    "Payment • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -6434,7 +6432,7 @@ exports[`timeline scenario pins (redesign acceptance surface) payment-request (R
     },
   ],
   "texts": [
-    "Payment • Ready",
+    "Payment • In Progress",
     "DELIVERING",
     "Created",
     "2026-05-22",
@@ -7356,7 +7354,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-already-sp
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7401,7 +7399,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-already-sp
   "texts": [
     "Receive • Already Spent",
     "ALREADY SPENT",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Already spent",
     "2026-05-22",
@@ -7444,7 +7442,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-not-added 
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7489,7 +7487,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-not-added 
   "texts": [
     "Receive • Not Added",
     "NOT ADDED",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Not added",
     "2026-05-22",
@@ -7532,7 +7530,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7574,7 +7572,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Waiting",
     "WAITING TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Waiting to redeem",
     "We'll add this ecash to your wallet when you're back online.",
@@ -7616,7 +7614,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Complete",
     "ADDED TO WALLET",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Added to wallet",
     "2026-05-22",
@@ -7807,7 +7805,7 @@ exports[`timeline scenario pins (redesign acceptance surface) send-cancelled-ear
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",
@@ -7854,7 +7852,7 @@ exports[`timeline scenario pins (redesign acceptance surface) send-rolled-back (
   ],
   "lines": [],
   "texts": [
-    "Send • Ready",
+    "Send • In Progress",
     "CREATING TOKEN",
     "Creating token",
     "Setting aside ecash",

@@ -56,6 +56,9 @@ function MatrixCard({ cell, index }: { cell: MatrixCell; index: number }) {
   // stand in for the device's.
   const model = buildTimelineModel({ ...node.input, paymentCopy, doneRowKeys: drawn });
   const surfaces = describeTimelineSurfaces({ node, model }, paymentCopy);
+  // Checked against the default wording, which is what the check matches.
+  const verdict = describeTimelineSurfaces(cell.frame);
+  const disagreement = verdict.disagreement ?? verdict.cardDisagreement;
   const badgeColor = useStatusHeaderColor(surfaces.statusColor);
   const now = currentTime ?? 0;
   const conditions =
@@ -81,9 +84,9 @@ function MatrixCard({ cell, index }: { cell: MatrixCell; index: number }) {
       <Text size={13} bold className="text-foreground mb-2 mt-1">
         {surfaces.headerTitle || '(no title)'}
       </Text>
-      {surfaces.disagreement ? (
+      {disagreement ? (
         <Text size={12} bold className="text-warning mb-2" testID="timeline-matrix-disagreement">
-          {surfaces.disagreement}
+          {disagreement}
         </Text>
       ) : null}
       {/* Cancel the page's 16px padding so the card's own margin lines up. */}
@@ -116,7 +119,11 @@ export function SettingsDesignSystemTimelineMatrixScreen() {
 
   const cells = useMemo(() => collectCells(flow, everyFrame), [flow, everyFrame]);
   const disagreeing = useMemo(
-    () => cells.filter((cell) => describeTimelineSurfaces(cell.frame).disagreement !== null),
+    () =>
+      cells.filter((cell) => {
+        const verdict = describeTimelineSurfaces(cell.frame);
+        return verdict.disagreement !== null || verdict.cardDisagreement !== null;
+      }),
     [cells]
   );
   const shown = onlyDisagreements ? disagreeing : cells;

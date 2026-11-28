@@ -15,6 +15,7 @@ import { getPaymentRequest } from "../../annotations";
 import { receiveFailedAsSpent } from "../states";
 import {
   DEFAULT_PAYMENT_COPY,
+  EXPIRED_STATE,
   getMintTimelineState,
   type EntryRecord,
 } from "./context";
@@ -48,6 +49,14 @@ export function getCardLabel(
       item.stepType === "already-spent",
   );
 
+  // An expiry is drawn in the failure style, but it is its own ending: the
+  // quote ran out before anything was paid.
+  const isExpired = timeline.some((item) => item.state === EXPIRED_STATE);
+  // A row that is spinning or stalled means something is under way.
+  const isWorking = timeline.some(
+    (item) => item.stepType === "current" || item.stepType === "waiting",
+  );
+
   let status = "";
 
   switch (historyEntry.type) {
@@ -57,7 +66,9 @@ export function getCardLabel(
       // payment (or an on-chain deposit) has been seen.
       const hasObservedPayment =
         timeline.filter((item) => item.stepType === "complete").length > 1;
-      if (isFailed) {
+      if (isExpired) {
+        status = text("timeline.status.expired");
+      } else if (isFailed) {
         status = text("timeline.status.failed");
       } else if (mintState === MintQuoteState.ISSUED) {
         status = text("timeline.status.complete");
@@ -94,6 +105,8 @@ export function getCardLabel(
         status = text("timeline.status.failed");
       } else if (timeline.some((item) => item.stepType === "rolled-back")) {
         status = text("timeline.status.cancelled");
+      } else if (isExpired) {
+        status = text("timeline.status.expired");
       } else if (isFailed) {
         status = text("timeline.status.failed");
       } else if (last?.stepType === "success") {
@@ -137,9 +150,11 @@ export function getCardLabel(
       } else if (
         historyEntry.state === "pending" ||
         historyEntry.state === "executing" ||
-        timeline.some((item) => item.id === "cancelling")
+        timeline.some((item) => item.id === "cancelling") ||
+        isWorking
       ) {
-        // A reversal in flight is under way, not waiting on a tap.
+        // A reversal in flight, or a token being made or delivered, is under
+        // way, not waiting on a tap.
         status = text("timeline.status.inProgress");
       } else {
         status = text("timeline.status.ready");

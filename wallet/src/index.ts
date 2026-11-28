@@ -94,6 +94,7 @@ export type {
   AiRequestGroup,
   AiRequestState,
   TimelineFlowVariant,
+  TimelineModel,
   TimelineStep,
   TimelineStepType,
   TransactionDirection,

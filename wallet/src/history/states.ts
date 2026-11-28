@@ -212,6 +212,41 @@ export function receiveFailedAsSpent(error: unknown): boolean {
   );
 }
 
+/** What an entry recorded about why it ended, when it recorded anything. */
+function recordedReason(error: unknown): string | undefined {
+  return typeof error === "string" && error.trim() ? error : undefined;
+}
+
+// The wallet writes exactly one reason itself when the user backs out of a
+// melt, and coco has several for a payment that did not go through
+// ("Recovered: …", "Rollback requested by handler", whatever a later version
+// adds). So the known thing is the cancellation, and every other reason is a
+// failure: guessing the other way round calls a failed payment a choice the
+// user made.
+const USER_CANCELLED = /user cancel|rolled back by user/i;
+
+/**
+ * Whether a reversed melt is a payment that did not go through, rather than
+ * one the user backed out of. A melt that ended `failed` was never backed out
+ * of: coco records the user's cancel as `rolled_back` with the reason above.
+ * Says nothing about whether the melt WAS reversed; callers check the state.
+ */
+export function meltReversalFailed(state: string, error: unknown): boolean {
+  if (state === "failed") return true;
+  const reason = recordedReason(error);
+  return reason !== undefined && !USER_CANCELLED.test(reason);
+}
+
+/**
+ * coco's own verdict that an issued mint quote left nothing in the wallet.
+ * Matched on its wording because nothing else marks it, and matched narrowly:
+ * a live entry can still be carrying an error from an attempt that later
+ * succeeded, and any-error-at-all would call that success a failure.
+ */
+export function mintNothingRestored(error: unknown): boolean {
+  return /no proofs could be restored/i.test(recordedReason(error) ?? "");
+}
+
 const FLOWS = new Set<TimelineFlow>(["mint", "melt", "send", "receive"]);
 
 export function isTimelineFlow(value: unknown): value is TimelineFlow {

@@ -21,9 +21,17 @@ function meltQuote(fields: Partial<MeltQuoteBolt11Response>): MeltQuoteBolt11Res
 }
 
 const meltEntry = historyEntry({ type: 'melt' });
+function sendEntry(state: string): HistoryEntry {
+  const fields: Record<string, unknown> = { type: 'send', state };
+  return fields as unknown as HistoryEntry;
+}
 const quoteExpiringIn = (seconds: number) => meltQuote({ expiry: NOW_MS / 1000 + seconds });
 
-function renderCountdown(meltQuote: MeltQuoteBolt11Response) {
+function renderCountdown(
+  meltQuote: MeltQuoteBolt11Response | undefined,
+  entry: HistoryEntry = meltEntry,
+  unlockAtMs?: number
+) {
   let focused = true;
   const listeners = new Map<string, () => void>();
   const navigation = {
@@ -38,11 +46,12 @@ function renderCountdown(meltQuote: MeltQuoteBolt11Response) {
     // @ts-expect-error Deliberately minimal navigation provider for lifecycle events.
     <NavigationContext.Provider value={navigation}>
       <ExpiryCountdown
-        historyEntry={meltEntry}
+        historyEntry={entry}
         meltQuote={meltQuote}
         isOnchainMint={false}
         color="white"
         entryId="entry-1"
+        unlockAtMs={unlockAtMs}
       />
     </NavigationContext.Provider>
   );
@@ -94,5 +103,24 @@ describe('ExpiryCountdown tick', () => {
     act(() => jest.advanceTimersByTime(3000));
     expect(renderedText()).not.toContain('expires in');
     expect(runningTicks()).toBe(0);
+  });
+
+  // I-11: a locked send that was claimed or taken back has nothing left to
+  // unlock, so it shows no countdown and runs no tick.
+  it.each(['finalized', 'rolledBack', 'rolled_back'])(
+    'shows no unlock countdown once the send is %s',
+    (state) => {
+      const unlockAt = NOW_MS + 3 * 3_600_000;
+      renderCountdown(undefined, sendEntry(state), unlockAt);
+      expect(renderedText()).not.toContain('unlocks in');
+      expect(runningTicks()).toBe(0);
+    }
+  );
+
+  it('counts down to the unlock while the send is still out', () => {
+    const unlockAt = NOW_MS + 3 * 3_600_000;
+    renderCountdown(undefined, sendEntry('pending'), unlockAt);
+    expect(renderedText()).toContain('unlocks in');
+    expect(runningTicks()).toBe(1);
   });
 });

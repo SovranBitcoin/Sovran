@@ -145,14 +145,17 @@ function buildSteps(
       ctx.since === null ? null : ctx.since + REVERSAL_SLOW_AFTER_MS;
     const slow =
       !ctx.cancelling && slowAt !== null && ctx.currentTime >= slowAt;
+    // The user's tap is a cancel; a flow reversing itself may say why.
+    const copy = (!ctx.cancelling && flow.reversalCopy?.(ctx)) || {
+      label: ctx.paymentCopy.text("timeline.cancelling.label"),
+      info: ctx.paymentCopy.text("timeline.cancelling.info"),
+    };
     steps.push({
       id: "cancelling",
       rowKey: open.id,
       state: "rolling_back",
-      displayLabel: ctx.paymentCopy.text("timeline.cancelling.label"),
-      info: ctx.paymentCopy.text(
-        slow ? "timeline.cancelling.slowInfo" : "timeline.cancelling.info",
-      ),
+      displayLabel: copy.label,
+      info: slow ? ctx.paymentCopy.text("timeline.cancelling.slowInfo") : copy.info,
       stepType: slow ? "waiting" : "current",
     });
     return {

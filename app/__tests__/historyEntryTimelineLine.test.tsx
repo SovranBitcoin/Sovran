@@ -7,6 +7,7 @@ import { StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
+import { TimelineReportContext } from '@/features/transactions/components/detail/timeline/timelineReport';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -461,5 +462,24 @@ describe('HistoryEntryTimeline connector rail', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('reports the model it drew to the detail screen, and withdraws it on unmount', () => {
+    const report = jest.fn();
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <TimelineReportContext.Provider value={report}>
+          <HistoryEntryTimeline historyEntry={sendEntry('rolledBack')} />
+        </TimelineReportContext.Provider>
+      );
+    });
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: { kind: 'rolled-back' } })
+    );
+    act(() => {
+      renderer.unmount();
+    });
+    expect(report).toHaveBeenLastCalledWith(null);
   });
 });

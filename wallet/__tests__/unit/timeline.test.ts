@@ -48,7 +48,7 @@ describe('history timeline — token receive', () => {
 
   it('a token waiting on a tap opens the "added" slot', () => {
     expect(rows(build(receive('prepared')))).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       'next-pending | Ready to redeem | Tap Redeem to add to wallet',
     ]);
   });
@@ -57,7 +57,7 @@ describe('history timeline — token receive', () => {
     const entry = receive('executing');
     const timeline = build(entry);
     expect(rows(timeline)).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       "waiting | Waiting to redeem | We'll add this ecash to your wallet when you're back online.",
     ]);
     expect(getCardLabel(entry as never, timeline)).toBe('Receive • Waiting');
@@ -66,7 +66,7 @@ describe('history timeline — token receive', () => {
 
   it('finalized closes the slot as the success row', () => {
     expect(rows(build(receive('finalized')))).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       'success | Added to wallet | +21 sats added to wallet',
     ]);
   });
@@ -118,16 +118,34 @@ describe('history timeline — lightning SEND (melt)', () => {
       'expired | Quote expired | It ran out before the payment was sent',
     ]);
     expect(getStatusColorType(timeline)).toBe('error');
+    // I-8: an expiry is not a failure.
+    expect(getCardLabel(melt('UNPAID') as never, timeline)).toBe('Send • Expired');
   });
 
+  // I-10: the user's own cancel goes straight from prepared to rolled_back;
+  // a melt is only ever rolling_back while coco recovers a payment that did
+  // not go through. Nobody cancelled it, so the row does not say so.
   it('rolling_back is the reversal in flight, not its result', () => {
     expect(rows(build(melt('rolling_back')))).toEqual([
       'complete | Payment prepared',
-      'current | Cancelling | Returning ecash to your balance',
+      "current | Returning ecash | The payment didn't go through",
     ]);
   });
 
-  it.each(['rolled_back', 'rolledBack', 'failed'])(
+  // coco records the user backing out as `rolled_back` with a reason; a melt
+  // that ended `failed` never did so by choice, reason or not.
+  it('failed reads as a failed payment even without a recorded reason', () => {
+    const failed = melt('failed');
+    const timeline = build(failed);
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'rolled-back | Payment failed | Funds returned to your balance',
+    ]);
+    const { steps } = buildTimelineModel({ historyEntry: failed as never, currentTime: CREATED_AT });
+    expect(getCardLabel(failed as never, steps)).toBe('Send • Failed');
+  });
+
+  it.each(['rolled_back', 'rolledBack'])(
     '%s without a recorded reason reads as the user backing out',
     (state) => {
       expect(rows(build(melt(state)))).toEqual([
@@ -168,7 +186,7 @@ describe('history timeline — lightning SEND (melt)', () => {
     const stuck = melt('rolling_back', { updatedAt: CREATED_AT + 1_000 });
     const late = build(stuck, { currentTime: CREATED_AT + 10 * 60_000 });
     expect(rows(late)[1]).toBe(
-      'waiting | Cancelling | This has not finished. Your ecash is still held and may need recovering.'
+      'waiting | Returning ecash | This has not finished. Your ecash is still held and may need recovering.'
     );
   });
 
@@ -334,13 +352,17 @@ describe('history timeline — onchain SEND (melt)', () => {
     ]);
   });
 
-  it.each(['rolled_back', 'rolledBack', 'failed'])('%s → funds returned', (state) => {
+  it.each([
+    ['rolled_back', 'Cancelled'],
+    ['rolledBack', 'Cancelled'],
+    ['failed', 'Payment failed'],
+  ])('%s → funds returned', (state, label) => {
     const timeline = build(melt(state), { onchainConfirmationProgress: progress() });
     expect(rows(timeline)).toEqual([
       'complete | Payment prepared',
-      'rolled-back | Cancelled | Funds returned to your balance',
+      `rolled-back | ${label} | Funds returned to your balance`,
     ]);
-    expect(getStatusHeader(timeline)).toBe('CANCELLED');
+    expect(getStatusHeader(timeline)).toBe(label.toUpperCase());
   });
 });
 
@@ -355,7 +377,10 @@ describe('history timeline — bearer SEND', () => {
   });
 
   it.each(['prepared', 'executing'])('%s → the token is still being made', (state) => {
-    expect(rows(build(send(state)))).toEqual(['current | Creating token | Setting aside ecash']);
+    const timeline = build(send(state));
+    expect(rows(timeline)).toEqual(['current | Creating token | Setting aside ecash']);
+    // I-9: the card does not call a spinning row "Ready".
+    expect(getCardLabel(send(state) as never, timeline)).toBe('Send • In Progress');
   });
 
   it('pending → created, waiting on the recipient', () => {

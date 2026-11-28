@@ -2,6 +2,7 @@
 // places where the screen title and the timeline tell different stories.
 import { describe, expect, it } from 'vitest';
 
+import { transactionHeaderPhase, transactionHeaderTitle } from '../../src/history/header-title';
 import {
   TIMELINE_SPACES,
   describeTimelineSurfaces,
@@ -55,42 +56,62 @@ describe('timeline state space', () => {
         lines.add(`${space.flow}: "${surfaces.headerTitle}" over "${last.displayLabel}"`);
       }
     }
+    expect([...lines]).toMatchInlineSnapshot(`[]`);
+  });
+
+  // The card's label against the timeline under it, by the same rule.
+  it('lists every state whose card label and timeline disagree', () => {
+    const lines = new Set<string>();
+    for (const space of TIMELINE_SPACES) {
+      for (const frame of walkTimelineSpace(space)) {
+        const surfaces = describeTimelineSurfaces(frame);
+        if (!surfaces.cardDisagreement) continue;
+        lines.add(`${space.flow}: "${surfaces.cardLabel}" over "${surfaces.statusHeader}"`);
+      }
+    }
+    expect([...lines]).toMatchInlineSnapshot(`[]`);
+  });
+
+  // The same check for the title read off the entry alone (a caller with no
+  // timeline, or the first frame before the timeline reports). Each line is
+  // a fact only the timeline's other inputs carry.
+  it('lists what the entry alone cannot tell the title', () => {
+    const lines = new Set<string>();
+    for (const space of TIMELINE_SPACES) {
+      for (const frame of walkTimelineSpace(space)) {
+        if (!describeTimelineSurfaces(frame).entryOnlyDisagreement) continue;
+        const last = frame.model.steps[frame.model.steps.length - 1];
+        const title = transactionHeaderTitle(frame.node.input.historyEntry);
+        lines.add(`${space.flow}: "${title}" over "${last.displayLabel}"`);
+      }
+    }
     expect([...lines]).toMatchInlineSnapshot(`
       [
-        "lightning-mint: "Receive Lightning" over "Invoice expired"",
-        "lightning-mint: "Invoice expired" over "Failed"",
-        "lightning-mint: "Received Lightning" over "Not added"",
-        "onchain-mint: "Receive onchain" over "Failed"",
-        "onchain-mint: "Received onchain" over "Not added"",
         "lightning-melt: "Send Lightning" over "Quote expired"",
-        "lightning-melt: "Cancelled payment" over "Cancelling"",
-        "lightning-melt: "Lightning send failed" over "Cancelled"",
         "onchain-melt: "Sent onchain" over "Paid by the mint"",
-        "onchain-melt: "Cancelled payment" over "Cancelling"",
-        "onchain-melt: "Onchain send failed" over "Cancelled"",
         "onchain-melt: "Sent onchain" over "In mempool"",
-        "send: "Cancelled ecash" over "Cancelling"",
-        "locked-send(permanent): "Cancelled ecash" over "Cancelling"",
-        "locked-send(timed-refund): "Cancelled ecash" over "Cancelling"",
-        "locked-send(timed-public): "Cancelled ecash" over "Cancelling"",
-        "locked-send(timed-refund-theirs): "Cancelled ecash" over "Cancelling"",
-        "payment-request-send: "Cancelled ecash" over "Cancelling"",
-        "receive: "Received ecash" over "Ready to redeem"",
-        "receive: "Cancelled ecash" over "Already spent"",
-        "receive: "Cancelled ecash" over "Not added"",
-        "payment-request-receive: "Received ecash" over "Adding to wallet"",
-        "payment-request-receive: "Cancelled ecash" over "Already spent"",
-        "payment-request-receive: "Cancelled ecash" over "Not added"",
+        "send: "Send ecash" over "Cancelling"",
+        "send: "Sending ecash" over "Cancelling"",
+        "locked-send(permanent): "Send ecash" over "Cancelling"",
+        "locked-send(permanent): "Sending ecash" over "Cancelling"",
+        "locked-send(timed-refund): "Send ecash" over "Cancelling"",
+        "locked-send(timed-refund): "Sending ecash" over "Cancelling"",
+        "locked-send(timed-public): "Send ecash" over "Cancelling"",
+        "locked-send(timed-public): "Sending ecash" over "Cancelling"",
+        "locked-send(timed-refund-theirs): "Send ecash" over "Cancelling"",
+        "locked-send(timed-refund-theirs): "Sending ecash" over "Cancelling"",
       ]
     `);
   });
 
-  it('does not report the device clock as a disagreement', () => {
+  it('follows the clock of the timeline, not of the device', () => {
     const mint = TIMELINE_SPACES.find((space) => space.flow === 'lightning-mint')!;
     const unpaid = walkTimelineSpace(mint).find((frame) => frame.node.name === 'UNPAID#0/in-time')!;
     const surfaces = describeTimelineSurfaces(unpaid);
     // The fixture invoice is long past by the device clock, in time by its own.
-    expect(surfaces.headerPhase).toBe('expired');
+    expect(transactionHeaderPhase(unpaid.node.input.historyEntry)).toBe('expired');
+    expect(surfaces.headerPhase).toBe('ready');
     expect(surfaces.disagreement).toBeNull();
+    expect(surfaces.entryOnlyDisagreement).toBeNull();
   });
 });
