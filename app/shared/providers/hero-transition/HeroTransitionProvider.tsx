@@ -183,18 +183,18 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const startClaimUsername = useCallback(async () => {
     if (phase.state !== 'idle') return;
 
+    // Measure the source (it stays put under the pushed screen) and navigate in
+    // the same tick: the push starts off-screen, so seeding the overlay a
+    // frame later looks the same and the tap no longer waits on the bridge.
     const sourceRef = refs.current.claimUsername?.source;
-    const fromRect = await measureInWindowAsync(sourceRef);
-    if (!fromRect) {
-      router.navigate('/claimUsername');
-      return;
-    }
+    const measuring = measureInWindowAsync(sourceRef);
+    router.navigate('/claimUsername');
+    const fromRect = await measuring;
+    if (!fromRect) return;
 
     setPhase({ state: 'forward_navigating', id: 'claimUsername' });
     setOverlayVisible(true);
     seedOverlayFrom(fromRect);
-
-    router.navigate('/claimUsername');
 
     for (let i = 0; i < 30; i++) {
       await rafAsync();
