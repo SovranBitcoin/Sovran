@@ -239,7 +239,12 @@ export function LightningSendScreen({
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              condition: isPaid || !railEnabled,
+              // Also for a payment in flight (or one that ended unpaid): there is
+              // nothing left to pay or cancel, only to leave.
+              condition:
+                isPaid ||
+                !railEnabled ||
+                (!isPreview && !actions.pay.available && !actions.cancel.available),
             },
             {
               testID: 'melt-cancel',

@@ -3,8 +3,10 @@ import {
   buildBip321OnchainUri,
   defaultDetectors,
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  getOnchainConfirmationProgress,
   parsePaymentInput,
   looksLikeBitcoinAddress,
+  type MempoolAddressSummary,
 } from 'wallet';
 
 import { amountToNumber, type AmountValue } from 'wallet/amount';
@@ -351,4 +353,20 @@ export function buildSatisfiedOnchainConfirmationProgress(requiredConfirmations:
     isSatisfied: progress.isSatisfied,
   });
   return progress;
+}
+
+/**
+ * Whether an onchain receive page has nothing left to learn from
+ * mempool.space: the mint operation is finalized (the ecash is credited) and
+ * the deposit has the confirmations the mint wants. `executing` is not
+ * enough — Coco's operation is `executing` from before it asks the mint to
+ * issue until the ecash is stored (coco MintOperationService.ts:279).
+ */
+export function isOnchainReceiveSettled(
+  entry: { state?: unknown },
+  summary: MempoolAddressSummary | null | undefined,
+  requiredConfirmations: number
+): boolean {
+  const credited = entry.state === 'finalized' || entry.state === 'ISSUED';
+  return credited && !!getOnchainConfirmationProgress(summary, requiredConfirmations)?.isSatisfied;
 }

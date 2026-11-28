@@ -260,6 +260,11 @@ export function isOnchainMeltSettled(state: string | null | undefined): boolean 
   return onchainMeltStateRank(state) === 2;
 }
 
+/** The melt operation is executing or pending: paying, not yet ended. */
+export function isOnchainMeltInFlight(state: string | null | undefined): boolean {
+  return !isRolledBackMeltState(state) && onchainMeltStateRank(state) === 1;
+}
+
 /** Default target confirmations for an onchain SEND timeline. */
 const DEFAULT_ONCHAIN_MELT_CONFIRMATIONS = 6;
 

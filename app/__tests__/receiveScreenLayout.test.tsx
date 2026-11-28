@@ -159,6 +159,11 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(async () => true),
 }));
 
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useIsFocused: () => true,
+}));
+
 jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
   ReceiveReusableQuoteTab: () => null,
 }));

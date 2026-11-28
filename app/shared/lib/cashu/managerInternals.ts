@@ -33,6 +33,7 @@ import {
   type CoreProof,
 } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
+import { getKeysetUnits, getMintKeysets } from 'wallet';
 import { cashuLog, initPhase, mintUrlLogFields } from '@/shared/lib/logger';
 
 import { reportCocoApiFailure } from './cocoFeedback';
@@ -71,19 +72,6 @@ interface ManagerInternals {
   };
   mintOperationRepository: {
     delete(id: string): Promise<void>;
-  };
-  mintService: {
-    keysetRepo: {
-      getKeysetsByMintUrl(mintUrl: string): Promise<
-        {
-          id?: string;
-          unit?: string;
-          keypairs?: Record<string, unknown>;
-          active?: boolean;
-          feePpk?: number;
-        }[]
-      >;
-    };
   };
 }
 
@@ -155,38 +143,30 @@ function errorMessage(error: unknown): string {
 
 /**
  * The id, unit, active flag and NUT-02 fee of each keyset Coco saved for a
- * mint, through the same private keyset repository `getMintKeysetUnits` reads:
+ * mint, through the wallet's keyset reach-in (`wallet/src/core/keysetUnits.ts`):
  * local DB, no network. Throws when the read fails.
  */
 export async function getMintKeysetFees(
   manager: Manager,
   mintUrl: string
 ): Promise<{ id?: string; unit?: string; active?: boolean; feePpk?: number }[]> {
-  const keysets = await internals(manager).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
+  const keysets = await getMintKeysets(manager, mintUrl);
   return keysets.map(({ id, unit, active, feePpk }) => ({ id, unit, active, feePpk }));
 }
 
 /**
- * Units a mint actually holds keysets (with keys) for, via the private
- * keyset repository — local DB read, no network. Mirrors coco's own
- * WalletService validKeysets filter: a mint can only issue units it has
- * keypairs for, regardless of what NUT-04/05 advertises.
+ * Units a mint actually holds keysets (with keys) for, through the wallet's
+ * keyset reach-in — local DB read, no network. A mint can only issue units it
+ * has keypairs for, regardless of what NUT-04/05 advertises.
  */
 export async function getMintKeysetUnits(manager: Manager, mintUrl: string): Promise<string[]> {
   cashuLog.debug('cashu.manager_internals.keyset_units.start', {
     ...mintUrlLogFields(mintUrl),
   });
   try {
-    const keysets = await internals(manager).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
-    const units = new Set<string>();
-    for (const keyset of keysets) {
-      if (!keyset.keypairs || Object.keys(keyset.keypairs).length === 0) continue;
-      units.add((keyset.unit || 'sat').toLowerCase());
-    }
-    const result = [...units];
+    const result = await getKeysetUnits(manager, mintUrl);
     cashuLog.debug('cashu.manager_internals.keyset_units.done', {
       ...mintUrlLogFields(mintUrl),
-      keysetCount: keysets.length,
       units: result.join(','),
     });
     return result;

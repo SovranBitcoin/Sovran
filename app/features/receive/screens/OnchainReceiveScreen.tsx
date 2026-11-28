@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
+import { useIsFocused } from 'expo-router';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintHistoryEntry } from '@cashu/coco-core';
@@ -33,6 +34,7 @@ import {
   getOnchainMintAddress,
   getOnchainMintQuoteRequiredConfirmations,
   isOnchainMintRequirementFromMint,
+  isOnchainReceiveSettled,
 } from '@/shared/lib/cashu/onchainMint';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -73,19 +75,26 @@ export function OnchainReceiveScreen({
   const { width: windowWidth } = useWindowDimensions();
   const historyEntry = asHistoryEntry(entry);
   const onchainAddress = getOnchainMintAddress(historyEntry);
-  const mempool = useMempoolAddressSummary(onchainAddress);
-  const bip321 = useBip321Info(entry.id);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const isPaid = isMintQuotePaymentObserved(entry);
-  // Opened from the transactions (history) list, not the live receive flow —
-  // the mint is fixed, so show the non-clickable "Receiving with" row.
-  const isHistoryView = useIsTransactionHistoryView();
-  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const requiredConfirmations = getOnchainMintQuoteRequiredConfirmations(
     historyEntry,
     mintInfo,
     entry.unit ?? 'sat'
   );
+  const isFocused = useIsFocused();
+  // Stop asking mempool.space once the mint operation is finalized (ecash
+  // credited) and the deposit has the confirmations the mint wants: nothing
+  // on this page changes after that.
+  const mempool = useMempoolAddressSummary(onchainAddress, {
+    enabled: isFocused,
+    isSettled: (summary) => isOnchainReceiveSettled(entry, summary, requiredConfirmations),
+  });
+  const bip321 = useBip321Info(entry.id);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Opened from the transactions (history) list, not the live receive flow —
+  // the mint is fixed, so show the non-clickable "Receiving with" row.
+  const isHistoryView = useIsTransactionHistoryView();
+  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const requirementFromMint = isOnchainMintRequirementFromMint(
     historyEntry,
     mintInfo,

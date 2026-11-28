@@ -41,6 +41,8 @@ jest.mock('wallet', () => ({
         : mockSupported
       : ['sat'],
   pickHighestBalanceUnit: (units: string[]) => units[0],
+  pickPreferredCandidate: jest.requireActual('../../wallet/src/mint-selection')
+    .pickPreferredCandidate,
   toAccountUnit: (unit: string) => unit,
 }));
 jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
@@ -183,5 +185,18 @@ it('replaces a removed stored selectedMint with an active trusted mint', () => {
   mockMints = [{ mintUrl: MINT }];
   renderHook(useWalletContext, { wrapper });
   expect(mockSetSelectedMint).toHaveBeenCalledTimes(1);
+  expect(mockSetSelectedMint).toHaveBeenCalledWith(MINT);
+});
+
+it('auto-selects the first trusted mint when balances tie', () => {
+  mockSelectedMint = undefined;
+  mockMints = [{ mintUrl: MINT }, { mintUrl: SECOND_MINT }];
+  mockBalances = {
+    byMintAndUnit: {
+      [MINT]: { usd: { total: 9 } },
+      [SECOND_MINT]: { usd: { total: 9 } },
+    },
+  };
+  renderHook(useWalletContext, { wrapper });
   expect(mockSetSelectedMint).toHaveBeenCalledWith(MINT);
 });

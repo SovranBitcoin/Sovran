@@ -397,7 +397,10 @@ function meltQuoteAvailability(
 
   return {
     pay: { available: !isPaid && !isPending && state === "UNPAID" },
-    cancel: { available: !isPreview && (state === "UNPAID" || isPending) },
+    // Coco cancels only a prepared melt (MeltOpsApi.cancel). A PENDING melt
+    // is a payment in flight: nothing can call it back, and Coco's settlement
+    // processor releases its inputs itself if the mint reports it UNPAID.
+    cancel: { available: !isPreview && state === "UNPAID" },
     back: { available: true },
   };
 }

@@ -261,6 +261,14 @@ describe('selectMint — multiMintUnbalanced', () => {
  * It honors the preferred mint when present, else the highest balance.
  */
 describe('pickPreferredCandidate', () => {
+  it('keeps the earlier mint when two hold the same balance', () => {
+    const picked = pickPreferredCandidate([
+      { mintUrl: MINT1, balance: 0 },
+      { mintUrl: MINT2, balance: 0 },
+    ]);
+    expect(picked?.mintUrl).toBe(MINT1);
+  });
+
   it('returns the preferred mint when it is among the candidates', () => {
     const picked = pickPreferredCandidate(
       [

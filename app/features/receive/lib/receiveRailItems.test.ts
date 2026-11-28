@@ -1,9 +1,17 @@
+import type { Manager } from '@cashu/coco-core';
+
 import {
+  buildBolt12Items,
+  buildOnchainItems,
   classifyOnchainQuote,
   classifyPaymentRequest,
   isExpiryElapsed,
   isRailItemCopyable,
 } from '@/features/receive/lib/receiveRailItems';
+
+jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
+  useMintMetadataStore: { getState: () => ({ getCached: () => undefined }) },
+}));
 
 describe('receiveRailItems classification', () => {
   describe('classifyPaymentRequest', () => {
@@ -44,11 +52,16 @@ describe('receiveRailItems classification', () => {
     });
   });
 
-  describe('isExpiryElapsed (mirrors coco isExpiredMintQuoteSnapshot)', () => {
+  describe('isExpiryElapsed (same rule as the wallet keeps a standing quote by)', () => {
     const nowSeconds = 1_783_520_800;
 
-    it('treats expiry 0 as expired — coco reads 0 <= now, so bolt12 offers (expiry 0) are never watched', () => {
-      expect(isExpiryElapsed(0, nowSeconds)).toBe(true);
+    // Coco 58abfae watches and claims a pending mint quote whatever its expiry
+    // (coco models/MintQuoteClaimability.ts:85, MintOperationWatcherService
+    // has no expiry gate), and mints send bolt12 offers with `expiry: 0`
+    // meaning "no expiry" (NUT-25 allows null). The wallet keeps such an offer
+    // as the standing one (`wallet/src/quotes/reusable.ts` isUnexpired).
+    it('treats expiry 0 as no expiry', () => {
+      expect(isExpiryElapsed(0, nowSeconds)).toBe(false);
     });
 
     it('treats null / undefined expiry as never-expiring', () => {
@@ -74,5 +87,71 @@ describe('receiveRailItems classification', () => {
       expect(isRailItemCopyable('cancelled')).toBe(false);
       expect(isRailItemCopyable('expired')).toBe(false);
     });
+  });
+});
+
+const offerQuote = (method: 'bolt12' | 'onchain', mintUrl: string) => ({
+  mintUrl,
+  quoteId: `${method}-1`,
+  method,
+  request: method === 'bolt12' ? 'lno1offer' : 'bc1address',
+  unit: 'sat',
+  expiry: 0,
+  createdAt: 1,
+});
+
+function railManager(quotes: object[], trustedMints: string[]): Manager {
+  return {
+    quotes: { mint: { listPending: async () => quotes } },
+    mint: { isTrustedMint: async (url: string) => trustedMints.includes(url) },
+  } as unknown as Manager;
+}
+
+describe('buildBolt12Items', () => {
+  it('lists an offer with expiry 0 as reusable and listening, not expired', async () => {
+    const manager = railManager(
+      [offerQuote('bolt12', 'https://mint.example')],
+      ['https://mint.example']
+    );
+
+    const [item] = await buildBolt12Items(manager, { standingIds: new Set() });
+
+    expect(item).toMatchObject({ status: 'reusable', listening: true });
+  });
+
+  // Coco keeps an untrusted mint's quote in its pending list
+  // (sql-storage MintQuoteRepository.ts:263) but its watcher drops the
+  // subscription on untrust and skips untrusted mints on startup
+  // (MintOperationWatcherService.ts:384,501), so a payment to a copied offer
+  // would not be credited until recovered.
+  it('lists an offer from a mint that is no longer trusted as inactive, not copyable', async () => {
+    const manager = railManager([offerQuote('bolt12', 'https://gone.example')], []);
+
+    const [item] = await buildBolt12Items(manager, { standingIds: new Set() });
+
+    expect(item).toMatchObject({ status: 'inactive', listening: false });
+    expect(isRailItemCopyable(item.status)).toBe(false);
+  });
+});
+
+describe('buildOnchainItems', () => {
+  it('lists an unpaid address from a mint that is no longer trusted as inactive', async () => {
+    const manager = railManager([offerQuote('onchain', 'https://gone.example')], []);
+
+    const [item] = await buildOnchainItems(manager, { standingIds: new Set() });
+
+    expect(item).toMatchObject({ status: 'inactive', listening: false });
+    expect(isRailItemCopyable(item.status)).toBe(false);
+  });
+
+  it("keeps a trusted mint's unpaid address reusable and listening", async () => {
+    const manager = railManager(
+      [offerQuote('onchain', 'https://mint.example')],
+      ['https://mint.example']
+    );
+
+    const [item] = await buildOnchainItems(manager, { standingIds: new Set() });
+
+    expect(item).toMatchObject({ status: 'reusable', listening: true });
   });
 });

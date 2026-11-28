@@ -12,7 +12,7 @@
  * never accept a token offline that could not be checked offline.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Amount, type Proof } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 
@@ -137,15 +137,8 @@ describe("createExecuteReceive", () => {
     await expect(receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toBe(refused);
   });
 
-  it("returns this receive's row when another receive from the same mint was saved first", async () => {
+  it("reads this receive's own row once, by its history id", async () => {
     const { api, manager, saved } = receiveManager({ execute: "finalizes" });
-    const other = { ...saved, id: "receive:other-op", operationId: "other-op" };
-    api.history.getHistoryEntryById
-      .mockResolvedValueOnce(null)
-      .mockResolvedValue(saved);
-    api.history.getPaginatedHistory
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([other]);
 
     const result = await receive(manager, async () => {})({
       tokenString: TOKEN,
@@ -153,45 +146,62 @@ describe("createExecuteReceive", () => {
       amount: 1,
     });
 
-    expect(
-      JSON.parse((result as { historyEntry: string }).historyEntry),
-    ).toEqual(saved);
-    expect(api.history.getHistoryEntryById).toHaveBeenNthCalledWith(
-      1,
-      saved.id,
-    );
-    expect(api.history.getHistoryEntryById).toHaveBeenNthCalledWith(
-      2,
-      saved.id,
-    );
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
+    expect(api.history.getHistoryEntryById.mock.calls).toEqual([[saved.id]]);
     expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 
-  it("projects the same history ID from the finalized operation when lookup stays unavailable", async () => {
-    vi.useFakeTimers();
-    try {
-      const { api, manager, saved } = receiveManager({ execute: "finalizes" });
-      api.history.getHistoryEntryById.mockRejectedValue(new Error("history unavailable"));
+  it("projects the row from the finalized operation at once when history has none", async () => {
+    const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+    api.history.getHistoryEntryById.mockResolvedValue(null);
 
-      const pending = receive(manager, async () => {})({
-        tokenString: TOKEN,
-        mintUrl: MINT_URL,
-        amount: 1,
-      });
-      await vi.runAllTimersAsync();
-      const result = await pending;
+    const result = await receive(manager, async () => {})({
+      tokenString: TOKEN,
+      mintUrl: MINT_URL,
+      amount: 1,
+    });
 
-      expect(result).toMatchObject({ status: "finalized" });
-      expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toMatchObject({
-        id: saved.id,
-        operationId: saved.operationId,
-        source: "operation",
-        state: "finalized",
-      });
-      expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toMatchObject({
+      id: saved.id,
+      operationId: saved.operationId,
+      source: "operation",
+      state: "finalized",
+    });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(1);
+  });
+
+  it("projects the same history ID from the finalized operation when lookup is unavailable", async () => {
+    const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+    api.history.getHistoryEntryById.mockRejectedValue(new Error("history unavailable"));
+
+    const result = await receive(manager, async () => {})({
+      tokenString: TOKEN,
+      mintUrl: MINT_URL,
+      amount: 1,
+    });
+
+    expect(result).toMatchObject({ status: "finalized" });
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toMatchObject({
+      id: saved.id,
+      operationId: saved.operationId,
+      source: "operation",
+      state: "finalized",
+    });
+    expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
+  });
+
+  it("reads the receive's row again after a transient error instead of projecting it", async () => {
+    const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+    api.history.getHistoryEntryById.mockRejectedValueOnce(new Error("database is locked"));
+
+    const result = await receive(manager, async () => {})({
+      tokenString: TOKEN,
+      mintUrl: MINT_URL,
+      amount: 1,
+    });
+
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(2);
   });
 
   it("says so when there is no wallet", async () => {
@@ -205,8 +215,6 @@ describe("createExecuteReceive", () => {
 });
 
 describe("createExecuteMintQuote", () => {
-  afterEach(() => vi.useRealTimers());
-
   const prepared = {
     id: "mint-op",
     quoteId: "quote-1",
@@ -217,49 +225,43 @@ describe("createExecuteMintQuote", () => {
     request: "lnbc1fixture",
   };
 
-  function quoteManager(rows: unknown[]) {
-    const api = { history: { getPaginatedHistory: vi.fn().mockResolvedValue(rows) } };
+  function quoteManager(row: unknown) {
+    const api = {
+      history: {
+        getPaginatedHistory: vi.fn().mockResolvedValue([]),
+        getHistoryEntryById: vi.fn().mockResolvedValue(row),
+      },
+    };
     return { api, manager: api as unknown as Manager };
   }
 
-  it("asks for the method it was given and returns the row Coco saved for that quote", async () => {
-    const saved = {
-      id: "mint:saved-id",
-      type: "mint",
-      mintUrl: MINT_URL,
-      unit: "sat",
-      quoteId: "quote-1",
-      amount: Amount.from(21),
-      state: "UNPAID",
-      createdAt: 10,
-      updatedAt: 10,
-    };
-    const { manager } = quoteManager([saved]);
+  const savedRow = {
+    id: "mint:mint-op",
+    type: "mint",
+    mintUrl: MINT_URL,
+    unit: "sat",
+    quoteId: "quote-1",
+    amount: Amount.from(21),
+    state: "UNPAID",
+    createdAt: 10,
+    updatedAt: 10,
+  };
+
+  it("asks for the method it was given and returns the row Coco saved for that operation", async () => {
+    const { api, manager } = quoteManager(savedRow);
     const prepareMintQuote = vi.fn().mockResolvedValue(prepared);
     const execute = createExecuteMintQuote({ getManager: () => manager, prepareMintQuote });
 
     const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat", method: "onchain" });
 
     expect(prepareMintQuote).toHaveBeenCalledWith(manager, "onchain", MINT_URL, 21, "sat");
-    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:saved-id", quoteId: "quote-1" });
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:mint-op", quoteId: "quote-1" });
+    expect(api.history.getHistoryEntryById.mock.calls).toEqual([["mint:mint-op"]]);
+    expect(api.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 
-  it("returns this quote's row when another quote from the same mint was saved first", async () => {
-    const row = (id: string, quoteId: string) => ({
-      id,
-      type: "mint",
-      mintUrl: MINT_URL,
-      unit: "sat",
-      quoteId,
-      amount: Amount.from(21),
-      state: "UNPAID",
-      createdAt: 10,
-      updatedAt: 10,
-    });
-    const { api, manager } = quoteManager([]);
-    api.history.getPaginatedHistory
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([row("mint:other", "quote-other"), row("mint:saved-id", "quote-1")]);
+  it("falls back at once to an entry under Coco's history id when history has no row", async () => {
+    const { api, manager } = quoteManager(null);
     const execute = createExecuteMintQuote({
       getManager: () => manager,
       prepareMintQuote: vi.fn().mockResolvedValue(prepared),
@@ -267,27 +269,51 @@ describe("createExecuteMintQuote", () => {
 
     const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
 
-    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:saved-id", quoteId: "quote-1" });
-  });
-
-  it("falls back to an entry built from the quote when the row never appears", async () => {
-    vi.useFakeTimers();
-    const { manager } = quoteManager([]);
-    const execute = createExecuteMintQuote({
-      getManager: () => manager,
-      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
-    });
-
-    const pending = execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
-    await vi.advanceTimersByTimeAsync(11_000);
-
-    expect(JSON.parse((await pending).historyEntry)).toMatchObject({
-      id: "mint-op",
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: "mint:mint-op",
+      operationId: "mint-op",
       type: "mint",
       quoteId: "quote-1",
       state: "UNPAID",
       amount: 21,
       paymentRequest: "lnbc1fixture",
     });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(1);
+  });
+
+  // The fallback id flows to scan-history linking and location capture
+  // (app/features/send/lib/sovranPaymentConfig.ts), which must match the row
+  // Coco commits as `mint:<operationId>` (sql-storage HistoryRepository.ts:92).
+  it("reads again after a transient error and returns the row Coco saved", async () => {
+    const { api, manager } = quoteManager(savedRow);
+    api.history.getHistoryEntryById.mockRejectedValueOnce(new Error("database is locked"));
+    const execute = createExecuteMintQuote({
+      getManager: () => manager,
+      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
+    });
+
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:mint-op", state: "UNPAID" });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps Coco's history id when every bounded read fails", async () => {
+    const { api, manager } = quoteManager(savedRow);
+    api.history.getHistoryEntryById.mockRejectedValue(new Error("database is locked"));
+    const execute = createExecuteMintQuote({
+      getManager: () => manager,
+      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
+    });
+
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: "mint:mint-op",
+      operationId: "mint-op",
+      quoteId: "quote-1",
+    });
+    expect(api.history.getHistoryEntryById).toHaveBeenCalledTimes(3);
+    expect(api.history.getHistoryEntryById.mock.calls.every(([id]) => id === "mint:mint-op")).toBe(true);
   });
 });

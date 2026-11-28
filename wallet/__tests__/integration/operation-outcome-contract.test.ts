@@ -25,6 +25,7 @@ import {
 import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { serializeHistoryEntry } from "../../src/history/normalize";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
 import {
   createExecuteMintQuote,
@@ -501,6 +502,46 @@ describe("receive: the app's createExecuteReceive against a real Coco Manager", 
     expect(await balance(manager)).toEqual({ spendable: 8, reserved: 0 });
   });
 
+  it("hands back exactly the row Coco's history shows for that receive", async () => {
+    const { manager } = await harness([]);
+
+    const result = await appReceive(manager)({
+      tokenString: incomingToken(),
+      mintUrl: MINT_URL,
+      amount: 8,
+    } as never);
+
+    const operationId = await onlyOperationId(manager);
+    const row = await manager.history.getHistoryEntryById(
+      `receive:${operationId}`,
+    );
+    expect(result.historyEntry).toBe(JSON.stringify(row));
+  });
+
+  it("keys each of two receives from the same mint to its own row", async () => {
+    const { manager } = await harness([]);
+    const receive = appReceive(manager);
+
+    const first = await receive({
+      tokenString: incomingToken(8),
+      mintUrl: MINT_URL,
+      amount: 8,
+    } as never);
+    const second = await receive({
+      tokenString: incomingToken(16),
+      mintUrl: MINT_URL,
+      amount: 16,
+    } as never);
+
+    const firstRow = JSON.parse(first.historyEntry);
+    const secondRow = JSON.parse(second.historyEntry);
+    expect(firstRow).toMatchObject({ amount: "8", state: "finalized" });
+    expect(secondRow).toMatchObject({ amount: "16", state: "finalized" });
+    expect(firstRow.id).toBe(`receive:${firstRow.operationId}`);
+    expect(secondRow.id).toBe(`receive:${secondRow.operationId}`);
+    expect(secondRow.operationId).not.toBe(firstRow.operationId);
+  });
+
   it("rejects with the mint's error on a refusal and credits nothing", async () => {
     const { manager, mint } = await harness([]);
     mint.faults.swap = "refuse";
@@ -601,6 +642,22 @@ describe("mint: the app's createExecuteMintQuote against a real Coco Manager", (
     });
     expect(await historyRows(manager)).toEqual([["mint", "pending"]]);
     expect(mint.calls).toEqual(["mintQuote"]);
+  });
+
+  it("hands back exactly Coco's row for that operation, serialized", async () => {
+    const { manager } = await harness([]);
+
+    const result = await appMintQuote(manager)({
+      mintUrl: MINT_URL,
+      amount: 21,
+      unit: "sat",
+    } as never);
+
+    const operationId = await onlyOperationId(manager);
+    const row = await manager.history.getHistoryEntryById(
+      `mint:${operationId}`,
+    );
+    expect(result.historyEntry).toBe(serializeHistoryEntry(row!));
   });
 
   it.each([

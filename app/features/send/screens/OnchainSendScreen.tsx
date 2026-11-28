@@ -14,6 +14,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
@@ -44,6 +45,7 @@ import {
   canOnchainMeltQuoteExpire,
   getOnchainMeltAddress,
   getOnchainMeltRequiredConfirmations,
+  isOnchainMeltInFlight,
   isOnchainMeltSettled,
   resolveOnchainMeltFeeDisplay,
   resolveOnchainMeltTimelineState,
@@ -103,11 +105,15 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   // quote row. Annotation-first: the persisted verdict short-circuits the
   // hook's live re-derivation entirely.
   const annotation = useColadaTransactionAnnotation(entry);
+  // Safety re-checks of the quote run only while this page is focused.
+  const isFocused = useIsFocused();
   const quote = useOnchainMeltQuote(mintUrl, entry?.quoteId, {
     persistedOnchainMelt: annotation.onchainMelt,
     // The coco op state, NOT the resolved timeline state — a quote flipping
     // PAID live must keep the full 2-read debounce.
     entrySettledAtMount: isOnchainMeltSettled(entry?.state as string | undefined),
+    operationInFlight: isOnchainMeltInFlight(entry?.state as string | undefined),
+    active: isFocused,
   });
   const outpoint = parseOutpoint(quote.outpoint ?? annotation.onchainMelt?.outpoint ?? null);
   // A heuristic match is useful for progress/explorer visibility, but it is
@@ -249,8 +255,10 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              // Only after settlement (or when viewing history on a disabled rail); before that, Pay / Cancel apply.
-              condition: isPaid || !railEnabled,
+              // After settlement, on a disabled rail, or once nothing is left to
+              // pay or cancel (a payment in flight); before that, Pay / Cancel apply.
+              condition:
+                isPaid || !railEnabled || (!actions.pay.available && !actions.cancel.available),
             },
             {
               testID: 'onchain-send-cancel',

@@ -168,6 +168,7 @@ export {
   type SingleUseReencodeOptions,
 } from "./payment-request-receive";
 export {
+  isQuoteExpiryElapsed,
   rotateReusableMintQuote,
   reusableQuoteKey,
   type ReusableQuoteIdentityStore,
@@ -204,6 +205,10 @@ export {
   pickMintForUnit,
   resolveReceiveMethodMint,
 } from "./mint-capabilities";
+export { pickPreferredCandidate } from "./mint-selection";
+// The one reach-in to Coco's private keyset repository, until Coco has a
+// public keyset read.
+export { getKeysetUnits, getMintKeysets } from "./core/keysetUnits";
 export { FIAT_UNITS, SWITCHABLE_UNITS } from "./units/registry";
 export {
   ACCOUNT_UNITS,

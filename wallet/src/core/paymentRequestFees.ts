@@ -37,9 +37,15 @@ export class PaymentRequestFeesUnsupportedError extends AuthoredError {
 }
 
 /**
- * Coco 2.0.0 sends a gross amount and exposes no recipient-fee option. NUT-18
- * requires the amount after redemption fees. Reject before reserving proofs
- * until durable sends support that contract; ordinary token sends are separate.
+ * NUT-18 requires the amount the receiver gets after redemption fees. The
+ * NFC, Nostr and HTTP request sends prepare a gross amount, so a mint whose
+ * keysets charge input fees is refused before any proofs are reserved.
+ * Coco 58abfae does offer the net contract: `ops.send.prepare({ …,
+ * coverReceiverFees: true })` (coco api/SendOpsApi.ts:25,84,
+ * SendOperationService.ts:283), which its own HTTP request path uses
+ * (PaymentRequestService.ts:223). Switching to it makes fee-charging mints
+ * payable, so it is the owner's decision, not a refactor. Ordinary token
+ * sends are separate.
  */
 export async function assertPaymentRequestFeesSupported(
   manager: Manager,

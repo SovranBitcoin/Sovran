@@ -12,6 +12,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { setStringAsync } from 'expo-clipboard';
+import { useIsFocused } from 'expo-router';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMints } from '@cashu/coco-react';
@@ -391,6 +392,10 @@ function ReceiveScreenForUnit({
     ? receiveEntryData?.p2pkKey
     : undefined;
   const bip321 = useBip321RailSelection(unit);
+  const isFocused = useIsFocused();
+  const onchainInUnified = bip321.selection.rails.some(
+    (rail) => rail.id === 'onchain' && rail.state === 'included'
+  );
   const creqEnabled =
     selectedTab === 'Cashu' ||
     bip321.selection.rails.some((rail) => rail.id === 'creq' && rail.state === 'included');
@@ -600,11 +605,10 @@ function ReceiveScreenForUnit({
                   <ReceiveReusableQuoteTab
                     method="onchain"
                     active={selectedTab === 'Onchain'}
-                    enabled={
-                      selectedTab === 'Onchain' ||
-                      bip321.selection.rails.some(
-                        (rail) => rail.id === 'onchain' && rail.state === 'included'
-                      )
+                    enabled={selectedTab === 'Onchain' || onchainInUnified}
+                    watchDeposits={
+                      isFocused &&
+                      (selectedTab === 'Onchain' || (selectedTab === 'Unified' && onchainInUnified))
                     }
                     unit={unit}
                     actions={actions}
