@@ -46,6 +46,7 @@ import {
   encodeTokenChecked,
   isWellFormedEcashToken,
   rawAnnotationKey,
+  withPaymentRequestStepPhase,
 } from 'wallet';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
@@ -1187,7 +1188,14 @@ export function createSovranHandlers({
       );
     },
 
-    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
+    navigateToPaymentRequest: ({
+      mintUrl,
+      paymentRequest,
+      amount,
+      unit,
+      recipientPubkey,
+      phase,
+    }) => {
       paymentLog.info('payment.step.navigate_payment_request', {
         ...mintUrlLogFields(mintUrl),
         amount,
@@ -1195,20 +1203,25 @@ export function createSovranHandlers({
         recipientPubkeyPresent: !!recipientPubkey,
         paymentRequestLength: paymentRequest.length,
       });
-      const entry = {
-        id: mintLocalId('pr-preview'),
-        type: 'send',
-        createdAt: Date.now(),
-        mintUrl,
-        amount,
-        unit,
-        state: 'prepared',
-        metadata: {
-          paymentRequest,
-          phase: 'preview',
-          ...(recipientPubkey ? { recipientPubkey } : {}),
+      // An NFC tap that paid over the request's transport arrives already
+      // settled: the screen opens on that, not on a preview offering Pay.
+      const entry = withPaymentRequestStepPhase(
+        {
+          id: mintLocalId('pr-preview'),
+          type: 'send',
+          createdAt: Date.now(),
+          mintUrl,
+          amount,
+          unit,
+          state: 'prepared',
+          metadata: {
+            paymentRequest,
+            phase: 'preview',
+            ...(recipientPubkey ? { recipientPubkey } : {}),
+          },
         },
-      };
+        phase
+      );
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       leaveMintPicker('(send-flow)', () =>

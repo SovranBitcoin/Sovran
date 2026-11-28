@@ -3,6 +3,7 @@ import { createTestMachine } from "../_harness/createTestMachine";
 import { INPUTS, MINT1, MINT2, WALLETS } from "../_harness/fixtures";
 import type { MachineOperations } from "../../src/machine/types";
 import type { WalletContext, PaymentRequestInfo } from "../../src/types";
+import { PaymentRequestUndeliveredError } from "../../src/errors";
 
 const accepted = "https://mint1.example.com";
 const other = "https://mint2.example.com";
@@ -19,6 +20,8 @@ function setup({
   contextLags = false,
   satBalances = { [accepted]: 500, [other]: 1000, [third]: 2000 },
   unitSwitchTakes = true,
+  transports,
+  lockP2pkPubkey,
   operations = {},
 }: {
   unit?: string;
@@ -33,6 +36,9 @@ function setup({
   satBalances?: Record<string, number>;
   /** Whether the host's unit actually changes when asked to. */
   unitSwitchTakes?: boolean;
+  /** The transports the request offers; none means the tag takes the token. */
+  transports?: PaymentRequestInfo["transports"];
+  lockP2pkPubkey?: string;
   operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
@@ -42,6 +48,8 @@ function setup({
     mints,
     mintsPreferred,
     hasSpendingCondition,
+    ...(transports ? { transports } : {}),
+    ...(lockP2pkPubkey ? { lockP2pkPubkey } : {}),
   };
   const unitBalances: Record<string, Record<string, number>> = {
     sat: satBalances,
@@ -996,5 +1004,166 @@ describe("an NFC read the machine is too busy to take", () => {
 
     expect(tap.adapter.releaseSession).not.toHaveBeenCalled();
     await done();
+  });
+});
+
+// minibits emulates a read-only tag (minibits_wallet src/screens/Wallet/
+// QRCode.tsx:250-254 `writable: false`) whose request carries a nostr
+// transport, the one its own NFC payer uses (src/screens/NfcPayScreen.tsx:769).
+// A request that names a transport is paid over it; the tag is only written
+// when the request names none.
+describe("an NFC request that offers a nostr transport", () => {
+  const nostr = [{ type: "nostr", target: "nprofile1payee" }];
+  const calls = (tm: ReturnType<typeof createTestMachine>, name: string) =>
+    tm.operationCalls.filter((call) => call.name === name).length;
+  /** Every way a token could leave the wallet for this tap. */
+  const tokensOut = (
+    tm: ReturnType<typeof createTestMachine>,
+    adapter: ReturnType<typeof setup>["adapter"],
+  ) => ({
+    overTransport: calls(tm, "executePaymentRequest"),
+    forTheTag: calls(tm, "executeNfcSend"),
+    written: adapter.writeToken.mock.calls.length,
+  });
+
+  it("pays over the transport and never writes to the tag", async () => {
+    const { tm, adapter } = setup({ transports: nostr });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    expect(tm.operationCalls.find((c) => c.name === "executePaymentRequest")?.args).toEqual([
+      expect.objectContaining({ mintUrl: accepted, amount: 50, unit: "sat" }),
+    ]);
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "settled" } });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+    expect(tm.notificationCalls.filter((c) => c.key === "onPaymentConfirmed")).toHaveLength(1);
+  });
+
+  it("lets go of the tag before the network send", async () => {
+    const order: string[] = [];
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          order.push("send");
+          return { historyEntry: JSON.stringify({ id: "pr-1", type: "send", state: "pending" }) };
+        },
+      },
+    });
+    adapter.releaseSession.mockImplementation(async () => {
+      order.push("release");
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(order).toEqual(["release", "send"]);
+  });
+
+  it("keeps the terminal's unit once it paid", async () => {
+    const { tm, switchUnit } = setup({ unit: "usd", transports: nostr });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("navigateToPaymentRequest");
+    expect(switchUnit.mock.calls.map(([unit]) => unit)).toEqual(["usd"]);
+  });
+
+  it("is not sent again by Pay, the mint list, a mint or an amount", async () => {
+    for (const again of [
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.confirmPaymentRequest(),
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.requestMintSelector(),
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.changeMint(accepted),
+      (tm: ReturnType<typeof createTestMachine>) =>
+        tm.machine.enterAmount({ value: 50, unit: "sat" }, accepted),
+    ]) {
+      const { tm, adapter } = setup({ transports: nostr });
+      await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+      await again(tm);
+      await tm.machine.confirmPaymentRequest();
+      expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    }
+  });
+
+  // The operation took the ecash back itself (its own rollback, unchanged):
+  // the tag is not tried as a second way to deliver.
+  it("does not fall back to the tag when delivery fails and the ecash is taken back", async () => {
+    const { tm, adapter, switchUnit } = setup({
+      unit: "usd",
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => ({
+          historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "rolledBack" }),
+          rolledBack: true,
+          errorMessage: "relay refused",
+        }),
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    expect(tm.notificationCalls).toContainEqual({
+      key: "onPaymentFailed",
+      data: expect.objectContaining({ variant: "paymentRequest", rolledBack: true }),
+    });
+    // Nothing went out: the preview still waits for Pay.
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "preview" } });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(switchUnit.mock.calls.map(([unit]) => unit)).toEqual(["usd", "sat"]);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
+
+  it("does not fall back to the tag when the send fails before any ecash exists", async () => {
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          throw new Error("mint unreachable");
+        },
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({ phase: { kind: "preview" } });
+  });
+
+  // Delivery failed and the ecash could not be taken back: it may be out, so
+  // neither the tag nor a second Pay sends another token.
+  it("offers nothing more when the ecash is out and could not be taken back", async () => {
+    const { tm, adapter } = setup({
+      transports: nostr,
+      operations: {
+        executePaymentRequest: async () => {
+          throw new PaymentRequestUndeliveredError("op-1", new Error("relay refused"));
+        },
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    tm.assertStep("navigateToPaymentRequest");
+    expect(tm.handlerCalls.at(-1)?.data).toMatchObject({
+      phase: { kind: "undelivered", operationId: "op-1" },
+    });
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
+    await tm.machine.changeMint(accepted);
+    await tm.machine.confirmPaymentRequest();
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 1, forTheTag: 0, written: 0 });
+  });
+
+  it("still writes the token to the tag for a request without a transport", async () => {
+    const { tm, adapter } = setup({ transports: [] });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 0, forTheTag: 1, written: 1 });
+  });
+
+  // Coco POSTs a bare token, not the NUT-18 payload: the tag keeps being
+  // written for these, as before, until the POST body is right.
+  it("still writes the token to the tag when the only transport is HTTP POST", async () => {
+    const { tm, adapter } = setup({
+      transports: [{ type: "post", target: "https://payee.example/pay" }],
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(tokensOut(tm, adapter)).toEqual({ overTransport: 0, forTheTag: 1, written: 1 });
   });
 });

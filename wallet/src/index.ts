@@ -232,6 +232,7 @@ export type {
 // Screen actions (post-terminal screen action system)
 export {
   decodePaymentRequestEntryPhase,
+  withPaymentRequestStepPhase,
   shouldApplyEntryUpdate,
   mergeEntryUpdate,
   meltOperationToScreenActionEntry,

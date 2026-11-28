@@ -5,7 +5,10 @@ export {
   meltOperationToScreenActionEntry,
   type MeltOperationLike,
 } from './createManager';
-export { decodePaymentRequestEntryPhase } from './paymentRequestPhase';
+export {
+  decodePaymentRequestEntryPhase,
+  withPaymentRequestStepPhase,
+} from './paymentRequestPhase';
 export {
   startNewEcashSendIfFinished,
   type NavigationCallbacks,

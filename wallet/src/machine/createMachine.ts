@@ -972,6 +972,23 @@ export function createPaymentMachine(
   }
 
   /**
+   * Whether a tapped request is paid over its own transport instead of by
+   * writing the token back to the tag: it is when it offers nostr and no
+   * HTTP POST, the one case `executePaymentRequest` sends as a NIP-17 DM.
+   * NUT-18: a request without a transport is answered in band, here the tag.
+   */
+  function nfcPaysOverTransport(
+    data: StepDataMap["navigateToPaymentRequest"],
+  ): boolean {
+    const transports =
+      detectors.getPaymentRequestInfo(data.paymentRequest)?.transports ?? [];
+    return (
+      transports.some((transport) => transport.type === "nostr") &&
+      !transports.some((transport) => transport.type === "post")
+    );
+  }
+
+  /**
    * An NFC tap's payment went out, or may have: its flow is over, and the
    * context keeps nothing (request, intent, amount, mint) that choosing a
    * mint or an amount could rebuild a preview from for Pay to send again.
@@ -1930,7 +1947,12 @@ export function createPaymentMachine(
               };
             } else if (
               step === "navigateToPaymentRequest" &&
-              operations?.executeNfcSend
+              operations &&
+              (nfcPaysOverTransport(
+                stepData as StepDataMap["navigateToPaymentRequest"],
+              )
+                ? operations.executePaymentRequest
+                : operations.executeNfcSend)
             ) {
               const data = stepData as StepDataMap["navigateToPaymentRequest"];
               // The resolver picks a mint without a picker when one is the
@@ -1963,6 +1985,108 @@ export function createPaymentMachine(
                   if (!advanceNfc({ type: "REQUEST_MINT_SELECTOR" })) break;
                   continue;
                 }
+              }
+              if (
+                nfcPaysOverTransport(data) &&
+                operations.executePaymentRequest
+              ) {
+                // The request names a transport the payee listens on: the
+                // token goes there, once, and nothing is written to the tag
+                // (minibits' tag is read-only). The tag is let go first, so a
+                // slow relay never holds the phone to the terminal. What the
+                // send does with the ecash when delivery fails is its own
+                // rollback, the same as for a scanned request.
+                await releaseNfcSession(nfcTap).catch((error: unknown) => {
+                  logger.warn("machine.nfc.release.failed", {
+                    error: errField(error),
+                  });
+                });
+                setExecuting(true);
+                tell("onNfcPaymentProgress", () =>
+                  notifications?.onNfcPaymentProgress?.({ phase: "creating" }),
+                );
+                logger.info("machine.nfc.payOverTransport.start", {
+                  ...mintUrlFields(data.mintUrl),
+                  amount: data.amount,
+                });
+                beginCommit(sendGeneration);
+                let sent: Awaited<
+                  ReturnType<typeof runConfirmPaymentRequestEffect>
+                >;
+                try {
+                  sent = await runConfirmPaymentRequestEffect({
+                    data,
+                    operation: operations.executePaymentRequest,
+                    context: flowCtx,
+                    isStale: stale,
+                  });
+                } finally {
+                  endCommit(sendGeneration);
+                }
+
+                if (sent.isOk()) {
+                  if (sent.value.kind === "stale") {
+                    // Overtaken: the flow that overtook it owns the machine.
+                    end = { kind: "stopped" };
+                    continue;
+                  }
+                  if (sent.value.kind === "rolledBack") {
+                    logger.warn("machine.nfc.payOverTransport.rolledBack", {
+                      ...mintUrlFields(data.mintUrl),
+                    });
+                    // The ecash is back: the preview stays for Pay to retry.
+                    routeOperationFailure(
+                      sent.value.cause,
+                      "paymentRequest",
+                      data.paymentRequest,
+                      data,
+                      { rolledBack: true },
+                    );
+                    end = { kind: "stopped" };
+                  } else {
+                    logger.info("machine.nfc.payOverTransport.success", {
+                      ...mintUrlFields(data.mintUrl),
+                    });
+                    setStep(sent.value.step, sent.value.data);
+                    forgetNfcPayment();
+                    announcePayment(sent.value);
+                    end = { kind: "paid" };
+                  }
+                } else {
+                  const cause = sent.error.cause;
+                  const undelivered =
+                    cause instanceof PaymentRequestUndeliveredError;
+                  logger.warn("machine.nfc.payOverTransport.failed", {
+                    undelivered,
+                    error: errField(cause),
+                  });
+                  if (undelivered) {
+                    // The ecash may be out: final, like a scanned request's.
+                    setStep("navigateToPaymentRequest", {
+                      ...data,
+                      phase: {
+                        kind: "undelivered",
+                        operationId: cause.operationId,
+                      },
+                    });
+                    forgetNfcPayment();
+                  }
+                  routeOperationFailure(
+                    cause,
+                    "paymentRequest",
+                    data.paymentRequest,
+                    data,
+                    { undelivered },
+                  );
+                  end = { kind: "stopped" };
+                }
+
+                setExecuting(false, false);
+                continue;
+              }
+              if (!operations.executeNfcSend) {
+                end = { kind: "stopped" };
+                continue;
               }
               // Auto-execute: create token → write back to NFC tag
               setExecuting(true);

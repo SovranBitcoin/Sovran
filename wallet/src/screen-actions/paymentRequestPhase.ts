@@ -7,7 +7,10 @@
 // `nostrSent: "true"`, `operationId`). This file is the one place that reads
 // them into a phase and the one place that writes them for a send's outcome.
 
-import type { PaymentRequestConfirmOutcome } from "../machine/types";
+import type {
+  PaymentRequestConfirmOutcome,
+  PaymentRequestPreviewPhase,
+} from "../machine/types";
 
 /** What a payment request screen entry says happened to its send. */
 type PaymentRequestEntryPhase =
@@ -134,6 +137,32 @@ export function withPaymentRequestSendOutcome(
       };
     default: {
       const unreachable: never = outcome;
+      return unreachable;
+    }
+  }
+}
+
+/**
+ * The screen entry for a payment request step the machine has already acted
+ * on. An NFC tap pays over the request's transport before any screen opens,
+ * so the screen must open saying what happened, not offering Pay.
+ */
+export function withPaymentRequestStepPhase(
+  entry: Entry,
+  phase: PaymentRequestPreviewPhase,
+): Entry {
+  switch (phase.kind) {
+    case "preview":
+      return entry;
+    case "settled":
+      return withPaymentRequestSendOutcome(entry, { kind: "delivered" });
+    case "undelivered":
+      return withPaymentRequestSendOutcome(entry, {
+        kind: "undelivered",
+        operationId: phase.operationId,
+      });
+    default: {
+      const unreachable: never = phase;
       return unreachable;
     }
   }
