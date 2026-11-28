@@ -24148,7 +24148,7 @@ exports[`Design System exact structural snapshots renders timeline/cashu-receive
                           "children": [
                             {
                               "children": [
-                                "Token accepted",
+                                "Token opened",
                               ],
                               "props": {
                                 "className": "css-text-146c3p1",

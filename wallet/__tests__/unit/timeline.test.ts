@@ -48,7 +48,7 @@ describe('history timeline — token receive', () => {
 
   it('a token waiting on a tap opens the "added" slot', () => {
     expect(rows(build(receive('prepared')))).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       'next-pending | Ready to redeem | Tap Redeem to add to wallet',
     ]);
   });
@@ -57,7 +57,7 @@ describe('history timeline — token receive', () => {
     const entry = receive('executing');
     const timeline = build(entry);
     expect(rows(timeline)).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       "waiting | Waiting to redeem | We'll add this ecash to your wallet when you're back online.",
     ]);
     expect(getCardLabel(entry as never, timeline)).toBe('Receive • Waiting');
@@ -66,7 +66,7 @@ describe('history timeline — token receive', () => {
 
   it('finalized closes the slot as the success row', () => {
     expect(rows(build(receive('finalized')))).toEqual([
-      'complete | Token accepted',
+      'complete | Token opened',
       'success | Added to wallet | +21 sats added to wallet',
     ]);
   });

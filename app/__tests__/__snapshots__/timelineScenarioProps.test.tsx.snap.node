@@ -34,7 +34,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cas
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -76,7 +76,7 @@ exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cas
   "texts": [
     "Receive • Complete",
     "ADDED TO WALLET",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Added to wallet",
     "2026-05-22",
@@ -7354,7 +7354,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-already-sp
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7399,7 +7399,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-already-sp
   "texts": [
     "Receive • Already Spent",
     "ALREADY SPENT",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Already spent",
     "2026-05-22",
@@ -7442,7 +7442,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-not-added 
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7487,7 +7487,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-not-added 
   "texts": [
     "Receive • Not Added",
     "NOT ADDED",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Not added",
     "2026-05-22",
@@ -7530,7 +7530,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Pending",
     "READY TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Ready to redeem",
     "Tap Redeem to add to wallet",
@@ -7572,7 +7572,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Waiting",
     "WAITING TO REDEEM",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Waiting to redeem",
     "We'll add this ecash to your wallet when you're back online.",
@@ -7614,7 +7614,7 @@ exports[`timeline scenario pins (redesign acceptance surface) receive-offline (C
   "texts": [
     "Receive • Complete",
     "ADDED TO WALLET",
-    "Token accepted",
+    "Token opened",
     "2026-05-22",
     "Added to wallet",
     "2026-05-22",

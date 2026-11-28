@@ -70,7 +70,7 @@ export const paymentCopyDefaults = {
 
   "timeline.receive.pending.label": "Ready to redeem",
   "timeline.receive.pending.info": "Tap Redeem to add to wallet",
-  "timeline.receive.accepted.label": "Token accepted",
+  "timeline.receive.accepted.label": "Token opened",
   "timeline.receive.waiting.label": "Waiting to redeem",
   "timeline.receive.waiting.info":
     "We'll add this ecash to your wallet when you're back online.",

@@ -168,9 +168,9 @@ Rows are written `✓ finished` / `● open slot` / `✕ ended`.
 | | relays accepted | … ✓ Delivered · ● Waiting for recipient |
 | | claimed / taken back | … ✓ Claimed / ✕ Cancelled |
 | | reopened from history (record only) | same rows, from the payer record and its transport |
-| Ecash receive | `prepared` | ✓ Token accepted · ● Ready to redeem |
-| | `executing` (mint unreachable) | ✓ Token accepted · ● Waiting to redeem (warning) |
-| | `finalized` | ✓ Token accepted · ✓ Added to wallet |
+| Ecash receive | `prepared` | ✓ Token opened · ● Ready to redeem |
+| | `executing` (mint unreachable) | ✓ Token opened · ● Waiting to redeem (warning) |
+| | `finalized` | ✓ Token opened · ✓ Added to wallet |
 | | `rolled_back`, mint said spent (11001) | … ✕ Already spent |
 | | `rolled_back`, any other reason | … ✕ Not added |
 | Receive a request | request live | ✓ Requested · ● Waiting for payment |
